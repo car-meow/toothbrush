@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unblocked Games</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Unblocked Games</h1>
+        <div class="controls">
+            <!-- These buttons allow game progress to survive a cache clear -->
+            <button id="export-btn" class="save-btn">Download Saves & Games</button>
+            <input type="file" id="import-btn" accept=".json" style="display:none">
+            <button onclick="document.getElementById('import-btn').click()" class="save-btn">Restore Saves</button>
+        </div>
+    </header>
+    
+    <main>
+        <aside class="sidebar">
+            <h2>Game List</h2>
+            <ul id="game-list"></ul>
+            
+            <div class="add-game">
+                <h3>Add Local HTML Game</h3>
+                <p class="micro-text">Must be a single-file HTML game.</p>
+                <input type="text" id="new-game-title" placeholder="Game Title">
+                <input type="file" id="new-game-file" accept=".html">
+                <button id="add-game-btn">Add Game</button>
+            </div>
+        </aside>
+        
+        <section class="game-container">
+            <!-- Games load into this iframe -->
+            <iframe id="game-frame" src="about:blank" title="Game Window"></iframe>
+        </section>
+    </main>
+    
+    <script src="app.js"></script>
+</body>
+</html>
