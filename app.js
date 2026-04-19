@@ -1,5 +1,6 @@
 const dbName = "UnblockedGamesDB";
 let db;
+let isRemovalMode = false;
 let games = [];
 let currentGame = null;
 
@@ -41,10 +42,25 @@ async function loadGames() {
 function renderGameList() {
     const list = document.getElementById('game-list');
     list.innerHTML = '';
-    games.forEach((game) => {
+    
+    games.forEach((game, index) => {
         const li = document.createElement('li');
         li.textContent = game.title;
-        li.onclick = () => loadGameToIframe(game);
+        
+        // Add a visual indicator if we are in removal mode
+        if (isRemovalMode && game.id.toString().startsWith('custom_')) {
+            li.style.border = "1px solid #f44336";
+            li.style.color = "#f44336";
+            li.textContent = "🗑️ " + game.title;
+        }
+
+        li.onclick = () => {
+            if (isRemovalMode) {
+                removeGame(game.id, index);
+            } else {
+                loadGameToIframe(game);
+            }
+        };
         list.appendChild(li);
     });
 }
@@ -144,3 +160,39 @@ document.getElementById('import-btn').onchange = (e) => {
 
 // Initialize
 loadGames();
+
+// Function to toggle Removal Mode
+document.getElementById('remove-mode-btn').onclick = (e) => {
+    isRemovalMode = !isRemovalMode;
+    e.target.textContent = isRemovalMode ? "Click a Game to Remove" : "Remove Game: OFF";
+    e.target.style.backgroundColor = isRemovalMode ? "#ff9800" : "#f44336";
+    renderGameList(); // Refresh the list to show/hide trash icons
+};
+
+// Function to actually delete the game
+async function removeGame(gameId, index) {
+    if (!gameId.toString().startsWith('custom_')) {
+        alert("Default games cannot be removed this way.");
+        return;
+    }
+
+    const confirmDelete = confirm("Are you sure you want to delete this game and its file?");
+    if (confirmDelete) {
+        // 1. Remove from IndexedDB
+        const tx = db.transaction('customGames', 'readwrite');
+        const store = tx.objectStore('customGames');
+        await store.delete(gameId);
+
+        // 2. Remove from the local array
+        games.splice(index, 1);
+
+        // 3. Refresh the UI
+        renderGameList();
+        
+        // 4. Clear the iframe if that game was open
+        if (currentGame && currentGame.id === gameId) {
+            document.getElementById('game-frame').srcdoc = "";
+            currentGame = null;
+        }
+    }
+}
