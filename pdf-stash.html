@@ -23,13 +23,17 @@
 </head>
 <body>
     <header>
-        <h1>Unblocked Games</h1>
-        <nav class="top-nav">
-            <a href="index.html" class="nav-btn">Play Games</a>
-            <a href="stash.html" class="nav-btn">List Stash</a>
-            <a href="pdf-stash.html" class="nav-btn" style="border-bottom: 2px solid #2196F3;">PDF Reader</a>
-        </nav>
-    </header>
+    <h1>Unblocked Games</h1>
+    
+    <!-- Navigation and other controls removed -->
+    
+    <div class="controls">
+        <!-- Only the Help button remains -->
+        <button onclick="window.location.href='help.html'" class="save-btn" style="background-color: #2196F3;">Help</button>
+        <!-- Added a Back button so you aren't stuck -->
+        <button onclick="window.location.href='index.html'" class="save-btn" style="background-color: #555;">Back</button>
+    </div>
+</header>
 
     <main class="pdf-container">
         <!-- This embeds your PDF file directly into the webpage -->

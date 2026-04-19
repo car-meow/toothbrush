@@ -105,3 +105,31 @@ iframe {
     height: 100%;
     border: none;
 }
+
+/* Light Blue for the Stash button */
+.stash-color {
+    background-color: #64B5F6 !important;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Ensure nav buttons and save buttons align nicely */
+.top-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+header {
+    display: flex;
+    justify-content: space-between; /* Pushes title to left, buttons to right */
+    align-items: center;
+    padding: 10px 25px;
+}
+
+.top-nav {
+    margin-right: auto; /* Keeps the nav links near the title */
+    margin-left: 40px;
+}

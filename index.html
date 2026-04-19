@@ -8,17 +8,25 @@
 </head>
 <body>
     <header>
-        <h1>Unblocked Games</h1>
-        <nav class="top-nav">
-    <a href="pdf-stash.html" class="nav-btn">Stash</a>
-        </nav>
-        <div class="controls">
-            <button id="cloak-btn" class="save-btn" style="background-color: #E91E63;">Cloak (about:blank)</button>
-            <button id="export-btn" class="save-btn">Backup</button>
-            <input type="file" id="import-btn" accept=".json" style="display:none">
-            <button onclick="document.getElementById('import-btn').click()" class="save-btn">Restore</button>
-        </div>
-    </header>
+    <h1>Toothbrush</h1>
+    
+    <nav class="top-nav">
+        <!-- "Play Games" has been removed -->
+        <a href="stash.html" class="save-btn stash-color">Games Stash</a>
+        <a href="pdf-stash.html" class="nav-btn">PDF Reader</a>
+    </nav>
+
+    <div class="controls">
+        <button id="cloak-btn" class="save-btn" style="background-color: #E91E63;">Cloak</button>
+        
+        <!-- Blue Help Button -->
+        <button onclick="window.location.href='help.html'" class="save-btn" style="background-color: #2196F3;">Help</button>
+        
+        <button id="export-btn" class="save-btn">Backup</button>
+        <input type="file" id="import-btn" accept=".json" style="display:none">
+        <button onclick="document.getElementById('import-btn').click()" class="save-btn">Restore</button>
+    </div>
+</header>
     <main>
         <aside class="sidebar">
             <h2>Game List</h2>
