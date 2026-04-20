@@ -2,42 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stash Reader</title>
+    <title>Stash</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        /* This makes the PDF fill the entire screen below the header */
-        .pdf-container {
-            flex: 1;
-            width: 100%;
-            height: 100%;
-            background-color: #333;
-            display: flex;
-            flex-direction: column;
-        }
-        embed {
-            width: 100%;
-            height: 100%;
-        }
-    </style>
 </head>
 <body>
     <header>
-    <h1>Toothbrush</h1>
-    
-    <!-- Navigation and other controls removed -->
-    
-    <div class="controls">
-        <!-- Only the Help button remains -->
-        <button onclick="window.location.href='help.html'" class="save-btn" style="background-color: #2196F3;">Help</button>
-        <!-- Added a Back button so you aren't stuck -->
-        <button onclick="window.location.href='index.html'" class="save-btn" style="background-color: #555;">Back</button>
-    </div>
-</header>
-
-    <main class="pdf-container">
-        <!-- This embeds your PDF file directly into the webpage -->
-        <embed src="stash.pdf" type="application/pdf">
+        <h1 onclick="location.href='index.html'">Stash</h1>
+        <div class="controls">
+            <button onclick="location.href='help.html'" class="save-btn" style="background-color: #2196F3;">Help</button>
+            <button onclick="location.href='index.html'" class="save-btn" style="background-color: #555;">Back</button>
+        </div>
+    </header>
+    <main style="background:#333;">
+        <embed src="stash.pdf" type="application/pdf" width="100%" height="100%">
     </main>
 </body>
 </html>

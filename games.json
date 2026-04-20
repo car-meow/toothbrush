@@ -1,6 +1,7 @@
-{
+[
+  {
     "id": "2048",
-    "title": "2048 (Default Game)",
+    "title": "2048",
     "type": "url",
     "url": "https://play2048.co/"
   }

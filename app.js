@@ -1,235 +1,121 @@
-const dbName = "UnblockedGamesDB";
-let db;
-let isRemovalMode = false;
-let games = [];
-let currentGame = null;
+const dbName = "GameStorageDB";
+let db, games = [], currentGame = null;
 
-// Initialize Database
-function initDB() {
-    return new Promise((resolve) => {
-        const request = indexedDB.open(dbName, 1);
-        request.onupgradeneeded = (e) => {
-            const database = e.target.result;
-            if (!database.objectStoreNames.contains('customGames')) {
-                database.createObjectStore('customGames', { keyPath: 'id' });
-            }
-        };
-        request.onsuccess = (e) => {
-            db = e.target.result;
-            resolve(db);
-        };
+async function initDB() {
+    return new Promise(r => {
+        const req = indexedDB.open(dbName, 1);
+        req.onupgradeneeded = e => e.target.result.createObjectStore("customGames", { keyPath: "id" });
+        req.onsuccess = e => { db = e.target.result; r(); };
     });
 }
 
 async function loadGames() {
     await initDB();
-    const transaction = db.transaction('customGames', 'readonly');
-    const customGames = await new Promise(r => {
-        const req = transaction.objectStore('customGames').getAll();
+    const tx = db.transaction("customGames", "readonly");
+    const custom = await new Promise(r => {
+        const req = tx.objectStore("customGames").getAll();
         req.onsuccess = () => r(req.result);
     });
-
     try {
-        const response = await fetch('games.json');
-        const defaultGames = await response.json();
-        games = [...defaultGames, ...customGames];
-    } catch (e) {
-        games = [...customGames];
-    }
+        const res = await fetch('games.json');
+        const defaults = await res.json();
+        games = [...defaults, ...custom];
+    } catch { games = [...custom]; }
     renderGameList();
 }
 
 function renderGameList() {
     const list = document.getElementById('game-list');
     list.innerHTML = '';
-    
-    games.forEach((game, index) => {
+    games.forEach((game, i) => {
         const li = document.createElement('li');
-        li.textContent = game.title;
-        
-        // Add a visual indicator if we are in removal mode
-        if (isRemovalMode && game.id.toString().startsWith('custom_')) {
-            li.style.border = "1px solid #f44336";
-            li.style.color = "#f44336";
-            li.textContent = "🗑️ " + game.title;
+        const title = document.createElement('span');
+        title.textContent = game.title;
+        title.style.flex = "1";
+        title.onclick = () => loadGame(game);
+        li.appendChild(title);
+        if (game.id.toString().startsWith('custom_')) {
+            const trash = document.createElement('span');
+            trash.innerHTML = "🗑️";
+            trash.className = "trash-btn";
+            trash.onclick = (e) => { e.stopPropagation(); deleteGame(game.id, i); };
+            li.appendChild(trash);
         }
-
-        li.onclick = () => {
-            if (isRemovalMode) {
-                removeGame(game.id, index);
-            } else {
-                loadGameToIframe(game);
-            }
-        };
         list.appendChild(li);
     });
 }
 
-// THE FIX FOR SAVING: Use srcdoc to keep the game on your domain
-async function loadGameToIframe(game) {
+function loadGame(game) {
     currentGame = game;
-    const iframe = document.getElementById('game-frame');
-    
+    const frame = document.getElementById('game-frame');
     if (game.type === 'file') {
-        // Convert Base64 back to raw HTML string
-        const base64Data = game.content.split(',')[1];
-        const htmlContent = atob(base64Data);
-        // Injecting via srcdoc keeps the origin of YOUR site, allowing localstorage to work
-        iframe.srcdoc = htmlContent;
+        frame.srcdoc = atob(game.content.split(',')[1]);
     } else {
-        iframe.removeAttribute('srcdoc');
-        iframe.src = game.url;
+        frame.removeAttribute('srcdoc');
+        frame.src = game.url;
     }
 }
 
-// Add Game Logic
 document.getElementById('add-game-btn').onclick = () => {
     const title = document.getElementById('new-game-title').value;
-    const fileInput = document.getElementById('new-game-file');
-    if (!title || !fileInput.files.length) return alert("Missing Title or File");
-
+    const file = document.getElementById('new-game-file').files[0];
+    if (!title || !file) return alert("Fill in all fields");
     const reader = new FileReader();
-    reader.onload = async (e) => {
+    reader.onload = async e => {
         const newGame = { id: 'custom_' + Date.now(), title, type: 'file', content: e.target.result };
-        const tx = db.transaction('customGames', 'readwrite');
-        tx.objectStore('customGames').put(newGame);
+        const tx = db.transaction("customGames", "readwrite");
+        tx.objectStore("customGames").put(newGame);
         games.push(newGame);
         renderGameList();
     };
-    reader.readAsDataURL(fileInput.files[0]);
+    reader.readAsDataURL(file);
 };
+
+async function deleteGame(id, index) {
+    if (!confirm("Delete this game?")) return;
+    const tx = db.transaction("customGames", "readwrite");
+    await tx.objectStore("customGames").delete(id);
+    games.splice(index, 1);
+    renderGameList();
+}
 
 document.getElementById('cloak-btn').onclick = () => {
     if (!currentGame) return alert("Select a game first!");
-
-    // 1. Open a new window that is strictly about:blank
     const win = window.open('about:blank', '_blank');
-    if (!win) return alert("Pop-up Blocked! Please allow pop-ups to use Cloaker.");
-
-    // 2. Prepare the game source
-    let gameSrc = "";
-    if (currentGame.type === 'file') {
-        // For local files, we create a Blob URL to ensure the game 
-        // stays connected to your site's saving data.
-        const base64Data = currentGame.content.split(',')[1];
-        const binary = atob(base64Data);
-        const array = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
-        const blob = new Blob([array], { type: 'text/html' });
-        gameSrc = URL.createObjectURL(blob);
-    } else {
-        gameSrc = currentGame.url;
-    }
-
-    // 3. Set the new window's appearance (Google Drive style)
-    win.document.title = 'My Drive - Google Drive';
-    
-    // Add the Google Drive Favicon
+    const gameSrc = currentGame.type === 'file' ? URL.createObjectURL(new Blob([atob(currentGame.content.split(',')[1])], {type:'text/html'})) : currentGame.url;
+    win.document.title = "My Drive - Google Drive";
     const link = win.document.createElement('link');
-    link.rel = 'icon';
-    link.type = 'image/x-icon';
-    link.href = 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png';
+    link.rel = 'icon'; link.href = 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png';
     win.document.head.appendChild(link);
-
-    // 4. Create and inject the Iframe
-    // This is the key part: the window stays on about:blank while the game runs inside.
     const iframe = win.document.createElement('iframe');
-    const style = iframe.style;
-    style.position = 'fixed';
-    style.top = '0';
-    style.left = '0';
-    style.bottom = '0';
-    style.right = '0';
-    style.width = '100%';
-    style.height = '100%';
-    style.border = 'none';
-    style.margin = '0';
-    style.padding = '0';
-    style.overflow = 'hidden';
-    style.backgroundColor = '#000';
-    
+    Object.assign(iframe.style, { position:'fixed', top:0, left:0, width:'100%', height:'100%', border:'none' });
     iframe.src = gameSrc;
     win.document.body.appendChild(iframe);
-
-    // 5. Redirect the original site to Google (The "Evidence Wipe")
-    window.open('about:blank', '_self');
-window.close();
+    window.open('about:blank', '_self'); window.close();
 };
 
-// Backup and Restore
 document.getElementById('export-btn').onclick = async () => {
-    const tx = db.transaction('customGames', 'readonly');
-    const customGames = await new Promise(r => {
-        const req = tx.objectStore('customGames').getAll();
+    const tx = db.transaction("customGames", "readonly");
+    const custom = await new Promise(r => {
+        const req = tx.objectStore("customGames").getAll();
         req.onsuccess = () => r(req.result);
     });
-    const blob = new Blob([JSON.stringify({ saves: { ...localStorage }, games: customGames })], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'games_backup.json';
-    a.click();
+    const blob = new Blob([JSON.stringify({ saves: {...localStorage}, games: custom })], {type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'backup.json'; a.click();
 };
 
-document.getElementById('import-btn').onchange = (e) => {
+document.getElementById('import-btn').onchange = e => {
     const reader = new FileReader();
-    reader.onload = async (ev) => {
+    reader.onload = async ev => {
         const data = JSON.parse(ev.target.result);
         if (data.saves) Object.keys(data.saves).forEach(k => localStorage.setItem(k, data.saves[k]));
         if (data.games) {
-            const tx = db.transaction('customGames', 'readwrite');
-            data.games.forEach(g => tx.objectStore('customGames').put(g));
+            const tx = db.transaction("customGames", "readwrite");
+            data.games.forEach(g => tx.objectStore("customGames").put(g));
         }
-        alert("Done!");
         location.reload();
     };
     reader.readAsText(e.target.files[0]);
 };
 
-// Initialize
 loadGames();
-
-// Function to toggle Removal Mode
-document.getElementById('remove-mode-btn').onclick = (e) => {
-    isRemovalMode = !isRemovalMode;
-    
-    if (isRemovalMode) {
-        // Style when ON
-        e.target.textContent = "Click Game to Delete";
-        e.target.style.backgroundColor = "#E65100"; // Deep warning orange
-    } else {
-        // Style when OFF
-        e.target.textContent = "Click To Enable Delete Mode";
-        e.target.style.backgroundColor = "#B71C1C"; // Back to Dark Red
-    }
-    
-    renderGameList(); // Refresh the list to show/hide the trash icons
-};
-
-// Function to actually delete the game
-async function removeGame(gameId, index) {
-    if (!gameId.toString().startsWith('custom_')) {
-        alert("Default games cannot be removed this way.");
-        return;
-    }
-
-    const confirmDelete = confirm("Are you sure you want to delete this game and its file?");
-    if (confirmDelete) {
-        // 1. Remove from IndexedDB
-        const tx = db.transaction('customGames', 'readwrite');
-        const store = tx.objectStore('customGames');
-        await store.delete(gameId);
-
-        // 2. Remove from the local array
-        games.splice(index, 1);
-
-        // 3. Refresh the UI
-        renderGameList();
-        
-        // 4. Clear the iframe if that game was open
-        if (currentGame && currentGame.id === gameId) {
-            document.getElementById('game-frame').srcdoc = "";
-            currentGame = null;
-        }
-    }
-}

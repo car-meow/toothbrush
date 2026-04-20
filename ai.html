@@ -2,174 +2,102 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Chat Hub</title>
     <link rel="stylesheet" href="style.css">
     <style>
         .chat-layout { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 80px); }
         .chat-sidebar { width: 250px; background: #1a1a1a; border-right: 1px solid #333; display: flex; flex-direction: column; padding: 15px; }
         .chat-list { flex: 1; overflow-y: auto; list-style: none; margin-top: 15px; }
-        .chat-list li { padding: 10px; background: #2c2c2c; margin-bottom: 8px; border-radius: 6px; cursor: pointer; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid transparent; }
-        .chat-list li:hover { background: #3d3d3d; }
-        .chat-list li.active { border-color: #9C27B0; background: #351e3d; }
-        
+        .chat-list li { padding: 10px; background: #2c2c2c; margin-bottom: 8px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+        .chat-list li.active { border: 1px solid #9C27B0; background: #25162b; }
         .chat-main { flex: 1; display: flex; flex-direction: column; background: #0a0a0a; }
         #chat-output { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
-        .message { padding: 10px 15px; border-radius: 12px; max-width: 80%; line-height: 1.5; word-wrap: break-word; white-space: pre-wrap; }
+        .message { padding: 12px; border-radius: 12px; max-width: 80%; line-height: 1.5; white-space: pre-wrap; }
         .user-msg { align-self: flex-end; background: #9C27B0; color: white; }
-        .ai-msg { align-self: flex-start; background: #333; color: #e0e0e0; border: 1px solid #444; }
-        
+        .ai-msg { align-self: flex-start; background: #333; color: #eee; border: 1px solid #444; }
         .chat-input-area { display: flex; padding: 15px; background: #1f1f1f; gap: 10px; border-top: 1px solid #333; }
-        #user-input { flex: 1; background: #121212; border: 1px solid #444; color: white; padding: 10px; border-radius: 8px; outline: none; }
-        .typing { font-style: italic; color: #888; font-size: 14px; padding: 5px 20px; }
     </style>
 </head>
 <body>
     <header>
-        <h1 onclick="window.location.href='index.html'" style="cursor:pointer">AI Chat</h1>
+        <h1 onclick="location.href='index.html'">AI Chat</h1>
         <div class="controls">
-            <button id="new-chat-btn" class="save-btn" style="background-color: #9C27B0;">+ New Chat</button>
-            <button onclick="window.location.href='help.html'" class="save-btn" style="background-color: #2196F3;">Help</button>
-            <button onclick="window.location.href='index.html'" class="save-btn" style="background-color: #555;">Back</button>
+            <button id="new-chat-btn" class="save-btn rainbow-btn">+ New Chat</button>
+            <button onclick="location.href='help.html'" class="save-btn" style="background-color: #2196F3;">Help</button>
+            <button onclick="location.href='index.html'" class="save-btn" style="background-color: #555;">Back</button>
         </div>
     </header>
-
     <main class="chat-layout">
-        <aside class="chat-sidebar">
-            <button id="export-chats" class="save-btn" style="font-size: 11px; background: #4CAF50;">Export History</button>
-            <ul id="chat-list" class="chat-list"></ul>
-        </aside>
-
+        <aside class="chat-sidebar"><ul id="chat-list" class="chat-list"></ul></aside>
         <section class="chat-main">
-            <div id="chat-output">
-                <div class="message ai-msg">Start a new conversation or select a saved chat from the sidebar.</div>
-            </div>
-            <div id="typing-indicator" class="typing" style="display: none;">AI is thinking...</div>
+            <div id="chat-output"></div>
+            <div id="typing" style="display:none; padding: 10px 20px; font-style: italic; color: #888;">AI is typing...</div>
             <div class="chat-input-area">
                 <input type="text" id="user-input" placeholder="Type a message..." autocomplete="off">
-                <button id="send-btn" class="save-btn" style="background-color: #9C27B0;">Send</button>
+                <button id="send-btn" class="save-btn rainbow-btn">Send</button>
             </div>
         </section>
     </main>
-
     <script>
-        const dbName = "AIChatDB";
-        let db;
-        let currentChatId = null;
-        let activeHistory = [];
-
-        // 1. Initialize Database
-        const request = indexedDB.open(dbName, 1);
-        request.onupgradeneeded = (e) => {
-            e.target.result.createObjectStore("chats", { keyPath: "id" });
-        };
-        request.onsuccess = (e) => {
-            db = e.target.result;
-            renderSidebar();
-        };
-
-        async function saveCurrentChat() {
-            if (!currentChatId || activeHistory.length === 0) return;
-            const title = activeHistory[0].content.substring(0, 30) + "...";
-            const tx = db.transaction("chats", "readwrite");
-            tx.objectStore("chats").put({ id: currentChatId, title, history: activeHistory });
-        }
+        let db, currentChatId = null, activeHistory = [];
+        const req = indexedDB.open("AIChatDB", 1);
+        req.onupgradeneeded = e => e.target.result.createObjectStore("chats", { keyPath: "id" });
+        req.onsuccess = e => { db = e.target.result; renderSidebar(); };
 
         async function renderSidebar() {
-            const list = document.getElementById('chat-list');
-            list.innerHTML = '';
+            const list = document.getElementById('chat-list'); list.innerHTML = '';
             const tx = db.transaction("chats", "readonly");
-            const chats = await new Promise(r => {
-                const req = tx.objectStore("chats").getAll();
-                req.onsuccess = () => r(req.result);
-            });
-
-            chats.sort((a, b) => b.id - a.id).forEach(chat => {
-                const li = document.createElement('li');
-                li.textContent = chat.title;
-                if (chat.id === currentChatId) li.className = 'active';
-                li.onclick = () => loadChat(chat.id);
-                list.appendChild(li);
+            const chats = await new Promise(r => { const req = tx.objectStore("chats").getAll(); req.onsuccess = () => r(req.result); });
+            chats.sort((a,b) => b.id - a.id).forEach(chat => {
+                const li = document.createElement('li'); if(chat.id === currentChatId) li.className = 'active';
+                const t = document.createElement('span'); t.textContent = chat.title; t.style.flex = "1"; t.onclick = () => loadChat(chat.id);
+                const del = document.createElement('span'); del.innerHTML = "🗑️"; del.className = "trash-btn";
+                del.onclick = (e) => { e.stopPropagation(); deleteChat(chat.id); };
+                li.append(t, del); list.appendChild(li);
             });
         }
 
         async function loadChat(id) {
             const tx = db.transaction("chats", "readonly");
-            const chat = await new Promise(r => {
-                const req = tx.objectStore("chats").get(id);
-                req.onsuccess = () => r(req.result);
-            });
-            currentChatId = id;
-            activeHistory = chat.history;
-            displayHistory();
+            const chat = await new Promise(r => { const req = tx.objectStore("chats").get(id); req.onsuccess = () => r(req.result); });
+            currentChatId = id; activeHistory = chat.history; display(); renderSidebar();
+        }
+
+        async function deleteChat(id) {
+            if(!confirm("Delete chat?")) return;
+            const tx = db.transaction("chats", "readwrite"); await tx.objectStore("chats").delete(id);
+            if(currentChatId === id) { currentChatId = null; activeHistory = []; document.getElementById('chat-output').innerHTML = ''; }
             renderSidebar();
         }
 
-        function displayHistory() {
-            const container = document.getElementById('chat-output');
-            container.innerHTML = '';
-            activeHistory.forEach(msg => appendMessage(msg.content, msg.role === 'user' ? 'user-msg' : 'ai-msg'));
-        }
-
-        async function sendMessage() {
-            const text = document.getElementById('user-input').value.trim();
-            if (!text) return;
-
-            if (!currentChatId) currentChatId = Date.now();
-
-            appendMessage(text, 'user-msg');
-            activeHistory.push({ role: 'user', content: text });
-            document.getElementById('user-input').value = '';
-            document.getElementById('typing-indicator').style.display = 'block';
-
-            try {
-                const context = activeHistory.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n');
-                const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(context)}?model=openai`);
-                const aiResponse = await response.text();
-                
-                document.getElementById('typing-indicator').style.display = 'none';
-                appendMessage(aiResponse, 'ai-msg');
-                activeHistory.push({ role: 'assistant', content: aiResponse });
-                
-                await saveCurrentChat();
-                renderSidebar();
-            } catch (e) {
-                document.getElementById('typing-indicator').style.display = 'none';
-                appendMessage("Error connecting to AI.", 'ai-msg');
-            }
-        }
-
-        function appendMessage(text, className) {
-            const div = document.createElement('div');
-            div.className = `message ${className}`;
-            div.textContent = text;
-            const out = document.getElementById('chat-output');
-            out.appendChild(div);
+        function display() {
+            const out = document.getElementById('chat-output'); out.innerHTML = '';
+            activeHistory.forEach(m => {
+                const d = document.createElement('div'); d.className = `message ${m.role === 'user' ? 'user-msg' : 'ai-msg'}`;
+                d.textContent = m.content; out.appendChild(d);
+            });
             out.scrollTop = out.scrollHeight;
         }
 
-        document.getElementById('new-chat-btn').onclick = () => {
-            currentChatId = null;
-            activeHistory = [];
-            document.getElementById('chat-output').innerHTML = '<div class="message ai-msg">New Chat Started.</div>';
-            renderSidebar();
-        };
+        async function send() {
+            const input = document.getElementById('user-input'); const val = input.value.trim(); if(!val) return;
+            if(!currentChatId) currentChatId = Date.now();
+            activeHistory.push({role:'user', content:val}); input.value = ''; display();
+            document.getElementById('typing').style.display = 'block';
+            try {
+                const ctx = activeHistory.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n');
+                const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(ctx)}?model=openai`);
+                const text = await res.text();
+                activeHistory.push({role:'assistant', content:text});
+                const tx = db.transaction("chats", "readwrite");
+                tx.objectStore("chats").put({id: currentChatId, title: activeHistory[0].content.substring(0,25), history: activeHistory});
+                document.getElementById('typing').style.display = 'none'; display(); renderSidebar();
+            } catch { document.getElementById('typing').style.display = 'none'; }
+        }
 
-        document.getElementById('send-btn').onclick = sendMessage;
-        document.getElementById('user-input').onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
-
-        document.getElementById('export-chats').onclick = async () => {
-            const tx = db.transaction("chats", "readonly");
-            const all = await new Promise(r => {
-                const req = tx.objectStore("chats").getAll();
-                req.onsuccess = () => r(req.result);
-            });
-            const blob = new Blob([JSON.stringify(all)], { type: 'application/json' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'ai_history_backup.json';
-            a.click();
-        };
+        document.getElementById('send-btn').onclick = send;
+        document.getElementById('user-input').onkeypress = e => { if(e.key === 'Enter') send(); };
+        document.getElementById('new-chat-btn').onclick = () => { currentChatId = null; activeHistory = []; document.getElementById('chat-output').innerHTML = ''; renderSidebar(); };
     </script>
 </body>
 </html>
