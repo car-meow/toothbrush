@@ -133,3 +133,17 @@ header {
     margin-right: auto; /* Keeps the nav links near the title */
     margin-left: 40px;
 }
+.sidebar .save-btn {
+    display: block;
+    text-align: center;
+    transition: transform 0.1s, filter 0.2s;
+}
+
+.sidebar .save-btn:hover {
+    filter: brightness(1.2);
+    transform: translateY(-1px);
+}
+
+.sidebar .save-btn:active {
+    transform: translateY(1px);
+}

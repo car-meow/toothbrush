@@ -191,9 +191,18 @@ loadGames();
 // Function to toggle Removal Mode
 document.getElementById('remove-mode-btn').onclick = (e) => {
     isRemovalMode = !isRemovalMode;
-    e.target.textContent = isRemovalMode ? "Click a Game to Remove" : "Remove Game: OFF";
-    e.target.style.backgroundColor = isRemovalMode ? "#ff9800" : "#f44336";
-    renderGameList(); // Refresh the list to show/hide trash icons
+    
+    if (isRemovalMode) {
+        // Style when ON
+        e.target.textContent = "Click Game to Delete";
+        e.target.style.backgroundColor = "#E65100"; // Deep warning orange
+    } else {
+        // Style when OFF
+        e.target.textContent = "Click To Enable Delete Mode";
+        e.target.style.backgroundColor = "#B71C1C"; // Back to Dark Red
+    }
+    
+    renderGameList(); // Refresh the list to show/hide the trash icons
 };
 
 // Function to actually delete the game
