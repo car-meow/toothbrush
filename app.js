@@ -29,14 +29,6 @@ function renderGameList() {
     list.innerHTML = '';
     games.forEach((game, i) => {
         const li = document.createElement('li');
-		
-		// Checks if the game ID is "tutorial" and applies a dark blue background
-        if (game.id === "tutorial") {
-            li.style.backgroundColor = "#0D47A1"; // Dark Blue
-            li.style.color = "#ffffff";           // White text
-            li.style.fontWeight = "bold";
-			
-		
         const title = document.createElement('span');
         title.textContent = game.title;
         title.style.flex = "1";
