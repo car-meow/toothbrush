@@ -1,7 +1,7 @@
 [
   {
     "id": "tutorial",
-    "title": "Click me to start!",
+    "title": "Tutorial",
     "type": "url",
     "url": "tutorial.pdf"
   }

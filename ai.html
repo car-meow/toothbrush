@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>AI Chat Hub</title>
+    <title>Toothbrush Chatbot</title>
     <link rel="stylesheet" href="style.css">
     <style>
         .chat-layout { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 80px); }
@@ -23,7 +23,6 @@
         <h1 onclick="location.href='index.html'">AI Chat</h1>
         <div class="controls">
             <button id="new-chat-btn" class="save-btn rainbow-btn">+ New Chat</button>
-            <button onclick="location.href='help.html'" class="save-btn" style="background-color: #2196F3;">Help</button>
             <button onclick="location.href='index.html'" class="save-btn" style="background-color: #555;">Back</button>
         </div>
     </header>
@@ -31,7 +30,7 @@
         <aside class="chat-sidebar"><ul id="chat-list" class="chat-list"></ul></aside>
         <section class="chat-main">
             <div id="chat-output"></div>
-            <div id="typing" style="display:none; padding: 10px 20px; font-style: italic; color: #888;">AI is typing...</div>
+            <div id="typing" style="display:none; padding: 10px 20px; font-style: italic; color: #888;">AI is thinking...</div>
             <div class="chat-input-area">
                 <input type="text" id="user-input" placeholder="Type a message..." autocomplete="off">
                 <button id="send-btn" class="save-btn rainbow-btn">Send</button>
