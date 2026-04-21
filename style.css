@@ -44,12 +44,17 @@ main { display: flex; flex: 1; overflow: hidden; }
 #game-list { list-style: none; flex: 1; overflow-y: auto; margin-top: 10px; }
 
 #game-list li { 
-    padding: 12px; background-color: #2c2c2c; margin-bottom: 8px; 
+    padding: 12px; background-color: #2c2c2c; margin-bottom: 8px; margin-right: 15px;
     border-radius: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
     transition: all 0.2s; border: 1px solid transparent;
 }
-#game-list li:hover { background-color: #3d3d3d; transform: translateX(5px); border-color: #444; }
+#game-list li:hover { background-color: #3d3d3d; transform: translateX(5px); border-color: #444; box-shadow: -5px 5px 5px rgba(0,0,0,0.3); }
 #game-list li:has(.trash-btn:hover) { background-color: #441a1a !important; }
+#game-list li:active {
+    transform: translateX(-5px); 
+    filter: brightness(1.5);
+    transition: all 0.1s;
+}
 
 .tutorial-item { background-color: #0D47A1 !important; border: 1px solid #1565C0 !important; }
 
