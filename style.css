@@ -1,21 +1,37 @@
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
 body { background-color: #121212; color: #e0e0e0; display: flex; flex-direction: column; height: 100vh; }
 
 header { background-color: #1f1f1f; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; }
-h1 { font-size: 24px; color: #fff; cursor: pointer; }
+h1 { font-size: 24px; color: #fff; cursor: pointer; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
 
 .top-nav { display: flex; gap: 10px; margin-left: 20px; margin-right: auto; }
 .controls { display: flex; gap: 8px; }
 
+/* Button Base Style */
 .save-btn, .nav-btn { 
-    padding: 8px 15px; border-radius: 8px; border: none; cursor: pointer; 
+    padding: 8px 18px; border-radius: 10px; border: none; cursor: pointer; 
     font-weight: bold; color: white; text-decoration: none; font-size: 13px;
-    transition: transform 0.1s, filter 0.2s;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: inline-flex; align-items: center; justify-content: center;
 }
-.save-btn:hover, .nav-btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
+
+/* Hover: Subtle Raise */
+.save-btn:hover, .nav-btn:hover { 
+    filter: brightness(1.1); 
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+/* Click: Sink and Flash */
+.save-btn:active, .nav-btn:active { 
+    transform: translateY(2px); 
+    filter: brightness(1.5);
+    transition: all 0.1s;
+}
+
 .nav-btn { background-color: #333; }
 
-/* Rainbow AI Button */
 .rainbow-btn {
     background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
     background-size: 400% 400%;
@@ -28,66 +44,27 @@ main { display: flex; flex: 1; overflow: hidden; }
 #game-list { list-style: none; flex: 1; overflow-y: auto; margin-top: 10px; }
 
 #game-list li { 
-    padding: 10px; background-color: #2c2c2c; margin-bottom: 8px; 
-    border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; 
+    padding: 12px; background-color: #2c2c2c; margin-bottom: 8px; 
+    border-radius: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+    transition: all 0.2s; border: 1px solid transparent;
 }
-#game-list li:hover { background-color: #3d3d3d; }
+#game-list li:hover { background-color: #3d3d3d; transform: translateX(5px); border-color: #444; }
 #game-list li:has(.trash-btn:hover) { background-color: #441a1a !important; }
 
-.trash-btn { opacity: 0; transition: opacity 0.2s; font-size: 18px; }
+.tutorial-item { background-color: #0D47A1 !important; border: 1px solid #1565C0 !important; }
+
+.trash-btn { opacity: 0; transition: opacity 0.2s; font-size: 18px; padding-left: 10px; }
 li:hover .trash-btn { opacity: 1; }
-.trash-btn:hover { color: #f44336; }
+.trash-btn:hover { color: #f44336; transform: scale(1.2); }
 
 .add-game { margin-top: 20px; padding-top: 20px; border-top: 1px solid #333; }
-input[type="text"], #stash-search { width: 100%; padding: 10px; background: #121212; border: 1px solid #444; color: white; border-radius: 8px; margin-bottom: 10px; }
+input[type="text"], #stash-search { width: 100%; padding: 10px; background: #121212; border: 1px solid #444; color: white; border-radius: 8px; margin-bottom: 10px; outline: none; }
 
 .game-container { flex: 1; background-color: #000; }
 iframe { width: 100%; height: 100%; border: none; }
 
-/* Stash / Help Containers */
+#splash-text { font-size: 14px; font-style: italic; color: #FFEB3B; margin-left: 10px; font-weight: normal; animation: splash-pulse 2s infinite ease-in-out; display: inline-block; }
+@keyframes splash-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+
 .stash-container { flex: 1; overflow-y: auto; padding: 40px; display: flex; justify-content: center; }
 .stash-content { max-width: 800px; width: 100%; background: #1a1a1a; padding: 30px; border-radius: 12px; border: 1px solid #333; }
-
-/* Specific fix for Game List trashcan */
-#game-list li {
-    position: relative;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    background-color: #2c2c2c;
-    border-radius: 8px;
-    margin-bottom: 8px;
-    cursor: pointer;
-}
-
-#game-list li .trash-btn {
-    opacity: 0;
-    font-size: 18px;
-    transition: opacity 0.2s, color 0.2s;
-    padding: 0 5px;
-}
-
-#game-list li:hover .trash-btn {
-    opacity: 1; /* Shows trashcan when you hover the game name */
-}
-
-#game-list li:has(.trash-btn:hover) {
-    background-color: #441a1a !important; /* Turns red when hovering the trashcan specifically */
-}
-
-#splash-text {
-    font-size: 14px;
-    font-style: italic;
-    color: #FFEB3B; /* Gold/Yellow color */
-    margin-left: 10px;
-    font-weight: normal;
-    vertical-align: middle;
-    display: inline-block;
-    animation: splash-pulse 2s infinite ease-in-out;
-}
-
-@keyframes splash-pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-}
