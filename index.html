@@ -2,37 +2,51 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Unblocked Games</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Tab</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header>
-        <h1 onclick="location.href='index.html'">Toothbrush</h1>
+        <h1 onclick="location.href='index.html'" style="cursor:pointer">Toothbrush</h1>
+        
         <nav class="top-nav">
         </nav>
+
         <div class="controls">
+            <!-- Pink Cloak -->
             <button id="cloak-btn" class="save-btn" style="background-color: #E91E63;">Fullscreen</button>
+            
+            <!-- Dark Orange Stash -->
             <button onclick="location.href='pdf-stash.html'" class="save-btn" style="background-color: #F57C00;">Stash</button>
+            
+            <!-- Rainbow AI -->
             <button onclick="location.href='ai.html'" class="save-btn rainbow-btn">AI Chat</button>
+            
+            <!-- Green Backup/Restore -->
             <button id="export-btn" class="save-btn" style="background-color: #4CAF50;">Backup</button>
-            <button onclick="document.getElementById('import-btn').click()" class="save-btn" style="background-color: #4CAF50;">Restore</button>
             <input type="file" id="import-btn" accept=".json" style="display:none">
+            <button onclick="document.getElementById('import-btn').click()" class="save-btn" style="background-color: #4CAF50;">Restore</button>
         </div>
     </header>
+
     <main>
         <aside class="sidebar">
             <ul id="game-list"></ul>
+            
             <div class="add-game">
                 <h3>Add Local Game</h3>
                 <input type="text" id="new-game-title" placeholder="Game Title">
                 <input type="file" id="new-game-file" accept=".html">
-                <button id="add-game-btn" class="save-btn" style="background-color:#2196F3; width:100%">Add Game</button>
+                <button id="add-game-btn" class="save-btn" style="background-color:#2196F3; width:100%; margin-top:10px;">Add Game</button>
             </div>
         </aside>
+        
         <section class="game-container">
-            <iframe id="game-frame" name="game-frame"></iframe>
+            <iframe id="game-frame" name="game-frame" title="Game Window"></iframe>
         </section>
     </main>
+
     <script src="app.js"></script>
 </body>
 </html>
