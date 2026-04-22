@@ -260,8 +260,7 @@ document.getElementById('proxy-btn').onclick = () => {
         backgroundColor: '#000'
     });
     
-    // Using a Rammerhead instance (Iframe-friendly)
-    iframe.src = "https://scramjet.mercurywork.shop/"; 
+    iframe.src = "https://dreams.centromariapolis.cl/"; 
     
     win.document.body.appendChild(iframe);
 
