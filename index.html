@@ -13,7 +13,7 @@
         <div class="controls">
             <button id="cloak-btn" class="save-btn" style="background-color: #E91E63;">Fullscreen</button>
             <button onclick="location.href='pdf-stash.html'" class="save-btn" style="background-color: #F57C00;">Stash</button>
-			<button onclick="location.href='proxy.html'" class="save-btn" style="background-color: #00BCD4;">Proxy</button>
+			<button id="proxy-btn" class="save-btn" style="background-color: #00BCD4;">Proxy</button>
             <button onclick="location.href='ai.html'" class="save-btn rainbow-btn">AI Chat</button>
             <button id="export-btn" class="save-btn" style="background-color: #4CAF50;">Backup</button>
             <button onclick="document.getElementById('import-btn').click()" class="save-btn" style="background-color: #4CAF50;">Restore</button>
@@ -24,10 +24,10 @@
         <aside class="sidebar">
             <ul id="game-list"></ul>
             <div class="add-game">
-                <h3>Add Local Game</h3>
-                <input type="text" id="new-game-title" placeholder="Game Title">
+                <h3>Add Local App</h3>
+                <input type="text" id="new-game-title" placeholder="App Title">
                 <input type="file" id="new-game-file" accept=".html">
-                <button id="add-game-btn" class="save-btn" style="background-color:#2196F3; width:100%; margin-top:10px;">Add Game</button>
+                <button id="add-game-btn" class="save-btn" style="background-color:#2196F3; width:100%; margin-top:10px;">Add App</button>
             </div>
         </aside>
         <section class="game-container">

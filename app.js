@@ -226,3 +226,27 @@ function setSplash() {
 
 loadGames();
 window.addEventListener('DOMContentLoaded', setSplash);
+
+document.getElementById('proxy-btn').onclick = () => {
+    // 1. Open the cloaked window
+    const win = window.open('about:blank', '_blank');
+    if (!win) return alert("Pop-up Blocked! Please allow pop-ups.");
+
+    // 2. Set tab name to New Tab
+    win.document.title = 'New Tab';
+
+    // 3. Inject the Proxy into the cloaked tab
+    const iframe = win.document.createElement('iframe');
+    Object.assign(iframe.style, {
+        position: 'fixed', top: '0', left: '0', width: '100%', height: '100%', 
+        border: 'none', margin: '0', padding: '0', overflow: 'hidden'
+    });
+    
+    // Using the DDX Proxy URL
+    iframe.src = "https://dreams.centromariapolis.cl/";
+    win.document.body.appendChild(iframe);
+
+    // 4. Close the original website tab
+    window.open('about:blank', '_self');
+    window.close();
+};
