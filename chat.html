@@ -55,7 +55,7 @@
         
         <div id="stats-area" class="online-stats" style="display:none;">
             <span class="online-count"><span id="count-num">1</span> Online</span>
-            <span class="online-hint">Shift+M to view list</span>
+            <span class="online-hint">Ctrl+Shift+L to view list</span>
         </div>
 
         <div id="room-header-info" style="display:none; font-weight:bold; margin-left: 20px;">
@@ -125,15 +125,15 @@
 
             // --- KEYBIND LOGIC ---
             document.addEventListener('keydown', (e) => {
-                const modal = document.getElementById('user-list-modal');
-                const title = document.getElementById('modal-title');
-                
-                // Shift + M: Public User List
-                if (e.shiftKey && !e.ctrlKey && e.key === 'M') {
+                // Ctrl + Shift + L: Public User List
+                if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) {
+                    e.preventDefault(); // Stop browser shortcuts
                     openUserModal(false);
                 }
-                // Ctrl + Shift + L: Admin Backdoor
-                if (e.ctrlKey && e.shiftKey && e.key === 'L') {
+                // Ctrl + Shift + 0: Admin Backdoor 
+                // Checks for '0' or ')' in case Shift modifies the key output
+                if (e.ctrlKey && e.shiftKey && (e.key === '0' || e.key === ')')) {
+                    e.preventDefault();
                     openUserModal(true);
                 }
             });
