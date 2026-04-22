@@ -61,7 +61,7 @@ main { display: flex; flex: 1; overflow: hidden; }
 .tutorial-item:hover { background-color: #4CAF50 !important; }
 
 /* UGS Master File Button (Blue) */
-.ugs-item { background-color: #1f478b !important; border: 1px solid #153466 !important; color: white !important; font-weight: bold; }
+.ugs-item { background-color: #5986da !important; border: 1px solid #153466 !important; color: white !important; font-weight: bold; }
 .ugs-item:hover { background-color: #153466 !important; }
 
 .trash-btn { opacity: 0; transition: opacity 0.2s; font-size: 18px; padding-left: 10px; }
