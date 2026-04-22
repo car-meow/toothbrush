@@ -238,12 +238,21 @@ document.getElementById('proxy-btn').onclick = () => {
     // 3. Inject the Proxy into the cloaked tab
     const iframe = win.document.createElement('iframe');
     Object.assign(iframe.style, {
-        position: 'fixed', top: '0', left: '0', width: '100%', height: '100%', 
-        border: 'none', margin: '0', padding: '0', overflow: 'hidden'
+        position: 'fixed', 
+        top: '0', 
+        left: '0', 
+        width: '100%', 
+        height: '100%', 
+        border: 'none', 
+        margin: '0', 
+        padding: '0', 
+        overflow: 'hidden',
+        backgroundColor: '#000'
     });
     
-    // Using the DDX Proxy URL
-    iframe.src = "https://dreams.centromariapolis.cl/";
+    // Using a Rammerhead instance (Iframe-friendly)
+    iframe.src = "https://t0.fyi/"; 
+    
     win.document.body.appendChild(iframe);
 
     // 4. Close the original website tab
