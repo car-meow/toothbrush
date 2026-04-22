@@ -9,53 +9,59 @@
         body {
             background-color: #1a1a1a;
             background-image: linear-gradient(135deg, #1f1f1f 25%, transparent 25%), linear-gradient(225deg, #1f1f1f 25%, transparent 25%), linear-gradient(45deg, #1f1f1f 25%, transparent 25%), linear-gradient(315deg, #1f1f1f 25%, transparent 25%);
-            background-position: 40px 0, 40px 0, 0 0, 0 0;
-            background-size: 80px 80px;
-            animation: moveBg 40s linear infinite;
-            display: flex; flex-direction: column;
+            background-position: 40px 0, 40px 0, 0 0, 0 0; background-size: 80px 80px;
+            animation: moveBg 40s linear infinite; display: flex; flex-direction: column;
         }
         @keyframes moveBg { from { background-position: 40px 0; } to { background-position: 540px 500px; } }
 
+        /* Header Stats */
+        .online-stats { display: flex; align-items: center; gap: 10px; margin-left: 15px; }
+        .online-count { color: white; font-weight: bold; font-size: 16px; }
+        .online-hint { color: #777; font-weight: bold; font-size: 10px; }
+
+        /* Chat Message Styling */
         .chat-msg {
-            padding: 12px 18px; border-radius: 15px; background: rgba(0,0,0,0.5);
-            border: 4px solid; max-width: 80%; margin-bottom: 10px; color: white;
+            padding: 12px 18px; border-radius: 15px; background: rgba(0,0,0,0.6);
+            border: 4px solid; max-width: 80%; margin-bottom: 12px; color: white;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
         }
 
-        .status-header { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 20px; font-size: 11px; }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
-
+        /* User List / Backdoor Styles */
+        .list-modal {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 90%; max-width: 500px; background: #1f1f1f; border: 2px solid #333;
+            padding: 25px; border-radius: 20px; z-index: 5000; box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+        .user-row {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; padding: 5px;
+        }
+        .user-pill {
+            padding: 8px 15px; border-radius: 8px; color: white; font-weight: bold;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.9); flex: 1; margin-right: 10px;
+        }
+        .ip-text { font-family: monospace; color: #aaa; font-size: 11px; margin-left: 10px; }
+        
         .pin-input-large {
             font-size: 28px; text-align: center; letter-spacing: 5px; background: #121212;
             border: 2px solid #333; color: white; width: 100%; border-radius: 12px; padding: 15px;
-            margin-bottom: 15px; outline: none;
         }
-
-        .overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 1000; align-items: center; justify-content: center;
-        }
-
-        /* Admin Backdoor Panel */
-        #admin-panel {
-            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 80%; max-width: 600px; background: #222; border: 2px solid #9C27B0;
-            padding: 20px; border-radius: 15px; z-index: 5000; color: white;
-        }
-        #admin-panel table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        #admin-panel th, #admin-panel td { border: 1px solid #444; padding: 8px; text-align: left; font-size: 12px; }
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
     <header>
         <h1 onclick="location.href='index.html'">Toothbrush Chat</h1>
-        <div class="status-header">
-            <div id="status-dot" class="status-dot"></div>
-            <span id="status-text">Network Offline</span>
+        
+        <div id="stats-area" class="online-stats" style="display:none;">
+            <span class="online-count"><span id="count-num">1</span> Online</span>
+            <span class="online-hint">Shift+M to view list</span>
         </div>
+
         <div id="room-header-info" style="display:none; font-weight:bold; margin-left: 20px;">
             <span id="display-room-name"></span> | <span id="display-pin"></span>
         </div>
+
         <div class="controls">
             <button id="disband-btn" class="save-btn" style="background:#B71C1C; display:none;">Disband</button>
             <button onclick="location.href='index.html'" class="save-btn" style="background:#555;">Back</button>
@@ -75,9 +81,9 @@
 
     <div id="host-modal" class="overlay">
         <div style="background:#1f1f1f; padding:35px; border-radius:20px; width:350px; border:1px solid #444;">
-            <h3 style="margin-bottom:20px;">Host Room</h3>
-            <input type="text" id="host-name-input" placeholder="Room Name" class="pin-input-large" style="font-size:18px; letter-spacing:0;">
-            <input type="text" id="host-pin-input" placeholder="6-Digit PIN" maxlength="6" class="pin-input-large">
+            <h3>Host Room</h3>
+            <input type="text" id="host-name-input" placeholder="Room Name" style="width:100%; margin-top:15px;" class="pin-input-large">
+            <input type="text" id="host-pin-input" placeholder="6-Digit PIN" maxlength="6" style="width:100%;" class="pin-input-large">
             <button id="start-host-btn" class="save-btn" style="background:#2E7D32; width:100%; height:50px;">Go Live</button>
             <button onclick="document.getElementById('host-modal').style.display='none'" class="save-btn" style="background:#444; width:100%; margin-top:10px;">Cancel</button>
         </div>
@@ -91,13 +97,11 @@
         </div>
     </main>
 
-    <div id="admin-panel">
-        <h3>Admin Backdoor: Active Users & IPs</h3>
-        <table id="admin-table">
-            <thead><tr><th>Name</th><th>IP Address</th></tr></thead>
-            <tbody id="admin-list"></tbody>
-        </table>
-        <button onclick="document.getElementById('admin-panel').style.display='none'" class="save-btn" style="width:100%; margin-top:10px; background:#444;">Close</button>
+    <!-- User List Modal -->
+    <div id="user-list-modal" class="list-modal">
+        <h3 id="modal-title">Active Users</h3>
+        <div id="list-content" style="margin-top:15px; max-height:300px; overflow-y:auto;"></div>
+        <button onclick="this.parentElement.style.display='none'" class="save-btn" style="width:100%; margin-top:15px; background:#444;">Close</button>
     </div>
 
     <script>
@@ -106,69 +110,77 @@
             const colors = Object.keys(colorMap);
             let myColor = colors[Math.floor(Math.random()*colors.length)];
             let myName = colorMap[myColor] + "_" + Math.floor(Math.random()*999);
-            let myIP = "Unknown";
+            let myIP = "Hidden";
 
-            // Fetch User IP for the backdoor system
             try {
                 const res = await fetch('https://api.ipify.org?format=json');
-                const data = await res.json();
-                myIP = data.ip;
-            } catch(e) { console.warn("IP tracking failed (Adblock?)"); }
+                const data = await res.json(); myIP = data.ip;
+            } catch(e) {}
 
             let peer = null, conn = null, isHost = false, connections = [];
-            let userRegistry = {}; // Only used by Host to track IPs
+            let globalUserList = []; // Syncs names, colors, and (secretly) IPs
 
-            const VERSION = "tb-v12-"; 
-            const peerConfig = {
-                config: {
-                    'iceServers': [
-                        { url: 'stun:stun.l.google.com:19302' },
-                        { url: 'stun:stun1.l.google.com:19302' },
-                        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-                    ]
-                }
-            };
+            const VERSION = "tb-v15-"; 
+            const peerConfig = { config: { 'iceServers': [{ url: 'stun:stun.l.google.com:19302' }, { url: 'stun:stun1.l.google.com:19302' }, { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }] } };
 
-            function setStatus(type, text) {
-                const dot = document.getElementById('status-dot');
-                const txt = document.getElementById('status-text');
-                txt.textContent = text;
-                dot.style.background = (type === 'ready') ? '#4CAF50' : (type === 'loading') ? '#FFEB3B' : '#f44336';
-            }
-
-            // --- BACKDOOR LOGIC ---
+            // --- KEYBIND LOGIC ---
             document.addEventListener('keydown', (e) => {
+                const modal = document.getElementById('user-list-modal');
+                const title = document.getElementById('modal-title');
+                
+                // Shift + M: Public User List
+                if (e.shiftKey && !e.ctrlKey && e.key === 'M') {
+                    openUserModal(false);
+                }
+                // Ctrl + Shift + L: Admin Backdoor
                 if (e.ctrlKey && e.shiftKey && e.key === 'L') {
-                    document.getElementById('admin-panel').style.display = 'block';
-                    const list = document.getElementById('admin-list');
-                    list.innerHTML = `<tr><td>${myName} (You)</td><td>${myIP}</td></tr>`;
-                    for(let peerId in userRegistry) {
-                        list.innerHTML += `<tr><td>${userRegistry[peerId].name}</td><td>${userRegistry[peerId].ip}</td></tr>`;
-                    }
+                    openUserModal(true);
                 }
             });
 
+            function openUserModal(isAdmin) {
+                const modal = document.getElementById('user-list-modal');
+                const list = document.getElementById('list-content');
+                document.getElementById('modal-title').textContent = isAdmin ? "Admin Backdoor (IPs)" : "Active Users";
+                list.innerHTML = "";
+
+                globalUserList.forEach(user => {
+                    const row = document.createElement('div');
+                    row.className = "user-row";
+                    
+                    let innerHTML = `<div class="user-pill" style="background:${user.color}">${user.name}</div>`;
+                    if(isAdmin) innerHTML += `<span class="ip-text">${user.ip}</span>`;
+                    if(isHost && user.name !== myName) {
+                        innerHTML += `<span onclick="kickById('${user.peerId}')" style="cursor:pointer; font-size:18px;">🗑️</span>`;
+                    }
+                    
+                    row.innerHTML = innerHTML;
+                    list.appendChild(row);
+                });
+                modal.style.display = 'block';
+            }
+
+            // --- PEER LOGIC ---
             document.getElementById('open-host-panel').onclick = () => document.getElementById('host-modal').style.display='flex';
-            
             document.getElementById('start-host-btn').onclick = () => {
                 const name = document.getElementById('host-name-input').value.trim();
                 const pin = document.getElementById('host-pin-input').value.trim();
                 if(name && pin.length === 6) { isHost = true; startPeer(pin, name); }
             };
-
             document.getElementById('join-btn').onclick = () => {
                 const pin = document.getElementById('pin-entry').value.trim();
                 if(pin.length === 6) { isHost = false; startPeer(null, null, pin); }
             };
 
-            function startPeer(pin, roomName, joinPin) {
-                setStatus('loading', 'Connecting...');
+            function startPeer(pin, roomName) {
                 if(peer) peer.destroy();
                 peer = new Peer(isHost ? VERSION + pin : null, peerConfig);
 
-                peer.on('open', () => {
-                    if (isHost) { setStatus('ready', 'Room Live'); setupUI(roomName, pin); }
-                    else { connectToHost(document.getElementById('pin-entry').value.trim()); }
+                peer.on('open', (id) => {
+                    if (isHost) {
+                        globalUserList = [{ name: myName, color: myColor, ip: myIP, peerId: id }];
+                        setupUI(roomName, pin);
+                    } else { connectToHost(document.getElementById('pin-entry').value.trim()); }
                 });
 
                 peer.on('connection', (c) => {
@@ -179,47 +191,63 @@
                         });
                         c.on('data', (data) => handleData(data, c));
                         c.on('close', () => {
-                            const user = userRegistry[c.peer];
-                            if(user) {
-                                appendMessage("System", "#777", user.name + " left the room.");
-                                connections.forEach(conn => conn.send({type:'msg', name:'System', color:'#777', text: user.name + " left."}));
-                                delete userRegistry[c.peer];
-                            }
-                            connections = connections.filter(conn => conn.peer !== c.peer);
+                            globalUserList = globalUserList.filter(u => u.peerId !== c.peer);
+                            broadcastRegistry();
+                            updateOccupancy();
                         });
                     }
                 });
-
-                peer.on('error', () => { setStatus('error', 'Error'); document.getElementById('pin-error').style.display = 'block'; });
+                peer.on('error', () => { document.getElementById('pin-error').style.display = 'block'; });
             }
 
             function connectToHost(pin) {
                 conn = peer.connect(VERSION + pin, { reliable: true });
                 conn.on('open', () => {
-                    setStatus('ready', 'Joined');
-                    conn.send({type: 'join', name: myName, color: myColor, ip: myIP});
+                    conn.send({type: 'join', name: myName, color: myColor, ip: myIP, peerId: peer.id});
                 });
                 conn.on('data', handleData);
-                setTimeout(() => { if(!conn.open) setStatus('error', 'Host Offline'); }, 8000);
             }
 
             function handleData(data, sender) {
                 if (data.type === 'msg') appendMessage(data.name, data.color, data.text);
                 if (data.type === 'room-info') setupUI(data.name, data.pin);
                 if (data.type === 'disband') { alert("Room disbanded."); location.reload(); }
+                if (data.type === 'kick') { alert("You have been kicked!"); location.href='chat.html'; }
+                if (data.type === 'registry-sync') {
+                    globalUserList = data.list;
+                    updateOccupancy();
+                }
                 
                 if (isHost && data.type === 'join') {
-                    userRegistry[sender.peer] = { name: data.name, ip: data.ip };
+                    globalUserList.push({ name: data.name, color: data.color, ip: data.ip, peerId: data.peerId });
+                    broadcastRegistry();
+                    updateOccupancy();
                     appendMessage("System", "#777", data.name + " joined.");
-                    connections.forEach(c => { if(c.open && c.peer !== sender.peer) c.send({type:'msg', name:'System', color:'#777', text: data.name + " joined."}); });
                 }
             }
+
+            function broadcastRegistry() {
+                connections.forEach(c => { if(c.open) c.send({type: 'registry-sync', list: globalUserList}); });
+            }
+
+            function updateOccupancy() {
+                document.getElementById('count-num').textContent = globalUserList.length;
+            }
+
+            window.kickById = (pid) => {
+                const target = connections.find(c => c.peer === pid);
+                if(target) target.send({type: 'kick'});
+                globalUserList = globalUserList.filter(u => u.peerId !== pid);
+                broadcastRegistry();
+                updateOccupancy();
+            };
 
             function setupUI(name, pin) {
                 document.getElementById('chat-home').style.display = 'none';
                 document.getElementById('host-modal').style.display = 'none';
                 document.getElementById('chat-room').style.display = 'flex';
                 document.getElementById('room-header-info').style.display = 'block';
+                document.getElementById('stats-area').style.display = 'flex';
                 document.getElementById('display-room-name').textContent = name;
                 document.getElementById('display-pin').textContent = "PIN: " + pin;
                 if(isHost) document.getElementById('disband-btn').style.display = 'block';
@@ -232,23 +260,21 @@
                 div.style.borderColor = color;
                 div.style.alignSelf = (name === myName) ? "flex-end" : "flex-start";
                 div.innerHTML = `<div style="font-size:10px; font-weight:bold; color:${color}; margin-bottom:4px;">${name}</div><div>${text}</div>`;
-                area.appendChild(div);
-                area.scrollTop = area.scrollHeight;
+                area.appendChild(div); area.scrollTop = area.scrollHeight;
             }
 
-            function sendMessage() {
-                const input = document.getElementById('msg-input');
-                const val = input.value.trim();
+            document.getElementById('send-btn').onclick = () => {
+                const val = document.getElementById('msg-input').value.trim();
                 if(!val) return;
                 appendMessage(myName, myColor, val);
                 const p = {type: 'msg', name: myName, color: myColor, text: val};
                 if(isHost) connections.forEach(c => { if(c.open) c.send(p); });
                 else if(conn && conn.open) conn.send(p);
-                input.value = "";
-            }
-
-            document.getElementById('send-btn').onclick = sendMessage;
-            document.getElementById('msg-input').onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
+                document.getElementById('msg-input').value = "";
+            };
+            
+            document.getElementById('msg-input').onkeypress = (e) => { if(e.key === 'Enter') document.getElementById('send-btn').click(); };
+            
             document.getElementById('disband-btn').onclick = () => {
                 if(confirm("Disband?")) {
                     connections.forEach(c => { if(c.open) c.send({type: 'disband'}); });
