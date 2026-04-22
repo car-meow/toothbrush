@@ -48,11 +48,21 @@ function renderGameList() {
 function loadGame(game) {
     currentGame = game;
     const frame = document.getElementById('game-frame');
+    
+    // 1. Always reset the sandbox security for standard HTML games
+    frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals');
+    
     if (game.type === 'file') {
         const htmlContent = atob(game.content.split(',')[1]);
         frame.srcdoc = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>` + htmlContent;
     } else {
         frame.removeAttribute('srcdoc');
+        
+        // 2. THE PDF FIX: If the file is a PDF, remove the sandbox so Chrome's PDF plugin is allowed to run.
+        if (game.url.endsWith('.pdf')) {
+            frame.removeAttribute('sandbox');
+        }
+        
         frame.src = game.url;
     }
 }
