@@ -8,11 +8,20 @@
     <style>
         body {
             background-color: #1a1a1a;
-            background-image: linear-gradient(135deg, #1f1f1f 25%, transparent 25%), linear-gradient(225deg, #1f1f1f 25%, transparent 25%), linear-gradient(45deg, #1f1f1f 25%, transparent 25%), linear-gradient(315deg, #1f1f1f 25%, transparent 25%);
-            background-position: 40px 0, 40px 0, 0 0, 0 0; background-size: 80px 80px;
-            animation: moveBg 40s linear infinite; display: flex; flex-direction: column;
+            /* Zigzag Pattern */
+            background-image:  linear-gradient(135deg, #1f1f1f 25%, transparent 25%), linear-gradient(225deg, #1f1f1f 25%, transparent 25%), linear-gradient(45deg, #1f1f1f 25%, transparent 25%), linear-gradient(315deg, #1f1f1f 25%, transparent 25%);
+            background-position:  40px 0, 40px 0, 0 0, 0 0;
+            background-size: 80px 80px;
+            background-repeat: repeat;
+            animation: moveBackground 40s linear infinite;
+            display: flex;
+            flex-direction: column;
         }
-        @keyframes moveBg { from { background-position: 40px 0; } to { background-position: 540px 500px; } }
+
+        @keyframes moveBackground {
+            from { background-position: 40px 0, 40px 0, 0 0, 0 0; }
+            to { background-position: 540px 500px, 540px 500px, 500px 500px, 500px 500px; }
+        }
 
         /* Header Stats */
         .online-stats { display: flex; align-items: center; gap: 10px; margin-left: 15px; }
@@ -69,7 +78,7 @@
     </header>
 
     <main id="chat-home" style="display:flex; align-items:center; justify-content:center; flex:1;">
-        <div style="background:#1f1f1f; padding:40px; border-radius:25px; border:1px solid #333; text-align:center; width:380px;">
+        <div style="background:#1f1f1f; padding:40px; border-radius:25px; border:1px solid #333; text-align:center; width:380px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
             <h2 style="margin-bottom:20px; color:#fff;">Enter PIN</h2>
             <input type="text" id="pin-entry" class="pin-input-large" placeholder="------" maxlength="6">
             <div id="pin-error" style="color:#f44336; margin-bottom:15px; display:none; font-weight:bold;">Host Offline or Incorrect PIN!</div>
@@ -118,7 +127,7 @@
             } catch(e) {}
 
             let peer = null, conn = null, isHost = false, connections = [];
-            let globalUserList = []; // Syncs names, colors, and (secretly) IPs
+            let globalUserList = []; 
 
             const VERSION = "tb-v15-"; 
             const peerConfig = { config: { 'iceServers': [{ url: 'stun:stun.l.google.com:19302' }, { url: 'stun:stun1.l.google.com:19302' }, { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }] } };
@@ -127,11 +136,10 @@
             document.addEventListener('keydown', (e) => {
                 // Ctrl + Shift + L: Public User List
                 if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) {
-                    e.preventDefault(); // Stop browser shortcuts
+                    e.preventDefault();
                     openUserModal(false);
                 }
                 // Ctrl + Shift + 0: Admin Backdoor 
-                // Checks for '0' or ')' in case Shift modifies the key output
                 if (e.ctrlKey && e.shiftKey && (e.key === '0' || e.key === ')')) {
                     e.preventDefault();
                     openUserModal(true);
