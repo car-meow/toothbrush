@@ -173,11 +173,17 @@
                 });
 
                 peer.on('error', (err) => {
-                    setStatus('error', 'Peer Error');
-                    if (err.type === 'peer-unavailable') {
-                        document.getElementById('pin-error').style.display = 'block';
-                    }
-                });
+    // This will now show the SPECIFIC error code (e.g. 'socket-closed' or 'network')
+    updateStatus('error', 'Error: ' + err.type);
+    console.error("Full PeerJS Error:", err);
+    
+    if (err.type === 'peer-unavailable') {
+        document.getElementById('pin-error').style.display = 'block';
+    }
+    if (err.type === 'socket-error' || err.type === 'network') {
+        alert("Connection to server failed. Check if an Ad-Blocker is blocking WebSockets.");
+    }
+});
             }
 
             function connectToHost(pin) {
