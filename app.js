@@ -251,7 +251,7 @@ document.getElementById('proxy-btn').onclick = () => {
     });
     
     // Using a Rammerhead instance (Iframe-friendly)
-    iframe.src = "https://t0.fyi/"; 
+    iframe.src = "https://scramjet.mercurywork.shop/"; 
     
     win.document.body.appendChild(iframe);
 
