@@ -225,15 +225,20 @@
             };
 
             function startPeer(pin, roomName) {
+                setStatus('loading', 'Connecting...'); // <-- Added Status Update
+                
                 if(peer) peer.destroy();
                 peer = new Peer(isHost ? VERSION + pin : null, peerConfig);
 
                 peer.on('open', (id) => {
                     if (isHost) {
-                        globalUserList = [{ name: myName, color: myColor, ip: myIP, peerId: id }];
+                        setStatus('ready', 'Room Live'); // <-- Added Status Update
+                        globalUserList =[{ name: myName, color: myColor, ip: myIP, peerId: id }];
                         updateOccupancy();
                         setupUI(roomName, pin);
-                    } else { connectToHost(document.getElementById('pin-entry').value.trim()); }
+                    } else { 
+                        connectToHost(document.getElementById('pin-entry').value.trim()); 
+                    }
                 });
 
                 peer.on('connection', (c) => {
@@ -243,7 +248,6 @@
                             c.send({type: 'room-info', name: roomName, pin: pin});
                         });
                         c.on('data', (data) => handleData(data, c));
-                        
                         c.on('close', () => {
                             const user = globalUserList.find(u => u.peerId === c.peer);
                             if (user) {
@@ -257,15 +261,28 @@
                         });
                     }
                 });
-                peer.on('error', () => { document.getElementById('pin-error').style.display = 'block'; });
+                peer.on('error', () => { 
+                    setStatus('error', 'Network Error'); // <-- Added Status Update
+                    document.getElementById('pin-error').style.display = 'block'; 
+                });
             }
 
             function connectToHost(pin) {
+                setStatus('loading', 'Joining Room...'); // <-- Added Status Update
+                
                 conn = peer.connect(VERSION + pin, { reliable: true });
                 conn.on('open', () => {
+                    setStatus('ready', 'Connected'); // <-- Added Status Update
                     conn.send({type: 'join', name: myName, color: myColor, ip: myIP, peerId: peer.id});
                 });
                 conn.on('data', handleData);
+                
+                setTimeout(() => { 
+                    if(!conn.open) {
+                        setStatus('error', 'Host Offline'); // <-- Added Status Update
+                        document.getElementById('pin-error').style.display = 'block';
+                    } 
+                }, 8000);
             }
 
             function handleData(data, sender) {
