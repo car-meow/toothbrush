@@ -4,71 +4,49 @@
     <meta charset="UTF-8">
     <title>New Tab</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+    <!-- NEW ENGINE: MQTT over WebSockets (Bypasses WebRTC DPI Blocks) -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         body {
             background-color: #1a1a1a;
-            /* Zigzag Pattern */
-            background-image:  linear-gradient(135deg, #1f1f1f 25%, transparent 25%), linear-gradient(225deg, #1f1f1f 25%, transparent 25%), linear-gradient(45deg, #1f1f1f 25%, transparent 25%), linear-gradient(315deg, #1f1f1f 25%, transparent 25%);
-            background-position:  40px 0, 40px 0, 0 0, 0 0;
-            background-size: 80px 80px;
-            background-repeat: repeat;
-            animation: moveBackground 40s linear infinite;
-            display: flex;
-            flex-direction: column;
+            background-image: linear-gradient(135deg, #1f1f1f 25%, transparent 25%), linear-gradient(225deg, #1f1f1f 25%, transparent 25%), linear-gradient(45deg, #1f1f1f 25%, transparent 25%), linear-gradient(315deg, #1f1f1f 25%, transparent 25%);
+            background-position: 40px 0, 40px 0, 0 0, 0 0; background-size: 80px 80px;
+            animation: moveBg 40s linear infinite; display: flex; flex-direction: column;
         }
+        @keyframes moveBg { from { background-position: 40px 0; } to { background-position: 540px 500px; } }
 
-        @keyframes moveBackground {
-            from { background-position: 40px 0, 40px 0, 0 0, 0 0; }
-            to { background-position: 540px 500px, 540px 500px, 500px 500px, 500px 500px; }
-        }
-
-        /* Header Stats */
+        .status-header { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 20px; font-size: 11px; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
         .online-stats { display: flex; align-items: center; gap: 10px; margin-left: 15px; }
         .online-count { color: white; font-weight: bold; font-size: 16px; }
         .online-hint { color: #777; font-weight: bold; font-size: 10px; }
 
-        /* Chat Message Styling */
         .chat-msg {
             padding: 12px 18px; border-radius: 15px; background: rgba(0,0,0,0.6);
             border: 4px solid; max-width: 80%; margin-bottom: 12px; color: white;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
         }
 
-        /* User List / Backdoor Styles */
         .list-modal {
             display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 90%; max-width: 500px; background: #1f1f1f; border: 2px solid #333;
             padding: 25px; border-radius: 20px; z-index: 5000; box-shadow: 0 0 50px rgba(0,0,0,0.8);
         }
         .user-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 5px; }
-        .user-pill {
-            padding: 8px 15px; border-radius: 8px; color: white; font-weight: bold;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.9); flex: 1; margin-right: 10px;
-        }
+        .user-pill { padding: 8px 15px; border-radius: 8px; color: white; font-weight: bold; text-shadow: 1px 1px 3px rgba(0,0,0,0.9); flex: 1; margin-right: 10px; }
         .ip-text { font-family: monospace; color: #aaa; font-size: 11px; margin-left: 10px; }
         
-        .pin-input-large {
-            font-size: 28px; text-align: center; letter-spacing: 5px; background: #121212;
-            border: 2px solid #333; color: white; width: 100%; border-radius: 12px; padding: 15px;
-        }
+        .pin-input-large { font-size: 28px; text-align: center; letter-spacing: 5px; background: #121212; border: 2px solid #333; color: white; width: 100%; border-radius: 12px; padding: 15px; }
         .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; align-items: center; justify-content: center; }
 		
-		/* PIN Hider Styles */
         #pin-wrapper { position: relative; display: inline-block; cursor: pointer; user-select: none; padding: 0 5px; min-width: 130px; text-align: center; }
         #pin-cover {
             position: absolute; top: -4px; left: 0; right: 0; bottom: -4px;
             background-color: #1a1a1a; color: #777777; font-size: 10px; font-weight: bold;
             border-radius: 8px; display: flex; align-items: center; justify-content: center;
-            transition: opacity 0.15s ease-in-out; opacity: 1; /* Covered by default */
+            transition: opacity 0.15s ease-in-out; opacity: 1;
         }
-
-        /* When the wrapper is clicked, this class hides the cover */
         #pin-wrapper.revealed #pin-cover { opacity: 0; }
-
-        /* RE-ADDED STATUS HEADER STYLES */
-        .status-header { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 20px; font-size: 11px; }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
     </style>
 </head>
 <body>
@@ -77,7 +55,7 @@
         
         <div class="status-header">
             <div id="status-dot" class="status-dot"></div>
-            <span id="status-text">Network Offline</span>
+            <span id="status-text">Network Currently Offline. Join or host a room to start!</span>
         </div>
 
         <div id="stats-area" class="online-stats" style="display:none;">
@@ -105,12 +83,7 @@
             <input type="text" id="pin-entry" class="pin-input-large" placeholder="------" maxlength="6">
             <div id="pin-error" style="color:#f44336; margin-bottom:15px; display:none; font-weight:bold;">Host Offline or Incorrect PIN!</div>
             
-            <!-- Added School Mode Option for Joining -->
-			<label style="color:#aaa; font-size:13px; display:block; margin-bottom:15px; cursor:pointer;">
-                <input type="checkbox" id="join-school-mode"> Enable School Mode (Use if connecting fails)
-            </label>
-            
-            <button id="join-btn" class="save-btn" style="background:#2E7D32; width:100%; height:55px; font-size:18px;">Join Room</button>
+            <button id="join-btn" class="save-btn" style="background:#2E7D32; width:100%; height:55px; font-size:18px; margin-top: 15px;">Join Room</button>
             <div style="margin:25px 0; color:#444; font-weight:bold;">OR</div>
             <button id="open-host-panel" class="save-btn" style="background:rgba(255,255,255,0.05); border:1px solid #444; width:100%;">Host New Room</button>
         </div>
@@ -122,12 +95,7 @@
             <input type="text" id="host-name-input" placeholder="Room Name" style="width:100%; margin-top:15px;" class="pin-input-large">
             <input type="text" id="host-pin-input" placeholder="6-Digit PIN" maxlength="6" style="width:100%;" class="pin-input-large">
             
-            <!-- Added School Mode Option for Hosting -->
-			<label style="color:#aaa; font-size:13px; display:block; margin-bottom:15px; margin-top:5px; cursor:pointer;">
-                <input type="checkbox" id="host-school-mode"> Enable School Mode (Bypass Firewall)
-            </label>
-            
-            <button id="start-host-btn" class="save-btn" style="background:#2E7D32; width:100%; height:50px;">Go Live</button>
+            <button id="start-host-btn" class="save-btn" style="background:#2E7D32; width:100%; height:50px; margin-top:15px;">Go Live</button>
             <button onclick="document.getElementById('host-modal').style.display='none'" class="save-btn" style="background:#444; width:100%; margin-top:10px;">Cancel</button>
         </div>
     </div>
@@ -140,7 +108,6 @@
         </div>
     </main>
 
-    <!-- User List Modal -->
     <div id="user-list-modal" class="list-modal">
         <h3 id="modal-title">Active Users</h3>
         <div id="list-content" style="margin-top:15px; max-height:300px; overflow-y:auto;"></div>
@@ -149,18 +116,15 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            // --- 1. TIMEOUT BAN CHECK ---
+            // --- 1. BAN CHECK ---
             const timeoutEnd = localStorage.getItem('tb_chat_timeout');
             if (timeoutEnd && Date.now() < parseInt(timeoutEnd)) {
                 const timeLeft = Math.ceil((parseInt(timeoutEnd) - Date.now()) / 1000);
                 alert(`You are currently in a timeout from being kicked. Please wait ${timeLeft} seconds.`);
-                location.href = 'index.html'; 
-                return; 
-            } else if (timeoutEnd) {
-                localStorage.removeItem('tb_chat_timeout'); 
-            }
+                location.href = 'index.html'; return; 
+            } else if (timeoutEnd) { localStorage.removeItem('tb_chat_timeout'); }
 
-            // --- 2. IDENTITY PERSISTENCE (5-Minute Rule) ---
+            // --- 2. IDENTITY PERSISTENCE ---
             const colorMap = {"#F44336":"Crimson","#E91E63":"Rose","#9C27B0":"Purple","#673AB7":"Indigo","#2196F3":"Azure","#00BCD4":"Cyan","#009688":"Teal","#4CAF50":"Leaf","#8BC34A":"Lime","#FFEB3B":"Gold","#FF9800":"Orange","#795548":"Cedar","#607D8B":"Steel","#636B2F":"Olive","#D4E157":"Pear","#26C6DA":"Sky"};
             const colors = Object.keys(colorMap);
             
@@ -169,49 +133,30 @@
             const now = Date.now();
             
             if (savedIdentity && savedIdentity.lastActive && (now - savedIdentity.lastActive < 300000)) {
-                myColor = savedIdentity.color;
-                myName = savedIdentity.name;
+                myColor = savedIdentity.color; myName = savedIdentity.name;
             } else {
                 myColor = colors[Math.floor(Math.random()*colors.length)];
                 myName = colorMap[myColor] + "_" + Math.floor(Math.random()*999);
             }
 
-            function updateActiveTimer() {
-                localStorage.setItem('tb_identity', JSON.stringify({ color: myColor, name: myName, lastActive: Date.now() }));
-            }
-            updateActiveTimer(); 
-            setInterval(updateActiveTimer, 60000); 
-            window.addEventListener('beforeunload', updateActiveTimer); 
+            function updateActiveTimer() { localStorage.setItem('tb_identity', JSON.stringify({ color: myColor, name: myName, lastActive: Date.now() })); }
+            updateActiveTimer(); setInterval(updateActiveTimer, 60000); window.addEventListener('beforeunload', updateActiveTimer); 
 
-            // --- 3. IP AND GLOBAL STATE ---
             let myIP = "Hidden";
             try {
                 const res = await fetch('https://api.ipify.org?format=json');
                 const data = await res.json(); myIP = data.ip;
             } catch(e) {}
 
-            let peer = null, conn = null, isHost = false, connections = [];
+            // --- 3. MQTT ENGINE (The School Bypass) ---
+            let mqttClient = null;
+            let currentTopic = null;
+            let isHost = false;
             let globalUserList =[]; 
             let isModalAdmin = false; 
+            let hostWaitTimeout = null;
 
-            const VERSION = "tb-v16-"; 
-            
-            // NEW: Config generator to support standard and School Mode fallback
-            function getPeerConfig(useSchoolMode) {
-                let config = {
-                    'iceServers':[
-                        { url: 'stun:stun.l.google.com:19302' },
-                        { url: 'stun:stun1.l.google.com:19302' },
-                        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-                        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-                        { urls: 'turn:global.turn.twilio.com:3478?transport=tcp', username: 'turn', credential: 'turn' }
-                    ]
-                };
-                if (useSchoolMode) {
-                    config.iceTransportPolicy = 'relay'; // Forces traffic through standard HTTP ports
-                }
-                return { debug: 1, config: config };
-            }
+            const VERSION = "tb-wss-v1-"; // Fresh version for the MQTT switch
 
             function setStatus(type, text) {
                 const dot = document.getElementById('status-dot');
@@ -219,20 +164,13 @@
                 if(!dot || !txt) return; 
                 txt.textContent = text;
                 dot.style.background = (type === 'ready') ? '#4CAF50' : (type === 'loading') ? '#FFEB3B' : '#f44336';
+                dot.style.boxShadow = (type === 'ready') ? "0 0 10px #4CAF50" : "none";
             }
 
-            // --- 4. KEYBINDS & LIVE-UPDATING LIST ---
+            // --- 4. KEYBINDS & LISTS ---
             document.addEventListener('keydown', (e) => {
-                // Ctrl + Shift + L: Public User List
-                if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) { 
-                    e.preventDefault(); 
-                    openUserModal(false); 
-                }
-                // Ctrl + Shift + 0: Admin Backdoor (Also checks ')' for Shift variation)
-                if (e.ctrlKey && e.shiftKey && (e.key === '0' || e.key === ')')) { 
-                    e.preventDefault(); 
-                    openUserModal(true); 
-                }
+                if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) { e.preventDefault(); openUserModal(false); }
+                if (e.ctrlKey && e.shiftKey && (e.key === '0' || e.key === ')')) { e.preventDefault(); openUserModal(true); }
             });
 
             function openUserModal(isAdmin) {
@@ -260,126 +198,120 @@
             }
 
             function refreshModalIfOpen() {
-                if (document.getElementById('user-list-modal').style.display === 'block') {
-                    openUserModal(isModalAdmin);
-                }
+                if (document.getElementById('user-list-modal').style.display === 'block') openUserModal(isModalAdmin);
             }
 
-            // PIN Wrapper visibility toggle
             document.getElementById('pin-wrapper').onclick = function() { this.classList.toggle('revealed'); };
 
-            // --- 5. PEER LOGIC ---
+            // --- 5. NETWORK LOGIC ---
             document.getElementById('open-host-panel').onclick = () => document.getElementById('host-modal').style.display='flex';
-            
             document.getElementById('start-host-btn').onclick = () => {
                 const name = document.getElementById('host-name-input').value.trim();
                 const pin = document.getElementById('host-pin-input').value.trim();
-                const schoolMode = document.getElementById('host-school-mode').checked;
-                if(name && pin.length === 6) { isHost = true; startPeer(pin, name, null, schoolMode); }
+                if(name && pin.length === 6) { isHost = true; startNetwork(pin, name); }
             };
-            
             document.getElementById('join-btn').onclick = () => {
                 const pin = document.getElementById('pin-entry').value.trim();
-                const schoolMode = document.getElementById('join-school-mode').checked;
-                if(pin.length === 6) { isHost = false; startPeer(null, null, pin, schoolMode); }
+                if(pin.length === 6) { isHost = false; startNetwork(pin, null); }
             };
 
-            function startPeer(pin, roomName, joinPin, useSchoolMode) {
-                setStatus('loading', 'Connecting...'); 
-                if(peer) peer.destroy();
+            function publish(data) {
+                if(mqttClient && mqttClient.connected) mqttClient.publish(currentTopic, JSON.stringify(data));
+            }
+
+            function startNetwork(pin, roomName) {
+                setStatus('loading', 'Connecting to secure relay...');
+                if(mqttClient) mqttClient.end();
                 
-                const currentConfig = getPeerConfig(useSchoolMode);
-                peer = new Peer(isHost ? VERSION + pin : null, currentConfig);
+                currentTopic = VERSION + pin;
+                
+                // Using public WebSockets MQTT broker (Port 8084 Secure)
+                mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
 
-                peer.on('open', (id) => {
-                    if (isHost) {
-                        setStatus('ready', 'Room Live'); 
-                        globalUserList =[{ name: myName, color: myColor, ip: myIP, peerId: id }];
-                        updateOccupancy();
-                        setupUI(roomName, pin);
-                    } else { 
-                        // Add slight delay in school mode for relays to catch up
-                        setTimeout(() => { 
-                            connectToHost(joinPin || document.getElementById('pin-entry').value.trim()); 
-                        }, useSchoolMode ? 1000 : 0);
-                    }
-                });
-
-                peer.on('connection', (c) => {
-                    if (isHost) {
-                        c.on('open', () => {
-                            connections.push(c);
-                            c.send({type: 'room-info', name: roomName, pin: pin});
-                        });
-                        c.on('data', (data) => handleData(data, c));
-                        c.on('close', () => {
-                            const user = globalUserList.find(u => u.peerId === c.peer);
-                            if (user) {
-                                appendMessage("System", "#777", user.name + " left the room.");
-                                connections.forEach(conn => { if(conn.open && conn.peer !== c.peer) conn.send({type:'msg', name:'System', color:'#777', text: user.name + " left."}); });
+                mqttClient.on('connect', () => {
+                    mqttClient.subscribe(currentTopic, (err) => {
+                        if (!err) {
+                            if (isHost) {
+                                setStatus('ready', 'Room Live');
+                                globalUserList =[{ name: myName, color: myColor, ip: myIP, peerId: myName }];
+                                updateOccupancy();
+                                setupUI(roomName, pin);
+                            } else {
+                                setStatus('loading', 'Locating Host...');
+                                publish({type: 'join', name: myName, color: myColor, ip: myIP, peerId: myName});
+                                
+                                // Guest Timeout: If host doesn't respond with sync data in 6 seconds
+                                hostWaitTimeout = setTimeout(() => {
+                                    if(globalUserList.length === 0) {
+                                        setStatus('error', 'Host Offline');
+                                        document.getElementById('pin-error').style.display = 'block';
+                                        mqttClient.end();
+                                    }
+                                }, 6000);
                             }
-                            globalUserList = globalUserList.filter(u => u.peerId !== c.peer);
-                            connections = connections.filter(conn => conn.peer !== c.peer);
-                            updateOccupancy();
-                            broadcastRegistry();
-                        });
-                    }
+                        }
+                    });
                 });
-                
-                peer.on('error', () => { 
-                    setStatus('error', 'Network Error'); 
-                    document.getElementById('pin-error').style.display = 'block'; 
+
+                mqttClient.on('message', (topic, message) => {
+                    try {
+                        const data = JSON.parse(message.toString());
+                        handleData(data);
+                    } catch(e) {}
+                });
+
+                mqttClient.on('error', () => {
+                    setStatus('error', 'Network Blocked');
                 });
             }
 
-            function connectToHost(pin) {
-                setStatus('loading', 'Joining Room...'); 
-                conn = peer.connect(VERSION + pin, { reliable: true });
+            function handleData(data) {
+                // Ignore messages meant for everyone that we already showed locally
+                if (data.type === 'msg' && data.name !== myName) {
+                    appendMessage(data.name, data.color, data.text);
+                }
                 
-                conn.on('open', () => {
-                    setStatus('ready', 'Joined');
-                    conn.send({type: 'join', name: myName, color: myColor, ip: myIP, peerId: peer.id});
-                });
+                if (data.type === 'room-info' && !isHost) {
+                    setupUI(data.name, data.pin);
+                }
                 
-                conn.on('data', handleData);
+                if (data.type === 'disband') { 
+                    alert("Room disbanded by host."); location.reload(); 
+                }
                 
-                setTimeout(() => { 
-                    if(!conn.open) {
-                        setStatus('error', 'Host Offline'); 
-                        document.getElementById('pin-error').style.display = 'block';
-                    } 
-                }, 8000);
-            }
-
-            function handleData(data, sender) {
-                if (data.type === 'msg') appendMessage(data.name, data.color, data.text);
-                if (data.type === 'room-info') setupUI(data.name, data.pin);
-                if (data.type === 'disband') { alert("Room disbanded."); location.reload(); }
-                
-                if (data.type === 'kick') { 
+                if (data.type === 'kick' && data.target === myName) { 
                     localStorage.setItem('tb_chat_timeout', Date.now() + 60000); 
                     alert("You have been kicked! You are timed out for 1 minute."); 
                     location.href = 'index.html'; 
                 }
                 
                 if (data.type === 'registry-sync') {
+                    if (hostWaitTimeout) clearTimeout(hostWaitTimeout);
+                    setStatus('ready', 'Joined Room');
                     globalUserList = data.list;
                     updateOccupancy();
                 }
                 
-                if (isHost && data.type === 'join') {
+                // Host manages joins
+                if (isHost && data.type === 'join' && data.name !== myName) {
                     if (!globalUserList.find(u => u.peerId === data.peerId)) {
                         globalUserList.push({ name: data.name, color: data.color, ip: data.ip, peerId: data.peerId });
+                        appendMessage("System", "#777", data.name + " joined.");
+                        publish({type: 'msg', name: 'System', color: '#777', text: data.name + " joined."});
+                        publish({type: 'room-info', name: document.getElementById('display-room-name').textContent, pin: document.getElementById('display-pin').textContent.replace('PIN: ','')});
+                        updateOccupancy();
+                        publish({type: 'registry-sync', list: globalUserList});
                     }
-                    appendMessage("System", "#777", data.name + " joined.");
-                    connections.forEach(c => { if(c.open && c.peer !== sender.peer) c.send({type:'msg', name:'System', color:'#777', text: data.name + " joined."}); });
-                    updateOccupancy();
-                    broadcastRegistry();
                 }
-            }
 
-            function broadcastRegistry() {
-                connections.forEach(c => { if(c.open) c.send({type: 'registry-sync', list: globalUserList}); });
+                // Host manages leaves
+                if (isHost && data.type === 'leave' && data.name !== myName) {
+                    globalUserList = globalUserList.filter(u => u.peerId !== data.peerId);
+                    appendMessage("System", "#777", data.name + " left the room.");
+                    publish({type: 'msg', name: 'System', color: '#777', text: data.name + " left."});
+                    updateOccupancy();
+                    publish({type: 'registry-sync', list: globalUserList});
+                }
             }
 
             function updateOccupancy() {
@@ -388,11 +320,10 @@
             }
 
             window.kickById = (pid) => {
-                const target = connections.find(c => c.peer === pid);
-                if(target) target.send({type: 'kick'});
+                publish({type: 'kick', target: pid});
                 globalUserList = globalUserList.filter(u => u.peerId !== pid);
                 updateOccupancy();
-                broadcastRegistry();
+                publish({type: 'registry-sync', list: globalUserList});
             };
 
             function setupUI(name, pin) {
@@ -421,9 +352,7 @@
                 const val = document.getElementById('msg-input').value.trim();
                 if(!val) return;
                 appendMessage(myName, myColor, val);
-                const p = {type: 'msg', name: myName, color: myColor, text: val};
-                if(isHost) connections.forEach(c => { if(c.open) c.send(p); });
-                else if(conn && conn.open) conn.send(p);
+                publish({type: 'msg', name: myName, color: myColor, text: val});
                 document.getElementById('msg-input').value = "";
             };
             
@@ -431,10 +360,23 @@
             
             document.getElementById('disband-btn').onclick = () => {
                 if(confirm("Disband?")) {
-                    connections.forEach(c => { if(c.open) c.send({type: 'disband'}); });
-                    location.reload();
+                    publish({type: 'disband'});
+                    setTimeout(() => location.reload(), 500);
                 }
             };
+
+            document.getElementById('pin-entry').oninput = () => {
+                document.getElementById('pin-entry').style.color = "white";
+                document.getElementById('pin-error').style.display = "none";
+            };
+
+            // Notify host when leaving
+            window.addEventListener('beforeunload', () => {
+                if (mqttClient && mqttClient.connected) {
+                    if (isHost) publish({type: 'disband'});
+                    else publish({type: 'leave', name: myName, peerId: myName});
+                }
+            });
         });
     </script>
 </body>
