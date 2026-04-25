@@ -11,6 +11,13 @@
         <nav class="top-nav">
             <!-- Removed the stash list button since you use the PDF version -->
         </nav>
+		
+		<!-- Put this directly under </nav> and above <div class="controls"> -->
+        <div id="game-status-container" class="status-header" style="display: none; margin-right: auto;">
+            <div id="game-status-dot" class="status-dot"></div>
+            <span id="game-status-text" style="color: white; font-weight: bold;">Loading...</span>
+        </div>
+		
         <div class="controls">
             <button id="cloak-btn" class="save-btn" style="background-color: #E91E63;">Fullscreen</button>
             <button id="emergency-open-btn" class="save-btn" style="background-color: #f44336; display:none;">Emergency Open</button>
@@ -38,7 +45,14 @@
             </div>
         </aside>
         <section class="game-container">
-            <iframe id="game-frame" name="game-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals" allow="allow-storage-access-by-user-activation; storage-access"></iframe>
+            <!-- The Zigzag Empty State -->
+            <div id="empty-state" class="empty-state-bg">
+                <h2 class="empty-state-title">Nothing Loaded.</h2>
+                <p class="empty-state-subtitle">Click an app in the sidebar to get started</p>
+            </div>
+            
+            <!-- Iframe (Hidden by default until clicked) -->
+            <iframe id="game-frame" name="game-frame" style="display:none;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals" allow="allow-storage-access-by-user-activation; storage-access"></iframe>
         </section>
     </main>
     <script src="app.js"></script>

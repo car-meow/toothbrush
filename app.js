@@ -52,12 +52,37 @@ function loadGame(game) {
     currentGame = game;
     const frame = document.getElementById('game-frame');
     const emergencyBtn = document.getElementById('emergency-open-btn');
+    const emptyState = document.getElementById('empty-state');
+    const statusContainer = document.getElementById('game-status-container');
+    const statusDot = document.getElementById('game-status-dot');
+    const statusText = document.getElementById('game-status-text');
+
+    // 1. UI Updates: Hide empty state, show frame, show emergency btn
+    if (emptyState) emptyState.style.display = 'none';
+    if (emergencyBtn) emergencyBtn.style.display = 'inline-flex';
     
     frame.style.setProperty('display', 'block', 'important');
     frame.style.setProperty('visibility', 'visible', 'important');
     frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals');
-    if (emergencyBtn) emergencyBtn.style.display = 'inline-flex';
 
+    // 2. Set Status to Loading (Yellow)
+    if (statusContainer) {
+        statusContainer.style.display = 'flex';
+        statusDot.style.background = '#FFEB3B';
+        statusDot.style.boxShadow = '0 0 8px #FFEB3B';
+        statusText.textContent = 'Loading...';
+    }
+
+    // 3. Listen for Iframe to finish loading (Set Status to Green)
+    frame.onload = () => {
+        if (statusContainer) {
+            statusDot.style.background = '#4CAF50';
+            statusDot.style.boxShadow = '0 0 8px #4CAF50';
+            statusText.textContent = 'Loaded';
+        }
+    };
+
+    // 4. Inject Game Content
     if (game.type === 'file') {
         const base64Data = game.content.split(',')[1];
         let htmlContent;
