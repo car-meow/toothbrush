@@ -182,7 +182,7 @@
             if (el) el.textContent = splashes[Math.floor(Math.random() * splashes.length)];
 
             // --- GOLDEN COOKIE SPAWNER LOGIC ---
-            const spawnChance = 1; // 1 in 365 chance. Change to 1 to test it!
+            const spawnChance = 100; //Change to 1 to test it!
             if (Math.floor(Math.random() * spawnChance) === 0) {
                 setTimeout(spawnGoldenCookie, 10);
             }
