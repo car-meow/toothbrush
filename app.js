@@ -31,7 +31,6 @@ function renderGameList() {
     games.forEach((game, i) => {
         const li = document.createElement('li');
         
-        if (game.id === "tutorial") li.classList.add('tutorial-item');
         if (game.id === "ugs-stash") li.classList.add('ugs-item');
         
         const t = document.createElement('span');

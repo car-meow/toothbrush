@@ -1,11 +1,5 @@
 [
   {
-    "id": "tutorial",
-    "title": "Tutorial",
-    "type": "url",
-    "url": "tutorial.pdf"
-  },
-  {
     "id": "ugs-stash",
     "title": "Master Stash",
     "type": "url",
