@@ -215,6 +215,33 @@ if (exportBtn) {
     };
 }
 
+const proxyBtn = document.getElementById('proxy-btn');
+if (proxyBtn) {
+    proxyBtn.onclick = () => {
+        const win = window.open('about:blank', '_blank');
+        if (!win) return alert("Pop-up Blocked! Please allow pop-ups.");
+
+        // Set the cloaked tab title and icon
+        win.document.title = 'New Tab';
+        const icon = win.document.createElement('link');
+        icon.rel = 'icon';
+        icon.href = 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png';
+        win.document.head.appendChild(icon);
+
+        // Inject the proxy iframe
+        const iframe = win.document.createElement('iframe');
+        Object.assign(iframe.style, {
+            position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
+            border: 'none', margin: '0', padding: '0', overflow: 'hidden'
+        });
+        iframe.src = "https://szns.us/"; // You can change this proxy link if it gets blocked
+        win.document.body.appendChild(iframe);
+        
+        // Kill the original tab
+        killMainTab();
+    };
+}
+
 const importBtn = document.getElementById('import-btn');
 if (importBtn) {
     importBtn.onchange = (e) => {
