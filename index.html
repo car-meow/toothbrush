@@ -226,7 +226,7 @@
             document.body.appendChild(cookie);
 
             // Calculate Random Edge-to-Edge Trajectory
-            const size = 110;
+            const size = 160;
             const vw = window.innerWidth;
             const vh = window.innerHeight;
             const edge = Math.floor(Math.random() * 4);
@@ -237,19 +237,25 @@
             else if (edge === 2) { startX = Math.random() * vw; startY = vh + size; endX = vw - startX; endY = -size; }
             else { startX = -size; startY = Math.random() * vh; endX = vw + size; endY = vh - startY; }
 
+            // Calculate Random Duration (Between 8 seconds and 14 seconds)
+            const randomDuration = Math.floor(Math.random() * 6000) + 8000;
+
             // Float across screen
             const animation = cookie.animate([
                 { left: startX + 'px', top: startY + 'px' },
                 { left: endX + 'px', top: endY + 'px' }
-            ], { duration: 10000, easing: 'linear', fill: 'forwards' });
+            ], { duration: randomDuration, easing: 'linear', fill: 'forwards' });
 
             // Remove if it floats off-screen
             animation.onfinish = () => cookie.remove();
 
             // When user clicks the cookie!
             cookie.onclick = (e) => {
-                cookie.remove();
-                
+                // Prevent clicking it twice while it's doing the pop animation
+                if(cookie.dataset.clicked) return;
+                cookie.dataset.clicked = "true";
+                cookie.style.pointerEvents = 'none';
+
                 // Add money and save
                 cookieBucks += spawnedType.value;
                 localStorage.setItem('tb_cookie_bucks', cookieBucks);
@@ -264,6 +270,16 @@
                     localStorage.setItem('tb_discovered_cookies', JSON.stringify(discoveredCookies));
                     showDiscovery(spawnedType.name, spawnedType.quote);
                 }
+
+                // NEW: Pop & Fade Animation (Lasts 1 second)
+                cookie.animate([
+                    { transform: 'scale(1)', opacity: 1 },
+                    { transform: 'scale(1.8)', opacity: 0 }
+                ], { 
+                    duration: 1000, 
+                    easing: 'ease-out', 
+                    fill: 'forwards' 
+                }).onfinish = () => cookie.remove(); // Delete after fading out
             };
         }
 

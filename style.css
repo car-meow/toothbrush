@@ -144,16 +144,15 @@ iframe { width: 100%; height: 100%; border: none; }
     text-shadow: 2px 2px 5px rgba(0,0,0,0.5); 
 }
 
-/* --- COOKIE CLICKER MINI-GAME --- */
-
 /* Base Cookie Settings */
 .cookie-entity {
     position: fixed;
-    width: 110px; 
-    height: 110px;
+    width: 160px;  /* Increased size from 110px */
+    height: 160px; /* Increased size from 110px */
+    object-fit: contain; 
     z-index: 9999;
     cursor: pointer;
-    animation: cookie-spin 10s linear infinite;
+    animation: cookie-spin 20s linear infinite; /* Slowed down spin to 20 seconds */
     border-radius: 50%;
 }
 
@@ -161,6 +160,7 @@ iframe { width: 100%; height: 100%; border: none; }
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
+
 
 /* Specific Cookie Auras */
 .aura-basic { filter: drop-shadow(0 0 15px rgba(139, 69, 19, 0.8)); }
@@ -174,7 +174,7 @@ iframe { width: 100%; height: 100%; border: none; }
 .aura-golden { filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.9)) drop-shadow(0 0 30px rgba(255, 215, 0, 0.6)); }
 
 /* Nebula has a custom animated aura alongside the spin */
-.aura-nebula { animation: cookie-spin 10s linear infinite, nebula-flicker 1.5s alternate infinite !important; }
+.aura-nebula { animation: cookie-spin 20s linear infinite, nebula-flicker 1.5s alternate infinite !important; }
 @keyframes nebula-flicker {
     0% { filter: drop-shadow(0 0 15px #00BCD4) drop-shadow(0 0 20px #9C27B0) drop-shadow(0 0 15px #FFEB3B); }
     100% { filter: drop-shadow(0 0 25px #4CAF50) drop-shadow(0 0 30px #E91E63) drop-shadow(0 0 25px #FFEB3B); }
