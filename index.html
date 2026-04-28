@@ -106,19 +106,16 @@
 <body>
     
     <div class="home-container">
-        <!-- Golden Cookie Popup -->
-        <div id="cookie-modal" class="overlay">
-            <div class="cookie-modal-box">
-                <img src="cookie.png" style="width:90px; margin-bottom:15px; animation: cookie-spin 10s linear infinite;">
-                <h2 style="color:#FFD700; margin-bottom:10px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">You found a Golden Cookie!</h2>
-                <p style="color:#ddd; margin-bottom:20px; font-style:italic;">Amazing job!</p>
-                <div style="background:#121212; padding:15px; border-radius:10px; border:1px solid #333; margin-bottom:20px;">
-                    <p style="color:#aaa; font-size:13px; margin-bottom:5px;">Global Cookies Found:</p>
-                    <h1 id="cookie-counter" style="color:white; margin:0;">Loading...</h1>
-                </div>
-                <button onclick="document.getElementById('cookie-modal').style.display='none'" class="save-btn" style="background:#FFD700; color:#000; width:100%; font-size:16px;">Awesome!</button>
-            </div>
-        </div>
+        <!-- Cookie Bucks Counter (Top Left) -->
+    <div style="position: fixed; top: 20px; left: 25px; font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
+    </div>
+
+    <!-- Discovery Popup Notification -->
+    <div id="discovery-popup" class="discovery-popup">
+        <h3 id="discovery-name" style="color: #FFD700; margin-bottom: 5px; font-size: 22px; text-shadow: 1px 1px 2px black;"></h3>
+        <p id="discovery-quote" style="color: #ddd; font-style: italic; font-size: 16px;"></p>
+    </div>
 
         <!-- Title and Splash -->
         <div class="title-area">
@@ -178,77 +175,124 @@
         ]; 
 
         window.addEventListener('DOMContentLoaded', () => {
+            // Splash Text Logic
             const el = document.getElementById('splash-text');
             if (el) el.textContent = splashes[Math.floor(Math.random() * splashes.length)];
 
-            // --- GOLDEN COOKIE SPAWNER LOGIC ---
-            const spawnChance = 100; //Change to 1 to test it!
-            if (Math.floor(Math.random() * spawnChance) === 0) {
-                setTimeout(spawnGoldenCookie, 10);
-            }
+            // Initialize the Cookie Game
+            updateBucksUI();
+            setInterval(spawnCookieRoutine, 3000); // Tries to spawn a cookie every 3 seconds
         });
 
-        // The logic to fly the cookie across the screen
-        function spawnGoldenCookie() {
+        // --- COOKIE CLICKER MINI-GAME ---
+        
+        let cookieBucks = parseInt(localStorage.getItem('tb_cookie_bucks') || '0');
+        let discoveredCookies = JSON.parse(localStorage.getItem('tb_discovered_cookies') || '[]');
+
+        // The Cookie Dictionary (Add new cookies here easily!)
+        const cookieTypes =[
+            { id: 'nebula', name: 'Nebula', value: 10000, chance: 1000, quote: "Woah, is that a portal to space?", img: 'Cookies/nebula.png', css: 'aura-nebula' },
+            { id: 'golden', name: 'Golden Cookie', value: 1000, chance: 300, quote: "Thanks, Grandma!", img: 'Cookies/golden.png', css: 'aura-golden' },
+            { id: 'sugar', name: 'Sugar (with sprinkle)', value: 100, chance: 50, quote: "So sweet, my teeth burn!", img: 'Cookies/sugar.png', css: 'aura-sugar' },
+            { id: 'smore', name: "S'more", value: 75, chance: 35, quote: "Fresh from the campfire!", img: 'Cookies/smore.png', css: 'aura-smore' },
+            { id: 'chocolate', name: 'Chocolate', value: 20, chance: 25, quote: "Are you sure you didn't put a brownie in the cookie cutter?", img: 'Cookies/chocolate.png', css: 'aura-chocolate' },
+            { id: 'snickerdoodle', name: 'Snickerdoodle', value: 10, chance: 20, quote: "Soft AND cinnamony- what's not to like?", img: 'Cookies/snickerdoodle.png', css: 'aura-snickerdoodle' },
+            { id: 'peanut_butter', name: 'Peanut Butter', value: 5, chance: 15, quote: "Ooooh, my favorite!", img: 'Cookies/peanut_butter.png', css: 'aura-peanut' },
+            { id: 'cashew', name: 'Cashew', value: 4, chance: 10, quote: "Hope you're having a good day!", img: 'Cookies/cashew.png', css: 'aura-cashew' },
+            { id: 'oatmeal_raisin', name: 'Oatmeal Raisin', value: 3, chance: 5, quote: "An under-appreciated classic.", img: 'Cookies/oatmeal_raisin.png', css: 'aura-oatmeal' },
+            { id: 'chocolate_chip', name: 'Chocolate Chip', value: 1, chance: 3, quote: "You can't go wrong with the basics.", img: 'Cookies/chocolate_chip.png', css: 'aura-basic' }
+        ];
+
+        function updateBucksUI() {
+            document.getElementById('cookie-bucks-counter').textContent = cookieBucks.toLocaleString();
+        }
+
+        function spawnCookieRoutine() {
+            // Evaluates from rarest to most common to prevent common ones overriding rare spawns
+            let spawnedType = null;
+            for (let type of cookieTypes) {
+                if (Math.floor(Math.random() * type.chance) === 0) {
+                    spawnedType = type;
+                    break; 
+                }
+            }
+
+            if (!spawnedType) return; // Nothing spawned this tick
+
+            // Create Cookie HTML Element
             const cookie = document.createElement('img');
-            cookie.src = 'cookie.png';
-            cookie.className = 'golden-cookie';
+            cookie.src = spawnedType.img;
+            cookie.className = 'cookie-entity ' + spawnedType.css;
             document.body.appendChild(cookie);
 
-            const edge = Math.floor(Math.random() * 4); // 0:Top, 1:Right, 2:Bottom, 3:Left
-            let startX, startY, endX, endY;
+            // Calculate Random Edge-to-Edge Trajectory
             const size = 110;
             const vw = window.innerWidth;
             const vh = window.innerHeight;
+            const edge = Math.floor(Math.random() * 4);
+            let startX, startY, endX, endY;
 
-            if (edge === 0) { 
-                startX = Math.random() * vw; startY = -size;
-                endX = vw - startX; endY = vh + size; 
-            } else if (edge === 1) { 
-                startX = vw + size; startY = Math.random() * vh;
-                endX = -size; endY = vh - startY;
-            } else if (edge === 2) { 
-                startX = Math.random() * vw; startY = vh + size;
-                endX = vw - startX; endY = -size;
-            } else { 
-                startX = -size; startY = Math.random() * vh;
-                endX = vw + size; endY = vh - startY;
-            }
+            if (edge === 0) { startX = Math.random() * vw; startY = -size; endX = vw - startX; endY = vh + size; }
+            else if (edge === 1) { startX = vw + size; startY = Math.random() * vh; endX = -size; endY = vh - startY; }
+            else if (edge === 2) { startX = Math.random() * vw; startY = vh + size; endX = vw - startX; endY = -size; }
+            else { startX = -size; startY = Math.random() * vh; endX = vw + size; endY = vh - startY; }
 
+            // Float across screen
             const animation = cookie.animate([
                 { left: startX + 'px', top: startY + 'px' },
                 { left: endX + 'px', top: endY + 'px' }
-            ], {
-                duration: 10000,
-                easing: 'linear',
-                fill: 'forwards'
-            });
+            ], { duration: 10000, easing: 'linear', fill: 'forwards' });
 
+            // Remove if it floats off-screen
             animation.onfinish = () => cookie.remove();
 
-            // When user clicks the flying cookie!
-            cookie.onclick = async () => {
-                cookie.remove(); 
-                document.getElementById('cookie-modal').style.display = 'flex'; 
+            // When user clicks the cookie!
+            cookie.onclick = (e) => {
+                cookie.remove();
                 
-                // Local fallback: Track how many the user has found personally
-                let localCookies = parseInt(localStorage.getItem('tb_cookies') || '0') + 1;
-                localStorage.setItem('tb_cookies', localCookies);
+                // Add money and save
+                cookieBucks += spawnedType.value;
+                localStorage.setItem('tb_cookie_bucks', cookieBucks);
+                updateBucksUI();
 
-                try {
-                    // FIX: Removed underscores, which often crash this specific API
-                    const res = await fetch('https://api.counterapi.dev/v1/toothbrushsite/goldencookie/up');
-                    if (!res.ok) throw new Error("API Blocked");
-                    const data = await res.json();
-                    document.getElementById('cookie-counter').textContent = data.count.toLocaleString();
-                } catch(e) {
-                    // FAILSAFE: If the school Wi-Fi or an Ad-Blocker kills the request, show the personal counter instead!
-                    document.getElementById('cookie-counter').innerHTML = `
-                        <span style="font-size:16px; color:#f44336;">Global Counter Blocked by Network</span><br>
-                        <span style="font-size: 18px; color: #5fc772; margin-top: 10px; display: block;">Your Total Found: ${localCookies}</span>
-                    `;
+                // Show floating text (+₡5)
+                showFloatingText(e.clientX, e.clientY, "+₡" + spawnedType.value);
+
+                // Handle First Discovery
+                if (!discoveredCookies.includes(spawnedType.id)) {
+                    discoveredCookies.push(spawnedType.id);
+                    localStorage.setItem('tb_discovered_cookies', JSON.stringify(discoveredCookies));
+                    showDiscovery(spawnedType.name, spawnedType.quote);
                 }
             };
+        }
+
+        // Creates the floating green text where the mouse clicked
+        function showFloatingText(x, y, text) {
+            const el = document.createElement('div');
+            el.className = 'floating-bucks';
+            el.textContent = text;
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1500); // Cleans up after animation
+        }
+
+        // Drops the non-intrusive alert from the top of the screen
+        let discoveryTimeout;
+        function showDiscovery(name, quote) {
+            const popup = document.getElementById('discovery-popup');
+            document.getElementById('discovery-name').textContent = "New Cookie Discovered: " + name;
+            document.getElementById('discovery-quote').textContent = '"' + quote + '"';
+            
+            popup.classList.remove('show');
+            void popup.offsetWidth; // Force CSS reflow so animation restarts
+            popup.classList.add('show');
+            
+            clearTimeout(discoveryTimeout);
+            discoveryTimeout = setTimeout(() => {
+                popup.classList.remove('show');
+            }, 5000);
         }
 
         // Proxy Logic (Launches in about:blank and closes home screen)
