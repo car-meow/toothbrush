@@ -99,5 +99,39 @@
         document.getElementById('user-input').onkeypress = e => { if(e.key === 'Enter') send(); };
         document.getElementById('new-chat-btn').onclick = () => { currentChatId = null; activeHistory = []; document.getElementById('chat-output').innerHTML = ''; renderSidebar(); };
     </script>
+	
+	<!-- Tutorial Modal -->
+    <div id="tut-overlay" class="tut-overlay">
+        <div class="tut-box">
+            <h2 style="color: #2196F3; margin-bottom: 15px;">AI Chat</h2>
+            <div id="tut-text" class="tut-text"></div>
+            <button id="tut-btn" class="save-btn" style="background-color: #2196F3; width: 100%; font-size: 16px;">Next</button>
+        </div>
+    </div>
+
+    <script>
+        // EDIT YOUR TEXT HERE:
+        const tutorialSteps =[
+            "This is an AI chatbot powered by GPT-4 and Pollinations API. Type a prompt and click Send. You can create new chats, and old chats automatically save in the sidebar. Happy larping!"
+        ];
+        
+        let currentStep = 0;
+        if (!localStorage.getItem('tb_tut_ai')) {
+            document.getElementById('tut-overlay').style.display = 'flex';
+            updateTut();
+        }
+        function updateTut() {
+            document.getElementById('tut-text').textContent = tutorialSteps[currentStep];
+            document.getElementById('tut-btn').textContent = (currentStep === tutorialSteps.length - 1) ? "OK" : "Next";
+        }
+        document.getElementById('tut-btn').onclick = () => {
+            currentStep++;
+            if (currentStep >= tutorialSteps.length) {
+                document.getElementById('tut-overlay').style.display = 'none';
+                localStorage.setItem('tb_tut_ai', 'done'); 
+            } else { updateTut(); }
+        };
+    </script>
+	
 </body>
 </html>

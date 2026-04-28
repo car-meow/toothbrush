@@ -20,7 +20,6 @@
 		
         <div class="controls">
             <button id="cloak-btn" class="save-btn" style="background-color: #E91E63;">Fullscreen</button>
-            <button id="emergency-open-btn" class="save-btn" style="background-color: #f44336; display:none;">Emergency Open</button>
             
             <button onclick="location.href='pdf-stash.html'" class="save-btn" style="background-color: #F57C00;">Stash</button>
             <button id="export-btn" class="save-btn" style="background-color: #4CAF50;">Backup</button>
@@ -56,5 +55,41 @@
         </section>
     </main>
     <script src="app.js"></script>
+	
+	<!-- Tutorial Modal -->
+    <div id="tut-overlay" class="tut-overlay">
+        <div class="tut-box">
+            <h2 style="color: #2196F3; margin-bottom: 15px;">Games Tab</h2>
+            <div id="tut-text" class="tut-text"></div>
+            <button id="tut-btn" class="save-btn" style="background-color: #2196F3; width: 100%; font-size: 16px;">Next</button>
+        </div>
+    </div>
+
+    <script>
+        // EDIT YOUR TEXT HERE:
+        const tutorialSteps =[
+            "This is the Games tab. The sidebar (to your left) contains the 'Master Stash', which has all the games on this website. If you want to add an independent HTML file to the sidebar, though, you can add it via the orange 'Stash' button at the top of your screen.",
+            "You can then download any HTML file through that Stash. Then you can click 'Browse', select your file, name it, and then click 'Add App' on the main website to add it to the sidebar. Deleting apps (other than the Master Stash) is done by hovering and clicking on the trashcan icon above the app.",
+            "The Fullscreen option loads your game in an about:blank window when it's loaded. Progress saves automatically in games, and the Backup and Restore options are there to sync progress with any other devices. Now you're ready to play some games! Have fun!"
+        ];
+        
+        let currentStep = 0;
+        if (!localStorage.getItem('tb_tut_games')) {
+            document.getElementById('tut-overlay').style.display = 'flex';
+            updateTut();
+        }
+        function updateTut() {
+            document.getElementById('tut-text').textContent = tutorialSteps[currentStep];
+            document.getElementById('tut-btn').textContent = (currentStep === tutorialSteps.length - 1) ? "OK" : "Next";
+        }
+        document.getElementById('tut-btn').onclick = () => {
+            currentStep++;
+            if (currentStep >= tutorialSteps.length) {
+                document.getElementById('tut-overlay').style.display = 'none';
+                localStorage.setItem('tb_tut_games', 'done'); 
+            } else { updateTut(); }
+        };
+    </script>
+	
 </body>
 </html>

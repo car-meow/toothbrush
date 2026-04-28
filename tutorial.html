@@ -8,10 +8,25 @@
 <body>
     <header>
         <h1 onclick="location.href='index.html'" style="cursor:pointer">Toothbrush Tutorial</h1>
-        <div class="controls">
-            <!-- The Back Button -->
+        <<div class="controls">
+            <!-- NEW: Replay Tutorial Button -->
+            <button id="replay-tut-btn" class="save-btn" style="background-color: #2196F3;">Replay In-App Tutorial</button>
             <button onclick="location.href='index.html'" class="save-btn" style="background-color: #555;">Back</button>
         </div>
+        
+        <script>
+            document.getElementById('replay-tut-btn').onclick = () => {
+                if (confirm("Are you sure you want to replay the tutorial?")) {
+                    // Wipe the memory of all completed tutorials
+                    localStorage.removeItem('tb_tut_welcome');
+                    localStorage.removeItem('tb_tut_games');
+                    localStorage.removeItem('tb_tut_ai');
+                    localStorage.removeItem('tb_tut_chat');
+                    // Send them back to the home screen to start over
+                    location.href = 'index.html';
+                }
+            };
+        </script>
     </header>
     
     <main style="background:#333;">
