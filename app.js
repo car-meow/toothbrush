@@ -62,8 +62,8 @@ function loadGame(game) {
     
     frame.style.setProperty('display', 'block', 'important');
     frame.style.setProperty('visibility', 'visible', 'important');
-    frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals');
-
+    frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock');
+	
     // 2. Set Status to Loading (Yellow)
     if (statusContainer) {
         statusContainer.style.display = 'flex';
