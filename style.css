@@ -355,3 +355,25 @@ iframe { width: 100%; height: 100%; border: none; }
     width: 600px !important; /* Made wider for the 2-column layout */
     max-height: 85vh;
 }
+
+.cps-display {
+    font-size: 16px;
+    color: #FFF59D; /* Lighter yellow */
+    margin-left: 10px;
+    font-weight: bold;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+}
+
+.incinerate-btn {
+    background-color: #B71C1C !important;
+    color: white !important;
+    grid-column: span 2;
+    margin-top: 10px;
+    border: 2px solid #ef5350 !important;
+    font-size: 14px !important;
+}
+
+.incinerate-btn:hover {
+    background-color: #D32F2F !important;
+    box-shadow: 0 0 15px rgba(211, 47, 47, 0.4);
+}
