@@ -377,3 +377,27 @@ iframe { width: 100%; height: 100%; border: none; }
     background-color: #D32F2F !important;
     box-shadow: 0 0 15px rgba(211, 47, 47, 0.4);
 }
+
+/* --- RARITY COLORS --- */
+.rarity-common { color: #CFCFCF; }
+.rarity-uncommon { color: #6CDB66; }
+.rarity-rare { background: linear-gradient(to bottom, #415DE6, #566FEB); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold; }
+.rarity-epic { background: linear-gradient(to bottom, #AD0FEB, #733CE2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold; }
+.rarity-divine { background: linear-gradient(to bottom, #FAA00F, #EDD11D); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold; }
+
+/* --- FLOATING RARITY TEXT --- */
+.floating-rarity {
+    position: fixed; font-weight: 900; font-size: 24px; z-index: 10001; pointer-events: none;
+    animation: rarity-float 2s ease-out forwards; /* Stays 0.5s longer than money */
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+}
+@keyframes rarity-float {
+    0% { transform: translate(-50%, -50%); opacity: 1; }
+    100% { transform: translate(-50%, -80px); opacity: 0; }
+}
+
+/* --- SWAG UPGRADES --- */
+.swag-upgrade-box { background: rgba(139, 0, 0, 0.3) !important; border: 1px solid #b71c1c !important; }
+
+/* --- FIXED BUTTON SIZES --- */
+.controls .save-btn { width: 100px; justify-content: center; text-align: center; }
