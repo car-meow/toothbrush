@@ -106,15 +106,35 @@
 <body>
     
     <div class="home-container">
-        <!-- Cookie Bucks Counter (Top Left) -->
-    <div style="position: fixed; top: 20px; left: 25px; font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
+<!-- Cookie Bucks & Stats (Top Left) -->
+    <div style="position: fixed; top: 20px; left: 25px; z-index: 10000; display: flex; flex-direction: column; align-items: flex-start; gap: 5px;">
+        <div style="font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
+        </div>
+        <button onclick="openStatsMenu()" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc;">View Stats</button>
     </div>
 
     <!-- Discovery Popup Notification -->
     <div id="discovery-popup" class="discovery-popup">
         <h3 id="discovery-name" style="color: #FFD700; margin-bottom: 5px; font-size: 22px; text-shadow: 1px 1px 2px black;"></h3>
         <p id="discovery-quote" style="color: #ddd; font-style: italic; font-size: 16px;"></p>
+    </div>
+	
+	<!-- Cookie Stats Modal -->
+    <div id="stats-modal" class="overlay" style="z-index: 10000;">
+        <div class="cookie-modal-box" style="width: 400px;">
+            <h2 style="color:#FFD700; margin-bottom:10px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">Cookie Statistics</h2>
+            
+            <!-- Big Total Text -->
+            <h1 id="stats-total" style="color:white; margin-bottom:20px; font-size: 28px;">Total 0 Cookies</h1>
+            
+            <!-- Scrollable List of Cookies -->
+            <div id="stats-list" style="background:#121212; padding:15px; border-radius:10px; border:1px solid #333; margin-bottom:20px; text-align: left; max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                <!-- List injects here -->
+            </div>
+            
+            <button onclick="closeStatsMenu()" class="save-btn" style="background:#2196F3; color:white; width:100%; font-size:16px;">Okay</button>
+        </div>
     </div>
 
         <!-- Title and Splash -->
@@ -186,6 +206,8 @@
 
         // --- COOKIE CLICKER MINI-GAME ---
         
+		let isCookiePaused = false;
+        let cookieStats = JSON.parse(localStorage.getItem('tb_cookie_stats') || '{}');
         let cookieBucks = parseInt(localStorage.getItem('tb_cookie_bucks') || '0');
         let discoveredCookies = JSON.parse(localStorage.getItem('tb_discovered_cookies') || '[]');
 
@@ -209,7 +231,8 @@
 
         function spawnCookieRoutine() {
             // Evaluates from rarest to most common to prevent common ones overriding rare spawns
-            let spawnedType = null;
+            if (isCookiePaused) return; // Freezes spawning while menu is open
+			let spawnedType = null;
             for (let type of cookieTypes) {
                 if (Math.floor(Math.random() * type.chance) === 0) {
                     spawnedType = type;
@@ -251,35 +274,56 @@
 
             // When user clicks the cookie!
             cookie.onclick = (e) => {
-                // Prevent clicking it twice while it's doing the pop animation
                 if(cookie.dataset.clicked) return;
                 cookie.dataset.clicked = "true";
-                cookie.style.pointerEvents = 'none';
 
-                // Add money and save
+                // 1. Get the cookie's exact location right before deleting it
+                const rect = cookie.getBoundingClientRect();
+                cookie.remove(); 
+
+                // 2. Add money and save
                 cookieBucks += spawnedType.value;
                 localStorage.setItem('tb_cookie_bucks', cookieBucks);
                 updateBucksUI();
+				
+				// 2a. Record the stat
+                cookieStats.total = (cookieStats.total || 0) + 1;
+                cookieStats[spawnedType.id] = (cookieStats[spawnedType.id] || 0) + 1;
+                localStorage.setItem('tb_cookie_stats', JSON.stringify(cookieStats));
 
-                // Show floating text (+₡5)
+                // 3. Show floating text (+₡5)
                 showFloatingText(e.clientX, e.clientY, "+₡" + spawnedType.value);
 
-                // Handle First Discovery
+                // 4. Handle First Discovery
                 if (!discoveredCookies.includes(spawnedType.id)) {
                     discoveredCookies.push(spawnedType.id);
                     localStorage.setItem('tb_discovered_cookies', JSON.stringify(discoveredCookies));
                     showDiscovery(spawnedType.name, spawnedType.quote);
                 }
 
-                // NEW: Pop & Fade Animation (Lasts 1 second)
-                cookie.animate([
-                    { transform: 'scale(1)', opacity: 1 },
-                    { transform: 'scale(1.8)', opacity: 0 }
-                ], { 
-                    duration: 1000, 
-                    easing: 'ease-out', 
-                    fill: 'forwards' 
-                }).onfinish = () => cookie.remove(); // Delete after fading out
+                // 5. NEW: Play the explosion GIF at the cookie's exact location
+                const popGif = document.createElement('img');
+                
+                // Adding "?t=..." forces the browser to restart the GIF from frame 1 every time
+                popGif.src = 'pop.gif?t=' + Date.now(); 
+                
+                popGif.style.position = 'fixed';
+                popGif.style.left = rect.left + 'px';
+                popGif.style.top = rect.top + 'px';
+                popGif.style.width = '160px'; // Matches the cookie's size
+                popGif.style.height = '160px';
+                popGif.style.opacity = '0.5'; // 50% transparent as requested
+                popGif.style.pointerEvents = 'none'; // Prevents it from blocking other clicks
+                popGif.style.zIndex = '9999';
+                
+                // (Pro-Tip: Because your GIF has a black background, this CSS trick 
+                // makes the black completely invisible, leaving only the white explosion lines!)
+                popGif.style.mixBlendMode = 'screen'; 
+
+                document.body.appendChild(popGif);
+
+                // Remove the GIF element after 600 milliseconds (the length of the animation)
+                setTimeout(() => popGif.remove(), 600);
             };
         }
 
@@ -339,6 +383,42 @@
             window.close();
             setTimeout(() => { window.location.replace("about:blank"); }, 300);
         };
+		
+		// --- STATS MENU LOGIC ---
+        function openStatsMenu() {
+            isCookiePaused = true; // Pause spawning
+            
+            // Set the big total text
+            document.getElementById('stats-total').textContent = `Total ${cookieStats.total || 0} Cookies`;
+            
+            const listDiv = document.getElementById('stats-list');
+            listDiv.innerHTML = '';
+            
+            // Generate the list dynamically
+            cookieTypes.forEach(type => {
+                const count = cookieStats[type.id] || 0;
+                const row = document.createElement('div');
+                row.style.fontSize = '14px';
+                
+                if (discoveredCookies.includes(type.id)) {
+                    row.style.color = '#e0e0e0';
+                    row.innerHTML = `<span style="color:#FFD700; font-weight:bold;">${count}</span> ${type.name} Cookies have been found.`;
+                } else {
+                    row.style.color = '#777';
+                    row.style.fontStyle = 'italic';
+                    row.textContent = 'Cookie not discovered yet!';
+                }
+                
+                listDiv.appendChild(row);
+            });
+            
+            document.getElementById('stats-modal').style.display = 'flex';
+        }
+
+        function closeStatsMenu() {
+            document.getElementById('stats-modal').style.display = 'none';
+            isCookiePaused = false; // Resume spawning
+        }
 		
     </script>
 	
