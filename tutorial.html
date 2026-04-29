@@ -29,13 +29,26 @@
             };
 
             // NEW: Logic to Clear Cookie Stats
+            // Logic to Clear ALL Cookie Game Data
             document.getElementById('clear-cookies-btn').onclick = () => {
-                if (confirm("Are you sure you want to completely wipe all your Cookie Bucks and discovered cookies? This cannot be undone!")) {
-                    // Wipe the cookie game memory
+                const warning = "Are you sure? This will wipe your money, discovered cookies, all shop upgrades, autobakers, and Swag Points. This cannot be undone!";
+                
+                if (confirm(warning)) {
+                    // 1. Wipe basic stats
                     localStorage.removeItem('tb_cookie_bucks');
                     localStorage.removeItem('tb_discovered_cookies');
                     localStorage.removeItem('tb_cookie_stats');
-                    alert("Cookie stats have been cleared!");
+                    
+                    // 2. Wipe Shop & Inventory data
+                    localStorage.removeItem('tb_inventory');
+                    localStorage.removeItem('tb_swag_points');
+                    localStorage.removeItem('tb_magnet_on');
+                    localStorage.removeItem('tb_last_seen');
+                    
+                    alert("All cookie game data and shop purchases have been cleared!");
+                    
+                    // Optional: Return to home screen to refresh the UI
+                    location.href = 'index.html';
                 }
             };
         </script>
