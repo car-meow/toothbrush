@@ -391,33 +391,62 @@
             isCookiePaused = true;
             const container = document.getElementById('shop-list');
             container.innerHTML = "";
+            
             const addItem = (id, name, desc, cost, type) => {
                 const owned = (type === 'building' ? (inventory.buildings[id] || 0) : (inventory.upgrades[id] || 0));
                 let displayCost = cost;
+                
+                // Compounding price logic
                 if(id === 'gold_plates') displayCost = 5000000 * Math.pow(1.03, owned);
                 if(id === 'nebula_plates') displayCost = 1000000000 * Math.pow(1.02, owned);
-                const div = document.createElement('div'); div.className = "shop-item";
-                div.innerHTML = `<div class="item-name">${name} ${owned>0&&type==='building'?'('+owned+')':''}</div><div class="item-desc">${desc}</div><div class="item-cost">₡${Math.floor(displayCost).toLocaleString()}</div><button onclick="buyItem('${id}', ${displayCost}, '${type}')" class="save-btn buy-btn" style="background:#2E7D32 !important; padding: 8px;">${(type==='upgrade'&&owned>0&&id!=='gold_plates'&&id!=='nebula_plates')?'Already Bought':'Purchase'}</button>`;
+                
+                const div = document.createElement('div'); 
+                div.className = "shop-item";
+                div.innerHTML = `
+                    <div>
+                        <div class="item-name">${name} ${owned > 0 && type === 'building' ? '('+owned+')' : ''}</div>
+                        <div class="item-desc">${desc}</div>
+                        <div class="item-cost">Cost: ₡${Math.floor(displayCost).toLocaleString()}</div>
+                    </div>
+                    <button onclick="buyItem('${id}', ${displayCost}, '${type}')" class="save-btn buy-btn" style="background:#2E7D32 !important; padding: 8px;">
+                        ${(type === 'upgrade' && owned > 0 && id !== 'gold_plates' && id !== 'nebula_plates') ? 'Already Bought' : 'Purchase'}
+                    </button>`;
                 container.appendChild(div);
             };
+
             container.innerHTML += `<div class="shop-cat">Autobakers</div>`;
-            addItem('oven', 'Rusty Oven', '₡1 every 60s.', 500, 'building');
-            addItem('mixer', 'Industrial Mixer', '₡5 every 45s.', 5000, 'building');
-            addItem('bakery', 'Local Bakery', '₡25 every 45s.', 50000, 'building');
-            addItem('factory', 'Cookie Factory', '₡67 every 30s.', 250000, 'building');
-            addItem('dyson', 'Dyson Sphere', '₡625 every 15s.', 5000000, 'building');
+            addItem('oven', 'Rusty Oven', 'A slightly used toaster oven found in the basement. Generates ₡1 every 60 seconds.', 500, 'building');
+            addItem('mixer', 'Industrial Mixer', 'Heavy duty machinery for heavy duty dough. Generates ₡5 every 45 seconds.', 5000, 'building');
+            addItem('bakery', 'Local Bakery', 'You bought out the shop down the street. Generates ₡25 every 45 seconds.', 50000, 'building');
+            addItem('factory', 'Cookie Factory', 'Mass production at its finest. Generates ₡67 every 30 seconds.', 250000, 'building');
+            addItem('dyson', 'Dyson Sphere', 'A mega-structure surrounding a star, purely to bake cookies at lightspeed. Generates ₡625 every 15 seconds.', 5000000, 'building');
+
             container.innerHTML += `<div class="shop-cat">Upgrades</div>`;
-            addItem('frenzy', 'Cookie Frenzy', '2x Spawn Rate.', 1000, 'upgrade');
-            addItem('magnet', 'Sugar Magnet', 'Cookies float to center.', 20000, 'upgrade');
-            addItem('ceramic', 'Ceramic Plates', 'Choc Chips = ₡500.', 10000, 'upgrade');
-            addItem('gold_plates', 'Golden Plates', '+3% Value.', 5000000, 'upgrade');
-            addItem('nebula_plates', 'Nebula Plates', '+10% Value.', 1000000000, 'upgrade');
+            addItem('frenzy', 'Cookie Frenzy', 'Boosts the spawn check rate from every 3 seconds to every 1.5 seconds. Better know how to click fast!', 1000, 'upgrade');
+            addItem('magnet', 'Sugar Magnet', 'Cookies no longer float away; they are slowly pulled toward the center of your screen.', 20000, 'upgrade');
+            addItem('ceramic', 'Ceramic Plates', 'Every Chocolate Chip cookie you click is wrapped in high-quality ceramic. Boosts their base value to ₡500!', 10000, 'upgrade');
+            addItem('gold_plates', 'Golden Plates', 'Pure luxury. Every cookie you click is now worth 3% more. This effect compounds with every purchase.', 5000000, 'upgrade');
+            addItem('nebula_plates', 'Nebula-Infused Plates', 'Harness space-time itself. Every cookie you click is now worth 10% more. This effect compounds with every purchase.', 1000000000, 'upgrade');
+
             container.innerHTML += `<div class="shop-cat">Consumables</div>`;
-            addItem('glass', 'Magnifying Glass', 'Rare+25% (2m).', 50000, 'buff');
-            addItem('grandma', 'Grand Blessing', 'Golden 1/40 (1m).', 1000000, 'buff');
-            addItem('warp', 'Time Warp', '1hr production (1h CD).', 5000, 'buff');
-            container.innerHTML += `<div class="shop-cat">Swag</div>`;
-            addItem('swag', 'Swag Point (₴)', 'Goal: 1 Trillion.', 1000000000000, 'swag');
+            addItem('glass', 'Magnifying Glass', 'Helps you spot rare ingredients. Makes Nebula and Golden cookies 25% more common for two minutes.', 50000, 'buff');
+            addItem('grandma', "Grandma's Blessing", "Boosts the spawn rate of Golden cookies to 1/40 for one minute. Grandma is watching over you.", 1000000, 'buff');
+            addItem('warp', 'Time Warp', 'Instantly grants you 1 hour\'s worth of your current Idle Production. Can only be used once per hour.', 5000, 'buff');
+
+            container.innerHTML += `<div class="shop-cat">The Swag Collection</div>`;
+            addItem('swag', '₴1 - One Swag Point', 'Only buy if you have way too much money to burn! Said to bring good luck... but that could just be a rumor.', 1000000000000, 'swag');
+            
+            // Add Magnet Toggle at the bottom if owned
+            if(inventory.upgrades.magnet) {
+                const toggleDiv = document.createElement('div');
+                toggleDiv.style.gridColumn = "span 2";
+                toggleDiv.innerHTML = `
+                    <button onclick="toggleMagnet()" class="save-btn" style="background:${magnetEnabled?'#B71C1C':'#2E7D32'}; width:100%; margin-top:10px;">
+                        ${magnetEnabled ? 'Disable Magnet' : 'Enable Magnet'}
+                    </button>`;
+                container.appendChild(toggleDiv);
+            }
+
             document.getElementById('shop-modal').style.display = 'flex';
         }
 
