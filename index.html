@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>New Tab</title>
-    <link rel="stylesheet" href="style.css?v=25">
+    <link rel="stylesheet" href="style.css?v=26">
     <style>
         /* --- Zigzag Background & Animation --- */
         body {
@@ -30,44 +30,43 @@
 
         /* --- UI & Modals --- */
         .overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 20000; align-items: center; justify-content: center; }
-        .cookie-modal-box { background: #1f1f1f; padding: 30px; border-radius: 20px; width: 550px; max-width: 90vw; max-height: 85vh; border: 2px solid #2196F3; text-align: center; display: flex; flex-direction: column; overflow: hidden; }
+        .cookie-modal-box { background: #1f1f1f; padding: 30px; border-radius: 20px; width: 600px; max-width: 90vw; max-height: 85vh; border: 2px solid #2196F3; text-align: center; display: flex; flex-direction: column; overflow: hidden; }
         
         #shop-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; overflow-y: auto; padding: 10px; margin: 15px 0; }
         .shop-cat { grid-column: span 2; color: #888; font-size: 11px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #333; padding: 10px 0 5px 0; text-align: left; }
         .shop-item { background: #252525; padding: 12px; border-radius: 12px; border: 1px solid #444; text-align: left; display: flex; flex-direction: column; justify-content: space-between; }
         .item-name { color: #2196F3; font-weight: bold; font-size: 14px; }
-        .item-desc { color: #aaa; font-size: 11px; margin: 4px 0; line-height: 1.3; }
+        .item-desc { color: #aaa; font-size: 11px; margin: 6px 0; line-height: 1.3; height: auto; overflow: visible; }
         .item-cost { color: #FFEB3B; font-weight: bold; font-size: 12px; }
 
-        .cps-display { font-size: 16px; color: #FFF59D; margin-left: 10px; font-weight: bold; }
-        .incinerate-btn { background-color: #B71C1C !important; color: white !important; grid-column: span 2; margin-top: 10px; border: 2px solid #ef5350 !important; }
+        .cps-display { font-size: 16px; color: #FFF59D; margin-left: 10px; font-weight: bold; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); }
+        .incinerate-btn { background-color: #B71C1C !important; color: white !important; grid-column: span 2; margin-top: 10px; border: 2px solid #ef5350 !important; font-size: 14px !important; }
 
         .golden-cookie { position: fixed; width: 160px; height: 160px; object-fit: contain; z-index: 999; cursor: pointer; filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.8)); }
         .floating-bucks { position: fixed; color: #4CAF50; font-weight: bold; font-size: 28px; z-index: 1001; pointer-events: none; animation: float-up 1.5s ease-out forwards; }
         @keyframes float-up { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -120px) scale(1.5); opacity: 0; } }
 
         #effects-container { position: fixed; top: 20px; right: 25px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; z-index: 1000; pointer-events: none; }
-        .effect-item { background: rgba(31, 31, 31, 0.9); border: 2px solid #2196F3; padding: 8px 12px; border-radius: 10px; display: flex; flex-direction: column; align-items: flex-end; margin-bottom: 5px; }
+        .effect-item { background: rgba(31, 31, 31, 0.9); border: 2px solid #2196F3; padding: 8px 12px; border-radius: 10px; display: flex; flex-direction: column; align-items: flex-end; }
         .effect-name { font-size: 10px; font-weight: bold; color: #2196F3; text-transform: uppercase; }
         .effect-timer { font-size: 16px; font-weight: bold; color: white; }
     </style>
 </head>
 <body>
     
-    <!-- Top-Left UI: Currency and Navigation -->
+    <!-- Top-Left UI -->
     <div style="position: fixed; top: 20px; left: 25px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;">
         <div style="font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
             <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
-            <span id="cps-counter" class="cps-display">0/s</span>
+            <span id="cps-counter" class="cps-display">₡0/s</span>
         </div>
-        <button onclick="openShop()" class="save-btn" style="background: #2196F3; width: 100%; font-size: 14px; padding: 10px;">Open Shop</button>
+        <button onclick="openShop()" class="save-btn" style="background: #2196F3; width: 100%; font-size: 14px; padding: 10px; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);">Open Shop</button>
         <button onclick="openStatsMenu()" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc; width: 100%;">View Stats</button>
     </div>
 
-    <!-- Top-Right UI: Effects -->
+    <!-- Top-Right UI -->
     <div id="effects-container"></div>
 
-    <!-- Discovery Popups -->
     <div id="discovery-popup" class="discovery-popup" style="position: fixed; top: -150px; left: 50%; transform: translateX(-50%); background: rgba(25, 25, 25, 0.95); border: 2px solid #FFD700; border-radius: 15px; padding: 20px 40px; text-align: center; z-index: 10000; transition: top 0.5s;">
         <h3 id="discovery-name" style="color: #FFD700; margin-bottom: 5px; font-size: 22px;"></h3>
         <p id="discovery-quote" style="color: #ddd; font-style: italic;"></p>
@@ -152,7 +151,6 @@
             "\"Never underestimate the guy who writes the splash text! Who is also the dev!\"", "\"Thanks for using Toothbrush!\"", "\"Also try 55gms.app!\"", "\"Why is Classroom Center down..?\"",
             "\"Master, I'm hungry\"", "\"Yo Dhruva, wassup? Join the chat room!\"", "\"No food for you! Now be a good boy and stand in the corner.\"", "\"Iso bottom frags\""];
 
-        // --- DATA DICTIONARY ---
         const cookieTypes =[
             { id: 'nebula', name: 'Nebula', value: 10000000, chance: 1000, quote: "Woah, is that a portal to space?", img: 'Cookies/nebula.png', css: 'aura-nebula' },
             { id: 'golden', name: 'Golden Cookie', value: 1000000, chance: 300, quote: "Thanks, Grandma!", img: 'Cookies/golden.png', css: 'aura-golden' },
@@ -166,7 +164,7 @@
             { id: 'chocolate_chip', name: 'Chocolate Chip', value: 21, chance: 3, quote: "You can't go wrong with the basics.", img: 'Cookies/chocolate_chip.png', css: 'aura-basic' }
         ];
 
-        // --- STATE ---
+        // --- GAME STATE ---
         let cookieBucks = parseFloat(localStorage.getItem('tb_cookie_bucks') || '0');
         let swagPoints = parseInt(localStorage.getItem('tb_swag_points') || '0');
         let discoveredCookies = JSON.parse(localStorage.getItem('tb_discovered_cookies') || '[]');
@@ -186,9 +184,22 @@
             setInterval(updateEffectsUI, 1000);
         });
 
+        // ADMIN BACKDOOR: Shift + F1
+        document.addEventListener('keydown', (e) => {
+            if (e.shiftKey && e.key === 'F1') {
+                e.preventDefault();
+                const amount = prompt("Admin Backdoor: Enter ₡ to add:");
+                if (amount && !isNaN(amount)) {
+                    cookieBucks += parseFloat(amount);
+                    updateBucksUI();
+                    localStorage.setItem('tb_cookie_bucks', cookieBucks);
+                }
+            }
+        });
+
         function updateBucksUI() {
             document.getElementById('cookie-bucks-counter').textContent = Math.floor(cookieBucks).toLocaleString();
-            document.getElementById('cps-counter').textContent = `${getCPS().toFixed(1)}/s`;
+            document.getElementById('cps-counter').textContent = `₡${getCPS().toFixed(1)}/s`;
             localStorage.setItem('tb_last_seen', Date.now());
         }
 
@@ -232,7 +243,6 @@
             const cookie = document.createElement('img');
             cookie.src = type.img; cookie.className = 'golden-cookie ' + type.css;
             document.body.appendChild(cookie);
-            
             const size = 160; const vw = window.innerWidth, vh = window.innerHeight;
             const edge = Math.floor(Math.random() * 4);
             let startX, startY, endX, endY;
@@ -240,33 +250,27 @@
             else if (edge === 1) { startX = vw+size; startY = Math.random()*vh; endX = -size; endY = vh-startY; }
             else if (edge === 2) { startX = Math.random()*vw; startY = vh+size; endX = vw-startX; endY = -size; }
             else { startX = -size; startY = Math.random()*vh; endX = vw+size; endY = vh-startY; }
-
             if (magnetEnabled) { endX = vw/2 - size/2; endY = vh/2 - size/2; }
             const duration = Math.floor(Math.random() * 6000) + 8000;
             const anim = cookie.animate([{ left: startX+'px', top: startY+'px', transform: 'rotate(0deg)' }, { left: endX+'px', top: endY+'px', transform: 'rotate(360deg)' }], { duration, easing: 'linear', fill: 'forwards' });
-            
             anim.onfinish = () => cookie.remove();
             cookie.onclick = (e) => {
                 if(cookie.dataset.clicked) return;
                 cookie.dataset.clicked = "true";
                 const rect = cookie.getBoundingClientRect();
                 cookie.remove();
-                
                 let val = type.value;
                 if (type.id === 'chocolate_chip' && inventory.upgrades.ceramic) val = 500;
                 val = val * Math.pow(1.03, inventory.upgrades.gold_plates || 0) * Math.pow(1.10, inventory.upgrades.nebula_plates || 0);
-
                 cookieBucks += val;
                 cookieStats.total = (cookieStats.total || 0) + 1;
                 cookieStats[type.id] = (cookieStats[type.id] || 0) + 1;
                 localStorage.setItem('tb_cookie_bucks', cookieBucks);
                 localStorage.setItem('tb_cookie_stats', JSON.stringify(cookieStats));
                 updateBucksUI();
-
                 const el = document.createElement('div'); el.className = 'floating-bucks';
                 el.textContent = "+₡" + Math.floor(val); el.style.left = e.clientX + 'px'; el.style.top = e.clientY + 'px';
                 document.body.appendChild(el); setTimeout(() => el.remove(), 1500);
-
                 if (!discoveredCookies.includes(type.id)) {
                     discoveredCookies.push(type.id);
                     localStorage.setItem('tb_discovered_cookies', JSON.stringify(discoveredCookies));
@@ -292,22 +296,25 @@
                 container.appendChild(div);
             };
             container.innerHTML += `<div class="shop-cat">Autobakers</div>`;
-            addItem('oven', 'Rusty Oven', '₡1 every 60s.', 500, 'building');
-            addItem('mixer', 'Industrial Mixer', '₡5 every 45s.', 5000, 'building');
-            addItem('bakery', 'Local Bakery', '₡25 every 45s.', 50000, 'building');
-            addItem('factory', 'Cookie Factory', '₡67 every 30s.', 250000, 'building');
-            addItem('dyson', 'Dyson Sphere', '₡625 every 15s.', 5000000, 'building');
+            addItem('oven', 'Rusty Oven', 'A slightly used toaster oven found in the basement. Generates ₡1 every 60 seconds.', 500, 'building');
+            addItem('mixer', 'Industrial Mixer', 'Heavy duty machinery for heavy duty dough. Generates ₡5 every 45 seconds.', 5000, 'building');
+            addItem('bakery', 'Local Bakery', 'You bought out the shop down the street. Generates ₡25 every 45 seconds.', 50000, 'building');
+            addItem('factory', 'Cookie Factory', 'Mass production at its finest. Generates ₡67 every 30 seconds.', 250000, 'building');
+            addItem('dyson', 'Dyson Sphere', 'Surrounds a star to bake at lightspeed. Generates ₡625 every 15 seconds.', 5000000, 'building');
             container.innerHTML += `<div class="shop-cat">Value Upgrades (Permanent)</div>`;
-            addItem('ceramic', 'Ceramic Plates', 'Choc Chips base ₡500.', 10000, 'upgrade');
-            addItem('gold_plates', 'Golden Plates', '+3% Value. Compounds.', 10, 'upgrade', '₴');
-            addItem('nebula_plates', 'Nebula Plates', '+10% Value. Compounds.', 200, 'upgrade', '₴');
+            addItem('ceramic', 'Ceramic Plates', 'Choc Chips base value becomes ₡500.', 10000, 'upgrade');
+            addItem('gold_plates', 'Golden Plates', 'Every cookie worth 3% more. Compounds.', 10, 'upgrade', '₴');
+            addItem('nebula_plates', 'Nebula-Infused Plates', 'Every cookie worth 10% more. Compounds.', 200, 'upgrade', '₴');
             container.innerHTML += `<div class="shop-cat">Consumables</div>`;
-            addItem('glass', 'Magnifying Glass', 'Rare+25% (2m).', 50000, 'buff');
-            addItem('grandma', 'Grandma Blessing', 'Golden 1/40 (1m).', 1000000, 'buff');
+            addItem('frenzy', 'Cookie Frenzy', '2x Spawn Rate.', 1000, 'upgrade');
+            addItem('magnet', 'Sugar Magnet', 'Cookies float to center.', 20000, 'upgrade');
+            addItem('glass', 'Magnifying Glass', 'Rare cookies +25% (2m).', 50000, 'buff');
+            addItem('grandma', "Grandma's Blessing", "Golden rate 1/40 (1m).", 1000000, 'buff');
             addItem('warp', 'Time Warp', '1hr production (1h CD).', 5000, 'buff');
             container.innerHTML += `<div class="shop-cat">The Swag Collection</div>`;
             const pot = Math.floor(cookieBucks / 1000000);
             container.innerHTML += `<div class="shop-item" style="grid-column: span 2; border-color: #f44336; text-align: center;"><div class="item-name" style="color: #f44336; font-size: 18px;">₴${swagPoints} Swag Points Owned</div><div class="item-desc">Incinerating now will grant you ₴${pot.toLocaleString()} Swag Points.</div><button onclick="incinerateCookies()" class="save-btn incinerate-btn">Incinerate Cookies. Send an offering to the Cookie Gods.</button></div>`;
+            if(inventory.upgrades.magnet) { container.innerHTML += `<button onclick="toggleMagnet()" class="save-btn" style="grid-column: span 2; background:${magnetEnabled?'#B71C1C':'#2E7D32'}; margin-top:10px; width: 100%;">${magnetEnabled ? 'Disable Magnet' : 'Enable Magnet'}</button>`; }
             document.getElementById('shop-modal').style.display = 'flex';
         }
 
@@ -316,7 +323,7 @@
             if (currency==='₴' && swagPoints < cost) return alert("Not enough ₴!");
             if (currency==='₡') cookieBucks -= cost; else swagPoints -= cost;
             if (type === 'building') inventory.buildings[id] = (inventory.buildings[id] || 0) + 1;
-            else if (type === 'upgrade') inventory.upgrades[id] = (inventory.upgrades[id] || 0) + 1;
+            else if (type === 'upgrade') { if(inventory.upgrades[id]>0 && id!=='gold_plates' && id!=='nebula_plates' && id!=='magnet') return; inventory.upgrades[id] = (inventory.upgrades[id] || 0) + 1; }
             else if (type === 'buff') {
                 if (id === 'glass') inventory.cooldowns.glass = Date.now() + 120000;
                 if (id === 'grandma') inventory.cooldowns.grandma = Date.now() + 60000;
@@ -367,13 +374,8 @@
             document.getElementById('stats-modal').style.display = 'flex';
         }
 
-        function showDiscovery(name, quote) {
-            const p = document.getElementById('discovery-popup');
-            document.getElementById('discovery-name').textContent = "New Discovery: " + name;
-            document.getElementById('discovery-quote').textContent = '"' + quote + '"';
-            p.style.top = "20px"; setTimeout(() => p.style.top = "-150px", 5000);
-        }
-
+        function toggleMagnet() { magnetEnabled = !magnetEnabled; localStorage.setItem('tb_magnet_on', magnetEnabled); openShop(); }
+        function showDiscovery(name, quote) { const p = document.getElementById('discovery-popup'); document.getElementById('discovery-name').textContent = "New Discovery: " + name; document.getElementById('discovery-quote').textContent = '"' + quote + '"'; p.classList.add('show'); setTimeout(() => p.classList.remove('show'), 5000); }
         function closeStatsMenu() { document.getElementById('stats-modal').style.display = 'none'; isCookiePaused = false; }
         function closeShop() { document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false; }
         document.getElementById('tut-btn').onclick = () => { document.getElementById('tut-overlay').style.display = 'none'; localStorage.setItem('tb_tut_welcome', 'done'); };
