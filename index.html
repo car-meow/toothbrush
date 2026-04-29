@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>New Tab</title>
-    <link rel="stylesheet" href="style.css?v=22">
+    <link rel="stylesheet" href="style.css?v=23">
     <style>
-        /* --- Zigzag Background and Layout --- */
+        /* --- Zigzag Background and Body Fix --- */
         body {
             background-color: #1a1a1a;
             background-image:  linear-gradient(135deg, #1f1f1f 25%, transparent 25%), linear-gradient(225deg, #1f1f1f 25%, transparent 25%), linear-gradient(45deg, #1f1f1f 25%, transparent 25%), linear-gradient(315deg, #1f1f1f 25%, transparent 25%);
@@ -17,6 +17,7 @@
             flex-direction: column;
             height: 100vh;
             width: 100vw;
+            margin: 0;
             overflow: hidden;
         }
 
@@ -25,11 +26,15 @@
             to { background-position: 540px 500px, 540px 500px, 500px 500px, 500px 500px; }
         }
 
+        /* The Main Container stays clean now */
         .home-container {
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            flex: 1;
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+            z-index: 5;
             padding-bottom: 8vh;
         }
 
@@ -56,6 +61,7 @@
             font-weight: bold;
             text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.8);
             margin-top: 10px;
+            text-align: center;
         }
 
         .button-row {
@@ -71,12 +77,41 @@
             border-radius: 12px;
         }
 
-        /* --- Shop Card Layout --- */
+        /* --- MODAL FIXES --- */
+        .overlay {
+            display: none; 
+            position: fixed; top: 0; left: 0; 
+            width: 100vw; height: 100vh; 
+            background: rgba(0,0,0,0.85); 
+            z-index: 20000; /* Ensure it is above everything */
+            align-items: center; justify-content: center;
+        }
+
+        .cookie-modal-box {
+            background: #1f1f1f;
+            padding: 30px;
+            border-radius: 20px;
+            width: 550px;
+            max-width: 90vw; /* Prevent off-screen */
+            max-height: 85vh; /* Prevent off-screen */
+            border: 2px solid #2196F3;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #shop-list, #stats-list {
+            flex: 1;
+            overflow-y: auto;
+            margin: 15px 0;
+        }
+
         #shop-list {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
-            padding: 10px;
         }
 
         .shop-cat {
@@ -85,10 +120,9 @@
             font-size: 11px;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-top: 15px;
             border-bottom: 1px solid #333;
-            padding-bottom: 5px;
+            padding: 10px 0 5px 0;
+            text-align: left;
         }
 
         .shop-item {
@@ -96,9 +130,6 @@
             padding: 12px;
             border-radius: 12px;
             border: 1px solid #444;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
             text-align: left;
         }
 
@@ -106,19 +137,19 @@
         .item-desc { color: #aaa; font-size: 11px; margin: 4px 0; line-height: 1.2; }
         .item-cost { color: #FFEB3B; font-weight: bold; font-size: 12px; }
 
-        /* --- Golden Cookie & UI --- */
+        /* --- UI ELEMENTS --- */
         .golden-cookie {
             position: fixed;
             width: 160px; height: 160px;
             object-fit: contain;
-            z-index: 9999;
+            z-index: 999;
             cursor: pointer;
             filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.8));
         }
 
         .floating-bucks {
             position: fixed; color: #4CAF50; font-weight: bold; font-size: 28px;
-            z-index: 10001; pointer-events: none; animation: float-up 1.5s ease-out forwards;
+            z-index: 1001; pointer-events: none; animation: float-up 1.5s ease-out forwards;
         }
 
         @keyframes float-up {
@@ -134,11 +165,10 @@
         }
         .discovery-popup.show { top: 20px; }
 
-        /* --- Effects Tracker --- */
         #effects-container {
             position: fixed; top: 20px; right: 25px;
             display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
-            z-index: 10000; pointer-events: none;
+            z-index: 1000; pointer-events: none;
         }
         .effect-item {
             background: rgba(31, 31, 31, 0.9); border: 2px solid #2196F3;
@@ -150,8 +180,8 @@
 </head>
 <body>
     
-    <!-- Cookie Bucks & Shop (Top Left) -->
-    <div style="position: fixed; top: 20px; left: 25px; z-index: 10000; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;">
+    <!-- UI Layer (Counters and Effects) -->
+    <div style="position: fixed; top: 20px; left: 25px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;">
         <div style="font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
             <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
         </div>
@@ -159,23 +189,20 @@
         <button onclick="openStatsMenu()" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc; width: 100%;">View Stats</button>
     </div>
 
-    <!-- Active Effects (Top Right) -->
     <div id="effects-container"></div>
 
-    <!-- Discovery Popup -->
     <div id="discovery-popup" class="discovery-popup">
         <h3 id="discovery-name" style="color: #FFD700; margin-bottom: 5px; font-size: 22px;"></h3>
         <p id="discovery-quote" style="color: #ddd; font-style: italic;"></p>
     </div>
 
+    <!-- Main Content Container -->
     <div class="home-container">
-        <!-- Title and Splash -->
         <div class="title-area">
             <h1 class="home-title">Toothbrush</h1>
             <span id="splash-text" class="home-splash"></span>
         </div>
 
-        <!-- Bottom Button Row -->
         <div class="button-row">
             <button onclick="location.href='games.html'" class="save-btn rainbow-btn home-btn">Games</button>
             <button onclick="location.href='ai.html'" class="save-btn home-btn" style="background-color: #f57c00;">AI Chat</button>
@@ -185,25 +212,25 @@
         </div>
     </div>
 
-    <!-- Modals -->
+    <!-- Modals (Moved outside for layout stability) -->
     <div id="stats-modal" class="overlay">
-        <div class="cookie-modal-box" style="width: 400px;">
+        <div class="cookie-modal-box" style="border-color: #FFD700;">
             <h2 style="color:#FFD700; margin-bottom:10px;">Cookie Statistics</h2>
-            <h1 id="stats-total" style="color:white; margin-bottom:20px; font-size: 28px;">Total 0 Cookies</h1>
-            <div id="stats-list" style="background:#121212; padding:15px; border-radius:10px; border:1px solid #333; margin-bottom:20px; text-align: left; max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;"></div>
+            <h1 id="stats-total" style="color:white; margin: 10px 0; font-size: 28px;">Total 0 Cookies</h1>
+            <div id="stats-list" style="background:#121212; padding:15px; border-radius:10px; border:1px solid #333; text-align: left;"></div>
             <button onclick="closeStatsMenu()" class="save-btn" style="background:#2196F3; width:100%;">Okay</button>
         </div>
     </div>
 
     <div id="shop-modal" class="overlay">
-        <div class="cookie-modal-box" style="width: 600px; max-height: 85vh; display: flex; flex-direction: column;">
+        <div class="cookie-modal-box">
             <h2 style="color:#2196F3; margin-bottom:10px;">Toothbrush Shop</h2>
             <div id="shop-list"></div>
             <button onclick="closeShop()" class="save-btn" style="background:#444; width:100%; margin-top:15px;">Close Shop</button>
         </div>
     </div>
 
-    <div id="tut-overlay" class="tut-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:20000; align-items:center; justify-content:center;">
+    <div id="tut-overlay" class="overlay">
         <div style="background:#1f1f1f; padding:30px; border-radius:15px; width:450px; border:2px solid #2196F3; text-align:center;">
             <h2 style="color: #2196F3; margin-bottom: 15px;">Welcome!</h2>
             <div id="tut-text" style="color:#eee; margin-bottom:20px; line-height:1.6;">Welcome to Toothbrush! This tutorial will show you around. Click on one of the tabs at the bottom to get started.</div>
@@ -370,7 +397,7 @@
                 if(id === 'gold_plates') displayCost = 5000000 * Math.pow(1.03, owned);
                 if(id === 'nebula_plates') displayCost = 1000000000 * Math.pow(1.02, owned);
                 const div = document.createElement('div'); div.className = "shop-item";
-                div.innerHTML = `<div class="item-name">${name} ${owned>0&&type==='building'?'('+owned+')':''}</div><div class="item-desc">${desc}</div><div class="item-cost">₡${Math.floor(displayCost).toLocaleString()}</div><button onclick="buyItem('${id}', ${displayCost}, '${type}')" class="save-btn buy-btn">${(type==='upgrade'&&owned>0&&id!=='gold_plates'&&id!=='nebula_plates')?'Already Bought':'Purchase'}</button>`;
+                div.innerHTML = `<div class="item-name">${name} ${owned>0&&type==='building'?'('+owned+')':''}</div><div class="item-desc">${desc}</div><div class="item-cost">₡${Math.floor(displayCost).toLocaleString()}</div><button onclick="buyItem('${id}', ${displayCost}, '${type}')" class="save-btn buy-btn" style="background:#2E7D32 !important; padding: 8px;">${(type==='upgrade'&&owned>0&&id!=='gold_plates'&&id!=='nebula_plates')?'Already Bought':'Purchase'}</button>`;
                 container.appendChild(div);
             };
             container.innerHTML += `<div class="shop-cat">Autobakers</div>`;
@@ -387,7 +414,7 @@
             addItem('nebula_plates', 'Nebula Plates', '+10% Value.', 1000000000, 'upgrade');
             container.innerHTML += `<div class="shop-cat">Consumables</div>`;
             addItem('glass', 'Magnifying Glass', 'Rare+25% (2m).', 50000, 'buff');
-            addItem('grandma', 'Grandma Blessing', 'Golden 1/40 (1m).', 1000000, 'buff');
+            addItem('grandma', 'Grand Blessing', 'Golden 1/40 (1m).', 1000000, 'buff');
             addItem('warp', 'Time Warp', '1hr production (1h CD).', 5000, 'buff');
             container.innerHTML += `<div class="shop-cat">Swag</div>`;
             addItem('swag', 'Swag Point (₴)', 'Goal: 1 Trillion.', 1000000000000, 'swag');
@@ -435,7 +462,7 @@
                 const row = document.createElement('div'); row.style.fontSize = '14px';
                 if (discoveredCookies.includes(type.id)) {
                     row.innerHTML = `<span style="color:#FFD700; font-weight:bold;">${count}</span> ${type.name} Cookies found.<br><span style="color:#aaa; font-style:italic; font-size:12px;">"${type.quote}"</span>`;
-                } else { row.style.color = '#777'; row.textContent = 'Cookie not discovered yet!'; }
+                } else { row.style.color = '#777'; row.innerHTML = 'Cookie not discovered yet!'; }
                 list.appendChild(row);
             });
             document.getElementById('stats-modal').style.display = 'flex';
@@ -450,7 +477,7 @@
             if (!win) return alert("Pop-up Blocked!");
             win.document.title = 'New Tab';
             const icon = win.document.createElement('link'); icon.rel = 'icon'; icon.href = 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png'; win.document.head.appendChild(icon);
-            const iframe = win.document.createElement('iframe'); Object.assign(iframe.style, { position: 'fixed', top: '0', left: '0', width: '100%', height: '100%', border: 'none', margin: '0', padding: '0', overflow: 'hidden' });
+            const iframe = win.document.createElement('iframe'); Object.assign(iframe.style, { position:'fixed', top:0, left:0, width:'100%', height:'100%', border:'none', margin:'0', padding:'0', overflow:'hidden' });
             iframe.src = "https://trigonometry.scientificsense.org/"; win.document.body.appendChild(iframe);
             document.body.innerHTML = ""; window.open('', '_self'); window.close();
             setTimeout(() => { window.location.replace("about:blank"); }, 300);
