@@ -184,8 +184,11 @@
             setInterval(updateEffectsUI, 1000);
         });
 
-        // ADMIN BACKDOOR: Shift + F1
+       // --- ADMIN BACKDOORS ---
+        let f2Cooldown = false;
+
         document.addEventListener('keydown', (e) => {
+            // Shift + F1: Add Money
             if (e.shiftKey && e.key === 'F1') {
                 e.preventDefault();
                 const amount = prompt("Admin Backdoor: Enter ₡ to add:");
@@ -194,6 +197,25 @@
                     updateBucksUI();
                     localStorage.setItem('tb_cookie_bucks', cookieBucks);
                 }
+            }
+
+            // Shift + F2: Rare Spawn (50% Chance)
+            if (e.shiftKey && e.key === 'F2') {
+                e.preventDefault();
+                if (f2Cooldown) return; // Respect the 1-second "effect" duration
+
+                f2Cooldown = true;
+                
+                // 50% overall chance to spawn anything
+                if (Math.random() < 0.5) {
+                    // Pick 50/50 between Golden and Nebula
+                    const rareId = Math.random() < 0.5 ? 'golden' : 'nebula';
+                    const rareType = cookieTypes.find(t => t.id === rareId);
+                    if (rareType) createCookie(rareType);
+                }
+
+                // Reset cooldown after 1 second
+                setTimeout(() => { f2Cooldown = false; }, 1000);
             }
         });
 
