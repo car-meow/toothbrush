@@ -106,13 +106,18 @@
 <body>
     
     <div class="home-container">
-<!-- Cookie Bucks & Stats (Top Left) -->
+    <!-- Cookie Bucks & Stats (Top Left) -->
     <div style="position: fixed; top: 20px; left: 25px; z-index: 10000; display: flex; flex-direction: column; align-items: flex-start; gap: 5px;">
         <div style="font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
             <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
         </div>
-        <button onclick="openStatsMenu()" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc;">View Stats</button>
+        <!-- Added Shop Button -->
+        <button onclick="openShop()" class="save-btn" style="background: #2196F3; width: 100%; font-size: 14px; padding: 8px 12px; margin-bottom: 5px; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);">Open Shop</button>
+        <button onclick="openStatsMenu()" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc; width: 100%;">View Stats</button>
     </div>
+
+    <!-- Active Effects Tracker (Top Right) -->
+    <div id="effects-container"></div>
 
     <!-- Discovery Popup Notification -->
     <div id="discovery-popup" class="discovery-popup">
@@ -134,6 +139,17 @@
             </div>
             
             <button onclick="closeStatsMenu()" class="save-btn" style="background:#2196F3; color:white; width:100%; font-size:16px;">Okay</button>
+        </div>
+    </div>
+
+    <!-- Shop Modal -->
+    <div id="shop-modal" class="overlay" style="z-index: 11000;">
+        <div class="cookie-modal-box" style="width: 500px; max-height: 85vh; display: flex; flex-direction: column;">
+            <h2 style="color:#2196F3; margin-bottom:10px;">Toothbrush Shop</h2>
+            <div id="shop-list" style="flex: 1; overflow-y: auto; text-align: left; padding: 10px; display: flex; flex-direction: column; gap: 15px;">
+                <!-- Items inject here -->
+            </div>
+            <button onclick="closeShop()" class="save-btn" style="background:#444; width:100%; margin-top:15px;">Close Shop</button>
         </div>
     </div>
 
@@ -201,54 +217,99 @@
 
             // Initialize the Cookie Game
             updateBucksUI();
+            handleOfflineEarnings();
+            
             setInterval(spawnCookieRoutine, 3000); // Tries to spawn a cookie every 3 seconds
+            setInterval(idleProductionLoop, 1000); // Process passive income every second
+            setInterval(updateEffectsUI, 1000); // Check for active buffs every second
         });
 
         // --- COOKIE CLICKER MINI-GAME ---
         
 		let isCookiePaused = false;
         let cookieStats = JSON.parse(localStorage.getItem('tb_cookie_stats') || '{}');
-        let cookieBucks = parseInt(localStorage.getItem('tb_cookie_bucks') || '0');
+        let cookieBucks = parseFloat(localStorage.getItem('tb_cookie_bucks') || '0');
+        let swagPoints = parseInt(localStorage.getItem('tb_swag_points') || '0');
         let discoveredCookies = JSON.parse(localStorage.getItem('tb_discovered_cookies') || '[]');
+        let inventory = JSON.parse(localStorage.getItem('tb_inventory') || '{"buildings":{}, "upgrades":{}, "cooldowns":{}}');
+        let magnetEnabled = localStorage.getItem('tb_magnet_on') === 'true';
 
-        // The Cookie Dictionary (Add new cookies here easily!)
+        // The Cookie Dictionary with updated values
         const cookieTypes =[
-            { id: 'nebula', name: 'Nebula', value: 10000, chance: 1000, quote: "Woah, is that a portal to space?", img: 'Cookies/nebula.png', css: 'aura-nebula' },
-            { id: 'golden', name: 'Golden Cookie', value: 1000, chance: 300, quote: "Thanks, Grandma!", img: 'Cookies/golden.png', css: 'aura-golden' },
-            { id: 'sugar', name: 'Sugar (with sprinkle)', value: 100, chance: 50, quote: "So sweet, my teeth burn!", img: 'Cookies/sugar.png', css: 'aura-sugar' },
-            { id: 'smore', name: "S'more", value: 75, chance: 35, quote: "Fresh from the campfire!", img: 'Cookies/smore.png', css: 'aura-smore' },
-            { id: 'chocolate', name: 'Chocolate', value: 20, chance: 25, quote: "Are you sure you didn't put a brownie in the cookie cutter?", img: 'Cookies/chocolate.png', css: 'aura-chocolate' },
-            { id: 'snickerdoodle', name: 'Snickerdoodle', value: 10, chance: 20, quote: "Soft AND cinnamony- what's not to like?", img: 'Cookies/snickerdoodle.png', css: 'aura-snickerdoodle' },
-            { id: 'peanut_butter', name: 'Peanut Butter', value: 5, chance: 15, quote: "Ooooh, my favorite!", img: 'Cookies/peanut_butter.png', css: 'aura-peanut' },
-            { id: 'cashew', name: 'Cashew', value: 4, chance: 10, quote: "Hope you're having a good day!", img: 'Cookies/cashew.png', css: 'aura-cashew' },
-            { id: 'oatmeal_raisin', name: 'Oatmeal Raisin', value: 3, chance: 5, quote: "An under-appreciated classic.", img: 'Cookies/oatmeal_raisin.png', css: 'aura-oatmeal' },
-            { id: 'chocolate_chip', name: 'Chocolate Chip', value: 1, chance: 3, quote: "You can't go wrong with the basics.", img: 'Cookies/chocolate_chip.png', css: 'aura-basic' }
+            { id: 'nebula', name: 'Nebula', value: 10000000, chance: 1000, quote: "Woah, is that a portal to space?", img: 'Cookies/nebula.png', css: 'aura-nebula' },
+            { id: 'golden', name: 'Golden Cookie', value: 1000000, chance: 300, quote: "Thanks, Grandma!", img: 'Cookies/golden.png', css: 'aura-golden' },
+            { id: 'sugar', name: 'Sugar', value: 200000, chance: 50, quote: "So sweet, my teeth burn!", img: 'Cookies/sugar.png', css: 'aura-sugar' },
+            { id: 'smore', name: "S'more", value: 50000, chance: 35, quote: "Fresh from the campfire!", img: 'Cookies/smore.png', css: 'aura-smore' },
+            { id: 'chocolate', name: 'Chocolate', value: 10000, chance: 25, quote: "Are you sure you didn't put a brownie in the cookie cutter?", img: 'Cookies/chocolate.png', css: 'aura-chocolate' },
+            { id: 'snickerdoodle', name: 'Snickerdoodle', value: 4000, chance: 20, quote: "Soft AND cinnamony- what's not to like?", img: 'Cookies/snickerdoodle.png', css: 'aura-snickerdoodle' },
+            { id: 'peanut_butter', name: 'Peanut Butter', value: 300, chance: 15, quote: "Ooooh, my favorite!", img: 'Cookies/peanut_butter.png', css: 'aura-peanut' },
+            { id: 'cashew', name: 'Cashew', value: 100, chance: 10, quote: "Hope you're having a good day!", img: 'Cookies/cashew.png', css: 'aura-cashew' },
+            { id: 'oatmeal_raisin', name: 'Oatmeal Raisin', value: 50, chance: 5, quote: "An under-appreciated classic.", img: 'Cookies/oatmeal_raisin.png', css: 'aura-oatmeal' },
+            { id: 'chocolate_chip', name: 'Chocolate Chip', value: 21, chance: 3, quote: "You can't go wrong with the basics.", img: 'Cookies/chocolate_chip.png', css: 'aura-basic' }
         ];
 
         function updateBucksUI() {
-            document.getElementById('cookie-bucks-counter').textContent = cookieBucks.toLocaleString();
+            document.getElementById('cookie-bucks-counter').textContent = Math.floor(cookieBucks).toLocaleString();
+            localStorage.setItem('tb_last_seen', Date.now());
+        }
+
+        // --- IDLE LOGIC ---
+        function getCPS() {
+            let cps = 0;
+            const b = inventory.buildings;
+            if(b.oven) cps += (b.oven * (1/60));
+            if(b.mixer) cps += (b.mixer * (5/45));
+            if(b.bakery) cps += (b.bakery * (25/45));
+            if(b.factory) cps += (b.factory * (67/30));
+            if(b.dyson) cps += (b.dyson * (625/15));
+            return cps;
+        }
+
+        function idleProductionLoop() {
+            if (isCookiePaused) return;
+            cookieBucks += getCPS();
+            updateBucksUI();
+        }
+
+        function handleOfflineEarnings() {
+            const lastSeen = localStorage.getItem('tb_last_seen');
+            if (!lastSeen) return;
+            const secondsAway = (Date.now() - parseInt(lastSeen)) / 1000;
+            const earned = secondsAway * getCPS();
+            if (earned > 1) {
+                cookieBucks += earned;
+                alert(`Welcome back! Your autobakers made ₡${Math.floor(earned).toLocaleString()} while you were gone.`);
+                updateBucksUI();
+            }
         }
 
         function spawnCookieRoutine() {
-            // Evaluates from rarest to most common to prevent common ones overriding rare spawns
-            if (isCookiePaused) return; // Freezes spawning while menu is open
-			let spawnedType = null;
-            for (let type of cookieTypes) {
-                if (Math.floor(Math.random() * type.chance) === 0) {
-                    spawnedType = type;
-                    break; 
+            if (isCookiePaused) return; 
+            
+            let chanceMult = (inventory.upgrades.frenzy) ? 2 : 1;
+            
+            for (let i=0; i < chanceMult; i++) {
+                let spawnedType = null;
+                for (let type of cookieTypes) {
+                    let r = type.chance;
+                    // Grandma's Blessing logic
+                    if (type.id === 'golden' && Date.now() < inventory.cooldowns.grandma) r = 40;
+                    // Magnifying Glass logic
+                    if ((type.id === 'golden' || type.id === 'nebula') && Date.now() < inventory.cooldowns.glass) r *= 0.75;
+
+                    if (Math.floor(Math.random() * r) === 0) { spawnedType = type; break; }
                 }
+                
+                if (spawnedType) createCookieElement(spawnedType);
             }
+        }
 
-            if (!spawnedType) return; // Nothing spawned this tick
-
-            // Create Cookie HTML Element
+        function createCookieElement(type) {
             const cookie = document.createElement('img');
-            cookie.src = spawnedType.img;
-            cookie.className = 'cookie-entity ' + spawnedType.css;
+            cookie.src = type.img;
+            cookie.className = 'cookie-entity ' + type.css;
             document.body.appendChild(cookie);
 
-            // Calculate Random Edge-to-Edge Trajectory
             const size = 160;
             const vw = window.innerWidth;
             const vh = window.innerHeight;
@@ -260,69 +321,64 @@
             else if (edge === 2) { startX = Math.random() * vw; startY = vh + size; endX = vw - startX; endY = -size; }
             else { startX = -size; startY = Math.random() * vh; endX = vw + size; endY = vh - startY; }
 
-            // Calculate Random Duration (Between 8 seconds and 14 seconds)
+            // Sugar Magnet Logic
+            if (magnetEnabled) { endX = vw/2 - size/2; endY = vh/2 - size/2; }
+
             const randomDuration = Math.floor(Math.random() * 6000) + 8000;
 
-            // Float across screen
             const animation = cookie.animate([
                 { left: startX + 'px', top: startY + 'px' },
                 { left: endX + 'px', top: endY + 'px' }
             ], { duration: randomDuration, easing: 'linear', fill: 'forwards' });
 
-            // Remove if it floats off-screen
             animation.onfinish = () => cookie.remove();
 
-            // When user clicks the cookie!
             cookie.onclick = (e) => {
                 if(cookie.dataset.clicked) return;
                 cookie.dataset.clicked = "true";
 
-                // 1. Get the cookie's exact location right before deleting it
                 const rect = cookie.getBoundingClientRect();
                 cookie.remove(); 
 
-                // 2. Add money and save
-                cookieBucks += spawnedType.value;
+                // Value Calculation
+                let val = type.value;
+                if (type.id === 'chocolate_chip' && inventory.upgrades.ceramic) val = 500;
+                
+                // Compounding Multipliers
+                let goldMult = Math.pow(1.03, inventory.upgrades.gold_plates || 0);
+                let nebMult = Math.pow(1.10, inventory.upgrades.nebula_plates || 0);
+                val = val * goldMult * nebMult;
+
+                cookieBucks += val;
                 localStorage.setItem('tb_cookie_bucks', cookieBucks);
                 updateBucksUI();
 				
-				// 2a. Record the stat
                 cookieStats.total = (cookieStats.total || 0) + 1;
-                cookieStats[spawnedType.id] = (cookieStats[spawnedType.id] || 0) + 1;
+                cookieStats[type.id] = (cookieStats[type.id] || 0) + 1;
                 localStorage.setItem('tb_cookie_stats', JSON.stringify(cookieStats));
 
-                // 3. Show floating text (+₡5)
-                showFloatingText(e.clientX, e.clientY, "+₡" + spawnedType.value);
+                showFloatingText(e.clientX, e.clientY, "+₡" + Math.floor(val));
 
-                // 4. Handle First Discovery
-                if (!discoveredCookies.includes(spawnedType.id)) {
-                    discoveredCookies.push(spawnedType.id);
+                if (!discoveredCookies.includes(type.id)) {
+                    discoveredCookies.push(type.id);
                     localStorage.setItem('tb_discovered_cookies', JSON.stringify(discoveredCookies));
-                    showDiscovery(spawnedType.name, spawnedType.quote);
+                    showDiscovery(type.name, type.quote);
                 }
 
-                // 5. NEW: Play the explosion GIF at the cookie's exact location
+                // Explosion GIF
                 const popGif = document.createElement('img');
-                
-                // Adding "?t=..." forces the browser to restart the GIF from frame 1 every time
                 popGif.src = 'pop.gif?t=' + Date.now(); 
-                
                 popGif.style.position = 'fixed';
                 popGif.style.left = rect.left + 'px';
                 popGif.style.top = rect.top + 'px';
-                popGif.style.width = '160px'; // Matches the cookie's size
+                popGif.style.width = '160px';
                 popGif.style.height = '160px';
-                popGif.style.opacity = '0.5'; // 50% transparent as requested
-                popGif.style.pointerEvents = 'none'; // Prevents it from blocking other clicks
+                popGif.style.opacity = '0.5';
+                popGif.style.pointerEvents = 'none';
                 popGif.style.zIndex = '9999';
-                
-                // (Pro-Tip: Because your GIF has a black background, this CSS trick 
-                // makes the black completely invisible, leaving only the white explosion lines!)
                 popGif.style.mixBlendMode = 'screen'; 
 
                 document.body.appendChild(popGif);
-
-                // Remove the GIF element after 600 milliseconds (the length of the animation)
                 setTimeout(() => popGif.remove(), 600);
             };
         }
@@ -335,39 +391,190 @@
             el.style.left = x + 'px';
             el.style.top = y + 'px';
             document.body.appendChild(el);
-            setTimeout(() => el.remove(), 1500); // Cleans up after animation
+            setTimeout(() => el.remove(), 1500); 
         }
 
         // Drops the non-intrusive alert from the top of the screen
         let discoveryTimeout;
         function showDiscovery(name, quote) {
             const popup = document.getElementById('discovery-popup');
-            document.getElementById('discovery-name').textContent = "New Cookie Discovered: " + name;
+            document.getElementById('discovery-name').textContent = "New Discovery: " + name;
             document.getElementById('discovery-quote').textContent = '"' + quote + '"';
-            
-            popup.classList.remove('show');
-            void popup.offsetWidth; // Force CSS reflow so animation restarts
             popup.classList.add('show');
-            
-            clearTimeout(discoveryTimeout);
-            discoveryTimeout = setTimeout(() => {
-                popup.classList.remove('show');
-            }, 5000);
+            setTimeout(() => popup.classList.remove('show'), 5000);
         }
 
-        // Proxy Logic (Launches in about:blank and closes home screen)
+        // --- SHOP ENGINE ---
+        function openShop() {
+            isCookiePaused = true;
+            const container = document.getElementById('shop-list');
+            container.innerHTML = "";
+
+            const addItem = (cat, id, name, desc, cost, type) => {
+                const owned = (type === 'building' ? (inventory.buildings[id] || 0) : (inventory.upgrades[id] || 0));
+                const div = document.createElement('div');
+                div.className = "shop-item";
+                
+                let displayCost = cost;
+                if(id === 'gold_plates') displayCost = 5000000 * Math.pow(1.03, owned);
+                if(id === 'nebula_plates') displayCost = 1000000000 * Math.pow(1.02, owned);
+
+                div.innerHTML = `
+                    <div class="item-name">${name} ${owned > 0 && type === 'building' ? '('+owned+')' : ''}</div>
+                    <div class="item-desc">${desc}</div>
+                    <div class="item-cost">Cost: ₡${Math.floor(displayCost).toLocaleString()}</div>
+                    <button id="buy-${id}" class="save-btn buy-btn" style="background:#2E7D32">${(type === 'upgrade' && owned > 0 && id !== 'gold_plates' && id !== 'nebula_plates') ? 'Already Bought' : 'Purchase'}</button>
+                `;
+                container.appendChild(div);
+
+                document.getElementById(`buy-${id}`).onclick = () => buyItem(id, displayCost, type);
+            };
+
+            container.innerHTML += `<div class="shop-cat">Buildings (Idle)</div>`;
+            addItem('build', 'oven', 'Rusty Oven', '₡1 every 60s.', 500, 'building');
+            addItem('build', 'mixer', 'Industrial Mixer', '₡5 every 45s.', 5000, 'building');
+            addItem('build', 'bakery', 'Local Bakery', '₡25 every 45s.', 50000, 'building');
+            addItem('build', 'factory', 'Cookie Factory', '₡67 every 30s.', 250000, 'building');
+            addItem('build', 'dyson', 'Dyson Sphere', '₡625 every 15s.', 5000000, 'building');
+
+            container.innerHTML += `<div class="shop-cat">Upgrades</div>`;
+            addItem('up', 'frenzy', 'Cookie Frenzy', '2x Spawn Rate.', 1000, 'upgrade');
+            addItem('up', 'magnet', 'Sugar Magnet', 'Cookies float to center.', 20000, 'upgrade');
+            addItem('up', 'ceramic', 'Ceramic Plates', 'Choc Chips worth ₡500.', 10000, 'upgrade');
+            addItem('up', 'gold_plates', 'Golden Plates', '+3% Value (Compounds).', 5000000, 'upgrade');
+            addItem('up', 'nebula_plates', 'Nebula Plates', '+10% Value (Compounds).', 1000000000, 'upgrade');
+
+            container.innerHTML += `<div class="shop-cat">Consumables</div>`;
+            addItem('buff', 'glass', 'Magnifying Glass', 'Rare cookies +25% (2m).', 50000, 'buff');
+            addItem('buff', 'grandma', 'Grand Blessing', 'Golden spawn 1/40 (1m).', 1000000, 'buff');
+            addItem('buff', 'warp', 'Time Warp', 'Instant 1 hour production (1h CD).', 5000, 'buff');
+
+            container.innerHTML += `<div class="shop-cat">The End Game</div>`;
+            addItem('swag', 'swag', 'Swag Point (₴)', '1 Trillion per point.', 1000000000000, 'swag');
+            
+            if(inventory.upgrades.magnet) {
+                container.innerHTML += `
+                    <button onclick="toggleMagnet()" class="save-btn" style="background:${magnetEnabled?'#B71C1C':'#2E7D32'}; margin-top:10px;">
+                        ${magnetEnabled ? 'Disable Magnet' : 'Enable Magnet'}
+                    </button>
+                `;
+            }
+
+            document.getElementById('shop-modal').style.display = 'flex';
+        }
+
+        function buyItem(id, cost, type) {
+            if (cookieBucks < cost) return alert("Not enough ₡!");
+            if (type === 'upgrade' && inventory.upgrades[id] > 0 && id !== 'gold_plates' && id !== 'nebula_plates') return;
+
+            cookieBucks -= cost;
+            if (type === 'building') inventory.buildings[id] = (inventory.buildings[id] || 0) + 1;
+            if (type === 'upgrade') inventory.upgrades[id] = (inventory.upgrades[id] || 0) + 1;
+            if (type === 'swag') swagPoints++;
+            
+            if (type === 'buff') {
+                if (id === 'glass') inventory.cooldowns.glass = Date.now() + 120000;
+                if (id === 'grandma') inventory.cooldowns.grandma = Date.now() + 60000;
+                if (id === 'warp') {
+                    cookieBucks += (getCPS() * 3600);
+                    inventory.cooldowns.warp = Date.now() + 3600000;
+                }
+            }
+
+            localStorage.setItem('tb_inventory', JSON.stringify(inventory));
+            localStorage.setItem('tb_swag_points', swagPoints);
+            updateBucksUI();
+            openShop(); 
+        }
+
+        function toggleMagnet() {
+            magnetEnabled = !magnetEnabled;
+            localStorage.setItem('tb_magnet_on', magnetEnabled);
+            openShop();
+        }
+
+        function closeShop() {
+            document.getElementById('shop-modal').style.display = 'none';
+            isCookiePaused = false;
+        }
+
+        // --- STATS MENU LOGIC ---
+        function openStatsMenu() {
+            isCookiePaused = true; 
+            document.getElementById('stats-total').textContent = `Total ${cookieStats.total || 0} Cookies`;
+            const listDiv = document.getElementById('stats-list');
+            listDiv.innerHTML = '';
+            
+            cookieTypes.forEach(type => {
+                const count = cookieStats[type.id] || 0;
+                const row = document.createElement('div');
+                row.style.fontSize = '14px';
+                row.style.lineHeight = '1.4';
+                
+                if (discoveredCookies.includes(type.id)) {
+                    row.style.color = '#e0e0e0';
+                    row.innerHTML = `
+                        <span style="color:#FFD700; font-weight:bold;">${count}</span> ${type.name} Cookies have been found.<br>
+                        <span style="color:#aaa; font-style:italic; font-size:12px;">"${type.quote}"</span>
+                    `;
+                } else {
+                    row.style.color = '#777';
+                    row.style.fontStyle = 'italic';
+                    row.innerHTML = `Cookie not discovered yet!`;
+                }
+                listDiv.appendChild(row);
+            });
+            document.getElementById('stats-modal').style.display = 'flex';
+        }
+
+        function closeStatsMenu() {
+            document.getElementById('stats-modal').style.display = 'none';
+            isCookiePaused = false;
+        }
+
+        // --- ACTIVE EFFECTS TRACKER LOGIC ---
+        function updateEffectsUI() {
+            const container = document.getElementById('effects-container');
+            if (!container) return;
+            container.innerHTML = ""; 
+            const now = Date.now();
+
+            const activeBuffs = [
+                { id: 'glass', name: 'Magnifying Glass', class: 'effect-glass' },
+                { id: 'grandma', name: "Grandma's Blessing", class: 'effect-grandma' },
+                { id: 'warp', name: 'Time Warp Cooldown', class: '' }
+            ];
+
+            activeBuffs.forEach(buff => {
+                const endTime = inventory.cooldowns[buff.id];
+                if (endTime && now < endTime) {
+                    const secondsLeft = Math.ceil((endTime - now) / 1000);
+                    const mins = Math.floor(secondsLeft / 60);
+                    const secs = secondsLeft % 60;
+                    const timeString = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+                    const div = document.createElement('div');
+                    div.className = `effect-item ${buff.class}`;
+                    div.innerHTML = `
+                        <span class="effect-name">${buff.name}</span>
+                        <span class="effect-timer">${timeString}</span>
+                    `;
+                    container.appendChild(div);
+                }
+            });
+        }
+
+        // Proxy Logic 
         document.getElementById('proxy-btn').onclick = () => {
             const win = window.open('about:blank', '_blank');
             if (!win) return alert("Pop-up Blocked! Please allow pop-ups.");
             
-            // Set the cloaked tab title and icon
             win.document.title = 'New Tab';
             const icon = win.document.createElement('link');
             icon.rel = 'icon';
             icon.href = 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png';
             win.document.head.appendChild(icon);
 
-            // Inject the proxy iframe
             const iframe = win.document.createElement('iframe');
             Object.assign(iframe.style, {
                 position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
@@ -376,50 +583,12 @@
             iframe.src = "https://trigonometry.scientificsense.org/";
             win.document.body.appendChild(iframe);
 
-            // Kill the original tab
             document.title = "New Tab";
             document.body.innerHTML = ""; 
             window.open('', '_self');
             window.close();
             setTimeout(() => { window.location.replace("about:blank"); }, 300);
         };
-		
-		// --- STATS MENU LOGIC ---
-        function openStatsMenu() {
-            isCookiePaused = true; // Pause spawning
-            
-            // Set the big total text
-            document.getElementById('stats-total').textContent = `Total ${cookieStats.total || 0} Cookies`;
-            
-            const listDiv = document.getElementById('stats-list');
-            listDiv.innerHTML = '';
-            
-            // Generate the list dynamically
-            cookieTypes.forEach(type => {
-                const count = cookieStats[type.id] || 0;
-                const row = document.createElement('div');
-                row.style.fontSize = '14px';
-                
-                if (discoveredCookies.includes(type.id)) {
-                    row.style.color = '#e0e0e0';
-                    row.innerHTML = `<span style="color:#FFD700; font-weight:bold;">${count}</span> ${type.name} Cookies have been found.`;
-                } else {
-                    row.style.color = '#777';
-                    row.style.fontStyle = 'italic';
-                    row.textContent = 'Cookie not discovered yet!';
-                }
-                
-                listDiv.appendChild(row);
-            });
-            
-            document.getElementById('stats-modal').style.display = 'flex';
-        }
-
-        function closeStatsMenu() {
-            document.getElementById('stats-modal').style.display = 'none';
-            isCookiePaused = false; // Resume spawning
-        }
-		
     </script>
 	
 	<!-- Tutorial Modal -->
@@ -432,14 +601,12 @@
     </div>
 
     <script>
-        // EDIT YOUR TEXT HERE:
         const tutorialSteps =[
             "Welcome to Toothbrush! This tutorial will show you around. Click on one of the tabs at the bottom to get started. (If you'd like to replay this tutorial, click on the Tutorial tab in the home screen and click 'Replay In-App Tutorial'.)"
         ];
         
         let currentStep = 0;
         
-        // Check if this specific tutorial has been played before
         if (!localStorage.getItem('tb_tut_welcome')) {
             document.getElementById('tut-overlay').style.display = 'flex';
             updateTut();
@@ -454,7 +621,7 @@
             currentStep++;
             if (currentStep >= tutorialSteps.length) {
                 document.getElementById('tut-overlay').style.display = 'none';
-                localStorage.setItem('tb_tut_welcome', 'done'); // Mark as finished
+                localStorage.setItem('tb_tut_welcome', 'done'); 
             } else {
                 updateTut();
             }

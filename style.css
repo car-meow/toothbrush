@@ -247,3 +247,50 @@ iframe { width: 100%; height: 100%; border: none; }
     margin-bottom: 25px; min-height: 80px; display: flex; 
     align-items: center; justify-content: center;
 }
+
+/* --- ACTIVE EFFECTS TRACKER --- */
+#effects-container {
+    position: fixed;
+    top: 20px;
+    right: 25px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-end;
+    z-index: 10000;
+    pointer-events: none; /* Allows clicking through to the background */
+}
+
+.effect-item {
+    background: rgba(31, 31, 31, 0.9);
+    border: 2px solid #2196F3;
+    padding: 10px 15px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    min-width: 150px;
+    transition: opacity 0.3s;
+}
+
+.effect-name {
+    font-size: 12px;
+    font-weight: bold;
+    color: #2196F3;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.effect-timer {
+    font-size: 18px;
+    font-weight: bold;
+    color: white;
+    font-family: monospace;
+}
+
+/* Colors for specific buffs */
+.effect-glass { border-color: #00BCD4; }
+.effect-glass .effect-name { color: #00BCD4; }
+.effect-grandma { border-color: #FFD700; }
+.effect-grandma .effect-name { color: #FFD700; }

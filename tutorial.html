@@ -14,7 +14,8 @@
             <button onclick="location.href='index.html'" class="save-btn" style="background-color: #555;">Back</button>
         </div>
         
-        <script>
+<script>
+            // Logic to Replay the Tutorial
             document.getElementById('replay-tut-btn').onclick = () => {
                 if (confirm("Are you sure you want to replay the tutorial?")) {
                     // Wipe the memory of all completed tutorials
@@ -24,6 +25,17 @@
                     localStorage.removeItem('tb_tut_chat');
                     // Send them back to the home screen to start over
                     location.href = 'index.html';
+                }
+            };
+
+            // NEW: Logic to Clear Cookie Stats
+            document.getElementById('clear-cookies-btn').onclick = () => {
+                if (confirm("Are you sure you want to completely wipe all your Cookie Bucks and discovered cookies? This cannot be undone!")) {
+                    // Wipe the cookie game memory
+                    localStorage.removeItem('tb_cookie_bucks');
+                    localStorage.removeItem('tb_discovered_cookies');
+                    localStorage.removeItem('tb_cookie_stats');
+                    alert("Cookie stats have been cleared!");
                 }
             };
         </script>
