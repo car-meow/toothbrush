@@ -293,20 +293,61 @@
             localStorage.setItem('tb_last_seen', Date.now());
         }
 
-        function getCPS() {
+        function getAutobakerCPS() {
             let cps = 0; const b = inventory.buildings;
-            if(b.oven) cps += (b.oven * (1/60)); if(b.mixer) cps += (b.mixer * (5/45)); if(b.bakery) cps += (b.bakery * (25/45)); if(b.factory) cps += (b.factory * (67/30)); if(b.dyson) cps += (b.dyson * (625/15));
+            if(b.oven) cps += (b.oven * (1/60));
+            if(b.mixer) cps += (b.mixer * (5/45));
+            if(b.bakery) cps += (b.bakery * (25/45));
+            if(b.factory) cps += (b.factory * (67/30));
+            if(b.dyson) cps += (b.dyson * (625/15));
             if(inventory.upgrades.pierre) cps *= 2;
             return cps;
         }
 
-        function idleProductionLoop() { if (!isCookiePaused) { cookieBucks += getCPS(); updateBucksUI(); } }
+        function getClickCPS() {
+            // 1. Spawns per second
+            const checkRate = 3.0; // Base interval
+            const spawnsPerCheck = Math.pow(1.1, inventory.upgrades.frenzy || 0);
+            const sps = spawnsPerCheck / checkRate;
 
-        function handleOfflineEarnings() {
-            const lastSeen = localStorage.getItem('tb_last_seen');
-            if (!lastSeen) return;
-            const earned = ((Date.now() - parseInt(lastSeen)) / 1000) * getCPS();
-            if (earned > 1) { cookieBucks += earned; alert(`Offline earnings: ₡${Math.floor(earned).toLocaleString()}`); updateBucksUI(); }
+            // 2. Average value of a single spawn
+            let totalWeight = cookieTypes.reduce((sum, t) => sum + (1/t.chance), 0);
+            let avgValue = cookieTypes.reduce((sum, t) => {
+                let weight = (1/t.chance) / totalWeight;
+                // Basic rarity mult average (~1.2x)
+                return sum + (t.value * weight * 1.2);
+            }, 0);
+
+            // 3. Apply Shop Multipliers
+            avgValue *= Math.pow(1.03, inventory.upgrades.gold_plates || 0);
+            avgValue *= Math.pow(1.10, inventory.upgrades.nebula_plates || 0);
+            if (inventory.upgrades.pierre) avgValue *= 2;
+
+            // 4. Divine Intervention Factor
+            const diTiers = inventory.upgrades.divine_intervention || 0;
+            const clickChance = (inventory.upgrades.divine_calling > 0) ? 1.0 : (diTiers * 0.10);
+
+            return sps * avgValue * clickChance;
+        }
+
+        function getTotalCPS() {
+            return getAutobakerCPS() + getClickCPS();
+        }
+
+        function updateBucksUI() {
+            // Rounded down to whole number
+            document.getElementById('cookie-bucks-counter').textContent = Math.floor(cookieBucks).toLocaleString();
+            // Added ₡ icon to CPS
+            document.getElementById('cps-counter').textContent = `₡${Math.floor(getTotalCPS()).toLocaleString()}/s`;
+            localStorage.setItem('tb_last_seen', Date.now());
+        }
+
+        // Fix the production loop to use the total
+        function idleProductionLoop() { 
+            if (!isCookiePaused) { 
+                cookieBucks += (getTotalCPS()); 
+                updateBucksUI(); 
+            } 
         }
 
         function spawnCookieRoutine() {
@@ -378,28 +419,27 @@
             }, 3500);
         }
 
-        function createCookie(type) {
+function createCookie(type) {
             const cookie = document.createElement('img');
             cookie.src = type.img; cookie.className = 'golden-cookie ' + type.css;
             
             let size = 200; 
             if(type.id === 'golden') size = 160;
             if(type.id === 'chocolate_chip') size = 240;
-            cookie.style.width = size + "px";
-            cookie.style.height = size + "px";
-
+            cookie.style.width = size + "px"; cookie.style.height = size + "px";
             document.body.appendChild(cookie);
             
-            const vw = window.innerWidth, vh = window.innerHeight, edge = Math.floor(Math.random() * 4);
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const edge = Math.floor(Math.random() * 4);
             let startX, startY, endX, endY;
             if (edge === 0) { startX = Math.random()*vw; startY = -size; endX = vw-startX; endY = vh+size; }
             else if (edge === 1) { startX = vw+size; startY = Math.random()*vh; endX = -size; endY = vh-startY; }
             else if (edge === 2) { startX = Math.random()*vw; startY = vh+size; endX = vw-startX; endY = -size; }
             else { startX = -size; startY = Math.random()*vh; endX = vw+size; endY = vh-startY; }
+            if (magnetEnabled) { endX = vw/2-size/2; endY = vh/2-size/2; }
 
             let duration = Math.floor(Math.random() * 6000) + 8000;
             let finalRarity = rollRarity(type);
-            
             const keyframes =[{ left: startX+'px', top: startY+'px', transform: 'rotate(0deg)', offset: 0 }];
             if (magnetEnabled) {
                 const midX = vw/2-size/2, midY = vh/2-size/2;
@@ -411,28 +451,32 @@
             const anim = cookie.animate(keyframes, { duration, easing: 'linear', fill: 'forwards' });
             anim.onfinish = () => cookie.remove();
 
-            // Divine Intervention & Divine Calling Auto-Clicker Logic
-            const diTiers = inventory.upgrades.divine_intervention || 0;
-            const hasDivineCalling = inventory.upgrades.divine_calling > 0;
-            
-            if (diTiers > 0 || hasDivineCalling) {
-                // If they have the final calling, set chance to 1.0 (100%), otherwise use the 10% tiers
+            // --- FIXED AUTO-CLICKER LOGIC ---
+            function attemptAutoClick() {
+                const diTiers = inventory.upgrades.divine_intervention || 0;
+                const hasDivineCalling = inventory.upgrades.divine_calling > 0;
+                if (diTiers === 0 && !hasDivineCalling) return;
+
                 const clickChance = hasDivineCalling ? 1.0 : (diTiers * 0.10);
-                
                 if (Math.random() < clickChance) {
+                    const delay = Math.random() * 3000 + 1000;
                     setTimeout(() => {
-                        if (cookie && !cookie.dataset.clicked) cookie.onclick();
-                    }, Math.random() * 3000 + 1000); 
+                        // If game is paused, wait 500ms and try again instead of giving up
+                        if (isCookiePaused) {
+                            attemptAutoClick(); 
+                        } else if (cookie && !cookie.dataset.clicked && document.body.contains(cookie)) {
+                            cookie.onclick();
+                        }
+                    }, delay);
                 }
             }
+            attemptAutoClick();
 
             cookie.onclick = (e) => {
-                if(cookie.dataset.clicked || isCookiePaused) return; 
+                // We removed isCookiePaused from here so auto-clicks can finalize properly
+                if(cookie.dataset.clicked) return; 
                 cookie.dataset.clicked = "true";
-                
                 const rect = cookie.getBoundingClientRect(); cookie.remove();
-                const cX = e && e.clientX ? e.clientX : rect.left + (rect.width / 2);
-                const cY = e && e.clientY ? e.clientY : rect.top + (rect.height / 2);
 
                 const getSounds =['get1', 'get2', 'get3', 'get4'];
                 const sound = document.getElementById(getSounds[Math.floor(Math.random() * getSounds.length)]);
@@ -450,18 +494,17 @@
                 let val = type.value * mult;
                 val = val * Math.pow(1.03, inventory.upgrades.gold_plates || 0) * Math.pow(1.10, inventory.upgrades.nebula_plates || 0);
                 if (inventory.upgrades.pierre) val *= 2;
-                if (inventory.upgrades.quantum_cursor) val += (getCPS() * 5);
+                if (inventory.upgrades.quantum_cursor) val += (getAutobakerCPS() * 5);
 
-                cookieBucks += val; updateBucksUI();
+                cookieBucks += val; 
                 cookieStats.total = (cookieStats.total || 0) + 1;
                 cookieStats[type.id] = (cookieStats[type.id] || 0) + 1;
-                // NEW: Save the specific rarity count for this cookie
                 cookieStats[type.id + '_' + finalRarity.id] = (cookieStats[type.id + '_' + finalRarity.id] || 0) + 1;
-                
-                localStorage.setItem('tb_cookie_bucks', cookieBucks);
-                localStorage.setItem('tb_cookie_stats', JSON.stringify(cookieStats));
-                save();
+                save(); updateBucksUI();
 
+                // Coordinates for floating text
+                const cX = e && e.clientX ? e.clientX : rect.left + (rect.width/2);
+                const cY = e && e.clientY ? e.clientY : rect.top + (rect.height/2);
                 showFloatingText(cX, cY, "+₡" + Math.floor(val), 'floating-bucks');
                 showFloatingText(cX, cY + 35, finalRarity.label, 'floating-rarity ' + finalRarity.class);
 
