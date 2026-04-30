@@ -3,159 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <title>New Tab</title>
-    <link rel="stylesheet" href="style.css?v=33">
-    <style>
-        /* --- Zigzag Background & Animation --- */
-        body {
-            background-color: #1a1a1a;
-            background-image:  linear-gradient(135deg, #1f1f1f 25%, transparent 25%), linear-gradient(225deg, #1f1f1f 25%, transparent 25%), linear-gradient(45deg, #1f1f1f 25%, transparent 25%), linear-gradient(315deg, #1f1f1f 25%, transparent 25%);
-            background-position:  40px 0, 40px 0, 0 0, 0 0;
-            background-size: 80px 80px;
-            background-repeat: repeat;
-            animation: moveBackground 40s linear infinite;
-            display: flex; flex-direction: column; height: 100vh; width: 100vw; margin: 0; overflow: hidden;
-        }
-        @keyframes moveBackground { from { background-position: 40px 0; } to { background-position: 540px 500px; } }
-
-        .home-container { display: flex; flex-direction: column; justify-content: space-between; height: 100vh; width: 100vw; padding-bottom: 8vh; position: relative; z-index: 5; transition: opacity 0.5s; }
-        .title-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .home-title { font-size: 80px; color: #ffffff; text-shadow: 4px 4px 15px rgba(0, 0, 0, 0.8); margin: 0; letter-spacing: 2px; cursor: pointer; }
-        .home-splash { font-size: 20px; font-style: italic; color: #FFEB3B; font-weight: bold; text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.8); margin-top: 10px; text-align: center; max-width: 80%; }
-
-        .button-row { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
-        .home-btn { font-size: 22px; padding: 15px 40px; border-radius: 12px; }
-
-        /* --- UI & Modals --- */
-        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 20000; align-items: center; justify-content: center; }
-        .cookie-modal-box { background: #1f1f1f; padding: 30px; border-radius: 20px; width: 600px; max-width: 95vw; max-height: 85vh; border: 2px solid #2196F3; text-align: center; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 0 50px black; }
-        
-        #shop-list, #stats-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; overflow-y: auto; padding: 10px; margin: 15px 0; text-align: left; }
-        .shop-cat { grid-column: span 2; color: #888; font-size: 11px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #333; padding: 10px 0 5px 0; text-align: left; }
-        .shop-item { background: #252525; padding: 12px; border-radius: 12px; border: 1px solid #444; text-align: left; display: flex; flex-direction: column; justify-content: space-between; }
-        .swag-upgrade-box { background: rgba(139, 0, 0, 0.2) !important; border: 1px solid #b71c1c !important; }
-        .item-name { color: #2196F3; font-weight: bold; font-size: 14px; }
-        .item-desc { color: #aaa; font-size: 11px; margin: 6px 0; line-height: 1.3; height: auto; overflow: visible; }
-        .item-cost { color: #FFEB3B; font-weight: bold; font-size: 12px; }
-        .buy-btn.disabled { background: #444 !important; opacity: 0.5; cursor: not-allowed; }
-
-        .cps-display { font-size: 16px; color: #FFF59D; margin-left: 10px; font-weight: bold; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); }
-        .incinerate-btn { background-color: #B71C1C !important; color: white !important; grid-column: span 2; margin-top: 10px; border: 2px solid #ef5350 !important; font-size: 14px !important; }
-
-        /* --- RARITY SYSTEM (Standardized Design) --- */
-.rarity-common { color: #CFCFCF; -webkit-text-stroke: 1.5px #555; }
-.rarity-uncommon { color: #6CDB66; -webkit-text-stroke: 1.5px #1b5e20; }
-.rarity-rare { color: #566FEB; -webkit-text-stroke: 1.5px #1a237e; }
-.rarity-epic { color: #AD0FEB; -webkit-text-stroke: 1.5px #4a148c; }
-.rarity-divine { color: #EDD11D; -webkit-text-stroke: 1.5px #bf360c; }
-
-.floating-rarity { 
-    position: fixed; 
-    font-weight: 900; 
-    font-size: 28px; 
-    z-index: 10001; 
-    pointer-events: none; 
-    animation: rarity-float 2.5s ease-out forwards; 
-    paint-order: stroke fill;
-}
-
-@keyframes rarity-float { 
-    0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; } 
-    15% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
-    30% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    100% { transform: translate(-50%, -140px); opacity: 0; } 
-}
-
-        #screen-border { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9998; box-shadow: inset 0 0 100px rgba(0,0,0,0); transition: opacity 0.5s, box-shadow 0.5s; opacity: 0; }
-
-        /* --- DIVINE EVENT --- */
-        #divine-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0); z-index: 15000; display: none; align-items: center; justify-content: center; pointer-events: none; transition: background 0.5s; }
-        .divine-letter { font-size: 150px; font-weight: 900; position: absolute; top: 50%; margin-top: -75px; background: linear-gradient(to bottom, #FAA00F, #EDD11D); -webkit-background-clip: text; -webkit-text-fill-color: #FFD700; -webkit-text-stroke: 10px #bf360c; filter: drop-shadow(0 0 20px black); }
-        #div-part { left: 50%; transform: translateX(-150vw); } 
-        #ine-part { left: 50%; transform: translateX(150vw); } 
-        @keyframes shake { 0%,100%{transform:translate(0,0)} 25%{transform:translate(-5px,5px)} 50%{transform:translate(5px,-5px)} 75%{transform:translate(-5px,-5px)} }
-        .camera-shake { animation: shake 0.1s infinite; }
-
-        .hud-bottom-right { position: fixed; bottom: 20px; right: 25px; display: flex; gap: 10px; z-index: 11000; }
-        .golden-cookie { position: fixed; object-fit: contain; z-index: 999; cursor: pointer; }
-        .floating-bucks { position: fixed; color: #4CAF50; font-weight: bold; font-size: 28px; z-index: 1001; pointer-events: none; animation: float-up 1.5s ease-out forwards; text-shadow: 1px 1px 3px rgba(0,0,0,0.8), -1px -1px 3px rgba(0,0,0,0.8); }
-        @keyframes float-up { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -120px) scale(1.5); opacity: 0; } }
-
-        #effects-container { position: fixed; top: 20px; right: 25px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; z-index: 1000; pointer-events: none; }
-        .effect-item { background: rgba(31, 31, 31, 0.9); border: 2px solid #2196F3; padding: 8px 12px; border-radius: 10px; display: flex; flex-direction: column; align-items: flex-end; }
-        .effect-name { font-size: 10px; font-weight: bold; color: #2196F3; text-transform: uppercase; }
-        .effect-timer { font-size: 16px; font-weight: bold; color: white; }
-
-        .discovery-popup { position: fixed; top: -150px; left: 50%; transform: translateX(-50%); background: rgba(25, 25, 25, 0.95); border: 4px solid #FFD700; border-radius: 15px; padding: 20px 40px; text-align: center; z-index: 10000; transition: all 0.5s; pointer-events: none; }
-        .discovery-popup.show { top: 20px; }
-    </style>
+    <link rel="stylesheet" href="style.css?v=34">
 </head>
 <body class="chat-bg">
     
-    <!-- Audio -->
+    <!-- Audio Engine -->
     <audio id="bgm" src="bgm.mp3" loop></audio>
     <audio id="sfx-stop" src="stop.mp3"></audio>
     <audio id="sfx-divine1" src="divine.mp3"></audio>
     <audio id="sfx-divine2" src="divine2.mp3"></audio>
     <audio id="sfx-start" src="start.mp3"></audio>
-    <audio id="get1" src="get1.mp3"></audio><audio id="get2" src="get2.mp3"></audio><audio id="get3" src="get3.mp3"></audio><audio id="get4" src="get4.mp3"></audio>
+    <audio id="get1" src="get1.mp3"></audio>
+    <audio id="get2" src="get2.mp3"></audio>
+    <audio id="get3" src="get3.mp3"></audio>
+    <audio id="get4" src="get4.mp3"></audio>
+    <audio id="achN" src="achN.mp3"></audio>
+    <audio id="achR" src="achR.mp3"></audio>
 
     <div id="screen-border"></div>
-    <div id="divine-overlay"><div id="div-part" class="divine-letter">DIV</div><div id="ine-part" class="divine-letter">INE</div></div>
-
-    <div style="position: fixed; top: 20px; left: 25px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;">
-        <div style="font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
-            <span id="cps-counter" class="cps-display">₡0/s</span>
-        </div>
-        <button onclick="openShop()" class="save-btn" style="background: #2196F3; width: 130px; font-size: 14px; padding: 10px;">Open Shop</button>
-        <button onclick="openStatsMenu()" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc; width: 130px;">View Stats</button>
+    <div id="divine-overlay">
+        <div id="div-part" class="divine-letter">DIV</div>
+        <div id="ine-part" class="divine-letter">INE</div>
     </div>
 
-    <div id="effects-container"></div>
+    <!-- UI LAYER -->
+    <div id="ui-layer">
+        <div style="position: fixed; top: 20px; left: 25px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;">
+            <div style="font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
+                <span id="cps-counter" class="cps-display">₡0.0/s</span>
+            </div>
+            <button id="open-shop-btn" class="save-btn" style="background: #2196F3; width: 130px; font-size: 14px; padding: 10px; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);">Open Shop</button>
+            <button id="open-stats-btn" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc; width: 130px;">Cookie Stats</button>
+        </div>
+
+        <div id="effects-container"></div>
+
+        <div class="home-container">
+            <div class="title-area">
+                <h1 class="home-title" onclick="location.href='index.html'">Toothbrush</h1>
+                <span id="splash-text" class="home-splash"></span>
+            </div>
+            <div class="button-row">
+                <button onclick="location.href='games.html'" class="save-btn rainbow-btn home-btn">Games</button>
+                <button onclick="location.href='ai.html'" class="save-btn home-btn" style="background-color: #f57c00;">AI Chat</button>
+                <button id="proxy-btn" class="save-btn home-btn" style="background-color: #00BCD4;">Proxy</button>
+                <button onclick="location.href='chat.html'" class="save-btn home-btn" style="background-color: #9C27B0;">Chat Room</button>
+                <button onclick="location.href='tutorial.html'" class="save-btn home-btn" style="background-color: #5fc772;">Tutorial</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD Control (Restored) -->
+    <div class="hud-bottom-right">
+        <button id="hide-menu-btn" class="save-btn" style="background-color: #ffcdd2; color: #b71c1c; font-size: 11px;">Hide Menu Items</button>
+        <button id="mute-btn" class="save-btn" style="background-color: #333; width: 45px; font-size: 18px;">🔇</button>
+    </div>
+
+    <!-- Modals -->
+    <div id="stats-modal" class="overlay">
+        <div class="cookie-modal-box" style="border-color: #FFD700; width: 420px;">
+            <h2 style="color:#FFD700; margin-bottom:10px;">Cookie Statistics</h2>
+            <h1 id="stats-total" style="color:white; margin: 10px 0; font-size: 28px;">Total 0 Cookies</h1>
+            <div id="stats-list" style="background:#121212; padding:15px; border-radius:10px; border:1px solid #333; text-align: left; display:block; max-height: 250px; overflow-y:auto;"></div>
+            <button id="close-stats-btn" class="save-btn" style="background:#2196F3; width:100%; margin-top: 10px;">Okay</button>
+        </div>
+    </div>
+
+    <div id="shop-modal" class="overlay">
+        <div class="cookie-modal-box">
+            <h2 style="color:#2196F3; margin-bottom:10px;">Toothbrush Shop</h2>
+            <div id="shop-list"></div>
+            <button id="close-shop-btn" class="save-btn" style="background:#444; width:100%; margin-top:15px;">Close Shop</button>
+        </div>
+    </div>
 
     <div id="discovery-popup" class="discovery-popup">
         <h3 id="discovery-name" style="color: #fff; margin-bottom: 5px; font-size: 22px;"></h3>
         <p id="discovery-quote" style="color: #ddd; font-style: italic;"></p>
     </div>
 
-    <div id="menu-items-wrapper" class="home-container">
-        <div class="title-area">
-            <h1 class="home-title" onclick="location.href='index.html'">Toothbrush</h1>
-            <span id="splash-text" class="home-splash"></span>
-        </div>
-        <div class="button-row">
-            <button onclick="location.href='games.html'" class="save-btn rainbow-btn home-btn">Games</button>
-            <button onclick="location.href='ai.html'" class="save-btn home-btn" style="background-color: #f57c00;">AI Chat</button>
-            <button id="proxy-btn" class="save-btn home-btn" style="background-color: #00BCD4;">Proxy</button>
-            <button onclick="location.href='chat.html'" class="save-btn home-btn" style="background-color: #9C27B0;">Chat Room</button>
-            <button onclick="location.href='tutorial.html'" class="save-btn home-btn" style="background-color: #5fc772;">Tutorial</button>
-        </div>
-    </div>
-
-    <div class="hud-bottom-right">
-        <button id="hide-menu-btn" class="save-btn" style="background-color: #ffcdd2; color: #b71c1c; font-size: 11px;">Hide Menu Items</button>
-        <button id="mute-btn" class="save-btn" style="background-color: #333; width: 45px; font-size: 18px;">🔇</button>
-    </div>
-
-    <div id="stats-modal" class="overlay">
-        <div class="cookie-modal-box" style="border-color: #FFD700; width: 420px;">
-            <h2 style="color:#FFD700;">Cookie Statistics</h2>
-            <h1 id="stats-total" style="color:white; margin: 10px 0; font-size: 28px;">Total 0 Cookies</h1>
-            <div id="stats-list"></div>
-            <button onclick="closeStatsMenu()" class="save-btn" style="background:#2196F3; width:100%; margin-top: 10px;">Okay</button>
-        </div>
-    </div>
-
-    <div id="shop-modal" class="overlay">
-        <div class="cookie-modal-box">
-            <h2 style="color:#2196F3;">Toothbrush Shop</h2>
-            <div id="shop-list"></div>
-            <button onclick="closeShop()" class="save-btn" style="background:#444; width:100%; margin-top:15px;">Close Shop</button>
+    <div id="tut-overlay" class="overlay">
+        <div style="background:#1f1f1f; padding:30px; border-radius:15px; width:450px; border:2px solid #2196F3; text-align:center;">
+            <h2 style="color: #2196F3; margin-bottom: 15px;">Welcome!</h2>
+            <div id="tut-text" style="color:#eee; margin-bottom:20px; line-height:1.6;">Welcome to Toothbrush! This tutorial will show you around. Click on one of the tabs at the bottom to get started.</div>
+            <!-- Restored Tutorial Button -->
+            <button id="tut-btn" class="save-btn" style="background-color: #2196F3; width: 100%;">Got it!</button>
         </div>
     </div>
 
     <script>
-        const splashes = ["Assisted by Jayden!", "No, please don't close my ta-", "Wait, wait, I was about to finish the level!", "READ the TUTORIAL!", "Dead.", "Wow. Just... wow.", "Honorable mention: Ctrl+W.", "Iso bottom frags", "Thanks for using Toothbrush!", "Yo Dhruva, wassup? Join the chat room!", "Master, I'm hungry", "No food for you!", "Prompted to perfection.", "ALT+TAB is your best friend.", "AI solved the math, I solved the level.", "High scores > GPA.", "Saving progress... hopefully.", "Not a bug, it's a feature.", "Powered by pure procrastination.", "100% human-ish.", "Linewize is watching...", "GoGuardian is blind.", "Just one more level.", "0% hallucinations, 100% gaming.", "Strictly educational...", "Does this count as CS homework?", "Bypassing the boredom.", "Infinite storage, finite time.", "Don't forget to backup!", "Stealth mode engaged.", "Everything is unblocked if you try.", "Learning to code?", "Browser-based bliss.", "The stash is never empty.", "Level 99 Procrastinator.", "Error 404: Homework not found.", "IndexedDB is your best friend.", "About:blank magic.", "Speedrunning the semester.", "Logic applied, levels cleared.", "The AI says take a break.", "One file to rule them all.", "A student's best secret.", "Don't close the lid!", "GPT-4o approved.", "Your progress is persistent.", "Toothbrush Tutorial is mandatory.", "Cloak active. Icons changed.", "Memory leak? Never.", "HTML5 is the future.", "Wait, did I save?", "The AI is my co-pilot.", "Simulating success.", "Unblocked and unbothered.", "Chromebooks are gaming rigs.", "Loading a better reality.", "The Cloak is your shield.", "One prompt away.", "Gaming is a soft skill.", "The math adds up.", "Why study when you can run?", "Securely can't see this.", "Digital treasures.", "AI: I suggest playing.", "Minimalist fun.", "The stash is legendary.", "Secret is safe.", "Click to continue.", "The bell doesn't dismiss you.", "Context window: Infinite.", "Manual included.", "Optimized for Chromebooks.", "Saves are in the cloud-ish.", "Home of the bored.", "Synthesizing scores.", "The AI isn't cheating.", "Save states are rights.", "Don't let it timeout!", "The perfect distraction.", "Bypassing the mundane.", "Strictly local.", "Polished UI.", "Wait, solve this first.", "AI wrote this code.", "The final boss of school.", "Hardcoded for fun.", "Stash is ultimate.", "Tutorial complete.", "Testing 1, 2, 3.", "Can someone buy me Starbucks?", "Never underestimate the dev.", "Classroom Center is down.", "Stand in the corner!", "Don't blink.", "Reality is a simulation.", "Wait, this works?", "Click the cookie.", "Become a Swag Lord.", "Cookies are life.", "Baking at lightspeed."];
+        const splashes = ["Assisted by Jayden!", "No, please don't close my ta-", "Y'all, Vivian says hi!", "Wait, wait, I was about to finish the level!", "READ the TUTORIAL!", "Dead.", "Wow. Just... wow.", "Honorable mention: Ctrl+W.", "Iso bottom frags", "Thanks for using Toothbrush!", "Yo Dhruva, wassup? Join the chat room!", "Master, I'm hungry", "No food for you!", "Prompted to perfection.", "ALT+TAB is your best friend.", "AI solved the math, I solved the level.", "High scores > GPA.", "Saving progress... hopefully.", "Not a bug, it's a feature.", "Powered by pure procrastination.", "100% human-ish.", "Linewize is watching...", "GoGuardian is blind.", "Just one more level.", "0% hallucinations, 100% gaming.", "Strictly educational...", "Does this count as CS homework?", "Bypassing the boredom.", "Infinite storage, finite time.", "Don't forget to backup!", "Stealth mode engaged.", "Everything is unblocked if you try.", "Learning to code?", "Browser-based bliss.", "The stash is never empty.", "Level 99 Procrastinator.", "Error 404: Homework not found.", "IndexedDB is your best friend.", "About:blank magic.", "Speedrunning the semester.", "Logic applied, levels cleared.", "The AI says take a break.", "One file to rule them all.", "A student's best secret.", "Don't close the lid!", "GPT-4o approved.", "Your progress is persistent.", "Toothbrush Tutorial is mandatory.", "Cloak active. Icons changed.", "Memory leak? Never.", "HTML5 is the future.", "Wait, did I save?", "The AI is my co-pilot.", "Simulating success.", "Unblocked and unbothered.", "Chromebooks are gaming rigs.", "Loading a better reality.", "The Cloak is your shield.", "One prompt away.", "Gaming is a soft skill.", "The math adds up.", "Why study when you can run?", "Securely can't see this.", "Digital treasures.", "AI: I suggest playing.", "Minimalist fun.", "The stash is legendary.", "Secret is safe.", "Click to continue.", "The bell doesn't dismiss you.", "Context window: Infinite.", "Manual included.", "Optimized for Chromebooks.", "Saves are in the cloud-ish.", "Home of the bored.", "Synthesizing scores.", "The AI isn't cheating.", "Save states are rights.", "Don't let it timeout!", "The perfect distraction.", "Bypassing the mundane.", "Strictly local.", "Polished UI.", "Wait, solve this first.", "AI wrote this code.", "The final boss of school.", "Hardcoded for fun.", "Stash is ultimate.", "Tutorial complete.", "Testing 1, 2, 3.", "Can someone buy me Starbucks?", "Never underestimate the dev.", "Classroom Center is down.", "Stand in the corner!", "Don't blink.", "Reality is a simulation.", "Wait, this works?", "Click the cookie.", "Become a Swag Lord.", "Cookies are life.", "Baking at lightspeed."];
 
         const cookieTypes =[
             { id: 'nebula', name: 'Nebula', value: 10000000, chance: 1000, quote: "Woah, is that a portal to space?", img: 'Cookies/nebula.png', css: 'aura-nebula', maxR: 'Divine', minR: 'Rare', border: 'rainbow' },
@@ -183,27 +121,93 @@
         let discoveredCookies = JSON.parse(localStorage.getItem('tb_discovered_cookies') || '[]');
         let cookieStats = JSON.parse(localStorage.getItem('tb_cookie_stats') || '{}');
         let inventory = JSON.parse(localStorage.getItem('tb_inventory') || '{"buildings":{}, "upgrades":{}, "cooldowns":{}, "buy_counts":{}}');
-        let isCookiePaused = false, magnetEnabled = localStorage.getItem('tb_magnet_on') === 'true', isMuted = false, menusHidden = false, borderPriority = false, forceDivineNext = false, f2Cooldown = false;
+        let isCookiePaused = false, magnetEnabled = localStorage.getItem('tb_magnet_on') === 'true', isMuted = false, menusHidden = false, borderPriority = false;
+        let forceDivineNext = false; 
 
-        const bgm = document.getElementById('bgm');
-
+        // ROBUST INITIALIZATION: Assign all events after DOM loads
         window.addEventListener('DOMContentLoaded', () => {
+            const bgm = document.getElementById('bgm');
             const el = document.getElementById('splash-text');
             if (el) el.textContent = `"${splashes[Math.floor(Math.random() * splashes.length)]}"`;
-            updateBucksUI(); handleOfflineEarnings();
-            setInterval(spawnCookieRoutine, 3000); setInterval(idleProductionLoop, 1000); setInterval(updateEffectsUI, 1000);
+            
+            updateBucksUI(); 
+            handleOfflineEarnings();
+            
+            if(!localStorage.getItem('tb_tut_welcome')) document.getElementById('tut-overlay').style.display='flex';
+            
+            setInterval(spawnCookieRoutine, 3000); 
+            setInterval(idleProductionLoop, 1000); 
+            setInterval(updateEffectsUI, 1000);
+
+            // --- Robust Button Binds ---
+            document.body.addEventListener('click', () => { if(!isMuted && bgm.paused) bgm.play(); }, {once: true});
+
+            document.getElementById('mute-btn').onclick = () => {
+                isMuted = !isMuted;
+                bgm.muted = isMuted;
+                document.getElementById('mute-btn').textContent = isMuted ? "🔊" : "🔇";
+                if(!isMuted) bgm.play();
+            };
+
+            document.getElementById('hide-menu-btn').onclick = function() {
+                menusHidden = !menusHidden;
+                const wrapper = document.querySelector('.home-container'); // Targets title & buttons
+                if (menusHidden) {
+                    wrapper.style.opacity = "0";
+                    wrapper.style.pointerEvents = "none";
+                    this.textContent = "Show Menu Items";
+                    this.style.backgroundColor = "#c8e6c9";
+                    this.style.color = "#2e7d32";
+                } else {
+                    wrapper.style.opacity = "1";
+                    wrapper.style.pointerEvents = "all";
+                    this.textContent = "Hide Menu Items";
+                    this.style.backgroundColor = "#ffcdd2";
+                    this.style.color = "#b71c1c";
+                }
+            };
+
+            document.getElementById('open-shop-btn').onclick = openShop;
+            document.getElementById('close-shop-btn').onclick = () => { document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false; };
+            document.getElementById('open-stats-btn').onclick = openStatsMenu;
+            document.getElementById('close-stats-btn').onclick = () => { document.getElementById('stats-modal').style.display = 'none'; isCookiePaused = false; };
+            document.getElementById('tut-btn').onclick = () => { document.getElementById('tut-overlay').style.display = 'none'; localStorage.setItem('tb_tut_welcome', 'done'); };
+
+            document.getElementById('proxy-btn').onclick = () => {
+                const win = window.open('about:blank', '_blank'); if (!win) return alert("Pop-up Blocked!");
+                const icon = win.document.createElement('link'); icon.rel = 'icon'; icon.href = 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png'; win.document.head.appendChild(icon);
+                const iframe = win.document.createElement('iframe'); Object.assign(iframe.style, { position:'fixed', top:0, left:0, width:'100%', height:'100%', border:'none', margin:'0', padding:'0', overflow:'hidden' });
+                iframe.src = "https://trigonometry.scientificsense.org/"; win.document.body.appendChild(iframe);
+                document.body.innerHTML = ""; window.open('', '_self'); window.close(); setTimeout(() => { window.location.replace("about:blank"); }, 300);
+            };
         });
 
-        document.body.addEventListener('click', () => { if(!isMuted) bgm.play(); }, {once: true});
-
+        // --- ADMIN BACKDOORS (HARDENED) ---
         document.addEventListener('keydown', function(e) {
             if (!e.shiftKey) return; 
-            if (e.key === 'F1') { e.preventDefault(); let a = prompt("₡:"); if(a) { cookieBucks += parseFloat(a); updateBucksUI(); save(); } }
-            if (e.key === 'F2') { e.preventDefault(); createCookie(cookieTypes.find(t=>t.id==='nebula')); }
-            if (e.key === 'F3') { e.preventDefault(); createCookie(cookieTypes.find(t=>t.id==='golden')); }
-            if (e.key === 'F4') { e.preventDefault(); forceDivineNext = true; showFloatingText(window.innerWidth/2, 100, "DIVINE PREP ACTIVE", "floating-bucks"); }
+            if (e.key === 'F1' || e.key === '!') { 
+                e.preventDefault(); 
+                let a = prompt("Add Money:"); 
+                if(a && !isNaN(a)) { cookieBucks += parseFloat(a); updateBucksUI(); save(); } 
+            }
+            if (e.key === 'F2' || e.key === '@') { 
+                e.preventDefault(); 
+                const type = cookieTypes.find(t => t.id === 'nebula');
+                if (type) createCookie(type); 
+            }
+            if (e.key === 'F3' || e.key === '#') {
+                e.preventDefault();
+                const type = cookieTypes.find(t => t.id === 'golden');
+                if (type) createCookie(type);
+            }
+            if (e.key === 'F4' || e.key === '$') {
+                e.preventDefault();
+                forceDivineNext = true;
+                showFloatingText(window.innerWidth/2, 100, "DIVINE PREP ACTIVE", "floating-bucks");
+            }
         }, true);
 
+        // --- CORE FUNCTIONS ---
         function save() {
             localStorage.setItem('tb_cookie_bucks', Math.floor(cookieBucks));
             localStorage.setItem('tb_swag_points', swagPoints);
@@ -293,61 +297,36 @@
 
         async function startDivineEvent() {
             isCookiePaused = true;
-            const overlay = document.getElementById('divine-overlay');
-            const divPart = document.getElementById('div-part');
-            const inePart = document.getElementById('ine-part');
-            
-            // 1. Audio and Pause
+            const overlay = document.getElementById('divine-overlay'), divPart = document.getElementById('div-part'), inePart = document.getElementById('ine-part');
+            const bgm = document.getElementById('bgm');
             document.getElementById('sfx-stop').play();
             const startVol = bgm.volume; 
-            bgm.volume = 0.1;
+            let slowInterval = setInterval(() => { if(bgm.volume > 0.1) bgm.volume -= 0.1; else { bgm.pause(); clearInterval(slowInterval); } }, 50);
             
             const cookies = document.querySelectorAll('.golden-cookie');
             cookies.forEach(c => c.getAnimations().forEach(a => a.pause()));
             
-            // 2. Darken Screen
-            overlay.style.display = 'flex'; 
-            setTimeout(() => overlay.style.background = 'rgba(0,0,0,0.8)', 10);
+            overlay.style.display = 'flex'; setTimeout(() => overlay.style.background = 'rgba(0,0,0,0.8)', 10);
             
-            // 3. Animation
-            let animDiv = divPart.animate([
-                { transform: 'translateX(-150vw)' }, 
-                { transform: 'translateX(-100%)' }
-            ], { duration: 400, fill: 'forwards', easing:'ease-out' });
-
-            let animIne = inePart.animate([
-                { transform: 'translateX(150vw)' }, 
-                { transform: 'translateX(0%)' }
-            ], { duration: 400, fill: 'forwards', easing:'ease-out' });
-
+            let animDiv, animIne;
             setTimeout(() => {
-                document.getElementById('sfx-divine1').play(); 
-                document.getElementById('sfx-divine2').play();
-                document.body.classList.add('camera-shake'); 
-                setTimeout(() => document.body.classList.remove('camera-shake'), 500);
-            }, 400);
+                animDiv = divPart.animate([{ transform: 'translateX(-150vw)' }, { transform: 'translateX(-100%)' }], { duration: 400, fill: 'forwards', easing:'ease-out' });
+                animIne = inePart.animate([{ transform: 'translateX(150vw)' }, { transform: 'translateX(0%)' }], { duration: 400, fill: 'forwards', easing:'ease-out' });
+                setTimeout(() => {
+                    document.getElementById('sfx-divine1').play(); document.getElementById('sfx-divine2').play();
+                    document.body.classList.add('camera-shake'); setTimeout(() => document.body.classList.remove('camera-shake'), 500);
+                }, 400);
+            }, 500);
             
-            // 4. Start sound plays early
             setTimeout(() => { document.getElementById('sfx-start').play(); }, 2500);
             
-            // 5. Cleanup and HARD POSITION RESET
             setTimeout(() => {
                 overlay.style.opacity = '0'; 
                 setTimeout(() => {
-                    overlay.style.display = 'none'; 
-                    overlay.style.opacity = '1'; 
-                    overlay.style.background = 'rgba(0,0,0,0)';
-                    
-                    // FORCE RESET: Move them back off-screen manually
-                    divPart.style.transform = 'translateX(-150vw)';
-                    inePart.style.transform = 'translateX(150vw)';
-                    
-                    // Stop animations to prevent visual glitches on 2nd activation
-                    animDiv.cancel(); 
-                    animIne.cancel();
-
-                    bgm.volume = startVol; 
-                    if(!isMuted) bgm.play();
+                    overlay.style.display = 'none'; overlay.style.opacity = '1'; overlay.style.background = 'rgba(0,0,0,0)';
+                    divPart.style.transform = 'translateX(-150vw)'; inePart.style.transform = 'translateX(150vw)';
+                    if (animDiv) animDiv.cancel(); if (animIne) animIne.cancel();
+                    bgm.volume = startVol; if(!isMuted) bgm.play();
                     cookies.forEach(c => c.getAnimations().forEach(a => a.play()));
                     isCookiePaused = false;
                 }, 250);
@@ -385,20 +364,23 @@
             function attemptAutoClick() {
                 const diTiers = inventory.upgrades.divine_intervention || 0;
                 const hasDivineCalling = inventory.upgrades.divine_calling > 0;
+                if (diTiers === 0 && !hasDivineCalling) return;
+
                 const clickChance = hasDivineCalling ? 1.0 : (diTiers * 0.10);
-                if (diTiers > 0 || hasDivineCalling) {
-                    if (Math.random() < clickChance) {
-                        setTimeout(() => { if (isCookiePaused) attemptAutoClick(); else if (cookie && !cookie.dataset.clicked) cookie.onclick(); }, Math.random() * 3000 + 1000);
-                    }
+                if (Math.random() < clickChance) {
+                    setTimeout(() => { if (isCookiePaused) attemptAutoClick(); else if (cookie && !cookie.dataset.clicked) cookie.onclick(); }, Math.random() * 3000 + 1000);
                 }
             }
             attemptAutoClick();
 
             cookie.onclick = (e) => {
-                if(cookie.dataset.clicked) return; cookie.dataset.clicked = "true";
+                if(cookie.dataset.clicked || isCookiePaused) return; 
+                cookie.dataset.clicked = "true";
                 const rect = cookie.getBoundingClientRect(); cookie.remove();
-                const sound = document.getElementById(['get1','get2','get3','get4'][Math.floor(Math.random()*4)]);
-                if(sound){sound.currentTime=0; sound.play();}
+
+                const getSounds =['get1', 'get2', 'get3', 'get4'];
+                const sound = document.getElementById(getSounds[Math.floor(Math.random() * getSounds.length)]);
+                if (sound) { sound.currentTime = 0; sound.play(); }
 
                 if (forceDivineNext && (type.id==='golden'||type.id==='nebula')) { finalRarity = rarities.find(r=>r.id==='Divine'); forceDivineNext=false; }
                 if (finalRarity.id === 'Divine') startDivineEvent(); else flashBorder(finalRarity);
@@ -408,48 +390,62 @@
                 if (inventory.upgrades.pierre) val *= 2;
                 if (inventory.upgrades.quantum_cursor) val += (getAutobakerCPS() * 5);
 
-                cookieBucks += val; save(); updateBucksUI();
+                cookieBucks += val; updateBucksUI();
                 cookieStats.total = (cookieStats.total||0)+1; cookieStats[type.id]=(cookieStats[type.id]||0)+1; cookieStats[type.id+'_'+finalRarity.id]=(cookieStats[type.id+'_'+finalRarity.id]||0)+1;
+                save();
 
                 const cX = e && e.clientX ? e.clientX : rect.left + (rect.width/2);
                 const cY = e && e.clientY ? e.clientY : rect.top + (rect.height/2);
                 showFloatingText(cX, cY, "+₡" + Math.floor(val), 'floating-bucks');
                 showFloatingText(cX, cY + 35, finalRarity.label, 'floating-rarity rarity-' + finalRarity.id.toLowerCase());
 
-                if (!discoveredCookies.includes(type.id)) { discoveredCookies.push(type.id); localStorage.setItem('tb_discovered_cookies', JSON.stringify(discoveredCookies)); showDiscovery(type); }
+                if (!discoveredCookies.includes(type.id)) {
+                    discoveredCookies.push(type.id);
+                    localStorage.setItem('tb_discovered_cookies', JSON.stringify(discoveredCookies));
+                    showDiscovery(type);
+                }
                 const gif = document.createElement('img'); gif.src = 'pop.gif?t=' + Date.now();
                 Object.assign(gif.style, { position:'fixed', left:rect.left+'px', top:rect.top+'px', width:size+'px', height:size+'px', opacity:'0.5', pointerEvents:'none', zIndex:'9999', mixBlendMode:'screen' });
                 document.body.appendChild(gif); setTimeout(() => gif.remove(), 600);
             };
         }
 
+        // --- SHOP & UI ---
         function openShop() {
             isCookiePaused = true; const container = document.getElementById('shop-list'); container.innerHTML = "";
-            const addItem = (id, name, desc, cost, type, curve, curr = '₡') => {
-                const bought = (type === 'building' ? (inventory.buildings[id] || 0) : (inventory.upgrades[id] || 0));
-                const usage = inventory.buy_counts[id] || 0;
-                let dispCost = Math.floor(cost * Math.pow(curve, (type === 'buff' ? usage : bought)));
-                if(id === 'gold_plates') dispCost = Math.floor(10 * Math.pow(1.10, bought));
-                if(id === 'nebula_plates') dispCost = Math.floor(200 * Math.pow(1.05, bought));
-                const afford = (curr === '₡' ? cookieBucks >= dispCost : swagPoints >= dispCost);
+            const addItem = (id, name, desc, cost, type, curve, currency = '₡') => {
+                const boughtCount = (type === 'building' ? (inventory.buildings[id] || 0) : (inventory.upgrades[id] || 0));
+                const usageCount = inventory.buy_counts[id] || 0;
+                let displayCost = Math.floor(cost * Math.pow(curve, (type === 'buff' ? usageCount : boughtCount)));
+                if(id === 'gold_plates') displayCost = Math.floor(10 * Math.pow(1.10, boughtCount));
+                if(id === 'nebula_plates') displayCost = Math.floor(200 * Math.pow(1.05, boughtCount));
+                const afford = (currency === '₡' ? cookieBucks >= displayCost : swagPoints >= displayCost);
                 const inUse = (type === 'buff' && inventory.cooldowns[id] && Date.now() < inventory.cooldowns[id]);
-                const oneTime = (['pierre', 'magnet', 'quantum_cursor', 'divine_calling'].includes(id) && bought > 0);
-                const maxed = (id === 'divine_intervention' && bought >= 9);
-                const div = document.createElement('div'); div.className = "shop-item" + (curr === '₴' ? " swag-upgrade-box" : "");
-                let bTxt = "Purchase"; if (oneTime) bTxt = "Already Bought"; else if (maxed) bTxt = "Max Tier"; else if (inUse) bTxt = "Item in Use";
-                div.innerHTML = `<div><div class="item-name">${name} ${bought>0&&type==='building'?'('+bought+')':''}</div><div class="item-desc">${desc}</div><div class="item-cost">${curr}${dispCost.toLocaleString()}</div></div><button onclick="buyItem('${id}', ${dispCost}, '${type}', '${curr}')" class="save-btn buy-btn ${(!afford || inUse || oneTime || maxed) ? 'disabled' : ''}">${bTxt}</button>`;
+                const oneTime = (['pierre', 'magnet', 'quantum_cursor', 'divine_calling'].includes(id) && boughtCount > 0);
+                const maxedOut = (id === 'divine_intervention' && boughtCount >= 9);
+
+                const div = document.createElement('div'); div.className = "shop-item" + (currency === '₴' ? " swag-upgrade-box" : "");
+                let btnTxt = "Purchase"; if (oneTime) btnTxt = "Already Bought"; else if (maxedOut) btnTxt = "Max Tier"; else if (inUse) btnTxt = "Item in Use";
+                div.innerHTML = `<div><div class="item-name">${name} ${boughtCount>0&&type==='building'?'('+boughtCount+')':''}</div><div class="item-desc">${desc}</div><div class="item-cost">${currency}${Math.floor(displayCost).toLocaleString()}</div></div><button id="buy-${id}" class="save-btn buy-btn ${(!afford || inUse || oneTime || maxedOut) ? 'disabled' : ''}" style="background:#2E7D32 !important; padding: 8px;">${btnTxt}</button>`;
                 container.appendChild(div);
+                document.getElementById(`buy-${id}`).onclick = () => buyItem(id, displayCost, type, currency);
             };
             container.innerHTML += `<div class="shop-cat">Autobakers</div>`;
-            addItem('oven','Rusty Oven','₡1 every 60s.',500,'building',1.25); addItem('mixer','Industrial Mixer','₡5 every 45s.',5000,'building',1.18); addItem('bakery','Local Bakery','₡25 every 45s.',50000,'building',1.20); addItem('factory','Cookie Factory','₡67 every 30s.',250000,'building',1.15); addItem('dyson','Dyson Sphere','₡625 every 15s.',5000000,'building',1.19);
+            addItem('oven','Rusty Oven','Generates ₡1 every 60s.',500,'building',1.25); addItem('mixer','Industrial Mixer','Generates ₡5 every 45s.',5000,'building',1.18); addItem('bakery','Local Bakery','Generates ₡25 every 45s.',50000,'building',1.20); addItem('factory','Cookie Factory','Generates ₡67 every 30s.',250000,'building',1.15); addItem('dyson','Dyson Sphere','Generates ₡625 every 15s.',5000000,'building',1.19);
             container.innerHTML += `<div class="shop-cat">Swag Upgrades (Permanent)</div>`;
-            addItem('pierre',"Pierre d'Cauqi","x2 ₡/s gains.",1000,'upgrade',1,'₴'); addItem('gold_plates','Golden Plates','+3% Value.',50,'upgrade',1.10,'₴'); addItem('nebula_plates','Nebula Plates','+10% Value.',200,'upgrade',1.05,'₴'); addItem('frenzy','Cookie Frenzy','+10% Spawn Rate.',100,'upgrade',1.3,'₴'); addItem('magnet','Sugar Magnet','Attracts cookies.',100000,'upgrade',1,'₴'); addItem('divine_intervention','Divine Intervention','Auto-clicks 10%.',500,'upgrade',1.5,'₴');
+            addItem('pierre',"Pierre d'Cauqi","x2 ₡/s gains.",100,'upgrade',1,'₴'); addItem('gold_plates','Golden Plates','Every cookie worth 3% more. Compounds.',10,'upgrade',1.10,'₴'); addItem('nebula_plates','Nebula Plates','Every cookie worth 10% more. Compounds.',200,'upgrade',1.05,'₴'); addItem('divine_intervention','Divine Intervention','Auto-clicks 10%.',500,'upgrade',1.5,'₴');
             if ((inventory.upgrades.divine_intervention || 0) >= 9) addItem('divine_calling','Divine Calling','100% Auto-click.',1000000,'upgrade',1,'₴');
             container.innerHTML += `<div class="shop-cat">Consumables</div>`;
-            addItem('glass','Magnifying Glass','Rare+25% (2m).',50000,'buff',1.10); addItem('grandma','Grandma Blessing','Golden rate 1/40 (1m).',1000000,'buff',1.10); addItem('warp','Time Warp','1hr production.',5000,'buff',1.10);
+            addItem('glass','Magnifying Glass','Rare+25% (2m).',50000,'buff',1.10); addItem('grandma','Grandma Blessing','Golden 1/40 (1m).',1000000,'buff',1.10); addItem('warp','Time Warp','1hr production.',5000,'buff',1.10);
+            container.innerHTML += `<div class="shop-cat">Upgrades</div>`;
+            addItem('frenzy','Cookie Frenzy','Increases spawn rate 10%.',1000,'upgrade',1.5); addItem('magnet','Sugar Magnet','Attracts cookies.',20000,'upgrade',1); addItem('quantum_cursor','Quantum Cursors','Manual clicks grant +5s CPS.',250000,'upgrade',1);
+            
             const gain = Math.floor(cookieBucks / 1000000);
             container.innerHTML += `<div class="shop-item" style="grid-column: span 2; border-color: #f44336; text-align: center;"><div class="item-name" style="color: #f44336; font-size: 18px;">₴${swagPoints} Swag Points Owned</div><button onclick="incinerateCookies()" class="save-btn incinerate-btn">Incinerate Cookies (+₴${gain.toLocaleString()})</button></div>`;
-            if(inventory.upgrades.magnet) container.innerHTML += `<button onclick="toggleMagnet()" class="save-btn" style="grid-column: span 2; background:${magnetEnabled?'#B71C1C':'#2E7D32'}; margin-top:10px; width: 100%;">${magnetEnabled ? 'Disable Magnet' : 'Enable Magnet'}</button>`;
+            if(inventory.upgrades.magnet) {
+                window.toggleMagnet = () => { magnetEnabled = !magnetEnabled; localStorage.setItem('tb_magnet_on', magnetEnabled); openShop(); };
+                container.innerHTML += `<button onclick="toggleMagnet()" class="save-btn" style="grid-column: span 2; background:${magnetEnabled?'#B71C1C':'#2E7D32'}; margin-top:10px; width: 100%;">${magnetEnabled ? 'Disable Magnet' : 'Enable Magnet'}</button>`;
+            }
             document.getElementById('shop-modal').style.display = 'flex';
         }
 
@@ -459,7 +455,12 @@
             if (curr==='₡') cookieBucks -= cost; else swagPoints -= cost;
             if (type === 'building') inventory.buildings[id] = (inventory.buildings[id] || 0) + 1;
             else if (type === 'upgrade') { if(['pierre','magnet','quantum_cursor','divine_calling'].includes(id)&&inventory.upgrades[id]>0)return; inventory.upgrades[id] = (inventory.upgrades[id] || 0) + 1; }
-            else if (type === 'buff') { inventory.buy_counts[id] = (inventory.buy_counts[id] || 0) + 1; if (id === 'glass') inventory.cooldowns.glass = Date.now() + 120000; if (id === 'grandma') inventory.cooldowns.grandma = Date.now() + 60000; if (id === 'warp') { cookieBucks += (getAutobakerCPS() * 3600); inventory.cooldowns.warp = Date.now() + 3600000; } }
+            else if (type === 'buff') {
+                inventory.buy_counts[id] = (inventory.buy_counts[id] || 0) + 1;
+                if (id === 'glass') inventory.cooldowns.glass = Date.now() + 120000;
+                if (id === 'grandma') inventory.cooldowns.grandma = Date.now() + 60000;
+                if (id === 'warp') { cookieBucks += (getCPS() * 3600); inventory.cooldowns.warp = Date.now() + 3600000; }
+            }
             save(); updateBucksUI(); openShop();
         }
 
@@ -468,8 +469,22 @@
             if (confirm(`Incinerate for ₴${gain.toLocaleString()}?`)) {
                 swagPoints += gain; cookieBucks = 0; inventory.buildings = {};
                 inventory.upgrades = { gold_plates: inventory.upgrades.gold_plates, nebula_plates: inventory.upgrades.nebula_plates, pierre: inventory.upgrades.pierre, magnet: inventory.upgrades.magnet, quantum_cursor: inventory.upgrades.quantum_cursor, divine_intervention: inventory.upgrades.divine_intervention, divine_calling: inventory.upgrades.divine_calling };
-                save(); updateBucksUI(); closeShop();
+                save(); updateBucksUI(); document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false;
             }
+        }
+
+        function openStatsMenu() {
+            isCookiePaused = true; document.getElementById('stats-total').textContent = `Total ${cookieStats.total || 0} Cookies`;
+            const list = document.getElementById('stats-list'); list.innerHTML = '';
+            cookieTypes.forEach(type => {
+                const count = cookieStats[type.id] || 0; const row = document.createElement('div'); row.style.fontSize = '14px';
+                if (discoveredCookies.includes(type.id)) {
+                    const cCount = cookieStats[type.id + '_Common'] || 0; const uCount = cookieStats[type.id + '_Uncommon'] || 0; const rCount = cookieStats[type.id + '_Rare'] || 0; const eCount = cookieStats[type.id + '_Epic'] || 0; const dCount = cookieStats[type.id + '_Divine'] || 0;
+                    row.innerHTML = `<span style="color:#FFD700; font-weight:bold;">${count}</span> ${type.name} Cookies found. [<span style="color:#CFCFCF">${cCount}</span> <span style="color:#6CDB66">${uCount}</span> <span style="color:#566FEB">${rCount}</span> <span style="color:#AD0FEB">${eCount}</span> <span style="color:#EDD11D">${dCount}</span>]<br><span style="color:#aaa; font-style:italic; font-size:12px;">"${type.quote}"</span>`;
+                } else { row.style.color = '#777'; row.innerHTML = 'Cookie not discovered yet!'; }
+                list.appendChild(row);
+            });
+            document.getElementById('stats-modal').style.display = 'flex';
         }
 
         function showDiscovery(type) {
@@ -483,42 +498,15 @@
             setTimeout(() => { p.style.top = "-150px"; setTimeout(() => p.classList.remove('show'), 500); }, 5000);
         }
 
-        function showFloatingText(x, y, t, c) { const el = document.createElement('div'); el.className = c; el.textContent = t; el.style.left = x + 'px'; el.style.top = y + 'px'; document.body.appendChild(el); setTimeout(() => el.remove(), 2000); }
+        function showFloatingText(x, y, t, c) { const el = document.createElement('div'); el.className = c; el.textContent = t; el.style.left = x + 'px'; el.style.top = y + 'px'; document.getElementById('ui-layer').appendChild(el); setTimeout(() => el.remove(), 2000); }
         function updateEffectsUI() {
-            const c = document.getElementById('effects-container'); c.innerHTML = ""; const now = Date.now();
-            [{id:'glass', name:'Magnifying Glass', cls:'effect-glass'}, {id:'grandma', name:"Grandma's Blessing", cls:'effect-grandma'}, {id:'warp', name:'Time Warp CD', cls:''}].forEach(buff => {
-                const end = inventory.cooldowns[buff.id]; if (end && now < end) {
-                    const sec = Math.ceil((end - now) / 1000); const div = document.createElement('div'); div.className = `effect-item ${buff.cls}`;
-                    div.innerHTML = `<span class="effect-name">${buff.name}</span><span class="effect-timer">${Math.floor(sec/60)}:${(sec%60).toString().padStart(2,'0')}</span>`; c.appendChild(div);
+            const c = document.getElementById('effects-container'); c.innerHTML = ""; const now = Date.now();[{id:'glass',name:'Magnifying Glass',cls:'effect-glass'},{id:'grandma',name:"Grandma's Blessing",cls:'effect-grandma'},{id:'warp',name:'Time Warp CD',cls:''}].forEach(b => {
+                const end = inventory.cooldowns[b.id]; if (end && now < end) {
+                    const sec = Math.ceil((end - now) / 1000); const div = document.createElement('div'); div.className = `effect-item ${b.cls}`;
+                    div.innerHTML = `<span class="effect-name">${b.name}</span><span class="effect-timer">${Math.floor(sec/60)}:${(sec%60).toString().padStart(2,'0')}</span>`; c.appendChild(div);
                 }
             });
         }
-
-        function openStatsMenu() {
-            isCookiePaused = true; document.getElementById('stats-total').textContent = `Total ${cookieStats.total || 0} Cookies`;
-            const list = document.getElementById('stats-list'); list.innerHTML = '';
-            cookieTypes.forEach(type => {
-                const count = cookieStats[type.id] || 0; const row = document.createElement('div'); row.style.fontSize = '14px';
-                if (discoveredCookies.includes(type.id)) {
-                    const cCount = cookieStats[type.id + '_Common'] || 0; const uCount = cookieStats[type.id + '_Uncommon'] || 0; const rCount = cookieStats[type.id + '_Rare'] || 0; const eCount = cookieStats[type.id + '_Epic'] || 0; const dCount = cookieStats[type.id + '_Divine'] || 0;
-                    row.innerHTML = `<span style="color:#FFD700; font-weight:bold;">${count}</span> ${type.name} Cookies found. [<span style="color:#CFCFCF">${cCount}</span> <span style="color:#6CDB66">${uCount}</span> <span style="color:#415DE6">${rCount}</span> <span style="color:#AD0FEB">${eCount}</span> <span style="color:#FAA00F">${dCount}</span>]<br><span style="color:#aaa; font-style:italic; font-size:11px;">"${type.quote}"</span>`;
-                } else { row.style.color = '#777'; row.innerHTML = 'Cookie not discovered yet!'; }
-                list.appendChild(row);
-            });
-            document.getElementById('stats-modal').style.display = 'flex';
-        }
-
-        function toggleMagnet() { magnetEnabled = !magnetEnabled; localStorage.setItem('tb_magnet_on', magnetEnabled); openShop(); }
-        function closeStatsMenu() { document.getElementById('stats-modal').style.display = 'none'; isCookiePaused = false; }
-        function closeShop() { document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false; }
-
-        document.getElementById('proxy-btn').onclick = () => {
-            const win = window.open('about:blank', '_blank'); if (!win) return alert("Blocked!");
-            const icon = win.document.createElement('link'); icon.rel = 'icon'; icon.href = 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png'; win.document.head.appendChild(icon);
-            const iframe = win.document.createElement('iframe'); Object.assign(iframe.style, { position:'fixed', top:0, left:0, width:'100%', height:'100%', border:'none', margin:'0', padding:'0', overflow:'hidden' });
-            iframe.src = "https://trigonometry.scientificsense.org/"; win.document.body.appendChild(iframe);
-            document.body.innerHTML = ""; window.open('', '_self'); window.close(); setTimeout(() => { window.location.replace("about:blank"); }, 300);
-        };
     </script>
 </body>
 </html>
