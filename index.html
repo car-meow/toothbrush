@@ -120,18 +120,37 @@
         <div id="ine-part" class="divine-letter">INE</div>
     </div>
 
-     <!-- Top-Left UI (Always Visible) -->
-    <div style="position: fixed; top: 20px; left: 25px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;">
-        <div style="font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
-            <span id="cps-counter" class="cps-display">₡0.0/s</span>
+    <!-- UI LAYER: Everything inside here hides when 'Hide Menu Items' is clicked -->
+    <div id="ui-layer">
+        
+        <!-- Top Left: Currency & Buttons -->
+        <div class="hud-top-left">
+            <div style="font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
+                <span id="cps-counter" class="cps-display">₡0.0/s</span>
+            </div>
+            <button id="open-shop-btn" class="save-btn" style="background: #2196F3; width: 130px; font-size: 14px; padding: 10px; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);">Open Shop</button>
+            <button id="open-stats-btn" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc; width: 130px;">Cookie Stats</button>
         </div>
-        <button onclick="openShop()" class="save-btn" style="background: #2196F3; width: 130px; font-size: 14px; padding: 10px; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);">Open Shop</button>
-        <button onclick="openStatsMenu()" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc; width: 130px;">Cookie Stats</button>
-    </div>
 
-    <!-- Top-Right UI (Always Visible) -->
-    <div id="effects-container"></div>
+        <!-- Top Right: Active Buffs -->
+        <div id="effects-container" class="hud-top-right"></div>
+
+        <!-- Center: Title and Main Buttons -->
+        <div class="home-container">
+            <div class="title-area">
+                <h1 class="home-title" onclick="cycleSplash()">Toothbrush</h1>
+                <span id="splash-text" class="home-splash"></span>
+            </div>
+            <div class="button-row">
+                <button onclick="location.href='games.html'" class="save-btn rainbow-btn home-btn">Games</button>
+                <button onclick="location.href='ai.html'" class="save-btn home-btn" style="background-color: #f57c00;">AI Chat</button>
+                <button id="proxy-btn" class="save-btn home-btn" style="background-color: #00BCD4;">Proxy</button>
+                <button onclick="location.href='chat.html'" class="save-btn home-btn" style="background-color: #9C27B0;">Chat Room</button>
+                <button onclick="location.href='tutorial.html'" class="save-btn home-btn" style="background-color: #5fc772;">Tutorial</button>
+            </div>
+        </div>
+    </div>
 
     <!-- HUD Control (Always Visible) -->
     <div class="hud-bottom-right">
@@ -616,12 +635,7 @@
 
         function toggleMagnet() { magnetEnabled = !magnetEnabled; localStorage.setItem('tb_magnet_on', magnetEnabled); openShop(); }
         function showDiscovery(type) { const p = document.getElementById('discovery-popup'); document.getElementById('discovery-name').textContent = "New Discovery: " + type.name; document.getElementById('discovery-quote').textContent = `"${type.quote}"`; p.style.borderColor = (type.id === 'nebula') ? 'transparent' : type.border; p.className = (type.id === 'nebula') ? 'discovery-popup rainbow-btn' : 'discovery-popup'; p.classList.remove('show'); p.style.top = "-150px"; setTimeout(() => { p.classList.add('show'); p.style.top = "20px"; }, 50); setTimeout(() => { p.style.top = "-150px"; setTimeout(() => p.classList.remove('show'), 500); }, 5000); }
-        function showFloatingText(x, y, text, cls) {
-            const el = document.createElement('div'); el.className = cls;
-            el.textContent = text; el.style.left = x + 'px'; el.style.top = y + 'px';
-            document.body.appendChild(el); // Attached directly to body
-            setTimeout(() => el.remove(), 2000);
-        }
+        function showFloatingText(x, y, t, c) { const el = document.createElement('div'); el.className = c; el.textContent = t; el.style.left = x + 'px'; el.style.top = y + 'px'; document.getElementById('ui-layer').appendChild(el); setTimeout(() => el.remove(), 2000); }
         function closeStatsMenu() { document.getElementById('stats-modal').style.display = 'none'; isCookiePaused = false; }
         function closeShop() { document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false; }
     </script>
