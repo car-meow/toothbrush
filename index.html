@@ -19,13 +19,11 @@
         @keyframes moveBackground { from { background-position: 40px 0; } to { background-position: 540px 500px; } }
 
         /* --- Home Container (Centered UI) --- */
-        .home-container { 
-            display: flex; flex-direction: column; justify-content: center; align-items: center; 
-            height: 100vh; width: 100vw; position: relative; z-index: 5; transition: opacity 0.5s; 
-        }
+        .home-container { display: flex; flex-direction: column; justify-content: space-between; flex: 1; padding-bottom: 8vh; position: relative; z-index: 1; transition: opacity 0.5s; }
+		
         .title-area { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 50px; }
         .home-title { font-size: 80px; color: #ffffff; text-shadow: 4px 4px 15px rgba(0, 0, 0, 0.8); margin: 0; letter-spacing: 2px; cursor: pointer; }
-        .home-splash { font-size: 20px; font-style: italic; color: #FFEB3B; font-weight: bold; text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.8); margin-top: 10px; text-align: center; max-width: 80%; }
+        .home-splash { font-size: 20px; font-style: italic; color: #FFEB3B; font-weight: bold; text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.8); margin-top: 10px; text-align: center; max-width: 80%; transition: opacity 0.15s; }
 
         .button-row { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
         .home-btn { font-size: 22px; padding: 15px 40px; border-radius: 12px; }
@@ -141,7 +139,7 @@
         <!-- Center: Title and Main Buttons -->
         <div class="home-container">
             <div class="title-area">
-                <h1 class="home-title" onclick="location.href='index.html'">Toothbrush</h1>
+                <h1 class="home-title" onclick="cycleSplash()">Toothbrush</h1>
                 <span id="splash-text" class="home-splash"></span>
             </div>
             <div class="button-row">
@@ -192,6 +190,27 @@
     </div>
 
     <script>
+	
+	function cycleSplash() {
+            const el = document.getElementById('splash-text');
+            if (!el) return;
+            
+            // Pick a new random splash
+            let newSplash = splashes[Math.floor(Math.random() * splashes.length)];
+            
+            // Make sure it doesn't pick the exact same one twice in a row
+            while (`"${newSplash}"` === el.textContent && splashes.length > 1) {
+                newSplash = splashes[Math.floor(Math.random() * splashes.length)];
+            }
+            
+            // Briefly fade it out and back in for a smooth transition
+            el.style.opacity = 0;
+            setTimeout(() => {
+                el.textContent = `"${newSplash}"`;
+                el.style.opacity = 1;
+            }, 150); // 150ms fade
+        }
+	
         const splashes = ["Assisted by Jayden!", "No, please don't close my ta-", "Y'all, Vivian says hi!", "Wait, wait, I was about to finish the level!", "READ the TUTORIAL!", "Dead.", "Wow. Just... wow.", "Honorable mention: Ctrl+W.", "Iso bottom frags", "Thanks for using Toothbrush!", "Yo Dhruva, wassup? Join the chat room!", "Master, I'm hungry", "No food for you!", "Prompted to perfection.", "ALT+TAB is your best friend.", "AI solved the math, I solved the level.", "High scores > GPA.", "Saving progress... hopefully.", "Not a bug, it's a feature.", "Powered by pure procrastination.", "100% human-ish.", "Linewize is watching...", "GoGuardian is blind.", "Just one more level.", "0% hallucinations, 100% gaming.", "Strictly educational...", "Does this count as CS homework?", "Bypassing the boredom.", "Infinite storage, finite time.", "Don't forget to backup!", "Stealth mode engaged.", "Everything is unblocked if you try.", "Learning to code?", "Browser-based bliss.", "The stash is never empty.", "Level 99 Procrastinator.", "Error 404: Homework not found.", "IndexedDB is your best friend.", "About:blank magic.", "Speedrunning the semester.", "Logic applied, levels cleared.", "The AI says take a break.", "One file to rule them all.", "A student's best secret.", "Don't close the lid!", "GPT-4o approved.", "Your progress is persistent.", "Toothbrush Tutorial is mandatory.", "Cloak active. Icons changed.", "Memory leak? Never.", "HTML5 is the future.", "Wait, did I save?", "The AI is my co-pilot.", "Simulating success.", "Unblocked and unbothered.", "Chromebooks are gaming rigs.", "Loading a better reality.", "The Cloak is your shield.", "One prompt away.", "Gaming is a soft skill.", "The math adds up.", "Why study when you can run?", "Securely can't see this.", "Digital treasures.", "AI: I suggest playing.", "Minimalist fun.", "The stash is legendary.", "Secret is safe.", "Click to continue.", "The bell doesn't dismiss you.", "Context window: Infinite.", "Manual included.", "Optimized for Chromebooks.", "Saves are in the cloud-ish.", "Home of the bored.", "Synthesizing scores.", "The AI isn't cheating.", "Save states are rights.", "Don't let it timeout!", "The perfect distraction.", "Bypassing the mundane.", "Strictly local.", "Polished UI.", "Wait, solve this first.", "AI wrote this code.", "The final boss of school.", "Hardcoded for fun.", "Stash is ultimate.", "Tutorial complete.", "Testing 1, 2, 3.", "Can someone buy me Starbucks?", "Never underestimate the dev.", "Classroom Center is down.", "Stand in the corner!", "Don't blink.", "Reality is a simulation.", "Wait, this works?", "Click the cookie.", "Become a Swag Lord.", "Cookies are life.", "Baking at lightspeed."];
 
         const cookieTypes =[
@@ -247,22 +266,24 @@
             };
 
             document.getElementById('hide-menu-btn').onclick = function() {
-                menusHidden = !menusHidden;
-                const wrapper = document.getElementById('ui-layer'); 
-                if (menusHidden) {
-                    wrapper.style.opacity = "0";
-                    wrapper.style.pointerEvents = "none";
-                    this.textContent = "Show Menu Items";
-                    this.style.backgroundColor = "#c8e6c9";
-                    this.style.color = "#2e7d32";
-                } else {
-                    wrapper.style.opacity = "1";
-                    wrapper.style.pointerEvents = "all";
-                    this.textContent = "Hide Menu Items";
-                    this.style.backgroundColor = "#ffcdd2";
-                    this.style.color = "#b71c1c";
-                }
-            };
+            menusHidden = !menusHidden;
+            const centerContent = document.querySelector('.home-container'); 
+            
+            if (menusHidden) {
+                centerContent.style.opacity = "0";
+                // CRITICAL: This allows mouse clicks to pass through the invisible buttons to the cookies behind them
+                centerContent.style.visibility = "hidden"; 
+                this.textContent = "Show Menu Items";
+                this.style.backgroundColor = "#c8e6c9";
+                this.style.color = "#2e7d32";
+            } else {
+                centerContent.style.opacity = "1";
+                centerContent.style.visibility = "visible";
+                this.textContent = "Hide Menu Items";
+                this.style.backgroundColor = "#ffcdd2";
+                this.style.color = "#b71c1c";
+            }
+        };
 
             document.getElementById('open-shop-btn').onclick = openShop;
             document.getElementById('close-shop-btn').onclick = () => { document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false; };
@@ -530,17 +551,35 @@
                 div.innerHTML = `<div><div class="item-name">${name} ${bought>0&&type==='building'?'('+bought+')':''}</div><div class="item-desc">${desc}</div><div class="item-cost">${curr}${dispCost.toLocaleString()}</div></div><button onclick="buyItem('${id}', ${dispCost}, '${type}', '${curr}')" class="save-btn buy-btn ${(!afford || inUse || oneTime || maxed) ? 'disabled' : ''}">${bTxt}</button>`;
                 container.appendChild(div);
             };
-            container.innerHTML += `<div class="shop-cat">Autobakers</div>`;
-            addItem('oven','Rusty Oven','Generates ₡1 every 60s.',500,'building',1.25); addItem('mixer','Industrial Mixer','Generates ₡5 every 45s.',5000,'building',1.18); addItem('bakery','Local Bakery','Generates ₡25 every 45s.',50000,'building',1.20); addItem('factory','Cookie Factory','Generates ₡67 every 30s.',250000,'building',1.15); addItem('dyson','Dyson Sphere','Generates ₡625 every 15s.',5000000,'building',1.19);
+            			
+						container.innerHTML += `<div class="shop-cat">Autobakers</div>`;
+            addItem('oven', 'Rusty Oven', 'Generates ₡1 every 60 seconds.', 500, 'building', 1.25);
+            addItem('mixer', 'Industrial Mixer', 'Generates ₡5 every 45 seconds.', 5000, 'building', 1.18);
+            addItem('bakery', 'Local Bakery', 'Generates ₡25 every 45 seconds.', 50000, 'building', 1.20);
+            addItem('factory', 'Cookie Factory', 'Generates ₡67 every 30 seconds.', 250000, 'building', 1.15);
+            addItem('dyson', 'Dyson Sphere', 'Generates ₡625 every 15 seconds.', 5000000, 'building', 1.19);
+
             container.innerHTML += `<div class="shop-cat">Swag Upgrades (Permanent)</div>`;
-            addItem('pierre',"Pierre d'Cauqi","x2 ₡/s gains.",100,'upgrade',1,'₴'); addItem('gold_plates','Golden Plates','Every cookie worth 3% more. Compounds.',10,'upgrade',1.10,'₴'); addItem('nebula_plates','Nebula Plates','Every cookie worth 10% more. Compounds.',200,'upgrade',1.05,'₴'); addItem('divine_intervention','Divine Intervention','Auto-clicks 10%.',500,'upgrade',1.5,'₴');
-            if ((inventory.upgrades.divine_intervention || 0) >= 9) addItem('divine_calling','Divine Calling','100% Auto-click.',1000000,'upgrade',1,'₴');
+            addItem('pierre', "Pierre d'Cauqi", "Harness the power of a TRUE French chef. Multiplies all ₡/s profit gains by 2.", 1000, 'upgrade', 1, '₴');
+            addItem('gold_plates', 'Golden Plates', 'Granny gave you her special Golden Plates in her will! Use them to make every cookie worth 3% more. Compounds.', 50, 'upgrade', 1.10, '₴');
+            addItem('nebula_plates', 'Nebula-Infused Plates', 'Harness the power of ultra-rare Nebula Cookies to infuse them in your own recipes. Every cookie worth 10% more. Compounds.', 200, 'upgrade', 1.05, '₴');
+			addItem('frenzy', 'Cookie Frenzy', 'Increases cookie spawn rates by 10%. Better know how to click fast!', 100, 'upgrade', 1.3, '₴');
+			addItem('magnet', 'Sugar Magnet', 'A divine magnet given by the Gods. Cookies stop in the center of your screen... better get to spamming! Can be enabled/disabled.', 100000, 'upgrade', 1, '₴');
+            addItem('divine_intervention', 'Divine Intervention', 'The Gods are pleased with you. They sent a divine figure to watch over you. Auto-clicks 10% of cookies per tier (Max 90%).', 500, 'upgrade', 1.5, '₴');
+            
+            // Only shows up if Divine Intervention is maxed out
+            if ((inventory.upgrades.divine_intervention || 0) >= 9) {
+                addItem('divine_calling', 'Divine Calling', 'The Gods are impressed by your power. They call you to Ascend to a higher plane. Auto-clicks all cookies onscreen.', 1000000, 'upgrade', 1, '₴');
+            }
+
             container.innerHTML += `<div class="shop-cat">Consumables</div>`;
-            addItem('glass','Magnifying Glass','Rare+25% (2m).',50000,'buff',1.10); addItem('grandma','Grandma Blessing','Golden rate 1/40 (1m).',1000000,'buff',1.10); addItem('warp','Time Warp','1hr production.',5000,'buff',1.10);
-            container.innerHTML += `<div class="shop-cat">Upgrades</div>`;
-            addItem('frenzy','Cookie Frenzy','+10% Spawn Rate.',1000,'upgrade',1.50); addItem('magnet','Sugar Magnet','Attracts cookies.',20000,'upgrade',1); addItem('quantum_cursor','Quantum Cursors','Manual clicks grant +5s CPS.',250000,'upgrade',1);
+            addItem('glass', 'Magnifying Glass', 'Obtain a magical glass that lets you spot rare ingredients. Rare cookies +25% (2m).', 50000, 'buff', 1.10);
+            addItem('grandma', 'Grandma Blessing', 'Golden rate 1/40 (1m). Granny is always watching over you.', 1000000, 'buff', 1.10);
+            addItem('warp', 'Time Warp', '1hr worth of your production value, instantly. (1h Cooldown).', 5000, 'buff', 1.10);
+
+            container.innerHTML += `<div class="shop-cat">You can't make a profit without burning some dough!</div>`;
             const gain = Math.floor(cookieBucks / 1000000);
-            container.innerHTML += `<div class="shop-item" style="grid-column: span 2; border-color: #f44336; text-align: center;"><div class="item-name" style="color: #f44336; font-size: 18px;">₴${swagPoints} Swag Points Owned</div><button onclick="incinerateCookies()" class="save-btn incinerate-btn">Incinerate Cookies (+₴${gain.toLocaleString()})</button></div>`;
+            container.innerHTML += `<div class="shop-item" style="grid-column: span 2; border-color: #f44336; text-align: center;"><div class="item-name" style="color: #f44336; font-size: 18px;">₴${swagPoints} Swag Points Owned</div><button onclick="incinerateCookies()" class="save-btn incinerate-btn">Incinerate Cookies. Send an offering to the Cookie Gods. (+₴${gain.toLocaleString()})</button></div>`;
             if(inventory.upgrades.magnet) container.innerHTML += `<button onclick="toggleMagnet()" class="save-btn" style="grid-column: span 2; background:${magnetEnabled?'#B71C1C':'#2E7D32'}; margin-top:10px; width: 100%;">${magnetEnabled ? 'Disable Magnet' : 'Enable Magnet'}</button>`;
             document.getElementById('shop-modal').style.display = 'flex';
         }
