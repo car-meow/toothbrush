@@ -123,7 +123,7 @@
                 <span id="cps-counter" class="cps-display">₡0.0/s</span>
             </div>
             <button onclick="openShop()" class="save-btn" style="background: #2196F3; width: 130px; font-size: 14px; padding: 10px; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);">Open Shop</button>
-            <button onclick="openStatsMenu()" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc; width: 130px;">View Stats</button>
+            <button onclick="openStatsMenu()" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc; width: 130px;">Cookie Stats</button>
         </div>
 
         <div id="effects-container"></div>
@@ -238,7 +238,7 @@
 
         document.getElementById('hide-menu-btn').onclick = function() {
             menusHidden = !menusHidden;
-            const wrapper = document.getElementById('ui-layer');
+            const wrapper = document.querySelector('.home-container'); // FIX: Targets only title and buttons
             if (menusHidden) {
                 wrapper.style.opacity = "0";
                 wrapper.style.pointerEvents = "none";
@@ -411,11 +411,18 @@
             const anim = cookie.animate(keyframes, { duration, easing: 'linear', fill: 'forwards' });
             anim.onfinish = () => cookie.remove();
 
-            // Divine Intervention Auto-Clicker
+            // Divine Intervention & Divine Calling Auto-Clicker Logic
             const diTiers = inventory.upgrades.divine_intervention || 0;
-            if (diTiers > 0) {
-                if (Math.random() < (diTiers * 0.10)) {
-                    setTimeout(() => { if (cookie && !cookie.dataset.clicked) cookie.onclick(); }, Math.random() * 3000 + 1000); 
+            const hasDivineCalling = inventory.upgrades.divine_calling > 0;
+            
+            if (diTiers > 0 || hasDivineCalling) {
+                // If they have the final calling, set chance to 1.0 (100%), otherwise use the 10% tiers
+                const clickChance = hasDivineCalling ? 1.0 : (diTiers * 0.10);
+                
+                if (Math.random() < clickChance) {
+                    setTimeout(() => {
+                        if (cookie && !cookie.dataset.clicked) cookie.onclick();
+                    }, Math.random() * 3000 + 1000); 
                 }
             }
 
@@ -448,6 +455,11 @@
                 cookieBucks += val; updateBucksUI();
                 cookieStats.total = (cookieStats.total || 0) + 1;
                 cookieStats[type.id] = (cookieStats[type.id] || 0) + 1;
+                // NEW: Save the specific rarity count for this cookie
+                cookieStats[type.id + '_' + finalRarity.id] = (cookieStats[type.id + '_' + finalRarity.id] || 0) + 1;
+                
+                localStorage.setItem('tb_cookie_bucks', cookieBucks);
+                localStorage.setItem('tb_cookie_stats', JSON.stringify(cookieStats));
                 save();
 
                 showFloatingText(cX, cY, "+₡" + Math.floor(val), 'floating-bucks');
@@ -479,7 +491,7 @@
                 
                 const afford = (currency === '₡' ? cookieBucks >= displayCost : swagPoints >= displayCost);
                 const inUse = (type === 'buff' && inventory.cooldowns[id] && Date.now() < inventory.cooldowns[id]);
-                const oneTime = (id === 'pierre' || id === 'magnet' || id === 'quantum_cursor') && boughtCount > 0;
+                const oneTime = (id === 'pierre' || id === 'magnet' || id === 'quantum_cursor' || id === 'divine_calling') && boughtCount > 0;
                 const maxedOut = (id === 'divine_intervention' && boughtCount >= 9);
 
                 const div = document.createElement('div'); div.className = "shop-item" + (currency === '₴' ? " swag-upgrade-box" : "");
@@ -501,6 +513,11 @@
 			addItem('frenzy', 'Cookie Frenzy', 'Increases cookie spawn rates by 10%. Better know how to click fast!', 100, 'upgrade', 1.3, '₴');
 			addItem('magnet', 'Sugar Magnet', 'A divine magnet given by the Gods. Cookies stop in the center of your screen... better get to spamming! Can be enabled/disabled.', 100000, 'upgrade', 1, '₴');
             addItem('divine_intervention', 'Divine Intervention', 'The Gods are pleased with you. They sent a divine figure to watch over you. Auto-clicks 10% of cookies per tier (Max 90%).', 500, 'upgrade', 1.5, '₴');
+            
+            // Only shows up if Divine Intervention is maxed out
+            if ((inventory.upgrades.divine_intervention || 0) >= 9) {
+                addItem('divine_calling', 'Divine Calling', 'The Gods are calling you to ascend as a higher being. Auto-clicks 100% of all cookies onscreen.', 1000000, 'upgrade', 1, '₴');
+            }
 
             container.innerHTML += `<div class="shop-cat">Consumables</div>`;
             addItem('glass', 'Magnifying Glass', 'Obtain a magical glass that lets you spot rare ingredients. Rare cookies +25% (2m).', 50000, 'buff', 1.10);
@@ -521,7 +538,11 @@
             
             if (currency==='₡') cookieBucks -= cost; else swagPoints -= cost;
             if (type === 'building') inventory.buildings[id] = (inventory.buildings[id] || 0) + 1;
-            else if (type === 'upgrade') { const ots=['pierre','magnet','quantum_cursor']; if(ots.includes(id) && inventory.upgrades[id]>0) return; inventory.upgrades[id] = (inventory.upgrades[id] || 0) + 1; }
+            else if (type === 'upgrade') { 
+                const ots =['pierre', 'magnet', 'quantum_cursor', 'divine_calling']; 
+                if(ots.includes(id) && inventory.upgrades[id] > 0) return; 
+                inventory.upgrades[id] = (inventory.upgrades[id] || 0) + 1; 
+            }
             else if (type === 'buff') {
                 inventory.buy_counts[id] = (inventory.buy_counts[id] || 0) + 1;
                 if (id === 'glass') inventory.cooldowns.glass = Date.now() + 120000;
@@ -535,7 +556,15 @@
             const gain = Math.floor(cookieBucks / 1000000); if (gain < 1) return;
             if (confirm(`Incinerate for ₴${gain.toLocaleString()}?`)) {
                 swagPoints += gain; cookieBucks = 0; inventory.buildings = {};
-                inventory.upgrades = { gold_plates: inventory.upgrades.gold_plates, nebula_plates: inventory.upgrades.nebula_plates, pierre: inventory.upgrades.pierre, magnet: inventory.upgrades.magnet, quantum_cursor: inventory.upgrades.quantum_cursor, divine_intervention: inventory.upgrades.divine_intervention };
+                inventory.upgrades = { 
+                    gold_plates: inventory.upgrades.gold_plates, 
+                    nebula_plates: inventory.upgrades.nebula_plates, 
+                    pierre: inventory.upgrades.pierre, 
+                    magnet: inventory.upgrades.magnet, 
+                    quantum_cursor: inventory.upgrades.quantum_cursor, 
+                    divine_intervention: inventory.upgrades.divine_intervention,
+                    divine_calling: inventory.upgrades.divine_calling
+                };
                 save(); updateBucksUI(); closeShop();
             }
         }
@@ -569,8 +598,25 @@
             const list = document.getElementById('stats-list'); list.innerHTML = '';
             cookieTypes.forEach(type => {
                 const count = cookieStats[type.id] || 0; const row = document.createElement('div'); row.style.fontSize = '14px';
-                if (discoveredCookies.includes(type.id)) row.innerHTML = `<span style="color:#FFD700; font-weight:bold;">${count}</span> ${type.name} Cookies found.<br><span style="color:#aaa; font-style:italic; font-size:12px;">"${type.quote}"</span>`;
-                else { row.style.color = '#777'; row.innerHTML = 'Cookie not discovered yet!'; }
+                if (discoveredCookies.includes(type.id)) {
+                    // Pull stats for each rarity (Default to 0 if none found yet)
+                    const cCount = cookieStats[type.id + '_Common'] || 0;
+                    const uCount = cookieStats[type.id + '_Uncommon'] || 0;
+                    const rCount = cookieStats[type.id + '_Rare'] || 0;
+                    const eCount = cookieStats[type.id + '_Epic'] || 0;
+                    const dCount = cookieStats[type.id + '_Divine'] || 0;
+
+                    // Formatted breakdown with colors
+                    const rarityBreakdown = `[ <span style="color:#CFCFCF">${cCount}</span> <span style="color:#6CDB66">${uCount}</span> <span style="color:#415DE6">${rCount}</span> <span style="color:#AD0FEB">${eCount}</span> <span style="color:#FAA00F">${dCount}</span> ]`;
+
+                    row.innerHTML = `
+                        <span style="color:#FFD700; font-weight:bold;">${count}</span> ${type.name} Cookies found. ${rarityBreakdown}<br>
+                        <span style="color:#aaa; font-style:italic; font-size:12px;">"${type.quote}"</span>
+                    `;
+                } else { 
+                    row.style.color = '#777'; 
+                    row.innerHTML = 'Cookie not discovered yet!'; 
+                }
                 list.appendChild(row);
             });
             document.getElementById('stats-modal').style.display = 'flex';
