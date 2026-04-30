@@ -3,100 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>New Tab</title>
-    <link rel="stylesheet" href="style.css?v=34">
-    <style>
-        /* --- Zigzag Background & Animation --- */
-        body {
-            background-color: #1a1a1a;
-            background-image:  linear-gradient(135deg, #1f1f1f 25%, transparent 25%), linear-gradient(225deg, #1f1f1f 25%, transparent 25%), linear-gradient(45deg, #1f1f1f 25%, transparent 25%), linear-gradient(315deg, #1f1f1f 25%, transparent 25%);
-            background-position:  40px 0, 40px 0, 0 0, 0 0;
-            background-size: 80px 80px;
-            background-repeat: repeat;
-            animation: moveBackground 40s linear infinite;
-            display: flex; flex-direction: column; height: 100vh; width: 100vw; margin: 0; overflow: hidden;
-            position: relative; /* Added to keep absolute children contained */
-        }
-        @keyframes moveBackground { from { background-position: 40px 0; } to { background-position: 540px 500px; } }
-
-        /* --- Home Container (Centered UI) --- */
-        .home-container { display: flex; flex-direction: column; justify-content: space-between; flex: 1; padding-bottom: 8vh; position: relative; z-index: 1; transition: opacity 0.5s; }
-		
-        .title-area { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 50px; }
-        .home-title { font-size: 80px; color: #ffffff; text-shadow: 4px 4px 15px rgba(0, 0, 0, 0.8); margin: 0; letter-spacing: 2px; cursor: pointer; }
-        .home-splash { font-size: 20px; font-style: italic; color: #FFEB3B; font-weight: bold; text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.8); margin-top: 10px; text-align: center; max-width: 80%; transition: opacity 0.15s; }
-
-        .button-row { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
-        .home-btn { font-size: 22px; padding: 15px 40px; border-radius: 12px; }
-
-        /* --- Modals & Overlays --- */
-        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 20000; align-items: center; justify-content: center; }
-        .cookie-modal-box { background: #1f1f1f; padding: 30px; border-radius: 20px; width: 600px; max-width: 95vw; max-height: 85vh; border: 2px solid #2196F3; text-align: center; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 0 50px black; }
-        #shop-list, #stats-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; overflow-y: auto; padding: 10px; margin: 15px 0; text-align: left; }
-        .shop-cat { grid-column: span 2; color: #888; font-size: 11px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #333; padding: 10px 0 5px 0; text-align: left; }
-        .shop-item { background: #252525; padding: 12px; border-radius: 12px; border: 1px solid #444; text-align: left; display: flex; flex-direction: column; justify-content: space-between; }
-        .swag-upgrade-box { background: rgba(139, 0, 0, 0.2) !important; border: 1px solid #b71c1c !important; }
-        .item-name { color: #2196F3; font-weight: bold; font-size: 14px; }
-        .item-desc { color: #aaa; font-size: 11px; margin: 6px 0; line-height: 1.3; height: auto; overflow: visible; }
-        .item-cost { color: #FFEB3B; font-weight: bold; font-size: 12px; }
-        .buy-btn.disabled { background: #444 !important; opacity: 0.5; cursor: not-allowed; }
-
-        .cps-display { font-size: 16px; color: #FFF59D; margin-left: 10px; font-weight: bold; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); }
-        .incinerate-btn { background-color: #B71C1C !important; color: white !important; grid-column: span 2; margin-top: 10px; border: 2px solid #ef5350 !important; font-size: 14px !important; }
-
-        /* --- RARITY SYSTEM --- */
-        .rarity-common { color: #CFCFCF; -webkit-text-stroke: 1.5px #555; }
-        .rarity-uncommon { color: #6CDB66; -webkit-text-stroke: 1.5px #1b5e20; }
-        .rarity-rare { color: #415DE6; -webkit-text-stroke: 1.5px #1a237e; }
-        .rarity-epic { color: #AD0FEB; -webkit-text-stroke: 1.5px #4a148c; }
-        .rarity-divine { color: #FAA00F; -webkit-text-stroke: 1.5px #bf360c; }
-        
-        .floating-rarity { position: fixed; font-weight: 900; font-size: 28px; z-index: 10001; pointer-events: none; animation: rarity-float 2.5s ease-out forwards; paint-order: stroke fill;}
-        @keyframes rarity-float { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; } 15% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; } 30% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -140px); opacity: 0; } }
-
-        /* --- SCREEN BORDER --- */
-        #screen-border { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9998; box-shadow: inset 0 0 100px rgba(0,0,0,0); transition: opacity 0.5s, box-shadow 0.5s; opacity: 0; }
-
-        /* --- DIVINE EVENT --- */
-        #divine-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0); z-index: 15000; display: none; align-items: center; justify-content: center; pointer-events: none; transition: background 0.5s; }
-        .divine-letter { font-size: 150px; font-weight: 900; position: absolute; top: 50%; margin-top: -75px; background: linear-gradient(to bottom, #FAA00F, #EDD11D); -webkit-background-clip: text; -webkit-text-fill-color: #FFD700; -webkit-text-stroke: 10px #bf360c; filter: drop-shadow(0 0 20px black); }
-        #div-part { left: 50%; transform: translateX(-150vw); } 
-        #ine-part { left: 50%; transform: translateX(150vw); } 
-        @keyframes shake { 0%,100%{transform:translate(0,0)} 25%{transform:translate(-5px,5px)} 50%{transform:translate(5px,-5px)} 75%{transform:translate(-5px,-5px)} }
-        .camera-shake { animation: shake 0.1s infinite; }
-
-        /* --- HUD CONTROLS & COOKIES --- */
-        .hud-bottom-right { position: fixed; bottom: 20px; right: 25px; display: flex; gap: 10px; z-index: 11000; }
-        .hud-top-left { position: absolute; top: 20px; left: 25px; z-index: 10000; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-        .hud-top-right { position: absolute; top: 20px; right: 25px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; z-index: 10000; pointer-events: none; }
-        
-        .golden-cookie { position: fixed; object-fit: contain; z-index: 999; cursor: pointer; }
-        
-        /* Auras */
-        .aura-basic { filter: drop-shadow(0 0 15px rgba(139, 69, 19, 0.8)) !important; }
-        .aura-cashew { filter: drop-shadow(0 0 15px rgba(210, 180, 140, 0.8)) !important; }
-        .aura-oatmeal { filter: drop-shadow(0 0 15px rgba(139, 69, 19, 0.8)) drop-shadow(0 0 20px rgba(128, 0, 128, 0.6)) !important; }
-        .aura-peanut { filter: drop-shadow(0 0 15px rgba(205, 133, 63, 0.8)) !important; }
-        .aura-sugar { filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 5px rgba(255, 0, 255, 0.6)) drop-shadow(0 0 5px rgba(0, 255, 255, 0.6)) !important; }
-        .aura-chocolate { filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.5)) drop-shadow(0 0 20px rgba(101, 67, 33, 0.8)) !important; }
-        .aura-snickerdoodle { filter: drop-shadow(0 0 15px rgba(160, 82, 45, 0.8)) !important; }
-        .aura-smore { filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 20px rgba(139, 69, 19, 0.8)) drop-shadow(0 0 25px rgba(210, 180, 140, 0.8)) !important; }
-        .aura-golden { filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.9)) drop-shadow(0 0 30px rgba(255, 215, 0, 0.6)) !important; }
-        .aura-nebula { animation: nebula-flicker 1.5s alternate infinite !important; }
-        @keyframes nebula-flicker {
-            0% { filter: drop-shadow(0 0 15px #00BCD4) drop-shadow(0 0 20px #9C27B0) drop-shadow(0 0 15px #FFEB3B); }
-            100% { filter: drop-shadow(0 0 25px #4CAF50) drop-shadow(0 0 30px #E91E63) drop-shadow(0 0 25px #FFEB3B); }
-        }
-
-        .floating-bucks { position: fixed; color: #4CAF50; font-weight: bold; font-size: 28px; z-index: 1001; pointer-events: none; animation: float-up 1.5s ease-out forwards; text-shadow: 1px 1px 3px rgba(0,0,0,0.8), -1px -1px 3px rgba(0,0,0,0.8); }
-        @keyframes float-up { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -120px) scale(1.5); opacity: 0; } }
-
-        .effect-item { background: rgba(31, 31, 31, 0.9); border: 2px solid #2196F3; padding: 8px 12px; border-radius: 10px; display: flex; flex-direction: column; align-items: flex-end; margin-bottom: 5px; }
-        .effect-name { font-size: 10px; font-weight: bold; color: #2196F3; text-transform: uppercase; }
-        .effect-timer { font-size: 16px; font-weight: bold; color: white; }
-
-        .discovery-popup { position: fixed; top: -150px; left: 50%; transform: translateX(-50%); background: rgba(25, 25, 25, 0.95); border: 4px solid #FFD700; border-radius: 15px; padding: 20px 40px; text-align: center; z-index: 10000; transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: none; }
-        .discovery-popup.show { top: 20px; }
-    </style>
+    <link rel="stylesheet" href="style.css?v=35">
 </head>
 <body class="chat-bg">
     
@@ -190,27 +97,6 @@
     </div>
 
     <script>
-	
-	function cycleSplash() {
-            const el = document.getElementById('splash-text');
-            if (!el) return;
-            
-            // Pick a new random splash
-            let newSplash = splashes[Math.floor(Math.random() * splashes.length)];
-            
-            // Make sure it doesn't pick the exact same one twice in a row
-            while (`"${newSplash}"` === el.textContent && splashes.length > 1) {
-                newSplash = splashes[Math.floor(Math.random() * splashes.length)];
-            }
-            
-            // Briefly fade it out and back in for a smooth transition
-            el.style.opacity = 0;
-            setTimeout(() => {
-                el.textContent = `"${newSplash}"`;
-                el.style.opacity = 1;
-            }, 150); // 150ms fade
-        }
-	
         const splashes = ["Assisted by Jayden!", "No, please don't close my ta-", "Y'all, Vivian says hi!", "Wait, wait, I was about to finish the level!", "READ the TUTORIAL!", "Dead.", "Wow. Just... wow.", "Honorable mention: Ctrl+W.", "Iso bottom frags", "Thanks for using Toothbrush!", "Yo Dhruva, wassup? Join the chat room!", "Master, I'm hungry", "No food for you!", "Prompted to perfection.", "ALT+TAB is your best friend.", "AI solved the math, I solved the level.", "High scores > GPA.", "Saving progress... hopefully.", "Not a bug, it's a feature.", "Powered by pure procrastination.", "100% human-ish.", "Linewize is watching...", "GoGuardian is blind.", "Just one more level.", "0% hallucinations, 100% gaming.", "Strictly educational...", "Does this count as CS homework?", "Bypassing the boredom.", "Infinite storage, finite time.", "Don't forget to backup!", "Stealth mode engaged.", "Everything is unblocked if you try.", "Learning to code?", "Browser-based bliss.", "The stash is never empty.", "Level 99 Procrastinator.", "Error 404: Homework not found.", "IndexedDB is your best friend.", "About:blank magic.", "Speedrunning the semester.", "Logic applied, levels cleared.", "The AI says take a break.", "One file to rule them all.", "A student's best secret.", "Don't close the lid!", "GPT-4o approved.", "Your progress is persistent.", "Toothbrush Tutorial is mandatory.", "Cloak active. Icons changed.", "Memory leak? Never.", "HTML5 is the future.", "Wait, did I save?", "The AI is my co-pilot.", "Simulating success.", "Unblocked and unbothered.", "Chromebooks are gaming rigs.", "Loading a better reality.", "The Cloak is your shield.", "One prompt away.", "Gaming is a soft skill.", "The math adds up.", "Why study when you can run?", "Securely can't see this.", "Digital treasures.", "AI: I suggest playing.", "Minimalist fun.", "The stash is legendary.", "Secret is safe.", "Click to continue.", "The bell doesn't dismiss you.", "Context window: Infinite.", "Manual included.", "Optimized for Chromebooks.", "Saves are in the cloud-ish.", "Home of the bored.", "Synthesizing scores.", "The AI isn't cheating.", "Save states are rights.", "Don't let it timeout!", "The perfect distraction.", "Bypassing the mundane.", "Strictly local.", "Polished UI.", "Wait, solve this first.", "AI wrote this code.", "The final boss of school.", "Hardcoded for fun.", "Stash is ultimate.", "Tutorial complete.", "Testing 1, 2, 3.", "Can someone buy me Starbucks?", "Never underestimate the dev.", "Classroom Center is down.", "Stand in the corner!", "Don't blink.", "Reality is a simulation.", "Wait, this works?", "Click the cookie.", "Become a Swag Lord.", "Cookies are life.", "Baking at lightspeed."];
 
         const cookieTypes =[
@@ -234,20 +120,22 @@
             { id: 'Divine', label: 'Divine', weight: 1, class: 'rarity-divine', mult: 3.50 }
         ];
 
+        // --- STATE ---
         let cookieBucks = Math.floor(parseFloat(localStorage.getItem('tb_cookie_bucks') || '0'));
         let swagPoints = parseInt(localStorage.getItem('tb_swag_points') || '0');
         let discoveredCookies = JSON.parse(localStorage.getItem('tb_discovered_cookies') || '[]');
         let cookieStats = JSON.parse(localStorage.getItem('tb_cookie_stats') || '{}');
         let inventory = JSON.parse(localStorage.getItem('tb_inventory') || '{"buildings":{}, "upgrades":{}, "cooldowns":{}, "buy_counts":{}}');
-        let isCookiePaused = false, magnetEnabled = localStorage.getItem('tb_magnet_on') === 'true', isMuted = false, menusHidden = false, borderPriority = false, forceDivineNext = false, f2Cooldown = false;
+        let isCookiePaused = false, magnetEnabled = localStorage.getItem('tb_magnet_on') === 'true', isMuted = false, menusHidden = false, borderPriority = false;
+        let forceDivineNext = false; 
 
-        const bgm = document.getElementById('bgm');
-
+        // ROBUST INITIALIZATION
         window.addEventListener('DOMContentLoaded', () => {
-            const el = document.getElementById('splash-text');
-            if (el) el.textContent = `"${splashes[Math.floor(Math.random() * splashes.length)]}"`;
+            const bgm = document.getElementById('bgm');
+            cycleSplash();
             
-            updateBucksUI(); handleOfflineEarnings();
+            updateBucksUI(); 
+            handleOfflineEarnings();
             
             if(!localStorage.getItem('tb_tut_welcome')) document.getElementById('tut-overlay').style.display='flex';
             
@@ -255,9 +143,10 @@
             setInterval(idleProductionLoop, 1000); 
             setInterval(updateEffectsUI, 1000);
 
-            // BIND UI ACTIONS
+            // Audio Auto-play fix
             document.body.addEventListener('click', () => { if(!isMuted && bgm.paused) bgm.play(); }, {once: true});
 
+            // UI Button Bindings
             document.getElementById('mute-btn').onclick = () => {
                 isMuted = !isMuted;
                 bgm.muted = isMuted;
@@ -266,24 +155,22 @@
             };
 
             document.getElementById('hide-menu-btn').onclick = function() {
-            menusHidden = !menusHidden;
-            const centerContent = document.querySelector('.home-container'); 
-            
-            if (menusHidden) {
-                centerContent.style.opacity = "0";
-                // CRITICAL: This allows mouse clicks to pass through the invisible buttons to the cookies behind them
-                centerContent.style.visibility = "hidden"; 
-                this.textContent = "Show Menu Items";
-                this.style.backgroundColor = "#c8e6c9";
-                this.style.color = "#2e7d32";
-            } else {
-                centerContent.style.opacity = "1";
-                centerContent.style.visibility = "visible";
-                this.textContent = "Hide Menu Items";
-                this.style.backgroundColor = "#ffcdd2";
-                this.style.color = "#b71c1c";
-            }
-        };
+                menusHidden = !menusHidden;
+                const wrapper = document.getElementById('ui-layer'); 
+                if (menusHidden) {
+                    wrapper.style.opacity = "0";
+                    wrapper.style.visibility = "hidden";
+                    this.textContent = "Show Menu Items";
+                    this.style.backgroundColor = "#c8e6c9";
+                    this.style.color = "#2e7d32";
+                } else {
+                    wrapper.style.opacity = "1";
+                    wrapper.style.visibility = "visible";
+                    this.textContent = "Hide Menu Items";
+                    this.style.backgroundColor = "#ffcdd2";
+                    this.style.color = "#b71c1c";
+                }
+            };
 
             document.getElementById('open-shop-btn').onclick = openShop;
             document.getElementById('close-shop-btn').onclick = () => { document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false; };
@@ -295,12 +182,26 @@
                 const win = window.open('about:blank', '_blank'); if (!win) return alert("Pop-up Blocked!");
                 const icon = win.document.createElement('link'); icon.rel = 'icon'; icon.href = 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png'; win.document.head.appendChild(icon);
                 const iframe = win.document.createElement('iframe'); Object.assign(iframe.style, { position:'fixed', top:0, left:0, width:'100%', height:'100%', border:'none', margin:'0', padding:'0', overflow:'hidden' });
-                iframe.src = "https://trigonometry.scientificsense.org/"; win.document.body.appendChild(iframe);
+                iframe.src = "https://t0.fyi/"; win.document.body.appendChild(iframe);
                 document.body.innerHTML = ""; window.open('', '_self'); window.close(); setTimeout(() => { window.location.replace("about:blank"); }, 300);
             };
         });
 
-        // ADMIN BACKDOORS
+        function cycleSplash() {
+            const el = document.getElementById('splash-text');
+            if (!el) return;
+            let newSplash = splashes[Math.floor(Math.random() * splashes.length)];
+            while (`"${newSplash}"` === el.textContent && splashes.length > 1) {
+                newSplash = splashes[Math.floor(Math.random() * splashes.length)];
+            }
+            el.style.opacity = 0;
+            setTimeout(() => {
+                el.textContent = `"${newSplash}"`;
+                el.style.opacity = 1;
+            }, 150);
+        }
+
+        // --- ADMIN BACKDOORS (HARDENED) ---
         document.addEventListener('keydown', function(e) {
             if (!e.shiftKey) return; 
 
@@ -419,7 +320,10 @@
             const overlay = document.getElementById('divine-overlay'), divPart = document.getElementById('div-part'), inePart = document.getElementById('ine-part');
             
             document.getElementById('sfx-stop').play();
-            const startVol = bgm.volume; bgm.volume = 0.1;
+            const bgm = document.getElementById('bgm');
+            const startVol = bgm.volume; 
+            let slowInterval = setInterval(() => { if(bgm.volume > 0.1) bgm.volume -= 0.1; else { bgm.pause(); clearInterval(slowInterval); } }, 50);
+            
             const cookies = document.querySelectorAll('.golden-cookie');
             cookies.forEach(c => c.getAnimations().forEach(a => a.pause()));
             
@@ -537,22 +441,26 @@
         function openShop() {
             isCookiePaused = true; const container = document.getElementById('shop-list'); container.innerHTML = "";
             const addItem = (id, name, desc, cost, type, curve, curr = '₡') => {
-                const bought = (type === 'building' ? (inventory.buildings[id] || 0) : (inventory.upgrades[id] || 0));
-                const usage = inventory.buy_counts[id] || 0;
-                let dispCost = Math.floor(cost * Math.pow(curve, (type === 'buff' ? usage : bought)));
-                if(id === 'gold_plates') dispCost = Math.floor(10 * Math.pow(1.10, bought));
-                if(id === 'nebula_plates') dispCost = Math.floor(200 * Math.pow(1.05, bought));
-                const afford = (curr === '₡' ? cookieBucks >= dispCost : swagPoints >= dispCost);
+                const boughtCount = (type === 'building' ? (inventory.buildings[id] || 0) : (inventory.upgrades[id] || 0));
+                const usageCount = inventory.buy_counts[id] || 0;
+                let displayCost = Math.floor(cost * Math.pow(curve, (type === 'buff' ? usageCount : boughtCount)));
+                if(id === 'gold_plates') displayCost = Math.floor(10 * Math.pow(1.10, boughtCount));
+                if(id === 'nebula_plates') displayCost = Math.floor(200 * Math.pow(1.05, boughtCount));
+                
+                const afford = (curr === '₡' ? cookieBucks >= displayCost : swagPoints >= displayCost);
                 const inUse = (type === 'buff' && inventory.cooldowns[id] && Date.now() < inventory.cooldowns[id]);
-                const oneTime = (['pierre', 'magnet', 'quantum_cursor', 'divine_calling'].includes(id) && bought > 0);
-                const maxed = (id === 'divine_intervention' && bought >= 9);
+                const oneTime = (['pierre', 'magnet', 'quantum_cursor', 'divine_calling'].includes(id) && boughtCount > 0);
+                const maxed = (id === 'divine_intervention' && boughtCount >= 9);
+
                 const div = document.createElement('div'); div.className = "shop-item" + (curr === '₴' ? " swag-upgrade-box" : "");
                 let bTxt = "Purchase"; if (oneTime) bTxt = "Already Bought"; else if (maxed) bTxt = "Max Tier"; else if (inUse) bTxt = "Item in Use";
-                div.innerHTML = `<div><div class="item-name">${name} ${bought>0&&type==='building'?'('+bought+')':''}</div><div class="item-desc">${desc}</div><div class="item-cost">${curr}${dispCost.toLocaleString()}</div></div><button onclick="buyItem('${id}', ${dispCost}, '${type}', '${curr}')" class="save-btn buy-btn ${(!afford || inUse || oneTime || maxed) ? 'disabled' : ''}">${bTxt}</button>`;
+                div.innerHTML = `<div><div class="item-name">${name} ${boughtCount>0&&type==='building'?'('+boughtCount+')':''}</div><div class="item-desc">${desc}</div><div class="item-cost">${curr}${displayCost.toLocaleString()}</div></div><button id="buy-${id}" class="save-btn buy-btn ${(!afford || inUse || oneTime || maxed) ? 'disabled' : ''}">${bTxt}</button>`;
                 container.appendChild(div);
+                
+                document.getElementById(`buy-${id}`).onclick = () => buyItem(id, displayCost, type, curr);
             };
-            			
-						container.innerHTML += `<div class="shop-cat">Autobakers</div>`;
+            
+            container.innerHTML += `<div class="shop-cat">Autobakers</div>`;
             addItem('oven', 'Rusty Oven', 'Generates ₡1 every 60 seconds.', 500, 'building', 1.25);
             addItem('mixer', 'Industrial Mixer', 'Generates ₡5 every 45 seconds.', 5000, 'building', 1.18);
             addItem('bakery', 'Local Bakery', 'Generates ₡25 every 45 seconds.', 50000, 'building', 1.20);
@@ -573,14 +481,15 @@
             }
 
             container.innerHTML += `<div class="shop-cat">Consumables</div>`;
-            addItem('glass', 'Magnifying Glass', 'Obtain a magical glass that lets you spot rare ingredients. Rare cookies +25% (2m).', 50000, 'buff', 1.10);
-            addItem('grandma', 'Grandma Blessing', 'Golden rate 1/40 (1m). Granny is always watching over you.', 1000000, 'buff', 1.10);
-            addItem('warp', 'Time Warp', '1hr worth of your production value, instantly. (1h Cooldown).', 5000, 'buff', 1.10);
+            addItem('glass', 'Magnifying Glass', 'Obtain a magnifying glass that lets you inspect cookies for rarer ingredients. Rare cookies +25% (2m).', 50000, 'buff', 1.10);
+            addItem('grandma', "Grandma's Blessing", "Grandma is watching over you. Golden rate 1/40 (1m).", 1000000, 'buff', 1.10);
+            addItem('warp', 'Time Warp', '1hr production value, instantly (1h Cooldown).', 5000, 'buff', 1.10);
 
             container.innerHTML += `<div class="shop-cat">You can't make a profit without burning some dough!</div>`;
             const gain = Math.floor(cookieBucks / 1000000);
             container.innerHTML += `<div class="shop-item" style="grid-column: span 2; border-color: #f44336; text-align: center;"><div class="item-name" style="color: #f44336; font-size: 18px;">₴${swagPoints} Swag Points Owned</div><button onclick="incinerateCookies()" class="save-btn incinerate-btn">Incinerate Cookies. Send an offering to the Cookie Gods. (+₴${gain.toLocaleString()})</button></div>`;
             if(inventory.upgrades.magnet) container.innerHTML += `<button onclick="toggleMagnet()" class="save-btn" style="grid-column: span 2; background:${magnetEnabled?'#B71C1C':'#2E7D32'}; margin-top:10px; width: 100%;">${magnetEnabled ? 'Disable Magnet' : 'Enable Magnet'}</button>`;
+            
             document.getElementById('shop-modal').style.display = 'flex';
         }
 
@@ -588,14 +497,20 @@
             if ((curr==='₡' && cookieBucks < cost) || (curr==='₴' && swagPoints < cost)) return;
             if (inventory.cooldowns[id] && Date.now() < inventory.cooldowns[id]) return;
             if (id === 'divine_intervention' && (inventory.upgrades[id] || 0) >= 9) return alert("Max tier reached!");
+            
             if (curr==='₡') cookieBucks -= cost; else swagPoints -= cost;
+            
             if (type === 'building') inventory.buildings[id] = (inventory.buildings[id] || 0) + 1;
-            else if (type === 'upgrade') { if(['pierre','magnet','quantum_cursor','divine_calling'].includes(id)&&inventory.upgrades[id]>0)return; inventory.upgrades[id] = (inventory.upgrades[id] || 0) + 1; }
+            else if (type === 'upgrade') { 
+                const ots =['pierre', 'magnet', 'quantum_cursor', 'divine_calling']; 
+                if(ots.includes(id) && inventory.upgrades[id] > 0) return; 
+                inventory.upgrades[id] = (inventory.upgrades[id] || 0) + 1; 
+            }
             else if (type === 'buff') {
                 inventory.buy_counts[id] = (inventory.buy_counts[id] || 0) + 1;
                 if (id === 'glass') inventory.cooldowns.glass = Date.now() + 120000;
                 if (id === 'grandma') inventory.cooldowns.grandma = Date.now() + 60000;
-                if (id === 'warp') { cookieBucks += (getCPS() * 3600); inventory.cooldowns.warp = Date.now() + 3600000; }
+                if (id === 'warp') { cookieBucks += (getAutobakerCPS() * 3600); inventory.cooldowns.warp = Date.now() + 3600000; }
             }
             save(); updateBucksUI(); openShop();
         }
@@ -609,12 +524,27 @@
             }
         }
 
+        function showDiscovery(type) {
+            const p = document.getElementById('discovery-popup');
+            document.getElementById('discovery-name').textContent = "New Discovery: " + type.name;
+            document.getElementById('discovery-quote').textContent = `"${type.quote}"`;
+            p.style.borderColor = (type.id === 'nebula') ? 'transparent' : type.border;
+            p.className = (type.id === 'nebula') ? 'discovery-popup rainbow-btn' : 'discovery-popup';
+            p.classList.remove('show'); p.style.top = "-150px";
+            setTimeout(() => { p.classList.add('show'); p.style.top = "20px"; }, 50);
+            setTimeout(() => { p.style.top = "-150px"; setTimeout(() => p.classList.remove('show'), 500); }, 5000);
+        }
+
+        function showFloatingText(x, y, text, cls) {
+            const el = document.createElement('div'); el.className = cls; el.textContent = text; el.style.left = x + 'px'; el.style.top = y + 'px'; document.getElementById('ui-layer').appendChild(el); setTimeout(() => el.remove(), 2000);
+        }
+
         function updateEffectsUI() {
-            const container = document.getElementById('effects-container'); container.innerHTML = ""; const now = Date.now();
+            const c = document.getElementById('effects-container'); c.innerHTML = ""; const now = Date.now();
             [{id:'glass', name:'Magnifying Glass', cls:'effect-glass'}, {id:'grandma', name:"Grandma's Blessing", cls:'effect-grandma'}, {id:'warp', name:'Time Warp CD', cls:''}].forEach(b => {
                 const end = inventory.cooldowns[b.id]; if (end && now < end) {
                     const sec = Math.ceil((end - now) / 1000); const div = document.createElement('div'); div.className = `effect-item ${b.cls}`;
-                    div.innerHTML = `<span class="effect-name">${b.name}</span><span class="effect-timer">${Math.floor(sec/60)}:${(sec%60).toString().padStart(2,'0')}</span>`; container.appendChild(div);
+                    div.innerHTML = `<span class="effect-name">${b.name}</span><span class="effect-timer">${Math.floor(sec/60)}:${(sec%60).toString().padStart(2,'0')}</span>`; c.appendChild(div);
                 }
             });
         }
@@ -634,10 +564,6 @@
         }
 
         function toggleMagnet() { magnetEnabled = !magnetEnabled; localStorage.setItem('tb_magnet_on', magnetEnabled); openShop(); }
-        function showDiscovery(type) { const p = document.getElementById('discovery-popup'); document.getElementById('discovery-name').textContent = "New Discovery: " + type.name; document.getElementById('discovery-quote').textContent = `"${type.quote}"`; p.style.borderColor = (type.id === 'nebula') ? 'transparent' : type.border; p.className = (type.id === 'nebula') ? 'discovery-popup rainbow-btn' : 'discovery-popup'; p.classList.remove('show'); p.style.top = "-150px"; setTimeout(() => { p.classList.add('show'); p.style.top = "20px"; }, 50); setTimeout(() => { p.style.top = "-150px"; setTimeout(() => p.classList.remove('show'), 500); }, 5000); }
-        function showFloatingText(x, y, t, c) { const el = document.createElement('div'); el.className = c; el.textContent = t; el.style.left = x + 'px'; el.style.top = y + 'px'; document.getElementById('ui-layer').appendChild(el); setTimeout(() => el.remove(), 2000); }
-        function closeStatsMenu() { document.getElementById('stats-modal').style.display = 'none'; isCookiePaused = false; }
-        function closeShop() { document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false; }
     </script>
 </body>
 </html>
