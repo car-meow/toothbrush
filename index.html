@@ -6,6 +6,23 @@
     <!-- We still link style.css for global things, but Home Screen specific styles are below -->
     <link rel="stylesheet" href="style.css?v=35">
     <style>
+	/* Fixes white buttons in the shop */
+.buy-btn {
+    background-color: #2E7D32 !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 4px 0 #1B5E20; /* Adds a little "sink" depth */
+}
+.buy-btn:active {
+    transform: translateY(2px);
+    box-shadow: none;
+}
+.buy-btn.disabled {
+    background-color: #444 !important;
+    box-shadow: none;
+    cursor: not-allowed !important;
+}
+
         /* --- Zigzag Background & Animation --- */
         body {
             background-color: #1a1a1a;
@@ -493,14 +510,18 @@
             attemptAutoClick();
 
             cookie.onclick = (e) => {
-                if(cookie.dataset.clicked || isCookiePaused) return; 
+                if(cookie.dataset.clicked) return; 
                 cookie.dataset.clicked = "true";
-                const rect = cookie.getBoundingClientRect(); cookie.remove();
+                const rect = cookie.getBoundingClientRect();
+                cookie.remove();
 
-                const getSounds =['get1', 'get2', 'get3', 'get4'];
+                // Sound logic
+                const getSounds = ['get1', 'get2', 'get3', 'get4'];
                 const sound = document.getElementById(getSounds[Math.floor(Math.random() * getSounds.length)]);
                 if (sound) { sound.currentTime = 0; sound.play(); }
 
+                // Rarity logic
+                let finalRarity = rollRarity(type);
                 if (forceDivineNext && (type.id === 'golden' || type.id === 'nebula')) {
                     finalRarity = rarities.find(r => r.id === 'Divine');
                     forceDivineNext = false;
@@ -509,17 +530,20 @@
                 if (finalRarity.id === 'Divine') startDivineEvent();
                 else flashBorder(finalRarity);
 
-                let mult = (type.id==='golden'||type.id==='nebula') ? (finalRarity.id==='Divine'?2:finalRarity.id==='Epic'?1.25:1) : finalRarity.mult;
-                let val = type.value * mult * Math.pow(1.03, inventory.upgrades.gold_plates || 0) * Math.pow(1.10, inventory.upgrades.nebula_plates || 0);
+                // Math & Savings
+                let val = type.value * getRarityMultiplier(finalRarity.id, type.id);
+                val = val * Math.pow(1.03, inventory.upgrades.gold_plates || 0) * Math.pow(1.10, inventory.upgrades.nebula_plates || 0);
                 if (inventory.upgrades.pierre) val *= 2;
                 if (inventory.upgrades.quantum_cursor) val += (getAutobakerCPS() * 5);
 
-                cookieBucks += val; updateBucksUI();
+                cookieBucks += val;
                 cookieStats.total = (cookieStats.total || 0) + 1;
                 cookieStats[type.id] = (cookieStats[type.id] || 0) + 1;
                 cookieStats[type.id + '_' + finalRarity.id] = (cookieStats[type.id + '_' + finalRarity.id] || 0) + 1;
                 save();
+                updateBucksUI();
 
+                // Floating Text (Attached to body via fixed function)
                 const cX = e && e.clientX ? e.clientX : rect.left + (rect.width/2);
                 const cY = e && e.clientY ? e.clientY : rect.top + (rect.height/2);
                 showFloatingText(cX, cY, "+₡" + Math.floor(val), 'floating-bucks');
@@ -530,9 +554,17 @@
                     localStorage.setItem('tb_discovered_cookies', JSON.stringify(discoveredCookies));
                     showDiscovery(type);
                 }
-                const gif = document.createElement('img'); gif.src = 'pop.gif?t=' + Date.now();
-                Object.assign(gif.style, { position:'fixed', left:rect.left+'px', top:rect.top+'px', width:size+'px', height:size+'px', opacity:'0.5', pointerEvents:'none', zIndex:'9999', mixBlendMode:'screen' });
-                document.body.appendChild(gif); setTimeout(() => gif.remove(), 600);
+
+                // The Smoke Poof (Fixed GIF size and parent)
+                const gif = document.createElement('img');
+                gif.src = 'pop.gif?t=' + Date.now();
+                Object.assign(gif.style, {
+                    position: 'fixed', left: rect.left + 'px', top: rect.top + 'px',
+                    width: rect.width + 'px', height: rect.height + 'px',
+                    opacity: '0.5', pointerEvents: 'none', zIndex: '30000', mixBlendMode: 'screen'
+                });
+                document.body.appendChild(gif);
+                setTimeout(() => gif.remove(), 600);
             };
         }
 
@@ -541,26 +573,45 @@
             isCookiePaused = true;
             const container = document.getElementById('shop-list');
             container.innerHTML = "";
-            const addItem = (id, name, desc, cost, type, curve, currency = '₡') => {
-                const boughtCount = (type === 'building' ? (inventory.buildings[id] || 0) : (inventory.upgrades[id] || 0));
-                const usageCount = inventory.buy_counts[id] || 0;
-                let displayCost = Math.floor(cost * Math.pow(curve, (type === 'buff' ? usageCount : boughtCount)));
-                
-                if(id === 'gold_plates') displayCost = Math.floor(10 * Math.pow(1.10, boughtCount));
-                if(id === 'nebula_plates') displayCost = Math.floor(200 * Math.pow(1.05, boughtCount));
-                
-                const afford = (currency === '₡' ? cookieBucks >= displayCost : swagPoints >= displayCost);
-                const inUse = (type === 'buff' && inventory.cooldowns[id] && Date.now() < inventory.cooldowns[id]);
-                const oneTime = (['pierre', 'magnet', 'quantum_cursor', 'divine_calling'].includes(id) && boughtCount > 0);
-                const maxedOut = (id === 'divine_intervention' && boughtCount >= 9);
+            const addItem = (id, name, desc, cost, type, curve, curr = '₡') => {
+    const bought = (type === 'building' ? (inventory.buildings[id] || 0) : (inventory.upgrades[id] || 0));
+    const usage = inventory.buy_counts[id] || 0;
+    let dispCost = Math.floor(cost * Math.pow(curve, (type === 'buff' ? usage : bought)));
+    
+    if(id === 'gold_plates') dispCost = Math.floor(50 * Math.pow(1.10, bought)); // Corrected starting cost to 50 Swag
+    if(id === 'nebula_plates') dispCost = Math.floor(200 * Math.pow(1.05, bought));
+    
+    const afford = (curr === '₡' ? cookieBucks >= dispCost : swagPoints >= dispCost);
+    const inUse = (type === 'buff' && inventory.cooldowns[id] && Date.now() < inventory.cooldowns[id]);
+    const oneTime = (['pierre', 'magnet', 'quantum_cursor', 'divine_calling'].includes(id) && bought > 0);
+    const maxed = (id === 'divine_intervention' && bought >= 9);
 
-                const div = document.createElement('div'); div.className = "shop-item" + (currency === '₴' ? " swag-upgrade-box" : "");
-                let btnTxt = "Purchase"; if (oneTime) btnTxt = "Already Bought"; else if (maxedOut) btnTxt = "Max Tier"; else if (inUse) btnTxt = "Item in Use";
-                div.innerHTML = `<div><div class="item-name">${name} ${boughtCount>0&&type==='building'?'('+boughtCount+')':''}</div><div class="item-desc">${desc}</div><div class="item-cost">${currency}${Math.floor(displayCost).toLocaleString()}</div></div><button id="buy-${id}" class="save-btn buy-btn ${(!afford || inUse || oneTime || maxedOut) ? 'disabled' : ''}">${btnTxt}</button>`;
-                container.appendChild(div);
-                
-                document.getElementById(`buy-${id}`).onclick = () => buyItem(id, displayCost, type, currency);
-            };
+    const div = document.createElement('div');
+    div.className = "shop-item" + (curr === '₴' ? " swag-upgrade-box" : "");
+    
+    let btnTxt = "Purchase";
+    if (oneTime) btnTxt = "Already Bought";
+    else if (maxed) btnTxt = "Max Tier";
+    else if (inUse) btnTxt = "Item in Use";
+
+    div.innerHTML = `
+        <div>
+            <div class="item-name">${name} ${bought > 0 ? '(' + bought + ')' : ''}</div>
+            <div class="item-desc">${desc}</div>
+            <div class="item-cost">${curr}${dispCost.toLocaleString()}</div>
+        </div>
+        <button id="buy-${id}" class="save-btn buy-btn ${(!afford || inUse || oneTime || maxed) ? 'disabled' : ''}">${btnTxt}</button>
+    `;
+    container.appendChild(div);
+    
+    // IMPORTANT: Re-bind the click event
+    const btn = document.getElementById(`buy-${id}`);
+    if (!afford || inUse || oneTime || maxed) {
+        btn.disabled = true;
+    } else {
+        btn.onclick = () => buyItem(id, dispCost, type, curr);
+    }
+};
             
             container.innerHTML += `<div class="shop-cat">Autobakers</div>`;
             addItem('oven', 'Rusty Oven', 'Generates ₡1 every 60 seconds.', 500, 'building', 1.25);
@@ -658,9 +709,28 @@
 
         function toggleMagnet() { magnetEnabled = !magnetEnabled; localStorage.setItem('tb_magnet_on', magnetEnabled); openShop(); }
         function showDiscovery(type) { const p = document.getElementById('discovery-popup'); document.getElementById('discovery-name').textContent = "New Discovery: " + type.name; document.getElementById('discovery-quote').textContent = `"${type.quote}"`; p.style.borderColor = (type.id === 'nebula') ? 'transparent' : type.border; p.className = (type.id === 'nebula') ? 'discovery-popup rainbow-btn' : 'discovery-popup'; p.classList.remove('show'); p.style.top = "-150px"; setTimeout(() => { p.classList.add('show'); p.style.top = "20px"; }, 50); setTimeout(() => { p.style.top = "-150px"; setTimeout(() => p.classList.remove('show'), 500); }, 5000); }
-        function showFloatingText(x, y, t, c) { const el = document.createElement('div'); el.className = c; el.textContent = t; el.style.left = x + 'px'; el.style.top = y + 'px'; document.getElementById('ui-layer').appendChild(el); setTimeout(() => el.remove(), 2000); }
+       function showFloatingText(x, y, text, cls) {
+    const el = document.createElement('div');
+    el.className = cls;
+    el.textContent = text;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    // FIX: Attach to body so it stays visible even when menus are hidden
+    document.body.appendChild(el); 
+    setTimeout(() => el.remove(), 2000);
+}
         function closeStatsMenu() { document.getElementById('stats-modal').style.display = 'none'; isCookiePaused = false; }
         function closeShop() { document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false; }
+		function getRarityMultiplier(rarityId, cookieId) {
+    const isSpecial = (cookieId === 'golden' || cookieId === 'nebula');
+    if (rarityId === 'Common') return 1;
+    if (rarityId === 'Uncommon') return 1.05;
+    if (rarityId === 'Rare') return isSpecial ? 1 : 1.15;
+    if (rarityId === 'Epic') return isSpecial ? 1.25 : 1.50;
+    if (rarityId === 'Divine') return isSpecial ? 2.00 : 3.50;
+    return 1;
+}
+		
     </script>
 </body>
 </html>
