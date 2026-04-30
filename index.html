@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>New Tab</title>
-    <link rel="stylesheet" href="style.css?v=30">
+    <link rel="stylesheet" href="style.css?v=31">
     <style>
         /* --- Zigzag Background & Animation --- */
         body {
@@ -20,7 +20,7 @@
             to { background-position: 540px 500px, 540px 500px, 500px 500px, 500px 500px; }
         }
 
-        /* --- Home Container (Fix for Squished Layout) --- */
+        /* --- Home Container --- */
         .home-container { 
             display: flex; flex-direction: column; justify-content: space-between; 
             height: 100vh; width: 100vw; padding-bottom: 8vh; 
@@ -56,7 +56,7 @@
         .rarity-epic { color: #AD0FEB; -webkit-text-stroke: 1.5px #4a148c; }
         .rarity-divine { color: #FAA00F; -webkit-text-stroke: 1.5px #bf360c; }
         
-        .floating-rarity { position: fixed; font-weight: 900; font-size: 28px; z-index: 10001; pointer-events: none; animation: rarity-float 2s ease-out forwards; }
+        .floating-rarity { position: fixed; font-weight: 900; font-size: 28px; z-index: 10001; pointer-events: none; animation: rarity-float 2.5s ease-out forwards; }
         @keyframes rarity-float { 0% { transform: translate(-50%, -50%); opacity: 1; } 100% { transform: translate(-50%, -100px); opacity: 0; } }
 
         /* --- SCREEN BORDER --- */
@@ -65,17 +65,33 @@
         /* --- DIVINE EVENT --- */
         #divine-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0); z-index: 15000; display: none; align-items: center; justify-content: center; pointer-events: none; transition: background 0.5s; }
         .divine-letter { font-size: 150px; font-weight: 900; position: absolute; top: 50%; margin-top: -75px; background: linear-gradient(to bottom, #FAA00F, #EDD11D); -webkit-background-clip: text; -webkit-text-fill-color: #FFD700; -webkit-text-stroke: 10px #bf360c; filter: drop-shadow(0 0 20px black); }
-        
-        /* Adjusted positioning to prevent overlap */
         #div-part { left: 50%; transform: translateX(-150vw); } 
         #ine-part { left: 50%; transform: translateX(150vw); } 
-        
         @keyframes shake { 0%,100%{transform:translate(0,0)} 25%{transform:translate(-5px,5px)} 50%{transform:translate(5px,-5px)} 75%{transform:translate(-5px,-5px)} }
         .camera-shake { animation: shake 0.1s infinite; }
 
         /* --- HUD CONTROLS & COOKIES --- */
         .hud-bottom-right { position: fixed; bottom: 20px; right: 25px; display: flex; gap: 10px; z-index: 11000; }
-        .golden-cookie { position: fixed; width: 160px; height: 160px; object-fit: contain; z-index: 999; cursor: pointer; filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.8)); }
+        
+        /* Cookie Base Class (Size applied dynamically in JS) */
+        .golden-cookie { position: fixed; object-fit: contain; z-index: 999; cursor: pointer; }
+        
+        /* Cookie Auras */
+        .aura-basic { filter: drop-shadow(0 0 15px rgba(139, 69, 19, 0.8)) !important; }
+        .aura-cashew { filter: drop-shadow(0 0 15px rgba(210, 180, 140, 0.8)) !important; }
+        .aura-oatmeal { filter: drop-shadow(0 0 15px rgba(139, 69, 19, 0.8)) drop-shadow(0 0 20px rgba(128, 0, 128, 0.6)) !important; }
+        .aura-peanut { filter: drop-shadow(0 0 15px rgba(205, 133, 63, 0.8)) !important; }
+        .aura-sugar { filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 5px rgba(255, 0, 255, 0.6)) drop-shadow(0 0 5px rgba(0, 255, 255, 0.6)) !important; }
+        .aura-chocolate { filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.5)) drop-shadow(0 0 20px rgba(101, 67, 33, 0.8)) !important; }
+        .aura-snickerdoodle { filter: drop-shadow(0 0 15px rgba(160, 82, 45, 0.8)) !important; }
+        .aura-smore { filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 20px rgba(139, 69, 19, 0.8)) drop-shadow(0 0 25px rgba(210, 180, 140, 0.8)) !important; }
+        .aura-golden { filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.9)) drop-shadow(0 0 30px rgba(255, 215, 0, 0.6)) !important; }
+        .aura-nebula { animation: nebula-flicker 1.5s alternate infinite !important; }
+        @keyframes nebula-flicker {
+            0% { filter: drop-shadow(0 0 15px #00BCD4) drop-shadow(0 0 20px #9C27B0) drop-shadow(0 0 15px #FFEB3B); }
+            100% { filter: drop-shadow(0 0 25px #4CAF50) drop-shadow(0 0 30px #E91E63) drop-shadow(0 0 25px #FFEB3B); }
+        }
+
         .floating-bucks { position: fixed; color: #4CAF50; font-weight: bold; font-size: 28px; z-index: 1001; pointer-events: none; animation: float-up 1.5s ease-out forwards; text-shadow: 1px 1px 3px rgba(0,0,0,0.8), -1px -1px 3px rgba(0,0,0,0.8); }
         @keyframes float-up { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -120px) scale(1.5); opacity: 0; } }
 
@@ -149,7 +165,7 @@
         <div class="cookie-modal-box" style="border-color: #FFD700; width: 400px;">
             <h2 style="color:#FFD700; margin-bottom:10px;">Cookie Statistics</h2>
             <h1 id="stats-total" style="color:white; margin: 10px 0; font-size: 28px;">Total 0 Cookies</h1>
-            <div id="stats-list"></div>
+            <div id="stats-list" style="background:#121212; padding:15px; border-radius:10px; border:1px solid #333; text-align: left; display:block;"></div>
             <button onclick="closeStatsMenu()" class="save-btn" style="background:#2196F3; width:100%; margin-top: 10px;">Okay</button>
         </div>
     </div>
@@ -184,11 +200,11 @@
             { id: 'sugar', name: 'Sugar', value: 200000, chance: 50, quote: "So sweet, my teeth burn!", img: 'Cookies/sugar.png', css: 'aura-sugar', maxR: 'Divine', minR: 'Common', border: '#fff' },
             { id: 'smore', name: "S'more", value: 50000, chance: 35, quote: "Fresh from the campfire!", img: 'Cookies/smore.png', css: 'aura-smore', maxR: 'Divine', minR: 'Common', border: '#ffcc80' },
             { id: 'chocolate', name: 'Chocolate', value: 10000, chance: 25, quote: "Are you sure you didn't put a brownie in the cookie cutter?", img: 'Cookies/chocolate.png', css: 'aura-chocolate', maxR: 'Divine', minR: 'Common', border: '#5d4037' },
-            { id: 'snickerdoodle', name: 'Snickerdoodle', value: 4000, chance: 20, quote: "Soft AND cinnamony- what's not to like?", img: 'Cookies/snickerdoodle.png', css: 'aura-snickerdoodle', maxR: 'Epic', minR: 'Common', border: '#8d6e63' },
-            { id: 'peanut_butter', name: 'Peanut Butter', value: 300, chance: 15, quote: "Ooooh, my favorite!", img: 'Cookies/peanut_butter.png', css: 'aura-peanut', maxR: 'Epic', minR: 'Common', border: '#ffa726' },
-            { id: 'cashew', name: 'Cashew', value: 100, chance: 10, quote: "Hope you're having a good day!", img: 'Cookies/cashew.png', css: 'aura-cashew', maxR: 'Epic', minR: 'Common', border: '#d7ccc8' },
-            { id: 'oatmeal_raisin', name: 'Oatmeal Raisin', value: 50, chance: 5, quote: "An under-appreciated classic.", img: 'Cookies/oatmeal_raisin.png', css: 'aura-oatmeal', maxR: 'Rare', minR: 'Common', border: '#6d4c41' },
-            { id: 'chocolate_chip', name: 'Chocolate Chip', value: 21, chance: 3, quote: "You can't go wrong with the basics.", img: 'Cookies/chocolate_chip.png', css: 'aura-basic', maxR: 'Rare', minR: 'Common', border: '#8b4513' }
+            { id: 'snickerdoodle', name: 'Snickerdoodle', value: 4000, chance: 20, quote: "Soft AND cinnamony- what's not to like?", img: 'Cookies/snickerdoodle.png', css: 'aura-snickerdoodle', maxR: 'Divine', minR: 'Common', border: '#8d6e63' },
+            { id: 'peanut_butter', name: 'Peanut Butter', value: 300, chance: 15, quote: "Ooooh, my favorite!", img: 'Cookies/peanut_butter.png', css: 'aura-peanut', maxR: 'Divine', minR: 'Common', border: '#ffa726' },
+            { id: 'cashew', name: 'Cashew', value: 100, chance: 10, quote: "Hope you're having a good day!", img: 'Cookies/cashew.png', css: 'aura-cashew', maxR: 'Divine', minR: 'Common', border: '#d7ccc8' },
+            { id: 'oatmeal_raisin', name: 'Oatmeal Raisin', value: 50, chance: 5, quote: "An under-appreciated classic.", img: 'Cookies/oatmeal_raisin.png', css: 'aura-oatmeal', maxR: 'Divine', minR: 'Common', border: '#6d4c41' },
+            { id: 'chocolate_chip', name: 'Chocolate Chip', value: 21, chance: 3, quote: "You can't go wrong with the basics.", img: 'Cookies/chocolate_chip.png', css: 'aura-basic', maxR: 'Divine', minR: 'Common', border: '#8b4513' }
         ];
 
         const rarities =[
@@ -217,13 +233,14 @@
             updateBucksUI(); handleOfflineEarnings();
             if(!localStorage.getItem('tb_tut_welcome')) document.getElementById('tut-overlay').style.display='flex';
             setInterval(spawnCookieRoutine, 3000); 
-            setInterval(idleProductionLoop, 1000);
+            setInterval(idleProductionLoop, 1000); 
             setInterval(updateEffectsUI, 1000);
         });
 
+        // First click starts audio
         document.body.addEventListener('click', () => { if(!isMuted) bgm.play(); }, {once: true});
 
-        // --- HUD CONTROLS ---
+        // --- AUDIO / MENU CONTROLS ---
         document.getElementById('mute-btn').onclick = () => {
             isMuted = !isMuted;
             bgm.muted = isMuted;
@@ -252,6 +269,7 @@
         // --- ADMIN BACKDOORS (HARDENED) ---
         document.addEventListener('keydown', function(e) {
             if (!e.shiftKey) return; 
+
             if (e.key === 'F1' || e.key === '!') { 
                 e.preventDefault(); 
                 let a = prompt("Add Money:"); 
@@ -318,7 +336,7 @@
 
         function rollRarity(type) {
             const possible = rarities.filter(r => {
-                const list =['Common', 'Uncommon', 'Rare', 'Epic', 'Divine'];
+                const list = ['Common', 'Uncommon', 'Rare', 'Epic', 'Divine'];
                 return list.indexOf(r.id) >= list.indexOf(type.minR || 'Common') && list.indexOf(r.id) <= list.indexOf(type.maxR);
             });
             const totalWeight = possible.reduce((s, r) => s + r.weight, 0);
@@ -348,10 +366,7 @@
 
         async function startDivineEvent() {
             isCookiePaused = true;
-            const overlay = document.getElementById('divine-overlay');
-            const divPart = document.getElementById('div-part');
-            const inePart = document.getElementById('ine-part');
-            
+            const overlay = document.getElementById('divine-overlay'), divPart = document.getElementById('div-part'), inePart = document.getElementById('ine-part');
             document.getElementById('sfx-stop').play();
             const startVol = bgm.volume; 
             let slowInterval = setInterval(() => { if(bgm.volume > 0.1) bgm.volume -= 0.1; else { bgm.pause(); clearInterval(slowInterval); } }, 50);
@@ -359,8 +374,7 @@
             const cookies = document.querySelectorAll('.golden-cookie');
             cookies.forEach(c => c.getAnimations().forEach(a => a.pause()));
             
-            overlay.style.display = 'flex'; 
-            setTimeout(() => overlay.style.background = 'rgba(0,0,0,0.8)', 10);
+            overlay.style.display = 'flex'; setTimeout(() => overlay.style.background = 'rgba(0,0,0,0.8)', 10);
             
             let animDiv, animIne;
             setTimeout(() => {
@@ -389,9 +403,16 @@
         function createCookie(type) {
             const cookie = document.createElement('img');
             cookie.src = type.img; cookie.className = 'golden-cookie ' + type.css;
+            
+            let size = 200; 
+            if(type.id === 'golden') size = 160;
+            if(type.id === 'chocolate_chip') size = 240;
+            cookie.style.width = size + "px";
+            cookie.style.height = size + "px";
+
             document.body.appendChild(cookie);
             
-            const size = 160, vw = window.innerWidth, vh = window.innerHeight, edge = Math.floor(Math.random() * 4);
+            const vw = window.innerWidth, vh = window.innerHeight, edge = Math.floor(Math.random() * 4);
             let startX, startY, endX, endY;
             if (edge === 0) { startX = Math.random()*vw; startY = -size; endX = vw-startX; endY = vh+size; }
             else if (edge === 1) { startX = vw+size; startY = Math.random()*vh; endX = -size; endY = vh-startY; }
@@ -412,10 +433,23 @@
             const anim = cookie.animate(keyframes, { duration, easing: 'linear', fill: 'forwards' });
             anim.onfinish = () => cookie.remove();
 
+            // Divine Intervention Auto-Clicker Logic
+            const diTiers = inventory.upgrades.divine_intervention || 0;
+            if (diTiers > 0) {
+                if (Math.random() < (diTiers * 0.10)) {
+                    setTimeout(() => {
+                        if (cookie && !cookie.dataset.clicked) cookie.onclick();
+                    }, Math.random() * 3000 + 1000); 
+                }
+            }
+
             cookie.onclick = (e) => {
                 if(cookie.dataset.clicked || isCookiePaused) return; 
                 cookie.dataset.clicked = "true";
+                
                 const rect = cookie.getBoundingClientRect(); cookie.remove();
+                const cX = e && e.clientX ? e.clientX : rect.left + (rect.width / 2);
+                const cY = e && e.clientY ? e.clientY : rect.top + (rect.height / 2);
 
                 const getSounds =['get1', 'get2', 'get3', 'get4'];
                 const sound = document.getElementById(getSounds[Math.floor(Math.random() * getSounds.length)]);
@@ -432,14 +466,15 @@
                 let val = type.value * getRarityMultiplier(finalRarity.id, type.id);
                 val = val * Math.pow(1.03, inventory.upgrades.gold_plates || 0) * Math.pow(1.10, inventory.upgrades.nebula_plates || 0);
                 if (inventory.upgrades.pierre) val *= 2;
+                if (inventory.upgrades.quantum_cursor) val += (getCPS() * 5);
 
                 cookieBucks += val; updateBucksUI();
                 cookieStats.total = (cookieStats.total || 0) + 1;
                 cookieStats[type.id] = (cookieStats[type.id] || 0) + 1;
                 save();
 
-                showFloatingText(e.clientX, e.clientY, "+₡" + Math.floor(val), 'floating-bucks');
-                showFloatingText(e.clientX, e.clientY + 35, finalRarity.label, 'floating-rarity ' + finalRarity.class);
+                showFloatingText(cX, cY, "+₡" + Math.floor(val), 'floating-bucks');
+                showFloatingText(cX, cY + 35, finalRarity.label, 'floating-rarity ' + finalRarity.class);
 
                 if (!discoveredCookies.includes(type.id)) {
                     discoveredCookies.push(type.id);
@@ -447,7 +482,7 @@
                     showDiscovery(type);
                 }
                 const gif = document.createElement('img'); gif.src = 'pop.gif?t=' + Date.now();
-                Object.assign(gif.style, { position:'fixed', left:rect.left+'px', top:rect.top+'px', width:'160px', height:'160px', opacity:'0.5', pointerEvents:'none', zIndex:'9999', mixBlendMode:'screen' });
+                Object.assign(gif.style, { position:'fixed', left:rect.left+'px', top:rect.top+'px', width:size+'px', height:size+'px', opacity:'0.5', pointerEvents:'none', zIndex:'9999', mixBlendMode:'screen' });
                 document.body.appendChild(gif); setTimeout(() => gif.remove(), 600);
             };
         }
@@ -465,42 +500,47 @@
                 if(id === 'gold_plates') displayCost = Math.floor(10 * Math.pow(1.10, boughtCount));
                 if(id === 'nebula_plates') displayCost = Math.floor(200 * Math.pow(1.05, boughtCount));
                 
-                const afford = (currency === '₡' ? cookieBucks >= displayCost : swagPoints >= displayCost);
+                const isAffordable = (currency === '₡' ? cookieBucks >= displayCost : swagPoints >= displayCost);
                 const inUse = (type === 'buff' && inventory.cooldowns[id] && Date.now() < inventory.cooldowns[id]);
-                const oneTime = (id === 'pierre' || id === 'magnet') && boughtCount > 0;
+                const oneTime = (id === 'pierre' || id === 'magnet' || id === 'quantum_cursor') && boughtCount > 0;
+                const maxedOut = (id === 'divine_intervention' && boughtCount >= 9);
 
-                const div = document.createElement('div'); div.className = "shop-item" + (currency === '₴' ? " swag-upgrade-box" : "");
-                let btnTxt = "Purchase"; if (oneTime) btnTxt = "Already Bought"; else if (inUse) btnTxt = "Item in Use";
-                div.innerHTML = `<div><div class="item-name">${name} ${boughtCount>0&&type==='building'?'('+boughtCount+')':''}</div><div class="item-desc">${desc}</div><div class="item-cost">${currency}${displayCost.toLocaleString()}</div></div><button onclick="buyItem('${id}', ${displayCost}, '${type}', '${currency}')" class="save-btn buy-btn ${(!afford || inUse || oneTime) ? 'disabled' : ''}">${btnTxt}</button>`;
+                const div = document.createElement('div'); 
+                div.className = "shop-item" + (currency === '₴' ? " swag-upgrade-box" : "");
+                
+                let btnText = "Purchase";
+                if (oneTime) btnText = "Already Bought";
+                else if (maxedOut) btnText = "Max Tier";
+                else if (inUse) btnText = "Item in Use";
+
+                div.innerHTML = `<div><div class="item-name">${name} ${boughtCount>0&&type==='building'?'('+boughtCount+')':''}</div><div class="item-desc">${desc}</div><div class="item-cost">${currency}${Math.floor(displayCost).toLocaleString()}</div></div><button onclick="buyItem('${id}', ${displayCost}, '${type}', '${currency}')" class="save-btn buy-btn ${(!isAffordable || inUse || oneTime || maxedOut) ? 'disabled' : ''}">${btnText}</button>`;
                 container.appendChild(div);
             };
 
             container.innerHTML += `<div class="shop-cat">Autobakers</div>`;
-            addItem('oven', 'Rusty Oven', 'A slightly used toaster oven found in the basement. Generates ₡1 every 60 seconds.', 500, 'building', 1.25);
-            addItem('mixer', 'Industrial Mixer', 'Heavy duty machinery for heavy duty dough. Generates ₡5 every 45 seconds.', 5000, 'building', 1.18);
-            addItem('bakery', 'Local Bakery', 'You bought out the shop down the street. Generates ₡25 every 45 seconds.', 50000, 'building', 1.20);
-            addItem('factory', 'Cookie Factory', 'Mass production at its finest. Generates ₡67 every 30 seconds.', 250000, 'building', 1.15);
-            addItem('dyson', 'Dyson Sphere', 'Surrounds a star to bake at lightspeed. Generates ₡625 every 15 seconds.', 5000000, 'building', 1.19);
+            addItem('oven', 'Rusty Oven', 'Generates ₡1 every 60 seconds.', 500, 'building', 1.25);
+            addItem('mixer', 'Industrial Mixer', 'Generates ₡5 every 45 seconds.', 5000, 'building', 1.18);
+            addItem('bakery', 'Local Bakery', 'Generates ₡25 every 45 seconds.', 50000, 'building', 1.20);
+            addItem('factory', 'Cookie Factory', 'Generates ₡67 every 30 seconds.', 250000, 'building', 1.15);
+            addItem('dyson', 'Dyson Sphere', 'Generates ₡625 every 15 seconds.', 5000000, 'building', 1.19);
 
             container.innerHTML += `<div class="shop-cat">Swag Upgrades (Permanent)</div>`;
-            addItem('pierre', "Pierre d'Cauqi", "Harness the power of a true French chef. Multiplies all profit gains by 2.", 100, 'upgrade', 1, '₴');
-            addItem('gold_plates', 'Golden Plates', 'Every cookie worth 3% more. Compounds.', 10, 'upgrade', 1.10, '₴');
+            addItem('pierre', "Pierre d'Cauqi", "Multiplies all ₡/s profit gains by 2.", 1000, 'upgrade', 1, '₴');
+            addItem('gold_plates', 'Golden Plates', 'Every cookie worth 3% more. Compounds.', 50, 'upgrade', 1.10, '₴');
             addItem('nebula_plates', 'Nebula-Infused Plates', 'Every cookie worth 10% more. Compounds.', 200, 'upgrade', 1.05, '₴');
+			addItem('frenzy', 'Cookie Frenzy', 'Increases cookie spawn rates by 10%. Better know how to click fast!', 100, 'upgrade', 1.7, '₴');
+			addItem('magnet', 'Sugar Magnet', 'A divine magnet given by the Gods. Cookies stop in the center of your screen... better get to spamming! Can be enabled/disabled.', 100000, 'upgrade', 1, '₴');
+            addItem('divine_intervention', 'Divine Intervention', 'The Gods are pleased with you. They sent a divine figure to watch over you. Auto-clicks 10% of cookies per tier (Max 90%).', 500, 'upgrade', 1.5, '₴');
 
             container.innerHTML += `<div class="shop-cat">Consumables</div>`;
-            addItem('glass', 'Magnifying Glass', 'Rare cookies +25% (2m).', 50000, 'buff', 1.10);
-            addItem('grandma', 'Grandma Blessing', 'Golden rate 1/40 (1m).', 1000000, 'buff', 1.10);
-            addItem('warp', 'Time Warp', '1hr production (1h CD).', 5000, 'buff', 1.10);
+            addItem('glass', 'Magnifying Glass', 'Obtain a magical glass that lets you spot rare ingredients. Rare cookies +25% (2m).', 50000, 'buff', 1.10);
+            addItem('grandma', 'Grandma Blessing', 'Golden rate 1/40 (1m). Granny is always watching over you.', 1000000, 'buff', 1.10);
+            addItem('warp', 'Time Warp', '1hr of your production value, instantly. (1h Cooldown).', 5000, 'buff', 1.10);
 
-            container.innerHTML += `<div class="shop-cat">Upgrades</div>`;
-            addItem('frenzy', 'Cookie Frenzy', 'Increases cookie spawn rates by 10%. Better know how to click fast!', 1000, 'upgrade', 1.5);
-            addItem('magnet', 'Sugar Magnet', 'Cookies go faster at edges but slow down in center.', 20000, 'upgrade', 1);
-
-            container.innerHTML += `<div class="shop-cat">The Swag Collection</div>`;
+            container.innerHTML += `<div class="shop-cat">You can't make a profit without burning some dough!</div>`;
             const gain = Math.floor(cookieBucks / 1000000);
             container.innerHTML += `<div class="shop-item" style="grid-column: span 2; border-color: #f44336; text-align: center;"><div class="item-name" style="color: #f44336; font-size: 18px;">₴${swagPoints} Swag Points Owned</div><button onclick="incinerateCookies()" class="save-btn incinerate-btn">Incinerate Cookies. Send an offering to the Cookie Gods. (+₴${gain.toLocaleString()})</button></div>`;
             if(inventory.upgrades.magnet) container.innerHTML += `<button onclick="toggleMagnet()" class="save-btn" style="grid-column: span 2; background:${magnetEnabled?'#B71C1C':'#2E7D32'}; margin-top:10px; width: 100%;">${magnetEnabled ? 'Disable Magnet' : 'Enable Magnet'}</button>`;
-            
             document.getElementById('shop-modal').style.display = 'flex';
         }
 
@@ -508,10 +548,16 @@
             if (currency==='₡' && cookieBucks < cost) return;
             if (currency==='₴' && swagPoints < cost) return;
             if (inventory.cooldowns[id] && Date.now() < inventory.cooldowns[id]) return;
+            if (id === 'divine_intervention' && (inventory.upgrades[id] || 0) >= 9) return alert("Max tier reached!");
             
             if (currency==='₡') cookieBucks -= cost; else swagPoints -= cost;
+            
             if (type === 'building') inventory.buildings[id] = (inventory.buildings[id] || 0) + 1;
-            else if (type === 'upgrade') { if(inventory.upgrades[id]>0 && id!=='gold_plates' && id!=='nebula_plates' && id!=='magnet') return; inventory.upgrades[id] = (inventory.upgrades[id] || 0) + 1; }
+            else if (type === 'upgrade') { 
+                const oneTimers = ['pierre', 'magnet', 'quantum_cursor'];
+                if(oneTimers.includes(id) && inventory.upgrades[id] > 0) return; 
+                inventory.upgrades[id] = (inventory.upgrades[id] || 0) + 1; 
+            }
             else if (type === 'buff') {
                 inventory.buy_counts[id] = (inventory.buy_counts[id] || 0) + 1;
                 if (id === 'glass') inventory.cooldowns.glass = Date.now() + 120000;
@@ -525,7 +571,11 @@
             const gain = Math.floor(cookieBucks / 1000000); if (gain < 1) return;
             if (confirm(`Incinerate for ₴${gain.toLocaleString()}?`)) {
                 swagPoints += gain; cookieBucks = 0; inventory.buildings = {};
-                inventory.upgrades = { gold_plates: inventory.upgrades.gold_plates, nebula_plates: inventory.upgrades.nebula_plates, pierre: inventory.upgrades.pierre, magnet: inventory.upgrades.magnet };
+                inventory.upgrades = { 
+                    gold_plates: inventory.upgrades.gold_plates, nebula_plates: inventory.upgrades.nebula_plates, 
+                    pierre: inventory.upgrades.pierre, magnet: inventory.upgrades.magnet, 
+                    quantum_cursor: inventory.upgrades.quantum_cursor, divine_intervention: inventory.upgrades.divine_intervention 
+                };
                 save(); updateBucksUI(); closeShop();
             }
         }
@@ -535,7 +585,7 @@
             document.getElementById('discovery-name').textContent = "New Discovery: " + type.name;
             document.getElementById('discovery-quote').textContent = `"${type.quote}"`;
             p.style.borderColor = (type.id === 'nebula') ? 'transparent' : type.border;
-            if(type.id === 'nebula') p.className = 'discovery-popup rainbow-btn'; else p.className = 'discovery-popup';
+            p.className = (type.id === 'nebula') ? 'discovery-popup rainbow-btn' : 'discovery-popup';
             p.classList.remove('show'); p.style.top = "-150px";
             setTimeout(() => { p.classList.add('show'); p.style.top = "20px"; }, 50);
             setTimeout(() => { p.style.top = "-150px"; setTimeout(() => p.classList.remove('show'), 500); }, 5000);
@@ -544,7 +594,7 @@
         function showFloatingText(x, y, text, cls) {
             const el = document.createElement('div'); el.className = cls;
             el.textContent = text; el.style.left = x + 'px'; el.style.top = y + 'px';
-            document.body.appendChild(el); setTimeout(() => el.remove(), 2000);
+            document.getElementById('ui-layer').appendChild(el); setTimeout(() => el.remove(), 2000);
         }
 
         function updateEffectsUI() {
@@ -580,11 +630,14 @@
         document.getElementById('tut-btn').onclick = () => { document.getElementById('tut-overlay').style.display = 'none'; localStorage.setItem('tb_tut_welcome', 'done'); };
 
         document.getElementById('proxy-btn').onclick = () => {
-            const win = window.open('about:blank', '_blank'); if (!win) return alert("Pop-up Blocked!");
-            const icon = win.document.createElement('link'); icon.rel = 'icon'; icon.href = 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png'; win.document.head.appendChild(icon);
-            const iframe = win.document.createElement('iframe'); Object.assign(iframe.style, { position:'fixed', top:0, left:0, width:'100%', height:'100%', border:'none' });
-            iframe.src = "https://trigonometry.scientificsense.org/"; win.document.body.appendChild(iframe);
-            document.body.innerHTML = ""; window.open('', '_self'); window.close(); setTimeout(() => { window.location.replace("about:blank"); }, 300);
+            const win = window.open('about:blank', '_blank');
+            if (!win) return alert("Pop-up Blocked!");
+            const iframe = win.document.createElement('iframe'); 
+            Object.assign(iframe.style, { position:'fixed', top:0, left:0, width:'100%', height:'100%', border:'none' });
+            iframe.src = "https://trigonometry.scientificsense.org/"; 
+            win.document.body.appendChild(iframe);
+            window.open('', '_self'); window.close();
+            setTimeout(() => { window.location.replace("about:blank"); }, 300);
         };
     </script>
 </body>
