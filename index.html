@@ -41,25 +41,21 @@
         .cps-display { font-size: 16px; color: #FFF59D; margin-left: 10px; font-weight: bold; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); }
         .incinerate-btn { background-color: #B71C1C !important; color: white !important; grid-column: span 2; margin-top: 10px; border: 2px solid #ef5350 !important; font-size: 14px !important; }
 
-        /* --- RARITY SYSTEM (Fixed Solid Colors) --- */
-.rarity-common { color: #CFCFCF; }
-.rarity-uncommon { color: #6CDB66; }
-.rarity-rare { color: #566FEB; } /* Lighter Blue */
-.rarity-epic { color: #AD0FEB; } /* Lighter Purple */
-.rarity-divine { color: #EDD11D; } /* Lighter Yellow/Gold */
+        /* --- RARITY SYSTEM (Standardized Design) --- */
+.rarity-common { color: #CFCFCF; -webkit-text-stroke: 1.5px #555; }
+.rarity-uncommon { color: #6CDB66; -webkit-text-stroke: 1.5px #1b5e20; }
+.rarity-rare { color: #566FEB; -webkit-text-stroke: 1.5px #1a237e; }
+.rarity-epic { color: #AD0FEB; -webkit-text-stroke: 1.5px #4a148c; }
+.rarity-divine { color: #EDD11D; -webkit-text-stroke: 1.5px #bf360c; }
 
 .floating-rarity { 
     position: fixed; 
     font-weight: 900; 
-    font-size: 32px; /* Slightly larger for better impact */
+    font-size: 28px; 
     z-index: 10001; 
     pointer-events: none; 
     animation: rarity-float 2.5s ease-out forwards; 
-    
-    /* Strong Black Outline */
-    -webkit-text-stroke: 6px #000;
     paint-order: stroke fill;
-    text-shadow: 2px 2px 10px rgba(0,0,0,0.5);
 }
 
 @keyframes rarity-float { 
@@ -296,22 +292,64 @@
         }
 
         async function startDivineEvent() {
-            isCookiePaused = true; const overlay = document.getElementById('divine-overlay'), divPart = document.getElementById('div-part'), inePart = document.getElementById('ine-part');
+            isCookiePaused = true;
+            const overlay = document.getElementById('divine-overlay');
+            const divPart = document.getElementById('div-part');
+            const inePart = document.getElementById('ine-part');
+            
+            // 1. Audio and Pause
             document.getElementById('sfx-stop').play();
-            const startVol = bgm.volume; bgm.volume = 0.1;
-            const cookies = document.querySelectorAll('.golden-cookie'); cookies.forEach(c => c.getAnimations().forEach(a => a.pause()));
-            overlay.style.display = 'flex'; setTimeout(() => overlay.style.background = 'rgba(0,0,0,0.8)', 10);
+            const startVol = bgm.volume; 
+            bgm.volume = 0.1;
+            
+            const cookies = document.querySelectorAll('.golden-cookie');
+            cookies.forEach(c => c.getAnimations().forEach(a => a.pause()));
+            
+            // 2. Darken Screen
+            overlay.style.display = 'flex'; 
+            setTimeout(() => overlay.style.background = 'rgba(0,0,0,0.8)', 10);
+            
+            // 3. Animation
+            let animDiv = divPart.animate([
+                { transform: 'translateX(-150vw)' }, 
+                { transform: 'translateX(-100%)' }
+            ], { duration: 400, fill: 'forwards', easing:'ease-out' });
+
+            let animIne = inePart.animate([
+                { transform: 'translateX(150vw)' }, 
+                { transform: 'translateX(0%)' }
+            ], { duration: 400, fill: 'forwards', easing:'ease-out' });
+
             setTimeout(() => {
-                divPart.animate([{ transform: 'translateX(-150vw)' }, { transform: 'translateX(-100%)' }], { duration: 400, fill: 'forwards' });
-                inePart.animate([{ transform: 'translateX(150vw)' }, { transform: 'translateX(0%)' }], { duration: 400, fill: 'forwards' });
-                setTimeout(() => { document.getElementById('sfx-divine1').play(); document.getElementById('sfx-divine2').play(); document.body.classList.add('camera-shake'); setTimeout(() => document.body.classList.remove('camera-shake'), 500); }, 400);
-            }, 500);
-            setTimeout(() => document.getElementById('sfx-start').play(), 2500);
+                document.getElementById('sfx-divine1').play(); 
+                document.getElementById('sfx-divine2').play();
+                document.body.classList.add('camera-shake'); 
+                setTimeout(() => document.body.classList.remove('camera-shake'), 500);
+            }, 400);
+            
+            // 4. Start sound plays early
+            setTimeout(() => { document.getElementById('sfx-start').play(); }, 2500);
+            
+            // 5. Cleanup and HARD POSITION RESET
             setTimeout(() => {
                 overlay.style.opacity = '0'; 
                 setTimeout(() => {
-                    overlay.style.display = 'none'; overlay.style.opacity = '1'; overlay.style.background = 'rgba(0,0,0,0)';
-                    bgm.volume = startVol; cookies.forEach(c => c.getAnimations().forEach(a => a.play())); isCookiePaused = false;
+                    overlay.style.display = 'none'; 
+                    overlay.style.opacity = '1'; 
+                    overlay.style.background = 'rgba(0,0,0,0)';
+                    
+                    // FORCE RESET: Move them back off-screen manually
+                    divPart.style.transform = 'translateX(-150vw)';
+                    inePart.style.transform = 'translateX(150vw)';
+                    
+                    // Stop animations to prevent visual glitches on 2nd activation
+                    animDiv.cancel(); 
+                    animIne.cancel();
+
+                    bgm.volume = startVol; 
+                    if(!isMuted) bgm.play();
+                    cookies.forEach(c => c.getAnimations().forEach(a => a.play()));
+                    isCookiePaused = false;
                 }, 250);
             }, 3500);
         }
