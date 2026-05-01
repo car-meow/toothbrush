@@ -5,6 +5,27 @@
     <title>New Tab</title>
     <link rel="stylesheet" href="style.css?v=38">
     <style>
+	
+	/* --- CHROMEBOOK CLICK-PRIORITY FIX --- */
+.save-btn, .home-btn, .golden-cookie {
+    pointer-events: auto !important; /* Forces the browser to listen to clicks */
+    touch-action: manipulation;
+    z-index: 99999 !important; /* Sits above school monitoring layers */
+}
+
+.hud-top-left, .hud-top-right, .button-row {
+    pointer-events: none; /* Let clicks pass through the gaps between buttons */
+}
+
+.hud-top-left button, .hud-top-right button, .button-row button {
+    pointer-events: auto !important; /* Re-enable for the buttons themselves */
+}
+
+/* Ensure the center container doesn't block the screen when invisible */
+.home-container.hidden {
+    pointer-events: none !important;
+}
+
         /* --- Zigzag Background & Animation --- */
         body {
             background-color: #1a1a1a;
@@ -205,9 +226,17 @@
             document.getElementById('open-shop-btn').onclick = openShop;
             document.getElementById('open-stats-btn').onclick = openStatsMenu;
 			
-			// --- REINFORCED CHROMEBOOK BINDINGS ---
-            const shopBtn = document.getElementById('btn-u1');
-            const statsBtn = document.getElementById('btn-u2');
+			// --- HARDENED CHROMEBOOK BINDINGS ---
+            const shopBtn = document.getElementById('open-shop-btn');
+            const statsBtn = document.getElementById('open-stats-btn');
+            const hideBtn = document.getElementById('hide-menu-btn');
+            const muteBtn = document.getElementById('mute-btn');
+
+            // We use pointerdown because Chromebook filters often ignore/block 'click'
+            if(shopBtn) shopBtn.onpointerdown = (e) => { e.preventDefault(); openShop(); };
+            if(statsBtn) statsBtn.onpointerdown = (e) => { e.preventDefault(); openStatsMenu(); };
+            if(muteBtn) muteBtn.onpointerdown = (e) => { e.preventDefault(); toggleMute(); };
+            if(hideBtn) hideBtn.onpointerdown = (e) => { e.preventDefault(); toggleMenus(); };
 
             if(shopBtn) {
                 // We use 'mousedown' as a backup because Chromebooks sometimes block 'click'
@@ -303,7 +332,9 @@
             }
             attemptAutoClick();
 
-            cookie.onclick = (e) => {
+            // Use pointerdown for instant response on Chromebooks
+            cookie.onpointerdown = (e) => {
+                e.preventDefault(); // Prevents the school filter from 'stealing' the interaction
                 if(cookie.dataset.clicked) return; cookie.dataset.clicked = "true";
                 const rect = cookie.getBoundingClientRect(); cookie.remove();
                 const sound = document.getElementById(['get1','get2','get3','get4'][Math.floor(Math.random()*4)]);
