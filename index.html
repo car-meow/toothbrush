@@ -86,11 +86,13 @@
     <audio id="sfx-stop" src="Sound/stop.mp3"></audio>
     <audio id="sfx-divine1" src="Sound/divine.mp3"></audio>
     <audio id="sfx-divine2" src="Sound/divine2.mp3"></audio>
+	<audio id="sfx-divine3" src="Sound/divine3.mp3"></audio>
     <audio id="sfx-start" src="Sound/start.mp3"></audio>
 	<audio id="sfx-Common" src="Sound/Common.mp3"></audio>
 	<audio id="sfx-Uncommon" src="Sound/Uncommon.mp3"></audio>
 	<audio id="sfx-Rare" src="Sound/Rare.mp3"></audio>
 	<audio id="sfx-Epic" src="Sound/Epic.mp3"></audio>
+	<audio id="sfx-Epic2" src="Sound/Epic2.mp3"></audio>
     <audio id="get1" src="Sound/get1.mp3"></audio><audio id="get2" src="Sound/get2.mp3"></audio><audio id="get3" src="Sound/get3.mp3"></audio><audio id="get4" src="Sound/get4.mp3"></audio>
 
     <div id="screen-border"></div>
@@ -309,7 +311,7 @@
             overlay.style.display = 'flex'; setTimeout(() => overlay.style.background = 'rgba(0,0,0,0.8)', 10);
             let dAn = divP.animate([{ transform: 'translateX(-150vw)' }, { transform: 'translateX(-100%)' }], { duration: 400, fill: 'forwards' });
             let iAn = ineP.animate([{ transform: 'translateX(150vw)' }, { transform: 'translateX(0%)' }], { duration: 400, fill: 'forwards' });
-            setTimeout(() => { document.getElementById('sfx-divine1').play(); document.getElementById('sfx-divine2').play(); document.body.classList.add('camera-shake'); setTimeout(() => document.body.classList.remove('camera-shake'), 500); }, 400);
+            setTimeout(() => { document.getElementById('sfx-divine1').play(); document.getElementById('sfx-divine2').play(); document.getElementById('sfx-divine3').play(); document.body.classList.add('camera-shake'); setTimeout(() => document.body.classList.remove('camera-shake'), 500); }, 400);
             setTimeout(() => document.getElementById('sfx-start').play(), 2500);
             setTimeout(() => {
                 overlay.style.opacity = '0';
@@ -330,6 +332,14 @@
                 sound.currentTime = 0;
                 sound.play();
             }
+			
+			if (rarity.id === 'Epic') {
+			const secondEpic = document.getElementById('sfx-Epic2');
+			if (secondEpic) {
+				secondEpic.currentTime = 0;
+				secondEpic.play();
+				}
+			}
 
             const b = document.getElementById('screen-border'); b.style.opacity = "1";
             if (rarity.id === 'Uncommon') { b.style.boxShadow = "inset 0 0 100px rgba(108,219,102,0.25)"; setTimeout(()=>b.style.opacity="0", 500); }
