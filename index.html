@@ -81,6 +81,18 @@
     </style>
 </head>
 <body>
+
+<!-- In-App Tutorial Overlay -->
+<div id="tut-overlay" class="tut-overlay">
+    <div class="tut-box">
+        <h2 style="color: #2196F3; margin: 0; font-size: 24px;">Welcome!</h2>
+        <div id="tut-text" class="tut-text">
+            <!-- Text is injected here by JavaScript -->
+        </div>
+        <button id="tut-btn" class="save-btn" style="background-color: #2196F3; width: 100%; font-size: 16px; padding: 12px;">Next</button>
+    </div>
+</div>
+
     <!-- Audio -->
     <audio id="bgm" src="Sound/bgm.mp3" loop></audio>
     <audio id="sfx-stop" src="Sound/stop.mp3"></audio>
@@ -100,13 +112,14 @@
 
     <!-- HUD -->
     <div class="hud-top-left">
-        <div style="font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
-            <span id="cps-counter" class="cps-display">₡0.0/s</span>
-        </div>
-        <button id="open-shop-btn" class="save-btn" style="background: #2196F3; width: 130px; font-size: 14px; padding: 10px;">Open Shop</button>
-        <button id="open-stats-btn" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc; width: 130px;">Cookie Stats</button>
+    <div style="font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
+        <span id="cps-counter" class="cps-display">₡0.0/s</span>
     </div>
+    <!-- IDs renamed to be 'innocent' and onclick removed -->
+    <button id="btn-u1" class="save-btn" style="background: #2196F3; width: 130px; font-size: 14px; padding: 10px; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);">Open Shop</button>
+    <button id="btn-u2" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc; width: 130px;">Cookie Stats</button>
+</div>
 
     <div id="effects-container" class="hud-top-right"></div>
 
@@ -202,6 +215,26 @@
             // Bind Top & HUD Buttons
             document.getElementById('open-shop-btn').onclick = openShop;
             document.getElementById('open-stats-btn').onclick = openStatsMenu;
+			
+			// --- REINFORCED CHROMEBOOK BINDINGS ---
+            const shopBtn = document.getElementById('btn-u1');
+            const statsBtn = document.getElementById('btn-u2');
+
+            if(shopBtn) {
+                // We use 'mousedown' as a backup because Chromebooks sometimes block 'click'
+                shopBtn.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    openShop();
+                });
+            }
+
+            if(statsBtn) {
+                statsBtn.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    openStatsMenu();
+                });
+            }
+			
             document.getElementById('close-shop-btn').onclick = () => { document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false; };
             document.getElementById('close-stats-btn').onclick = () => { document.getElementById('stats-modal').style.display = 'none'; isCookiePaused = false; };
             document.getElementById('hide-menu-btn').onclick = toggleMenus;
@@ -488,6 +521,39 @@
                 showFloatingText(window.innerWidth/2, 100, "DIVINE PREP ACTIVE", "floating-bucks");
             }
         }, true);
+		
+		// --- HARDENED ONBOARDING LOGIC ---
+        const tutorialSteps = [
+            "Welcome to Toothbrush! This tutorial will show you around. Click on one of the tabs at the bottom to get started.",
+            "If you'd like to replay this tutorial later, click the Tutorial button and click 'Replay In-App Tutorial'."
+        ];
+        
+        let currentStep = 0;
+        const tutOverlay = document.getElementById('tut-overlay');
+        const tutText = document.getElementById('tut-text');
+        const tutBtn = document.getElementById('tut-btn');
+
+        // Check if user has EVER finished the tutorial (using a more unique key)
+        if (!localStorage.getItem('tb_user_onboarded_v1')) {
+            tutOverlay.style.display = 'flex';
+            showStep();
+        }
+
+        function showStep() {
+            tutText.textContent = tutorialSteps[currentStep];
+            tutBtn.textContent = (currentStep === tutorialSteps.length - 1) ? "Start Playing!" : "Next";
+        }
+
+        tutBtn.onclick = () => {
+            currentStep++;
+            if (currentStep < tutorialSteps.length) {
+                showStep();
+            } else {
+                // FINISHED: Save to memory and hide
+                localStorage.setItem('tb_user_onboarded_v1', 'true');
+                tutOverlay.style.display = 'none';
+            }
+        };
 		
     </script>
 </body>
