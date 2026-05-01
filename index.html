@@ -82,12 +82,16 @@
 </head>
 <body>
     <!-- Audio -->
-    <audio id="bgm" src="bgm.mp3" loop></audio>
-    <audio id="sfx-stop" src="stop.mp3"></audio>
-    <audio id="sfx-divine1" src="divine.mp3"></audio>
-    <audio id="sfx-divine2" src="divine2.mp3"></audio>
-    <audio id="sfx-start" src="start.mp3"></audio>
-    <audio id="get1" src="get1.mp3"></audio><audio id="get2" src="get2.mp3"></audio><audio id="get3" src="get3.mp3"></audio><audio id="get4" src="get4.mp3"></audio>
+    <audio id="bgm" src="Sound/bgm.mp3" loop></audio>
+    <audio id="sfx-stop" src="Sound/stop.mp3"></audio>
+    <audio id="sfx-divine1" src="Sound/divine.mp3"></audio>
+    <audio id="sfx-divine2" src="Sound/divine2.mp3"></audio>
+    <audio id="sfx-start" src="Sound/start.mp3"></audio>
+	<audio id="sfx-Common" src="Sound/Common.mp3"></audio>
+	<audio id="sfx-Uncommon" src="Sound/Uncommon.mp3"></audio>
+	<audio id="sfx-Rare" src="Sound/Rare.mp3"></audio>
+	<audio id="sfx-Epic" src="Sound/Epic.mp3"></audio>
+    <audio id="get1" src="Sound/get1.mp3"></audio><audio id="get2" src="Sound/get2.mp3"></audio><audio id="get3" src="Sound/get3.mp3"></audio><audio id="get4" src="Sound/get4.mp3"></audio>
 
     <div id="screen-border"></div>
     <div id="divine-overlay"><div id="div-part" class="divine-letter">DIV</div><div id="ine-part" class="divine-letter">INE</div></div>
@@ -317,12 +321,20 @@
             }, 3500);
         }
 
-        function flashBorder(r) {
-            if (borderPriority && r.id !== 'Divine') return;
+        function flashBorder(rarity) {
+            if (borderPriority && rarity.id !== 'Divine') return;
+            
+            // --- NEW: Play Rarity Sound ---
+            const sound = document.getElementById('sfx-' + rarity.id);
+            if (sound) {
+                sound.currentTime = 0;
+                sound.play();
+            }
+
             const b = document.getElementById('screen-border'); b.style.opacity = "1";
-            if (r.id === 'Uncommon') { b.style.boxShadow = "inset 0 0 100px rgba(108,219,102,0.25)"; setTimeout(()=>b.style.opacity="0", 500); }
-            else if (r.id === 'Rare') { b.style.boxShadow = "inset 0 0 120px rgba(65,93,230,0.5)"; setTimeout(()=>b.style.opacity="0", 800); }
-            else if (r.id === 'Epic') { borderPriority = true; b.style.boxShadow = "inset 0 0 150px rgba(173,15,178,0.5)"; setTimeout(()=>{b.style.opacity="0"; borderPriority=false;}, 1500); }
+            if (rarity.id === 'Uncommon') { b.style.boxShadow = "inset 0 0 100px rgba(108,219,102,0.25)"; setTimeout(()=>b.style.opacity="0", 500); }
+            else if (rarity.id === 'Rare') { b.style.boxShadow = "inset 0 0 120px rgba(65,93,230,0.5)"; setTimeout(()=>b.style.opacity="0", 800); }
+            else if (rarity.id === 'Epic') { borderPriority = true; b.style.boxShadow = "inset 0 0 150px rgba(173,15,178,0.5)"; setTimeout(()=>{b.style.opacity="0"; borderPriority=false;}, 1500); }
         }
 
         function openShop() {
