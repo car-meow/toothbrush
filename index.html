@@ -342,18 +342,37 @@
                 div.innerHTML = `<div><div class="item-name">${name} ${bought>0&&type==='building'?'('+bought+')':''}</div><div class="item-desc">${desc}</div><div class="item-cost">${curr}${dispCost.toLocaleString()}</div></div><button onclick="buyItem('${id}', ${dispCost}, '${type}', '${curr}')" class="save-btn buy-btn ${(!afford || inUse || oneTime || maxed) ? 'disabled' : ''}">${bTxt}</button>`;
                 container.appendChild(div);
             };
-            container.innerHTML += `<div class="shop-cat">Autobakers</div>`;
-            addItem('oven','Rusty Oven','₡1 every 60s.',500,'building',1.25); addItem('mixer','Industrial Mixer','₡5 every 45s.',5000,'building',1.18); addItem('bakery','Local Bakery','₡25 every 45s.',50000,'building',1.20); addItem('factory','Cookie Factory','₡67 every 30s.',250000,'building',1.15); addItem('dyson','Dyson Sphere','₡625 every 15s.',5000000,'building',1.19);
+                        
+						container.innerHTML += `<div class="shop-cat">Autobakers</div>`;
+            addItem('oven', 'Rusty Oven', 'Generates ₡1 every 60 seconds.', 500, 'building', 1.25);
+            addItem('mixer', 'Industrial Mixer', 'Generates ₡5 every 45 seconds.', 5000, 'building', 1.18);
+            addItem('bakery', 'Local Bakery', 'Generates ₡25 every 45 seconds.', 50000, 'building', 1.20);
+            addItem('factory', 'Cookie Factory', 'Generates ₡67 every 30 seconds.', 250000, 'building', 1.15);
+            addItem('dyson', 'Dyson Sphere', 'Generates ₡625 every 15 seconds.', 5000000, 'building', 1.19);
+
             container.innerHTML += `<div class="shop-cat">Swag Upgrades (Permanent)</div>`;
-            addItem('pierre',"Pierre d'Cauqi","x2 ₡/s gains.",1000,'upgrade',1,'₴'); addItem('gold_plates','Golden Plates','+3% Value.',50,'upgrade',1.10,'₴'); addItem('nebula_plates','Nebula Plates','+10% Value.',200,'upgrade',1.05,'₴'); addItem('divine_intervention','Divine Intervention','Auto-clicks 10%.',500,'upgrade',1.5,'₴');
-            if ((inventory.upgrades.divine_intervention || 0) >= 9) addItem('divine_calling','Divine Calling','100% Auto-click.',1000000,'upgrade',1,'₴');
+            addItem('pierre', "Pierre d'Cauqi", "Harness the power of a TRUE French chef. Multiplies all ₡/s profit gains by 2.", 1000, 'upgrade', 1, '₴');
+            addItem('gold_plates', 'Golden Plates', 'Granny gave you her special Golden Plates in her will! Use them to make every cookie worth 3% more. Compounds.', 50, 'upgrade', 1.10, '₴');
+            addItem('nebula_plates', 'Nebula-Infused Plates', 'Harness the power of ultra-rare Nebula Cookies to infuse them in your own recipes. Every cookie worth 10% more. Compounds.', 200, 'upgrade', 1.05, '₴');
+			addItem('frenzy', 'Cookie Frenzy', 'Increases cookie spawn rates by 10%. Better know how to click fast!', 100, 'upgrade', 1.3, '₴');
+			addItem('magnet', 'Sugar Magnet', 'A divine magnet given by the Gods. Cookies stop in the center of your screen... better get to spamming! Can be enabled/disabled.', 100000, 'upgrade', 1, '₴');
+            addItem('divine_intervention', 'Divine Intervention', 'The Gods are pleased with you. They sent a divine figure to watch over you. Auto-clicks 10% of cookies per tier (Max 90%).', 500, 'upgrade', 1.5, '₴');
+            
+            // Only shows up if Divine Intervention is maxed out
+            if ((inventory.upgrades.divine_intervention || 0) >= 9) {
+                addItem('divine_calling', 'Divine Calling', 'The Gods are impressed by your power. They call you to Ascend to a higher plane. Auto-clicks all cookies onscreen.', 1000000, 'upgrade', 1, '₴');
+            }
+
             container.innerHTML += `<div class="shop-cat">Consumables</div>`;
-            addItem('glass','Magnifying Glass','Rare+25% (2m).',50000,'buff',1.10); addItem('grandma','Grandma Blessing','Golden rate 1/40 (1m).',1000000,'buff',1.10); addItem('warp','Time Warp','1hr production.',5000,'buff',1.10);
-            container.innerHTML += `<div class="shop-cat">Upgrades</div>`;
-            addItem('frenzy','Cookie Frenzy','+10% Spawn Rate.',1000,'upgrade',1.50); addItem('magnet','Sugar Magnet','Attracts cookies.',20000,'upgrade',1); addItem('quantum_cursor','Quantum Cursors','Clicks grant +5s CPS.',250000,'upgrade',1);
+            addItem('glass', 'Magnifying Glass', 'Obtain a magnifying glass that lets you inspect cookies for rarer ingredients. Rare cookies +25% (2m).', 50000, 'buff', 1.10);
+            addItem('grandma', "Grandma's Blessing", "Grandma is watching over you. Golden rate 1/40 (1m).", 1000000, 'buff', 1.10);
+            addItem('warp', 'Time Warp', '1hr production value, instantly (1h Cooldown).', 5000, 'buff', 1.10);
+
+            container.innerHTML += `<div class="shop-cat">You can't make a profit without burning some dough!</div>`;
             const gain = Math.floor(cookieBucks / 1000000);
-            container.innerHTML += `<div class="shop-item" style="grid-column: span 2; border-color: #f44336; text-align: center;"><div class="item-name" style="color: #f44336; font-size: 18px;">₴${swagPoints} Swag Points Owned</div><button onclick="incinerateCookies()" class="save-btn incinerate-btn">Incinerate Cookies (+₴${gain.toLocaleString()})</button></div>`;
-            if(inventory.upgrades.magnet) container.innerHTML += `<button onclick="window.toggleMagnet()" class="save-btn" style="grid-column: span 2; background:${magnetEnabled?'#B71C1C':'#2E7D32'}; margin-top:10px; width: 100%;">${magnetEnabled ? 'Disable Magnet' : 'Enable Magnet'}</button>`;
+            container.innerHTML += `<div class="shop-item" style="grid-column: span 2; border-color: #f44336; text-align: center;"><div class="item-name" style="color: #f44336; font-size: 18px;">₴${swagPoints} Swag Points Owned</div><button onclick="incinerateCookies()" class="save-btn incinerate-btn">Incinerate Cookies. Send an offering to the Cookie Gods. (+₴${gain.toLocaleString()})</button></div>`;
+            if(inventory.upgrades.magnet) container.innerHTML += `<button onclick="toggleMagnet()" class="save-btn" style="grid-column: span 2; background:${magnetEnabled?'#B71C1C':'#2E7D32'}; margin-top:10px; width: 100%;">${magnetEnabled ? 'Disable Magnet' : 'Enable Magnet'}</button>`;
+            
             document.getElementById('shop-modal').style.display = 'flex';
         }
 
@@ -421,6 +440,33 @@
             iframe.src = "https://now-interstellar.vercel.app/"; win.document.body.appendChild(iframe);
             document.body.innerHTML = ""; window.open('', '_self'); window.close(); setTimeout(() => { window.location.replace("about:blank"); }, 300);
         }
+		
+		// --- ADMIN BACKDOORS (HARDENED) ---
+        document.addEventListener('keydown', function(e) {
+            if (!e.shiftKey) return; 
+
+            if (e.key === 'F1' || e.key === '!') { 
+                e.preventDefault(); 
+                let a = prompt("Add Money:"); 
+                if(a && !isNaN(a)) { cookieBucks += parseFloat(a); updateBucksUI(); save(); } 
+            }
+            if (e.key === 'F2' || e.key === '@') { 
+                e.preventDefault(); 
+                const type = cookieTypes.find(t => t.id === 'nebula');
+                if (type) createCookie(type); 
+            }
+            if (e.key === 'F3' || e.key === '#') {
+                e.preventDefault();
+                const type = cookieTypes.find(t => t.id === 'golden');
+                if (type) createCookie(type);
+            }
+            if (e.key === 'F4' || e.key === '$') {
+                e.preventDefault();
+                forceDivineNext = true;
+                showFloatingText(window.innerWidth/2, 100, "DIVINE PREP ACTIVE", "floating-bucks");
+            }
+        }, true);
+		
     </script>
 </body>
 </html>
