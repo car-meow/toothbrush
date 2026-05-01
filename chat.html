@@ -391,39 +391,5 @@
         });
     </script>
 	
-	<!-- Tutorial Modal -->
-    <div id="tut-overlay" class="tut-overlay">
-        <div class="tut-box">
-            <h2 style="color: #2196F3; margin-bottom: 15px;">Chat Rooms</h2>
-            <div id="tut-text" class="tut-text"></div>
-            <button id="tut-btn" class="save-btn" style="background-color: #2196F3; width: 100%; font-size: 16px;">Next</button>
-        </div>
-    </div>
-
-    <script>
-        // EDIT YOUR TEXT HERE:
-        const tutorialSteps =[
-            "This chat room allows you to talk with multiple friends anonymously with randomly generated names. To host a chat room (from your own device) click 'Host New Room'. You can set a 6-digit PIN (letters and numbers), create a name for your room, and click 'Go Live' to start hosting. To join an existing room, enter the PIN shown at the top of any joined members' screens (click to unhide/hide the PIN).",
-            "View the currently joined people with Control+Shift+L. The Host can also kick people using this menu. If kicked, you'll be timed out of the Chat Room feature for one minute. The host can also disband a room, which removes everyone from the room and sends them back to the home screen. Have fun and happy chatting!"
-        ];
-        
-        let currentStep = 0;
-        if (!localStorage.getItem('tb_tut_chat')) {
-            document.getElementById('tut-overlay').style.display = 'flex';
-            updateTut();
-        }
-        function updateTut() {
-            document.getElementById('tut-text').textContent = tutorialSteps[currentStep];
-            document.getElementById('tut-btn').textContent = (currentStep === tutorialSteps.length - 1) ? "OK" : "Next";
-        }
-        document.getElementById('tut-btn').onclick = () => {
-            currentStep++;
-            if (currentStep >= tutorialSteps.length) {
-                document.getElementById('tut-overlay').style.display = 'none';
-                localStorage.setItem('tb_tut_chat', 'done'); 
-            } else { updateTut(); }
-        };
-    </script>
-	
 </body>
 </html>

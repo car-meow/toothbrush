@@ -82,17 +82,6 @@
 </head>
 <body>
 
-<!-- In-App Tutorial Overlay -->
-<div id="tut-overlay" class="tut-overlay">
-    <div class="tut-box">
-        <h2 style="color: #2196F3; margin: 0; font-size: 24px;">Welcome!</h2>
-        <div id="tut-text" class="tut-text">
-            <!-- Text is injected here by JavaScript -->
-        </div>
-        <button id="tut-btn" class="save-btn" style="background-color: #2196F3; width: 100%; font-size: 16px; padding: 12px;">Next</button>
-    </div>
-</div>
-
     <!-- Audio -->
     <audio id="bgm" src="Sound/bgm.mp3" loop></audio>
     <audio id="sfx-stop" src="Sound/stop.mp3"></audio>
@@ -521,40 +510,6 @@
                 showFloatingText(window.innerWidth/2, 100, "DIVINE PREP ACTIVE", "floating-bucks");
             }
         }, true);
-		
-		// --- HARDENED ONBOARDING LOGIC ---
-        const tutorialSteps = [
-            "Welcome to Toothbrush! This tutorial will show you around. Click on one of the tabs at the bottom to get started.",
-            "If you'd like to replay this tutorial later, click the Tutorial button and click 'Replay In-App Tutorial'."
-        ];
-        
-        let currentStep = 0;
-        const tutOverlay = document.getElementById('tut-overlay');
-        const tutText = document.getElementById('tut-text');
-        const tutBtn = document.getElementById('tut-btn');
-
-        // Check if user has EVER finished the tutorial (using a more unique key)
-        if (!localStorage.getItem('tb_user_onboarded_v1')) {
-            tutOverlay.style.display = 'flex';
-            showStep();
-        }
-
-        function showStep() {
-            tutText.textContent = tutorialSteps[currentStep];
-            tutBtn.textContent = (currentStep === tutorialSteps.length - 1) ? "Start Playing!" : "Next";
-        }
-
-        tutBtn.onclick = () => {
-            currentStep++;
-            if (currentStep < tutorialSteps.length) {
-                showStep();
-            } else {
-                // FINISHED: Save to memory and hide
-                localStorage.setItem('tb_user_onboarded_v1', 'true');
-                tutOverlay.style.display = 'none';
-            }
-        };
-		
     </script>
 </body>
 </html>

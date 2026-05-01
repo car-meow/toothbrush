@@ -13,45 +13,6 @@
             <button id="replay-tut-btn" class="save-btn" style="background-color: #2196F3;">Replay In-App Tutorial</button>
             <button onclick="location.href='index.html'" class="save-btn" style="background-color: #555;">Back</button>
         </div>
-        
-<script>
-            // Logic to Replay the Tutorial
-            document.getElementById('replay-tut-btn').onclick = () => {
-                if (confirm("Are you sure you want to replay the tutorial?")) {
-                    // Wipe the memory of all completed tutorials
-                    localStorage.removeItem('tb_tut_welcome');
-                    localStorage.removeItem('tb_tut_games');
-                    localStorage.removeItem('tb_tut_ai');
-                    localStorage.removeItem('tb_tut_chat');
-                    // Send them back to the home screen to start over
-                    location.href = 'index.html';
-                }
-            };
-
-            // NEW: Logic to Clear Cookie Stats
-            // Logic to Clear ALL Cookie Game Data
-            document.getElementById('clear-cookies-btn').onclick = () => {
-                const warning = "Are you sure? This will wipe your money, discovered cookies, all shop upgrades, autobakers, and Swag Points. This cannot be undone!";
-                
-                if (confirm(warning)) {
-                    // 1. Wipe basic stats
-                    localStorage.removeItem('tb_cookie_bucks');
-                    localStorage.removeItem('tb_discovered_cookies');
-                    localStorage.removeItem('tb_cookie_stats');
-                    
-                    // 2. Wipe Shop & Inventory data
-                    localStorage.removeItem('tb_inventory');
-                    localStorage.removeItem('tb_swag_points');
-                    localStorage.removeItem('tb_magnet_on');
-                    localStorage.removeItem('tb_last_seen');
-                    
-                    alert("All cookie game data and shop purchases have been cleared!");
-                    
-                    // Optional: Return to home screen to refresh the UI
-                    location.href = 'index.html';
-                }
-            };
-        </script>
     </header>
     
     <main style="background:#333;">
