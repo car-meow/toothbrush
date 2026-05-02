@@ -5,23 +5,6 @@
     <title>New Tab</title>
     <link rel="stylesheet" href="style.css?v=38">
     <style>
-		/* --- CHROMEBOOK NUCLEAR BUTTON FIX --- */
-.raw-div-btn {
-    display: flex; align-items: center; justify-content: center;
-    background: #2196F3; color: white; font-weight: bold; font-size: 14px;
-    padding: 10px; width: 130px; border-radius: 10px;
-    cursor: pointer; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);
-    user-select: none; -webkit-user-select: none;
-    z-index: 999999 !important; /* Maximum priority */
-}
-.raw-div-btn:active { filter: brightness(1.5); transform: translateY(2px); }
-
-/* Stats button specific styling */
-.stats-div-btn {
-    background: rgba(255,255,255,0.1); border: 1px solid #444; 
-    font-size: 11px; padding: 5px 12px; color: #ccc; box-shadow: none;
-}
-
         /* --- Zigzag Background & Animation --- */
         body {
             background-color: #1a1a1a;
@@ -117,17 +100,15 @@
     <div id="divine-overlay"><div id="div-part" class="divine-letter">DIV</div><div id="ine-part" class="divine-letter">INE</div></div>
 
     <!-- HUD -->
-    <!-- Top-Left UI (Nuclear Fix) -->
-    <div class="hud-top-left" style="pointer-events: none;">
-        <div style="font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
-            <span id="cps-counter" class="cps-display">₡0.0/s</span>
+    <!-- Top-Left UI -->
+    <div class="hud-top-left">
+            <div style="font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
+                <span id="cps-counter" class="cps-display">₡0.0/s</span>
+            </div>
+            <button id="open-shop-btn" class="save-btn" style="background: #2196F3; width: 130px; font-size: 14px; padding: 10px; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);">Open Shop</button>
+            <button id="open-stats-btn" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc; width: 130px;">Cookie Stats</button>
         </div>
-        
-        <!-- Changed from <button> to <div> to evade button-click blockers -->
-        <div class="raw-div-btn" data-action="shop" style="pointer-events: auto !important;">Open Shop</div>
-        <div class="raw-div-btn stats-div-btn" data-action="stats" style="pointer-events: auto !important;">Cookie Stats</div>
-    </div>
 
     <div id="effects-container" class="hud-top-right"></div>
 
@@ -218,46 +199,33 @@
         window.addEventListener('DOMContentLoaded', () => {
             const bgm = document.getElementById('bgm');
             cycleSplash(); updateBucksUI(); handleOfflineEarnings();
-            if(!localStorage.getItem('tb_tut_welcome')) document.getElementById('tut-overlay').style.display='flex';
             setInterval(spawnCookieRoutine, 3000); setInterval(idleProductionLoop, 1000); setInterval(updateEffectsUI, 1000);
 
-            // --- NUCLEAR CLICK DELEGATION (Bypasses Extension Blocking) ---
-            // Listens to the absolute highest level of the document
-            document.addEventListener('pointerdown', (e) => {
-                
-                // 1. Audio Auto-Play
-                if(!isMuted && bgm.paused) { bgm.play().catch(()=>{}); }
+            // BIND EVENTS (Chromebook Hardened with pointerdown)
+            document.body.addEventListener('click', () => { if(!isMuted && bgm.paused) bgm.play(); }, {once: true});
+            
+            document.getElementById('toothbrush-logo').onpointerdown = (e) => { e.preventDefault(); cycleSplash(); };
+            document.getElementById('open-shop-btn').onpointerdown = (e) => { e.preventDefault(); openShop(); };
+            document.getElementById('open-stats-btn').onpointerdown = (e) => { e.preventDefault(); openStatsMenu(); };
+            document.getElementById('close-shop-btn').onpointerdown = (e) => { e.preventDefault(); document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false; };
+            document.getElementById('close-stats-btn').onpointerdown = (e) => { e.preventDefault(); document.getElementById('stats-modal').style.display = 'none'; isCookiePaused = false; };
+            document.getElementById('hide-menu-btn').onpointerdown = (e) => { e.preventDefault(); toggleMenus(); };
+            document.getElementById('mute-btn').onpointerdown = (e) => { e.preventDefault(); toggleMute(); };
+            
+            // Navigation Buttons (Chromebook Hardened)
+            document.getElementById('btn-nav-games').onpointerdown = () => { location.href='games.html'; };
+            document.getElementById('btn-nav-ai').onpointerdown = () => { location.href='ai.html'; };
+            document.getElementById('btn-nav-chat').onpointerdown = () => { location.href='chat.html'; };
+            document.getElementById('btn-nav-tut').onpointerdown = () => { location.href='tutorial.html'; };
 
-                // 2. Identify what was clicked by climbing up the DOM tree
-                let target = e.target;
-                
-                // Climb up just in case they clicked text inside a div
-                while (target && target !== document.body) {
-                    
-                    // --- Custom UI Actions ---
-                    if (target.dataset && target.dataset.action === 'shop') {
-                        e.preventDefault(); e.stopPropagation();
-                        window.openShop();
-                        return;
-                    }
-                    if (target.dataset && target.dataset.action === 'stats') {
-                        e.preventDefault(); e.stopPropagation();
-                        window.openStatsMenu();
-                        return;
-                    }
-
-                    // --- Standard IDs ---
-                    if (target.id === 'toothbrush-logo') { e.preventDefault(); cycleSplash(); return; }
-                    if (target.id === 'close-shop-btn') { e.preventDefault(); document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false; return; }
-                    if (target.id === 'close-stats-btn') { e.preventDefault(); document.getElementById('stats-modal').style.display = 'none'; isCookiePaused = false; return; }
-                    if (target.id === 'tut-btn') { e.preventDefault(); document.getElementById('tut-overlay').style.display = 'none'; localStorage.setItem('tb_tut_welcome', 'done'); return; }
-                    if (target.id === 'mute-btn') { e.preventDefault(); toggleMute(); return; }
-                    if (target.id === 'hide-menu-btn') { e.preventDefault(); toggleMenus(); return; }
-                    if (target.id === 'proxy-btn') { e.preventDefault(); launchProxy(); return; }
-
-                    target = target.parentNode;
-                }
-            }, { capture: true }); // 'capture: true' intercepts the click BEFORE extensions can stop it
+            document.getElementById('proxy-btn').onpointerdown = (e) => {
+                e.preventDefault();
+                const win = window.open('about:blank', '_blank'); if (!win) return alert("Pop-up Blocked!");
+                const icon = win.document.createElement('link'); icon.rel = 'icon'; icon.href = 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png'; win.document.head.appendChild(icon);
+                const iframe = win.document.createElement('iframe'); Object.assign(iframe.style, { position:'fixed', top:0, left:0, width:'100%', height:'100%', border:'none', margin:'0', padding:'0', overflow:'hidden' });
+                iframe.src = "https://now-interstellar.vercel.app/"; win.document.body.appendChild(iframe);
+                document.body.innerHTML = ""; window.open('', '_self'); window.close(); setTimeout(() => { window.location.replace("about:blank"); }, 300);
+            };
         });
         
         // Helper function for the proxy launch
