@@ -34,6 +34,7 @@
         }
         @keyframes moveBackground { from { background-position: 40px 0; } to { background-position: 540px 500px; } }
 
+
         /* --- UI Layers (Fixed positions so they don't move title) --- */
         .hud-top-left { position: fixed; top: 20px; left: 25px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
         .hud-top-right { position: fixed; top: 20px; right: 25px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none; }
@@ -116,13 +117,16 @@
     <div id="divine-overlay"><div id="div-part" class="divine-letter">DIV</div><div id="ine-part" class="divine-letter">INE</div></div>
 
     <!-- HUD -->
-    <div class="hud-top-left">
+    <!-- Top-Left UI (Nuclear Fix) -->
+    <div class="hud-top-left" style="pointer-events: none;">
         <div style="font-size: 32px; font-weight: bold; color: #FFEB3B; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
             <span style="font-size: 42px;">₡</span> <span id="cookie-bucks-counter">0</span>
             <span id="cps-counter" class="cps-display">₡0.0/s</span>
         </div>
-        <button id="open-shop-btn" class="save-btn" style="background: #2196F3; width: 130px; font-size: 14px; padding: 10px;">Open Shop</button>
-        <button id="open-stats-btn" class="save-btn" style="background: rgba(255,255,255,0.1); border: 1px solid #444; font-size: 11px; padding: 5px 12px; color: #ccc; width: 130px;">Cookie Stats</button>
+        
+        <!-- Changed from <button> to <div> to evade button-click blockers -->
+        <div class="raw-div-btn" data-action="shop" style="pointer-events: auto !important;">Open Shop</div>
+        <div class="raw-div-btn stats-div-btn" data-action="stats" style="pointer-events: auto !important;">Cookie Stats</div>
     </div>
 
     <div id="effects-container" class="hud-top-right"></div>
@@ -212,20 +216,57 @@
         const bgm = document.getElementById('bgm');
 
         window.addEventListener('DOMContentLoaded', () => {
+            const bgm = document.getElementById('bgm');
             cycleSplash(); updateBucksUI(); handleOfflineEarnings();
             if(!localStorage.getItem('tb_tut_welcome')) document.getElementById('tut-overlay').style.display='flex';
             setInterval(spawnCookieRoutine, 3000); setInterval(idleProductionLoop, 1000); setInterval(updateEffectsUI, 1000);
 
-            // Bind Top & HUD Buttons
-            document.getElementById('open-shop-btn').onclick = openShop;
-            document.getElementById('open-stats-btn').onclick = openStatsMenu;
-            document.getElementById('close-shop-btn').onclick = () => { document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false; };
-            document.getElementById('close-stats-btn').onclick = () => { document.getElementById('stats-modal').style.display = 'none'; isCookiePaused = false; };
-            document.getElementById('hide-menu-btn').onclick = toggleMenus;
-            document.getElementById('mute-btn').onclick = toggleMute;
-            document.getElementById('tut-btn').onclick = () => { document.getElementById('tut-overlay').style.display = 'none'; localStorage.setItem('tb_tut_welcome', 'done'); };
-            document.getElementById('proxy-btn').onclick = launchProxy;
-            document.body.addEventListener('click', () => { if(!isMuted && bgm.paused) bgm.play(); }, {once: true});
+            // --- NUCLEAR CLICK DELEGATION (Bypasses Extension Blocking) ---
+            // Listens to the absolute highest level of the document
+            document.addEventListener('pointerdown', (e) => {
+                
+                // 1. Audio Auto-Play
+                if(!isMuted && bgm.paused) { bgm.play().catch(()=>{}); }
+
+                // 2. Identify what was clicked by climbing up the DOM tree
+                let target = e.target;
+                
+                // Climb up just in case they clicked text inside a div
+                while (target && target !== document.body) {
+                    
+                    // --- Custom UI Actions ---
+                    if (target.dataset && target.dataset.action === 'shop') {
+                        e.preventDefault(); e.stopPropagation();
+                        window.openShop();
+                        return;
+                    }
+                    if (target.dataset && target.dataset.action === 'stats') {
+                        e.preventDefault(); e.stopPropagation();
+                        window.openStatsMenu();
+                        return;
+                    }
+
+                    // --- Standard IDs ---
+                    if (target.id === 'toothbrush-logo') { e.preventDefault(); cycleSplash(); return; }
+                    if (target.id === 'close-shop-btn') { e.preventDefault(); document.getElementById('shop-modal').style.display = 'none'; isCookiePaused = false; return; }
+                    if (target.id === 'close-stats-btn') { e.preventDefault(); document.getElementById('stats-modal').style.display = 'none'; isCookiePaused = false; return; }
+                    if (target.id === 'tut-btn') { e.preventDefault(); document.getElementById('tut-overlay').style.display = 'none'; localStorage.setItem('tb_tut_welcome', 'done'); return; }
+                    if (target.id === 'mute-btn') { e.preventDefault(); toggleMute(); return; }
+                    if (target.id === 'hide-menu-btn') { e.preventDefault(); toggleMenus(); return; }
+                    if (target.id === 'proxy-btn') { e.preventDefault(); launchProxy(); return; }
+
+                    target = target.parentNode;
+                }
+            }, { capture: true }); // 'capture: true' intercepts the click BEFORE extensions can stop it
+        });
+        
+        // Helper function for the proxy launch
+        function launchProxy() {
+            const win = window.open('about:blank', '_blank'); if (!win) return alert("Pop-up Blocked!");
+            const icon = win.document.createElement('link'); icon.rel = 'icon'; icon.href = 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png'; win.document.head.appendChild(icon);
+            iframe.src = "https://www.google.com/"; win.document.body.appendChild(iframe);
+            const iframe = win.document.createElement('iframe'); Object.assign(iframe.style, { position:'fixed', top:0, left:0, width:'100%', height:'100%', border:'none', margin:'0', padding:'0', overflow:'hidden' });
+            document.body.innerHTML = ""; window.open('', '_self'); window.close(); setTimeout(() => { window.location.replace("about:blank"); }, 300);
         });
 
         function toggleMute() { isMuted = !isMuted; bgm.muted = isMuted; document.getElementById('mute-btn').textContent = isMuted ? "🔊" : "🔇"; }
