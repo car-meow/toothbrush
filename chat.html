@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>New Tab</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=40">
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         body {
@@ -71,6 +71,7 @@
         </div>
 
         <div class="controls">
+			<button id="reroll-btn" class="save-btn" style="background:#5E35B1; display:none;">Re-Roll Username</button>
             <button id="disband-btn" class="save-btn" style="background:#B71C1C; display:none;">Disband</button>
             <button onclick="location.href='index.html'" class="save-btn" style="background:#555;">Back</button>
         </div>
@@ -127,18 +128,25 @@
             const colorMap = {"#F44336":"Crimson","#E91E63":"Rose","#9C27B0":"Purple","#673AB7":"Indigo","#2196F3":"Azure","#00BCD4":"Cyan","#009688":"Teal","#4CAF50":"Leaf","#8BC34A":"Lime","#FFEB3B":"Gold","#FF9800":"Orange","#795548":"Cedar","#607D8B":"Steel","#636B2F":"Olive","#D4E157":"Pear","#26C6DA":"Sky"};
             const colors = Object.keys(colorMap);
             
-            let myColor, myName;
+            let myColor, myName, myUuid;
             const savedIdentity = JSON.parse(localStorage.getItem('tb_identity') || 'null');
             const now = Date.now();
             
             if (savedIdentity && savedIdentity.lastActive && (now - savedIdentity.lastActive < 300000)) {
-                myColor = savedIdentity.color; myName = savedIdentity.name;
+                myColor = savedIdentity.color; 
+                myName = savedIdentity.name;
+                myUuid = savedIdentity.uuid || Math.random().toString(36).substr(2, 9);
             } else {
-                myColor = colors[Math.floor(Math.random()*colors.length)];
-                myName = colorMap[myColor] + "_" + Math.floor(Math.random()*999);
+                generateNewIdentity();
             }
 
-            function updateActiveTimer() { localStorage.setItem('tb_identity', JSON.stringify({ color: myColor, name: myName, lastActive: Date.now() })); }
+            function generateNewIdentity() {
+                myColor = colors[Math.floor(Math.random()*colors.length)];
+                myName = colorMap[myColor] + "_" + Math.floor(Math.random()*999);
+                myUuid = Math.random().toString(36).substr(2, 9);
+            }
+
+            function updateActiveTimer() { localStorage.setItem('tb_identity', JSON.stringify({ color: myColor, name: myName, uuid: myUuid, lastActive: Date.now() })); }
             updateActiveTimer(); setInterval(updateActiveTimer, 60000); window.addEventListener('beforeunload', updateActiveTimer); 
 
             let myIP = "Hidden";
@@ -154,11 +162,9 @@
             let globalUserList =[]; 
             let isModalAdmin = false; 
             let hostWaitTimeout = null;
-            
-            // THE LOCK: Prevents multiple disband alerts
             let isDisconnecting = false; 
 
-            const VERSION = "tb-wss-v2-"; 
+            const VERSION = "tb-wss-v5-"; // Incremented version to ensure clean slate
 
             function setStatus(type, text) {
                 const dot = document.getElementById('status-dot');
@@ -190,7 +196,7 @@
                     if(isAdmin) innerHTML += `<span class="ip-text">${user.ip}</span>`;
                     
                     if(isHost && user.name !== myName) {
-                        innerHTML += `<span onclick="kickById('${user.peerId}')" style="cursor:pointer; font-size:18px;">🗑️</span>`;
+                        innerHTML += `<span onclick="kickById('${user.peerId}', '${user.name}')" style="cursor:pointer; font-size:18px;">🗑️</span>`;
                     }
                     
                     row.innerHTML = innerHTML;
@@ -226,7 +232,6 @@
                 if(mqttClient) mqttClient.end();
                 
                 currentTopic = VERSION + pin;
-                
                 mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
 
                 mqttClient.on('connect', () => {
@@ -266,15 +271,31 @@
             }
 
             function handleData(data) {
+                // NAME CHANGE LOGIC
+                if (data.type === 'name-change') {
+                    appendSystemMessage(`${data.oldName} changed their name to ${data.newName}`);
+                    updateMessagesInUI(data.uuid, data.newName, data.newColor);
+
+                    if (isHost) {
+                        const targetUser = globalUserList.find(u => u.peerId === data.senderId);
+                        if (targetUser) {
+                            targetUser.name = data.newName;
+                            targetUser.color = data.newColor;
+                            broadcastRegistry();
+                        }
+                    }
+                    return; // Done handling name change
+                }
+				
+                // NORMAL MESSAGES
                 if (data.type === 'msg' && data.name !== myName) {
-                    appendMessage(data.name, data.color, data.text);
+                    appendMessage(data.name, data.color, data.text, data.uuid);
                 }
                 
                 if (data.type === 'room-info' && !isHost) {
                     setupUI(data.name, data.pin);
                 }
                 
-                // FIX: Check if we are already disconnecting to prevent double popups
                 if (data.type === 'disband') { 
                     if (isDisconnecting) return;
                     isDisconnecting = true;
@@ -282,12 +303,22 @@
                     location.reload(); 
                 }
                 
-                if (data.type === 'kick' && data.target === myName) { 
-                    if (isDisconnecting) return;
-                    isDisconnecting = true;
-                    localStorage.setItem('tb_chat_timeout', Date.now() + 60000); 
-                    alert("You have been kicked! You are timed out for 1 minute."); 
-                    location.href = 'index.html'; 
+                // KICK LOGIC
+                if (data.type === 'kick') {
+                    // Tell everyone the user was kicked
+                    if (isHost) {
+                        appendSystemMessage(`${data.targetName} was kicked from the room.`);
+                        publish({type: 'msg', name: 'System', color: '#777', text: `${data.targetName} was kicked from the room.`});
+                    }
+                    
+                    // The victim's browser kicks them out
+                    if (data.targetId === myName) {
+                        if (isDisconnecting) return;
+                        isDisconnecting = true;
+                        localStorage.setItem('tb_chat_timeout', Date.now() + 60000); 
+                        alert("You have been kicked! You are timed out for 1 minute."); 
+                        location.href = 'index.html'; 
+                    }
                 }
                 
                 if (data.type === 'registry-sync') {
@@ -301,22 +332,26 @@
                 if (isHost && data.type === 'join' && data.name !== myName) {
                     if (!globalUserList.find(u => u.peerId === data.peerId)) {
                         globalUserList.push({ name: data.name, color: data.color, ip: data.ip, peerId: data.peerId });
-                        appendMessage("System", "#777", data.name + " joined.");
+                        appendSystemMessage(`${data.name} joined.`);
                         publish({type: 'msg', name: 'System', color: '#777', text: data.name + " joined."});
                         publish({type: 'room-info', name: document.getElementById('display-room-name').textContent, pin: document.getElementById('display-pin').textContent.replace('PIN: ','')});
                         updateOccupancy();
-                        publish({type: 'registry-sync', list: globalUserList});
+                        broadcastRegistry();
                     }
                 }
 
                 // Host manages leaves
                 if (isHost && data.type === 'leave' && data.name !== myName) {
                     globalUserList = globalUserList.filter(u => u.peerId !== data.peerId);
-                    appendMessage("System", "#777", data.name + " left the room.");
+                    appendSystemMessage(`${data.name} left the room.`);
                     publish({type: 'msg', name: 'System', color: '#777', text: data.name + " left."});
                     updateOccupancy();
-                    publish({type: 'registry-sync', list: globalUserList});
+                    broadcastRegistry();
                 }
+            }
+
+            function broadcastRegistry() {
+                publish({type: 'registry-sync', list: globalUserList});
             }
 
             function updateOccupancy() {
@@ -324,11 +359,11 @@
                 refreshModalIfOpen(); 
             }
 
-            window.kickById = (pid) => {
-                publish({type: 'kick', target: pid});
+            window.kickById = (pid, targetName) => {
+                publish({type: 'kick', targetId: pid, targetName: targetName});
                 globalUserList = globalUserList.filter(u => u.peerId !== pid);
                 updateOccupancy();
-                publish({type: 'registry-sync', list: globalUserList});
+                broadcastRegistry();
             };
 
             function setupUI(name, pin) {
@@ -337,33 +372,60 @@
                 document.getElementById('chat-room').style.display = 'flex';
                 document.getElementById('room-header-info').style.display = 'block';
                 document.getElementById('stats-area').style.display = 'flex';
+                document.getElementById('reroll-btn').style.display = 'block';
                 document.getElementById('display-room-name').textContent = name;
                 document.getElementById('display-pin').textContent = pin;
                 document.getElementById('pin-wrapper').classList.remove('revealed'); 
                 if(isHost) document.getElementById('disband-btn').style.display = 'block';
             }
 
-            function appendMessage(name, color, text) {
+            // UI UPDATES FOR MESSAGES
+            function appendSystemMessage(text) {
                 const area = document.getElementById('messages');
                 const div = document.createElement('div');
-                div.className = "chat-msg";
+                div.style.color = "#777";
+                div.style.fontWeight = "bold";
+                div.style.textAlign = "center";
+                div.style.margin = "10px 0";
+                div.style.fontSize = "12px";
+                div.textContent = text;
+                area.appendChild(div);
+                area.scrollTop = area.scrollHeight;
+            }
+
+            function updateMessagesInUI(uuid, newName, newColor) {
+                const elements = document.querySelectorAll(`.msg-uuid-${uuid}`);
+                elements.forEach(el => {
+                    el.style.borderColor = newColor;
+                    const nameTag = el.querySelector('.name-tag');
+                    if (nameTag) {
+                        nameTag.textContent = newName;
+                        nameTag.style.color = newColor;
+                    }
+                });
+            }
+
+            function appendMessage(name, color, text, uuid) {
+                const area = document.getElementById('messages');
+                const div = document.createElement('div');
+                div.className = `chat-msg msg-uuid-${uuid}`; 
                 div.style.borderColor = color;
                 div.style.alignSelf = (name === myName) ? "flex-end" : "flex-start";
-                div.innerHTML = `<div style="font-size:10px; font-weight:bold; color:${color}; margin-bottom:4px;">${name}</div><div>${text}</div>`;
+                div.innerHTML = `<div class="name-tag" style="font-size:10px; font-weight:bold; color:${color}; margin-bottom:4px; cursor:pointer;">${name}</div><div>${text}</div>`;
                 area.appendChild(div); area.scrollTop = area.scrollHeight;
             }
 
+            // BUTTON LOGIC
             document.getElementById('send-btn').onclick = () => {
                 const val = document.getElementById('msg-input').value.trim();
                 if(!val) return;
-                appendMessage(myName, myColor, val);
-                publish({type: 'msg', name: myName, color: myColor, text: val});
+                appendMessage(myName, myColor, val, myUuid);
+                publish({type: 'msg', name: myName, color: myColor, text: val, uuid: myUuid});
                 document.getElementById('msg-input').value = "";
             };
             
             document.getElementById('msg-input').onkeypress = (e) => { if(e.key === 'Enter') document.getElementById('send-btn').click(); };
             
-            // THE FIX: Added isDisconnecting lock to the Disband button
             document.getElementById('disband-btn').onclick = () => {
                 if(confirm("Disband Room?")) {
                     if (isDisconnecting) return;
@@ -374,12 +436,48 @@
                 }
             };
 
+            // Reroll Button
+            let rerollCooldown = false;
+            document.getElementById('reroll-btn').onclick = () => {
+                if (rerollCooldown) return alert("You must wait 3 minutes between name changes.");
+
+                const oldName = myName;
+                generateNewIdentity(); 
+                updateActiveTimer();
+
+                appendSystemMessage(`${oldName} changed their name to ${myName}`);
+                updateMessagesInUI(myUuid, myName, myColor);
+
+                publish({
+                    type: 'name-change',
+                    oldName: oldName,
+                    newName: myName,
+                    newColor: myColor,
+                    uuid: myUuid,
+                    senderId: myName // In MQTT, peerId is myName
+                });
+
+                if (isHost) {
+                    const meInRegistry = globalUserList.find(u => u.peerId === oldName);
+                    if (meInRegistry) { meInRegistry.name = myName; meInRegistry.color = myColor; meInRegistry.peerId = myName; }
+                    broadcastRegistry();
+                }
+
+                rerollCooldown = true;
+                const btn = document.getElementById('reroll-btn');
+                btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; btn.textContent = "Cooldown (3m)";
+                
+                setTimeout(() => {
+                    rerollCooldown = false;
+                    btn.style.opacity = '1'; btn.style.cursor = 'pointer'; btn.textContent = "Re-Roll Username";
+                }, 180000); 
+            };
+
             document.getElementById('pin-entry').oninput = () => {
                 document.getElementById('pin-entry').style.color = "white";
                 document.getElementById('pin-error').style.display = "none";
             };
 
-            // THE FIX: Added isDisconnecting lock to the close-tab event
             window.addEventListener('beforeunload', () => {
                 if (isDisconnecting) return;
                 isDisconnecting = true;
@@ -390,6 +488,5 @@
             });
         });
     </script>
-	
 </body>
 </html>

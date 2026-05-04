@@ -120,14 +120,18 @@
             document.getElementById('btn-nav-chat').onpointerdown = () => { location.href='chat.html'; };
             document.getElementById('btn-nav-tut').onpointerdown = () => { location.href='tutorial.html'; };
 
-            document.getElementById('proxy-btn').onpointerdown = (e) => {
-                e.preventDefault();
-                const win = window.open('about:blank', '_blank'); if (!win) return alert("Pop-up Blocked!");
-                const icon = win.document.createElement('link'); icon.rel = 'icon'; icon.href = 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png'; win.document.head.appendChild(icon);
-                const iframe = win.document.createElement('iframe'); Object.assign(iframe.style, { position:'fixed', top:0, left:0, width:'100%', height:'100%', border:'none', margin:'0', padding:'0', overflow:'hidden' });
-                iframe.src = "https://now-interstellar.vercel.app/"; win.document.body.appendChild(iframe);
-                document.body.innerHTML = ""; window.open('', '_self'); window.close(); setTimeout(() => { window.location.replace("about:blank"); }, 300);
-            };
+            document.getElementById('proxy-btn').onclick = () => {
+            // 1. Open the local helios.html file in a new tab
+            const win = window.open('helios.html', '_blank'); 
+            if (!win) return alert("Pop-up Blocked! Please allow pop-ups for the proxy to open.");
+            
+            // 2. Erase the current tab and redirect it to hide evidence
+            document.title = "New Tab";
+            document.body.innerHTML = ""; 
+            window.open('', '_self'); 
+            window.close(); 
+            setTimeout(() => { window.location.replace("about:blank"); }, 300);
+        };
         });
 
         function toggleMenus() {
