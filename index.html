@@ -1,160 +1,417 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>New Tab</title>
-    <link rel="stylesheet" href="style.css?v=41">
-    <style>
-        /* --- Zigzag Background & Animation --- */
-        body {
-            background-color: #1a1a1a;
-            background-image:  linear-gradient(135deg, #1f1f1f 25%, transparent 25%), linear-gradient(225deg, #1f1f1f 25%, transparent 25%), linear-gradient(45deg, #1f1f1f 25%, transparent 25%), linear-gradient(315deg, #1f1f1f 25%, transparent 25%);
-            background-position:  40px 0, 40px 0, 0 0, 0 0;
-            background-size: 80px 80px;
-            background-repeat: repeat;
-            animation: moveBackground 40s linear infinite;
-            display: flex; flex-direction: column; height: 100vh; width: 100vw; margin: 0; overflow: hidden;
-            position: relative;
-        }
-        @keyframes moveBackground { from { background-position: 40px 0; } to { background-position: 540px 500px; } }
+<meta charset="UTF-8">
+<title>New Tab</title>
+<link rel="stylesheet" href="style.css?v=42">
+<style>
+/* ============================================
+   BODY & BACKGROUND
+============================================ */
+body {
+    background-color: #1a1a1a;
+    background-image: linear-gradient(135deg,#1f1f1f 25%,transparent 25%),linear-gradient(225deg,#1f1f1f 25%,transparent 25%),linear-gradient(45deg,#1f1f1f 25%,transparent 25%),linear-gradient(315deg,#1f1f1f 25%,transparent 25%);
+    background-position: 40px 0,40px 0,0 0,0 0;
+    background-size: 80px 80px;
+    animation: moveBackground 40s linear infinite;
+    margin: 0; overflow: hidden; width: 100vw; height: 100vh; position: relative;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+@keyframes moveBackground { to { background-position: 540px 500px,540px 500px,500px 500px,500px 500px; } }
 
-        /* --- UI Layers (Fixed positions so they don't move title) --- */
-        .hud-bottom-right { position: fixed; bottom: 20px; right: 25px; display: flex; gap: 10px; z-index: 11000; pointer-events: none; }
-        .hud-bottom-right button { pointer-events: auto !important; z-index: 99999 !important; }
+/* ============================================
+   HUD TOP-LEFT (Currency + Buttons)
+============================================ */
+.hud-top-left {
+    position: fixed; top: 15px; left: 15px; z-index: 11000;
+    display: flex; flex-direction: column; gap: 8px;
+    pointer-events: none;
+}
+.hud-top-left > * { pointer-events: auto; }
+.currency-display {
+    background: rgba(15,15,15,0.85); border: 2px solid #4CAF50; border-radius: 14px;
+    padding: 10px 18px; display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6); backdrop-filter: blur(6px);
+}
+.currency-symbol { color: #4CAF50; font-size: 26px; font-weight: 900; }
+.currency-amount { color: #fff; font-size: 22px; font-weight: 700; }
+.cps-display { color: #FFF59D; font-size: 12px; font-weight: 600; margin-left: 4px; }
+.swag-display {
+    background: rgba(15,15,15,0.85); border: 2px solid #b71c1c; border-radius: 14px;
+    padding: 6px 14px; display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6); backdrop-filter: blur(6px);
+}
+.swag-symbol { color: #ef5350; font-size: 20px; font-weight: 900; }
+.swag-amount { color: #ffcdd2; font-size: 16px; font-weight: 700; }
+.hud-btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.hud-btn {
+    padding: 8px 14px; border-radius: 10px; border: none; cursor: pointer;
+    font-weight: bold; color: #fff; font-size: 12px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+    transition: transform 0.2s cubic-bezier(0.175,0.885,0.32,1.275), filter 0.2s;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    pointer-events: auto !important; z-index: 11001 !important; position: relative;
+}
+.hud-btn:hover { filter: brightness(1.15); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+.hud-btn:active { transform: translateY(1px); filter: brightness(1.4); transition-duration: 0.05s; }
 
-        /* --- Home Container (Centered UI) --- */
-        .home-container { 
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            display: flex; flex-direction: column; justify-content: center; align-items: center; 
-            z-index: 5; transition: opacity 0.5s, visibility 0.5s; width: 100%;
-        }
-        .title-area { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 50px; }
-        .home-title { font-size: 80px; color: #ffffff; text-shadow: 4px 4px 15px rgba(0, 0, 0, 0.8); margin: 0; letter-spacing: 2px; cursor: pointer; pointer-events: auto !important; }
-        .home-splash { font-size: 20px; font-style: italic; color: #FFEB3B; font-weight: bold; text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.8); margin-top: 10px; text-align: center; max-width: 80%; transition: opacity 0.15s; }
+/* ============================================
+   HOME CONTAINER (Centered Title + Nav)
+============================================ */
+.home-container {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 5; transition: opacity 0.5s, visibility 0.5s; width: 90%;
+    pointer-events: none;
+}
+.title-area { display: flex; flex-direction: column; align-items: center; margin-bottom: 40px; }
+.home-title {
+    font-size: 80px; color: #fff; margin: 0; letter-spacing: 2px; cursor: pointer;
+    text-shadow: 4px 4px 15px rgba(0,0,0,0.8);
+    pointer-events: auto !important;
+}
+.home-splash {
+    font-size: 18px; font-style: italic; color: #FFEB3B; font-weight: bold;
+    text-shadow: 2px 2px 5px rgba(0,0,0,0.8); margin-top: 10px;
+    text-align: center; max-width: 500px; transition: opacity 0.15s;
+}
+.button-row { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }
+.home-btn {
+    font-size: 20px; padding: 14px 36px; border-radius: 12px; border: none; cursor: pointer;
+    font-weight: bold; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+    transition: transform 0.2s cubic-bezier(0.175,0.885,0.32,1.275), filter 0.2s;
+    pointer-events: auto !important; z-index: 10 !important; position: relative;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.home-btn:hover { filter: brightness(1.1); transform: translateY(-3px); box-shadow: 0 6px 15px rgba(0,0,0,0.4); }
+.home-btn:active { transform: translateY(2px); filter: brightness(1.5); transition-duration: 0.05s; }
+.rainbow-btn {
+    background: linear-gradient(45deg,#ff0000,#ff7300,#fffb00,#48ff00,#00ffd5,#002bff,#7a00ff,#ff00c8,#ff0000);
+    background-size: 400%; animation: rainbow-shift 10s ease infinite;
+}
+@keyframes rainbow-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
 
-        .button-row { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; pointer-events: none; }
-        .home-btn { font-size: 22px; padding: 15px 40px; border-radius: 12px; pointer-events: auto !important; z-index: 99999 !important; }
+/* ============================================
+   HUD BOTTOM-RIGHT
+============================================ */
+.hud-bottom-right {
+    position: fixed; bottom: 15px; right: 15px; display: flex; gap: 8px;
+    z-index: 11000; pointer-events: none;
+}
+.hud-bottom-right > * { pointer-events: auto; }
 
-        /* --- Tutorial Overlay --- */
-        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 20000; align-items: center; justify-content: center; }
-        .tut-box { background: #1f1f1f; padding: 30px; border-radius: 15px; width: 450px; border: 2px solid #2196F3; text-align: center; }
-    </style>
+/* ============================================
+   COOKIE ENTITIES
+============================================ */
+.cookie-entity {
+    position: fixed; z-index: 900; cursor: pointer;
+    pointer-events: auto !important; touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    will-change: transform;
+    transition: none;
+}
+.cookie-entity img {
+    width: 100%; height: 100%; object-fit: contain;
+    pointer-events: none;
+}
+
+/* Auras */
+.aura-basic{filter:drop-shadow(0 0 12px rgba(139,69,19,0.7))}
+.aura-cashew{filter:drop-shadow(0 0 12px rgba(210,180,140,0.7))}
+.aura-oatmeal{filter:drop-shadow(0 0 12px rgba(139,69,19,0.7)) drop-shadow(0 0 18px rgba(128,0,128,0.5))}
+.aura-peanut{filter:drop-shadow(0 0 12px rgba(205,133,63,0.7))}
+.aura-sugar{filter:drop-shadow(0 0 12px rgba(255,255,255,0.8)) drop-shadow(0 0 5px rgba(255,0,255,0.5)) drop-shadow(0 0 5px rgba(0,255,255,0.5))}
+.aura-chocolate{filter:drop-shadow(0 0 12px rgba(255,255,255,0.4)) drop-shadow(0 0 18px rgba(101,67,33,0.7))}
+.aura-snickerdoodle{filter:drop-shadow(0 0 12px rgba(160,82,45,0.7))}
+.aura-smore{filter:drop-shadow(0 0 12px rgba(255,255,255,0.7)) drop-shadow(0 0 18px rgba(139,69,19,0.7))}
+.aura-golden{filter:drop-shadow(0 0 15px rgba(255,215,0,0.9)) drop-shadow(0 0 28px rgba(255,215,0,0.5))}
+.aura-nebula{animation:nebula-flicker 1.5s alternate infinite}
+@keyframes nebula-flicker {
+    0%{filter:drop-shadow(0 0 15px #00BCD4) drop-shadow(0 0 20px #9C27B0) drop-shadow(0 0 15px #FFEB3B)}
+    100%{filter:drop-shadow(0 0 25px #4CAF50) drop-shadow(0 0 30px #E91E63) drop-shadow(0 0 25px #FFEB3B)}
+}
+
+/* ============================================
+   FLOATING TEXT & EFFECTS
+============================================ */
+.floating-bucks {
+    position: fixed; color: #4CAF50; font-weight: 900; font-size: 26px;
+    z-index: 10001; pointer-events: none;
+    animation: float-up 1.5s ease-out forwards;
+    text-shadow: -2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000,0 4px 8px rgba(0,0,0,0.7);
+}
+@keyframes float-up {
+    0%{transform:translate(-50%,-50%) scale(1);opacity:1}
+    100%{transform:translate(-50%,-120px) scale(1.4);opacity:0}
+}
+.floating-rarity {
+    position: fixed; font-weight: 900; font-size: 22px; z-index: 10001; pointer-events: none;
+    animation: rarity-float 2.5s ease-out forwards;
+    text-shadow: -2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000,0 4px 8px rgba(0,0,0,0.7);
+}
+@keyframes rarity-float {
+    0%{transform:translate(-50%,-50%) scale(0.5);opacity:0}
+    15%{transform:translate(-50%,-50%) scale(1.2);opacity:1}
+    30%{transform:translate(-50%,-50%) scale(1);opacity:1}
+    100%{transform:translate(-50%,-120px);opacity:0}
+}
+.rarity-common{color:#CFCFCF} .rarity-uncommon{color:#6CDB66} .rarity-rare{color:#566FEB}
+.rarity-epic{color:#C24FFF} .rarity-divine{color:#FFD700}
+
+/* Pop explosion */
+.pop-effect {
+    position: fixed; pointer-events: none; z-index: 10002;
+    transform: translate(-50%,-50%); opacity: 0.5;
+}
+
+/* Vignette flash */
+#screen-border {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    pointer-events: none; z-index: 9998; opacity: 0;
+    transition: opacity 0.3s;
+}
+
+/* ============================================
+   DISCOVERY POPUP (Lore)
+============================================ */
+.discovery-popup {
+    position: fixed; top: -160px; left: 50%; transform: translateX(-50%);
+    background: rgba(20,20,20,0.95); border: 3px solid #FFD700; border-radius: 14px;
+    padding: 16px 30px; text-align: center; z-index: 10005;
+    transition: top 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+    pointer-events: none; max-width: 500px; box-shadow: 0 8px 30px rgba(0,0,0,0.7);
+}
+.discovery-popup.show { top: 20px; }
+.discovery-popup .disc-title { color: #FFD700; font-size: 16px; font-weight: 900; margin-bottom: 6px; }
+.discovery-popup .disc-lore { color: #ccc; font-size: 13px; font-style: italic; line-height: 1.4; }
+
+/* ============================================
+   EFFECTS TRACKER (Active buffs)
+============================================ */
+#effects-container {
+    position: fixed; top: 15px; right: 15px; display: flex; flex-direction: column;
+    gap: 6px; align-items: flex-end; z-index: 1000; pointer-events: none;
+}
+.effect-item {
+    background: rgba(20,20,20,0.9); border: 2px solid #2196F3; padding: 6px 12px;
+    border-radius: 10px; display: flex; flex-direction: column; align-items: flex-end;
+}
+.effect-name { font-size: 10px; font-weight: bold; color: #2196F3; text-transform: uppercase; }
+.effect-timer { font-size: 14px; font-weight: bold; color: #fff; }
+
+/* ============================================
+   MODALS (Shop, Stats)
+============================================ */
+.modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.85); z-index: 20000;
+    align-items: center; justify-content: center;
+    touch-action: manipulation;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+    background: #1a1a1a; padding: 24px; border-radius: 18px;
+    width: 620px; max-width: 95vw; max-height: 85vh;
+    border: 2px solid #2196F3; text-align: center;
+    display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 0 60px rgba(0,0,0,0.9);
+}
+.modal-box h2 { color: #2196F3; margin: 0 0 4px 0; font-size: 22px; }
+.modal-close {
+    align-self: flex-end; background: #333; color: #fff; border: none;
+    width: 32px; height: 32px; border-radius: 50%; font-size: 16px; cursor: pointer;
+    transition: background 0.2s; pointer-events: auto !important;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
+}
+.modal-close:hover { background: #f44336; }
+.modal-body { overflow-y: auto; flex: 1; padding: 8px; }
+
+/* Shop grid */
+.shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; }
+.shop-cat { grid-column: span 2; color: #777; font-size: 11px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #333; padding: 8px 0 4px; }
+.shop-item {
+    background: #222; padding: 10px; border-radius: 12px; border: 1px solid #444;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 4px;
+}
+.shop-item .item-name { color: #2196F3; font-weight: bold; font-size: 13px; }
+.shop-item .item-desc { color: #999; font-size: 11px; line-height: 1.3; }
+.shop-item .item-cost { color: #FFEB3B; font-weight: bold; font-size: 12px; }
+.shop-item .item-owned { color: #4CAF50; font-size: 11px; }
+.buy-btn {
+    padding: 6px 12px; border-radius: 8px; border: none; cursor: pointer;
+    font-weight: bold; color: #fff; font-size: 11px; background: #2196F3;
+    transition: transform 0.15s, filter 0.15s; margin-top: 4px;
+    pointer-events: auto !important; touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+.buy-btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
+.buy-btn:active { transform: translateY(1px); }
+.buy-btn.disabled { background: #444 !important; opacity: 0.5; cursor: not-allowed; }
+.swag-item { background: rgba(120,0,0,0.15) !important; border-color: #b71c1c !important; }
+.swag-item .item-name { color: #ef5350 !important; }
+.swag-item .item-cost { color: #ffcdd2 !important; }
+.incinerate-section { grid-column: span 2; text-align: center; margin-top: 10px; padding-top: 10px; border-top: 2px solid #b71c1c; }
+.incinerate-btn {
+    background: #b71c1c !important; padding: 10px 24px; border-radius: 10px;
+    border: 2px solid #ef5350; color: #fff; font-size: 14px; font-weight: bold;
+    cursor: pointer; transition: transform 0.2s, filter 0.2s;
+    pointer-events: auto !important; touch-action: manipulation;
+}
+.incinerate-btn:hover { filter: brightness(1.2); transform: translateY(-2px); }
+
+/* Stats grid */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: left; }
+.stat-item {
+    background: #222; padding: 10px; border-radius: 10px; border: 1px solid #333;
+    display: flex; align-items: center; gap: 10px;
+}
+.stat-item img { width: 40px; height: 40px; object-fit: contain; }
+.stat-info .stat-name { color: #fff; font-size: 13px; font-weight: bold; }
+.stat-info .stat-count { color: #888; font-size: 11px; }
+
+/* ============================================
+   DIVINE EVENT
+============================================ */
+#divine-overlay {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0); z-index: 15000; display: none;
+    align-items: center; justify-content: center; pointer-events: none;
+    transition: background 0.5s;
+}
+.divine-letter {
+    font-size: 140px; font-weight: 900; position: absolute; top: 50%; margin-top: -70px;
+    color: #FFD700; -webkit-text-stroke: 8px #bf360c;
+    filter: drop-shadow(0 0 20px #000) drop-shadow(0 0 40px rgba(255,215,0,0.5));
+    transition: transform 0.6s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+#div-part { right: 50%; transform: translateX(-150vw); }
+#ine-part { left: 50%; transform: translateX(150vw); }
+#div-part.slam { transform: translateX(5px); }
+#ine-part.slam { transform: translateX(-5px); }
+
+@keyframes shake { 0%,100%{transform:translate(0,0)} 25%{transform:translate(-5px,5px)} 50%{transform:translate(5px,-5px)} 75%{transform:translate(-5px,-5px)} }
+.camera-shake { animation: shake 0.1s infinite !important; }
+
+/* ============================================
+   TUTORIAL OVERLAY
+============================================ */
+.overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.88); z-index: 30000; align-items: center; justify-content: center;
+}
+.tut-box {
+    background: #1f1f1f; padding: 28px; border-radius: 16px; width: 440px; max-width: 90vw;
+    border: 2px solid #2196F3; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9);
+}
+</style>
 </head>
 <body class="chat-bg">
-    
-    <!-- UI LAYER: Everything inside here hides when 'Hide Menu Items' is clicked -->
-    <div id="ui-layer">
-        
-        <!-- Center: Title and Main Buttons -->
-        <div class="home-container" id="menu-items-wrapper">
-            <div class="title-area">
-                <h1 class="home-title" id="toothbrush-logo">Toothbrush</h1>
-                <span id="splash-text" class="home-splash"></span>
-            </div>
-            <div class="button-row">
-                <button id="btn-nav-games" class="save-btn rainbow-btn home-btn">Games</button>
-                <button id="btn-nav-ai" class="save-btn home-btn" style="background-color: #f57c00;">AI Chat</button>
-                <button id="proxy-btn" class="save-btn home-btn" style="background-color: #00BCD4;">Proxy</button>
-                <button id="btn-nav-chat" class="save-btn home-btn" style="background-color: #9C27B0;">Chat Room</button>
-                <button id="btn-nav-tut" class="save-btn home-btn" style="background-color: #5fc772;">Tutorial</button>
+
+<!-- ========== SCREEN BORDER (Vignette Flash) ========== -->
+<div id="screen-border"></div>
+
+<!-- ========== COOKIE SPAWN LAYER ========== -->
+<div id="cookie-layer" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:900;pointer-events:none;overflow:hidden;"></div>
+
+<!-- ========== FLOATING TEXT LAYER ========== -->
+<div id="float-layer" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:10001;pointer-events:none;"></div>
+
+<!-- ========== EFFECTS TRACKER ========== -->
+<div id="effects-container"></div>
+
+<!-- ========== DISCOVERY POPUP ========== -->
+<div id="discovery-popup" class="discovery-popup">
+    <div class="disc-title" id="disc-title"></div>
+    <div class="disc-lore" id="disc-lore"></div>
+</div>
+
+<!-- ========== HUD: TOP LEFT ========== -->
+<div class="hud-top-left" id="hud-top-left">
+    <div class="currency-display">
+        <span class="currency-symbol">₡</span>
+        <span class="currency-amount" id="bucks-display">0</span>
+        <span class="cps-display" id="cps-display">(0/s)</span>
+    </div>
+    <div class="swag-display">
+        <span class="swag-symbol">₴</span>
+        <span class="swag-amount" id="swag-display">0</span>
+    </div>
+    <div class="hud-btn-row">
+        <button class="hud-btn" id="btn-shop" style="background:#2196F3;">Shop</button>
+        <button class="hud-btn" id="btn-stats" style="background:#FF9800;">Stats</button>
+        <button class="hud-btn" id="btn-mute" style="background:#666;">🔊</button>
+    </div>
+</div>
+
+<!-- ========== CENTER: Title + Navigation ========== -->
+<div class="home-container" id="menu-items-wrapper">
+    <div class="title-area">
+        <h1 class="home-title" id="toothbrush-logo">Toothbrush</h1>
+        <span class="home-splash" id="splash-text"></span>
+    </div>
+    <div class="button-row">
+        <button id="btn-nav-games" class="home-btn rainbow-btn">Games</button>
+        <button id="btn-nav-ai" class="home-btn" style="background:#f57c00;">AI Chat</button>
+        <button id="proxy-btn" class="home-btn" style="background:#00BCD4;">Proxy</button>
+        <button id="btn-nav-chat" class="home-btn" style="background:#9C27B0;">Chat Room</button>
+        <button id="btn-nav-tut" class="home-btn" style="background:#5fc772;">Tutorial</button>
+    </div>
+</div>
+
+<!-- ========== HUD: BOTTOM RIGHT ========== -->
+<div class="hud-bottom-right">
+    <button class="hud-btn" id="hide-menu-btn" style="background:#ffcdd2;color:#b71c1c;">Hide Menu</button>
+</div>
+
+<!-- ========== SHOP MODAL ========== -->
+<div class="modal-overlay" id="shop-modal">
+    <div class="modal-box" style="border-color:#2196F3;">
+        <button class="modal-close" id="shop-close">&times;</button>
+        <h2>🍪 Cookie Shop</h2>
+        <div class="currency-display" style="align-self:center;margin:8px 0;">
+            <span class="currency-symbol">₡</span>
+            <span class="currency-amount" id="shop-bucks">0</span>
+        </div>
+        <div class="modal-body">
+            <div class="shop-grid" id="shop-list"></div>
+            <div class="incinerate-section">
+                <p style="color:#ef5350;font-size:13px;margin-bottom:8px;">🔥 <strong>INCINERATE</strong> — Sacrifice all ₡ and Autobakers for <strong>Swag Points (₴)</strong></p>
+                <p style="color:#888;font-size:11px;margin-bottom:10px;">You'll earn: <strong style="color:#ffcdd2;" id="prestige-preview">0 ₴</strong></p>
+                <button class="incinerate-btn" id="btn-incinerate">🔥 INCINERATE 🔥</button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- HUD Control (Always Visible) -->
-    <div class="hud-bottom-right">
-        <button id="hide-menu-btn" class="save-btn" style="background-color: #ffcdd2; color: #b71c1c; font-size: 11px;">Hide Menu Items</button>
-    </div>
-
-    <!-- Tutorial Modal -->
-    <div id="tut-overlay" class="overlay">
-        <div class="tut-box">
-            <h2 style="color: #2196F3; margin-bottom: 15px;">Welcome!</h2>
-            <div id="tut-text" style="color:#eee; margin-bottom:20px; line-height:1.6;">Welcome to Toothbrush! This tutorial will show you around. Click on one of the tabs at the bottom to get started.</div>
-            <button id="tut-btn" class="save-btn" style="background-color: #2196F3; width: 100%;">Got it!</button>
+<!-- ========== STATS MODAL ========== -->
+<div class="modal-overlay" id="stats-modal">
+    <div class="modal-box" style="border-color:#FF9800;">
+        <button class="modal-close" id="stats-close">&times;</button>
+        <h2>📊 Cookie Stats</h2>
+        <div class="modal-body">
+            <div class="stats-grid" id="stats-list"></div>
         </div>
     </div>
+</div>
 
-    <script>
-        const splashes = [
-            "Assisted by Jayden!", "No, please don't close my ta-", "Y'all, Vivian says hi!", "Wait, wait, I was about to finish the level!", 
-            "READ the TUTORIAL!", "Dead.", "Wow. Just... wow.", "Honorable mention: Ctrl+W.", "Iso bottom frags", "Thanks for using Toothbrush!", 
-            "Yo Dhruva, wassup? Join the chat room!", "Master, I'm hungry", "No food for you!", "Prompted to perfection.", "ALT+TAB is your best friend.", 
-            "AI solved the math, I solved the level.", "High scores > GPA.", "Saving progress... hopefully.", "Not a bug, it's a feature.", 
-            "Powered by pure procrastination.", "100% human-ish.", "Linewize is watching...", "GoGuardian is blind.", "Just one more level.", 
-            "0% hallucinations, 100% gaming.", "Strictly educational...", "Does this count as CS homework?", "Bypassing the boredom.", 
-            "Infinite storage, finite time.", "Don't forget to backup!", "Stealth mode engaged.", "Everything is unblocked if you try.", 
-            "Learning to code?", "Browser-based bliss.", "The stash is never empty.", "Level 99 Procrastinator.", "Error 404: Homework not found.", 
-            "IndexedDB is your best friend.", "About:blank magic.", "Speedrunning the semester.", "Logic applied, levels cleared.", 
-            "The AI says take a break.", "One file to rule them all.", "A student's best secret.", "Don't close the lid!", "GPT-4o approved.", 
-            "Your progress is persistent.", "Toothbrush Tutorial is mandatory.", "Cloak active. Icons changed.", "Memory leak? Never.", 
-            "HTML5 is the future.", "Wait, did I save?", "The AI is my co-pilot.", "Simulating success.", "Unblocked and unbothered.", 
-            "Chromebooks are gaming rigs.", "Loading a better reality.", "The Cloak is your shield.", "One prompt away.", "Gaming is a soft skill.", 
-            "The math adds up.", "Why study when you can run?", "Securely can't see this.", "Digital treasures.", "AI: I suggest playing.", 
-            "Minimalist fun.", "The stash is legendary.", "Secret is safe.", "Click to continue.", "The bell doesn't dismiss you.", 
-            "Context window: Infinite.", "Manual included.", "Optimized for Chromebooks.", "Saves are in the cloud-ish.", "Home of the bored.", 
-            "Synthesizing scores.", "The AI isn't cheating.", "Save states are rights.", "Don't let it timeout!", "The perfect distraction.", 
-            "Bypassing the mundane.", "Strictly local.", "Polished UI.", "Wait, solve this first.", "AI wrote this code.", "The final boss of school.", 
-            "Hardcoded for fun.", "Stash is ultimate.", "Tutorial complete.", "Testing 1, 2, 3.", "Can someone buy me Starbucks?", 
-            "Never underestimate the dev.", "Classroom Center is down.", "Stand in the corner!", "Don't blink.", "Reality is a simulation.", 
-            "Wait, this works?", "Click the cookie.", "Become a Swag Lord.", "Cookies are life.", "Baking at lightspeed."
-        ];
+<!-- ========== DIVINE OVERLAY ========== -->
+<div id="divine-overlay">
+    <div class="divine-letter" id="div-part">DIV</div>
+    <div class="divine-letter" id="ine-part">INE</div>
+</div>
 
-        let menusHidden = false;
+<!-- ========== TUTORIAL OVERLAY ========== -->
+<div id="tut-overlay" class="overlay">
+    <div class="tut-box">
+        <h2 style="color:#2196F3;margin-bottom:12px;">Welcome!</h2>
+        <div style="color:#eee;margin-bottom:18px;line-height:1.6;">Welcome to Toothbrush! Click cookies floating across the screen to earn ₡ Cookie Bucks. Spend them in the Shop. Navigate to other tabs using the buttons below.</div>
+        <button class="hud-btn" id="tut-btn" style="background:#2196F3;width:100%;padding:12px;font-size:16px;">Got it!</button>
+    </div>
+</div>
 
-        window.addEventListener('DOMContentLoaded', () => {
-            cycleSplash(); 
-            
-            if(!localStorage.getItem('tb_tut_welcome')) {
-                document.getElementById('tut-overlay').style.display='flex';
-            }
-
-            // BIND EVENTS (Chromebook Hardened with pointerdown)
-            document.getElementById('toothbrush-logo').onpointerdown = (e) => { e.preventDefault(); cycleSplash(); };
-            document.getElementById('hide-menu-btn').onpointerdown = (e) => { e.preventDefault(); toggleMenus(); };
-            document.getElementById('tut-btn').onclick = () => { document.getElementById('tut-overlay').style.display = 'none'; localStorage.setItem('tb_tut_welcome', 'done'); };
-            
-            // Navigation Buttons (Chromebook Hardened)
-            document.getElementById('btn-nav-games').onpointerdown = () => { location.href='games.html'; };
-            document.getElementById('btn-nav-ai').onpointerdown = () => { location.href='ai.html'; };
-            document.getElementById('btn-nav-chat').onpointerdown = () => { location.href='chat.html'; };
-            document.getElementById('btn-nav-tut').onpointerdown = () => { location.href='tutorial.html'; };
-
-            document.getElementById('proxy-btn').onclick = () => {
-            // 1. Open the local helios.html file in a new tab
-            const win = window.open('helios.html', '_blank'); 
-            if (!win) return alert("Pop-up Blocked! Please allow pop-ups for the proxy to open.");
-            
-            // 2. Erase the current tab and redirect it to hide evidence
-            document.title = "New Tab";
-            document.body.innerHTML = ""; 
-            window.open('', '_self'); 
-            window.close(); 
-            setTimeout(() => { window.location.replace("about:blank"); }, 300);
-        };
-        });
-
-        function toggleMenus() {
-            menusHidden = !menusHidden;
-            const wrap = document.getElementById('menu-items-wrapper');
-            const btn = document.getElementById('hide-menu-btn');
-            wrap.style.opacity = menusHidden ? "0" : "1";
-            wrap.style.visibility = menusHidden ? "hidden" : "visible";
-            btn.textContent = menusHidden ? "Show Menu Items" : "Hide Menu Items";
-            btn.style.backgroundColor = menusHidden ? "#c8e6c9" : "#ffcdd2";
-            btn.style.color = menusHidden ? "#2e7d32" : "#b71c1c";
-        }
-
-        function cycleSplash() {
-            const el = document.getElementById('splash-text');
-            if (!el) return;
-            let ns = splashes[Math.floor(Math.random() * splashes.length)];
-            el.style.opacity = 0; 
-            setTimeout(() => { 
-                el.textContent = `"${ns}"`; 
-                el.style.opacity = 1; 
-            }, 150);
-        }
-    </script>
+<!-- ========== JAVASCRIPT ========== -->
+<script src="cookie-core.js"></script>
+<script src="cookie-engine.js"></script>
 </body>
 </html>
