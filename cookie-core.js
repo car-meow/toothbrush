@@ -14,11 +14,11 @@ const COOKIES = [
 ];
 
 const RARITIES = [
-    {id:'common', name:'Common', weight: 100, mult: 1, color: '#CFCFCF', vignette: null},
-    {id:'uncommon', name:'Uncommon', weight: 40, mult: 2.5, color: '#6CDB66', vignette: 'rgba(108,219,102,0.25)'},
-    {id:'rare', name:'Rare', weight: 15, mult: 5, color: '#566FEB', vignette: 'rgba(86,111,235,0.3)'},
-    {id:'epic', name:'Epic', weight: 4, mult: 15, color: '#C24FFF', vignette: 'rgba(194,79,255,0.35)'},
-    {id:'divine', name:'Divine', weight: 1, mult: 50, color: '#FFD700', vignette: 'rgba(255,215,0,0.4)'}
+    {id:'common', name:'Common', mult: 1, color: '#CFCFCF', vignette: null},
+    {id:'uncommon', name:'Uncommon', mult: 2.5, color: '#6CDB66', vignette: 'rgba(108,219,102,0.25)'},
+    {id:'rare', name:'Rare', mult: 5, color: '#566FEB', vignette: 'rgba(86,111,235,0.3)'},
+    {id:'epic', name:'Epic', mult: 15, color: '#C24FFF', vignette: 'rgba(194,79,255,0.35)'},
+    {id:'divine', name:'Divine', mult: 50, color: '#FFD700', vignette: 'rgba(255,215,0,0.4)'}
 ];
 
 const SHOP_ITEMS = [
@@ -120,7 +120,7 @@ function getSpawnInterval() {
 }
 
 function getCookieSize() {
-    return 220; // Massively increased size
+    return 220;
 }
 
 function getItemCost(item, count) {
@@ -146,21 +146,26 @@ function rollCookie() {
 }
 
 function rollRarity() {
-    let weights = RARITIES.map(r => r.weight);
+    let r = Math.random();
+    let mult = 1;
     if (G.consumables['glass'] && G.consumables['glass'].active && Date.now() < G.consumables['glass'].endTime) {
-        for(let i=0; i<RARITIES.length; i++){
-            if(RARITIES[i].id === 'rare' || RARITIES[i].id === 'epic' || RARITIES[i].id === 'divine'){
-                weights[i] *= 1.25;
-            }
-        }
+        mult = 1.25;
     }
-    const total = weights.reduce((a,b)=>a+b, 0);
-    let roll = Math.random() * total;
-    for(let i=0; i<RARITIES.length; i++){
-        roll -= weights[i];
-        if(roll <= 0) return RARITIES[i];
-    }
-    return RARITIES[0];
+    
+    let pDivine = (1/250) * mult;
+    let pEpic = (1/110) * mult;
+    let pRare = (1/50) * mult;
+    let pUncommon = (1/15) * mult;
+    
+    if (r < pDivine) return RARITIES.find(x => x.id === 'divine');
+    r -= pDivine;
+    if (r < pEpic) return RARITIES.find(x => x.id === 'epic');
+    r -= pEpic;
+    if (r < pRare) return RARITIES.find(x => x.id === 'rare');
+    r -= pRare;
+    if (r < pUncommon) return RARITIES.find(x => x.id === 'uncommon');
+    
+    return RARITIES.find(x => x.id === 'common');
 }
 
 function calcPrestigeGain() {

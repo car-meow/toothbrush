@@ -51,6 +51,15 @@ let divineActive = false;
 let spawnTimer = null;
 let bgmStarted = false;
 let activeCookies = [];
+let discoveryQueue = [];
+let isShowingDiscovery = false;
+
+// Listen to localstorage updates so if tutorial.html clears data, we reset.
+window.addEventListener('storage', (e) => {
+    if (e.key === 'tb_cookie_save' && !e.newValue) {
+        window.location.reload();
+    }
+});
 
 // --- Splashes ---
 const splashes = [
@@ -150,7 +159,7 @@ function spawnCookie(forceCookie = null, forceRarity = null) {
 
 function animateCookies(now) {
     if (DOM.magnetVisual) {
-        DOM.magnetVisual.style.display = ((G.upgrades['magnet'] || 0) > 0 && G.magnetEnabled) ? 'block' : 'none';
+        DOM.magnetVisual.style.display = ((G.upgrades['magnet'] || 0) > 0 && G.magnetEnabled && menusHidden) ? 'block' : 'none';
     }
 
     for (let i = activeCookies.length - 1; i >= 0; i--) {
@@ -232,7 +241,7 @@ function handleCookieClick(data, cx, cy) {
     const isNew = !G.discoveries[cookie.id];
     if (isNew) {
         G.discoveries[cookie.id] = true;
-        showDiscovery(cookie, rarity.color);
+        queueDiscovery(cookie, rarity.color);
     }
 
     playRandomGet();
@@ -258,7 +267,7 @@ function handleCookieClick(data, cx, cy) {
 // --- Visual Effects ---
 function showPop(x, y) {
     const pop = document.createElement('img');
-    pop.src = 'pop.gif';
+    pop.src = 'pop.gif?t=' + Date.now(); // Cache busting to replay animation
     pop.className = 'pop-effect';
     pop.style.left = x + 'px';
     pop.style.top = y + 'px';
@@ -296,8 +305,17 @@ function flashVignette(color) {
     setTimeout(() => { DOM.screenBorder.style.opacity = '0'; }, 500);
 }
 
-function showDiscovery(cookie, color) {
-    if (!DOM.discoveryPopup) return;
+function queueDiscovery(cookie, color) {
+    discoveryQueue.push({cookie, color});
+    processDiscoveryQueue();
+}
+
+function processDiscoveryQueue() {
+    if (isShowingDiscovery || discoveryQueue.length === 0 || !DOM.discoveryPopup) return;
+    isShowingDiscovery = true;
+    
+    const {cookie, color} = discoveryQueue.shift();
+    
     DOM.discTitle.textContent = 'New ' + cookie.name + '!';
     DOM.discTitle.style.color = color || '#fff';
     DOM.discLore.textContent = '"' + cookie.lore + '"';
@@ -309,7 +327,13 @@ function showDiscovery(cookie, color) {
         playSound('achN');
     }
     
-    setTimeout(() => DOM.discoveryPopup.classList.remove('show'), 4000);
+    setTimeout(() => {
+        DOM.discoveryPopup.classList.remove('show');
+        setTimeout(() => {
+            isShowingDiscovery = false;
+            processDiscoveryQueue();
+        }, 600); 
+    }, 4000);
 }
 
 // --- Divine Event ---
@@ -337,10 +361,19 @@ function triggerDivineEvent() {
 
     setTimeout(() => {
         document.body.classList.remove('camera-shake');
+        DOM.divineOverlay.style.background = 'rgba(0,0,0,0)';
+        
+        DOM.divPart.style.transition = 'none';
+        DOM.inePart.style.transition = 'none';
         DOM.divPart.classList.remove('slam');
         DOM.inePart.classList.remove('slam');
-        DOM.divineOverlay.style.background = 'rgba(0,0,0,0)';
-        setTimeout(() => { DOM.divineOverlay.style.display = 'none'; }, 500);
+        
+        DOM.divineOverlay.style.display = 'none';
+        
+        setTimeout(() => {
+            DOM.divPart.style.transition = '';
+            DOM.inePart.style.transition = '';
+        }, 50);
 
         divineActive = false;
 
@@ -500,19 +533,19 @@ function renderStats() {
         if (!s || (s.total === 0 && !G.discoveries[cookie.id])) return;
         const div = document.createElement('div');
         div.className = 'stat-item';
-        div.innerHTML = `
-            <img src="${cookie.img}">
+        div.innerHTML = \`
+            <img src="\${cookie.img}">
             <div class="stat-info">
-                <div class="stat-name" style="color:#FFF">${cookie.name}</div>
-                <div class="stat-count">Total clicked: ${s.total}</div>
+                <div class="stat-name" style="color:#FFF">\${cookie.name}</div>
+                <div class="stat-count">Total clicked: \${s.total}</div>
                 <div class="stat-breakdown" style="font-size:10px; margin-top:4px; font-weight:bold;">
-                    <span style="color:#CFCFCF">C: ${s.common||0}</span> | 
-                    <span style="color:#6CDB66">U: ${s.uncommon||0}</span> | 
-                    <span style="color:#566FEB">R: ${s.rare||0}</span> | 
-                    <span style="color:#C24FFF">E: ${s.epic||0}</span> | 
-                    <span style="color:#FFD700">D: ${s.divine||0}</span>
+                    <span style="color:#CFCFCF">C: \${s.common||0}</span> | 
+                    <span style="color:#6CDB66">U: \${s.uncommon||0}</span> | 
+                    <span style="color:#566FEB">R: \${s.rare||0}</span> | 
+                    <span style="color:#C24FFF">E: \${s.epic||0}</span> | 
+                    <span style="color:#FFD700">D: \${s.divine||0}</span>
                 </div>
-            </div>`;
+            </div>\`;
         DOM.statsList.appendChild(div);
     });
     if (DOM.statsList.children.length === 0) {
@@ -573,6 +606,15 @@ function toggleMenus() {
     DOM.hideMenuBtn.textContent = menusHidden ? 'Show Menu' : 'Hide Menu';
     DOM.hideMenuBtn.style.backgroundColor = menusHidden ? '#c8e6c9' : '#ffcdd2';
     DOM.hideMenuBtn.style.color = menusHidden ? '#2e7d32' : '#b71c1c';
+}
+
+function closeAllModals() {
+    DOM.shopModal.classList.remove('open');
+    DOM.statsModal.classList.remove('open');
+    const dbg = document.getElementById('debug-menu');
+    if (dbg) dbg.style.display = 'none';
+    const tut = document.getElementById('tut-overlay');
+    if (tut) tut.style.display = 'none';
 }
 
 // ==================== INIT ====================
@@ -644,8 +686,18 @@ window.addEventListener('DOMContentLoaded', () => {
         if (!bgmStarted && !G.muted) { SFX.bgm.play().catch(()=>{}); bgmStarted = true; }
     }, { once: true });
 
-    // Debug Keys & Popups
+    // Keybinds & Debug
     document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeAllModals();
+        }
+        if (e.key === 'm' || e.key === 'M') {
+            DOM.muteBtn.click();
+        }
+        if (e.key === 'h' || e.key === 'H') {
+            toggleMenus();
+        }
+
         if (e.shiftKey && e.key === 'F1') {
             e.preventDefault();
             const amt = prompt('DEBUG: Enter amount of ₡ to add:');
