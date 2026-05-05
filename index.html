@@ -158,6 +158,8 @@ body {
 .rarity-common{color:#CFCFCF} .rarity-uncommon{color:#6CDB66} .rarity-rare{color:#566FEB}
 .rarity-epic{color:#C24FFF} .rarity-divine{color:#FFD700}
 
+@keyframes magnet-pulse { 0% { opacity: 0.2; filter: brightness(1); } 100% { opacity: 0.5; filter: brightness(1.5); } }
+
 /* Pop explosion */
 .pop-effect {
     position: fixed; pointer-events: none; z-index: 10002;
@@ -311,6 +313,9 @@ body {
 <!-- ========== SCREEN BORDER (Vignette Flash) ========== -->
 <div id="screen-border"></div>
 
+<!-- ========== MAGNET VISUAL ========== -->
+<img id="magnet-visual" src="magnet.png" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:150px; height:150px; opacity:0.3; z-index:800; pointer-events:none; animation: magnet-pulse 2s infinite alternate;">
+
 <!-- ========== COOKIE SPAWN LAYER ========== -->
 <div id="cookie-layer" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:900;pointer-events:none;overflow:hidden;"></div>
 
@@ -403,6 +408,14 @@ body {
         <div style="color:#eee;margin-bottom:18px;line-height:1.6;">Welcome to Toothbrush! Click cookies floating across the screen to earn ₡ Cookie Bucks. Spend them in the Shop. Navigate to other tabs using the buttons below.</div>
         <button class="hud-btn" id="tut-btn" style="background:#2196F3;width:100%;padding:12px;font-size:16px;">Got it!</button>
     </div>
+</div>
+
+<!-- ========== DEBUG MENU ========== -->
+<div id="debug-menu" style="display:none; position:fixed; top:20px; left:20px; z-index:99999; background:rgba(0,0,0,0.9); border:2px solid lime; padding:15px; border-radius:10px; font-family:monospace; color:lime;">
+    <h3 style="margin:0 0 10px 0; color:lime;">DEBUG MENU</h3>
+    <select id="debug-cookie" style="background:#000; color:lime; border:1px solid lime; margin-bottom:10px; width:100%;"></select><br>
+    <select id="debug-rarity" style="background:#000; color:lime; border:1px solid lime; margin-bottom:10px; width:100%;"></select><br>
+    <button id="debug-spawn" style="background:green; color:white; border:none; padding:5px 10px; cursor:pointer; width:100%; font-weight:bold;">SPAWN</button>
 </div>
 
 <!-- ========== JAVASCRIPT ========== -->

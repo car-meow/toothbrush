@@ -41,6 +41,7 @@ function cacheDom() {
         splashText: document.getElementById('splash-text'),
         menuWrapper: document.getElementById('menu-items-wrapper'),
         hideMenuBtn: document.getElementById('hide-menu-btn'),
+        magnetVisual: document.getElementById('magnet-visual')
     };
 }
 
@@ -81,9 +82,10 @@ function cycleSplash() {
 }
 
 // --- Cookie Spawning ---
-function spawnCookie() {
+function spawnCookie(forceCookie = null, forceRarity = null) {
     if (divineActive) return;
-    const cookie = rollCookie();
+    const cookie = forceCookie || rollCookie();
+    const rarity = forceRarity || rollRarity();
     const size = getCookieSize();
 
     const el = document.createElement('div');
@@ -106,11 +108,10 @@ function spawnCookie() {
     el.style.left = startX + 'px';
 
     const hasMagnet = (G.upgrades['magnet'] || 0) > 0;
-    const centerY = window.innerHeight / 2;
-
+    
     const data = {
-        el, cookie, startX, endX, yStart: yPos / 100 * window.innerHeight,
-        startTime: performance.now(), duration, hasMagnet, centerY, alive: true, size
+        el, cookie, rarity, startX, endX, yStart: yPos / 100 * window.innerHeight,
+        startTime: performance.now(), duration, hasMagnet, alive: true, size
     };
 
     activeCookies.push(data);
@@ -148,29 +149,47 @@ function spawnCookie() {
 }
 
 function animateCookies(now) {
+    if (DOM.magnetVisual) {
+        DOM.magnetVisual.style.display = ((G.upgrades['magnet'] || 0) > 0 && G.magnetEnabled) ? 'block' : 'none';
+    }
+
     for (let i = activeCookies.length - 1; i >= 0; i--) {
         const c = activeCookies[i];
         if (!c.alive) continue;
         if (divineActive) { requestAnimationFrame(animateCookies); return; }
 
         const elapsed = now - c.startTime;
-        const progress = Math.min(elapsed / c.duration, 1);
+        let progress = Math.min(elapsed / c.duration, 1);
 
-        if (progress >= 1) {
-            c.alive = false;
-            if (c.el && c.el.parentNode) c.el.parentNode.removeChild(c.el);
-            activeCookies.splice(i, 1);
-            continue;
-        }
+        let x, y, rot;
 
-        const x = c.startX + (c.endX - c.startX) * progress;
-        let y = c.yStart;
         if (c.hasMagnet && G.magnetEnabled) {
-            const pull = Math.sin(progress * Math.PI); 
-            y = c.yStart + (c.centerY - c.yStart) * pull * 0.6;
+            let magProgress = Math.min(elapsed / (c.duration / 2), 1);
+            const targetX = window.innerWidth / 2 - c.size / 2;
+            const targetY = window.innerHeight / 2 - c.size / 2;
+            
+            x = c.startX + (targetX - c.startX) * magProgress;
+            y = c.yStart + (targetY - c.yStart) * magProgress;
+            rot = magProgress * 360 * 2;
+            
+            if (magProgress >= 1) {
+                c.el.style.left = targetX + 'px';
+                c.el.style.top = targetY + 'px';
+                c.el.style.transform = 'rotate(' + rot + 'deg)';
+                continue; 
+            }
+        } else {
+            if (progress >= 1) {
+                c.alive = false;
+                if (c.el && c.el.parentNode) c.el.parentNode.removeChild(c.el);
+                activeCookies.splice(i, 1);
+                continue;
+            }
+            x = c.startX + (c.endX - c.startX) * progress;
+            y = c.yStart;
+            rot = progress * 360 * 2;
         }
 
-        const rot = progress * 360 * 2;
         c.el.style.left = x + 'px';
         c.el.style.top = y + 'px';
         c.el.style.transform = 'rotate(' + rot + 'deg)';
@@ -192,34 +211,45 @@ function handleCookieClick(data, cx, cy) {
     if (!bgmStarted && !G.muted) { SFX.bgm.play().catch(()=>{}); bgmStarted = true; }
     if (data.el && data.el.parentNode) data.el.parentNode.removeChild(data.el);
 
-    const value = Math.round(data.cookie.base * getGlobalMult());
+    const cookie = data.cookie;
+    const rarity = data.rarity;
+
+    let variance = 0.20;
+    if (['smore', 'sugar', 'golden', 'nebula'].includes(cookie.id)) variance = 0.35;
+    let baseVal = cookie.base * (1 + (Math.random() * variance * 2 - variance));
+    
+    const value = Math.round(baseVal * rarity.mult * getGlobalMult());
 
     G.bucks += value;
     G.totalEarned += value;
 
-    const statKey = data.cookie.id;
-    G.stats[statKey] = (G.stats[statKey] || 0) + 1;
+    if (!G.stats[cookie.id]) {
+        G.stats[cookie.id] = { total: 0, common: 0, uncommon: 0, rare: 0, epic: 0, divine: 0 };
+    }
+    G.stats[cookie.id].total++;
+    G.stats[cookie.id][rarity.id]++;
 
-    const isNew = !G.discoveries[statKey];
+    const isNew = !G.discoveries[cookie.id];
     if (isNew) {
-        G.discoveries[statKey] = true;
-        showDiscovery(data.cookie);
+        G.discoveries[cookie.id] = true;
+        showDiscovery(cookie, rarity.color);
     }
 
     playRandomGet();
-    if (data.cookie.cls !== 'rarity-common') {
-        const rsnd = data.cookie.cls === 'rarity-epic' ? (Math.random()>0.5?'Epic':'Epic2') :
-                     data.cookie.cls === 'rarity-divine' ? 'divine' : data.cookie.cls.split('-')[1];
-        let soundKey = data.cookie.cls.split('-')[1];
-        soundKey = soundKey.charAt(0).toUpperCase() + soundKey.slice(1);
+    if (rarity.id !== 'common') {
+        const rsnd = rarity.id === 'epic' ? (Math.random()>0.5?'Epic':'Epic2') :
+                     rarity.id === 'divine' ? 'divine' : rarity.id;
+        let soundKey = rarity.id.charAt(0).toUpperCase() + rarity.id.slice(1);
+        if (rsnd === 'Epic2') soundKey = 'Epic2';
+        if (rsnd === 'divine') soundKey = 'divine';
         setTimeout(() => playSound(soundKey), 100);
     }
 
     showPop(cx, cy);
     showFloatingBucks(cx, cy - 20, '+₡' + value);
-    showFloatingRarity(cx, cy + 20, data.cookie);
-    if (data.cookie.vignette) flashVignette(data.cookie.vignette);
-    if (data.cookie.cls === 'rarity-divine') triggerDivineEvent();
+    showFloatingRarity(cx, cy + 20, rarity.name, rarity.color);
+    if (rarity.vignette) flashVignette(rarity.vignette);
+    if (rarity.id === 'divine') triggerDivineEvent();
 
     updateHUD();
     saveGame();
@@ -248,11 +278,10 @@ function showFloatingBucks(x, y, text) {
     setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 1600);
 }
 
-function showFloatingRarity(x, y, cookie) {
+function showFloatingRarity(x, y, rName, rColor) {
     const el = document.createElement('div');
-    el.className = 'floating-rarity ' + cookie.cls;
-    let rName = cookie.cls.split('-')[1];
-    rName = rName.charAt(0).toUpperCase() + rName.slice(1);
+    el.className = 'floating-rarity';
+    el.style.color = rColor;
     el.textContent = rName;
     el.style.left = x + 'px';
     el.style.top = (y + 30) + 'px';
@@ -267,10 +296,10 @@ function flashVignette(color) {
     setTimeout(() => { DOM.screenBorder.style.opacity = '0'; }, 500);
 }
 
-function showDiscovery(cookie) {
+function showDiscovery(cookie, color) {
     if (!DOM.discoveryPopup) return;
-    DOM.discTitle.textContent = '🆕 ' + cookie.name + '!';
-    DOM.discTitle.style.color = cookie.color;
+    DOM.discTitle.textContent = 'New ' + cookie.name + '!';
+    DOM.discTitle.style.color = color || '#fff';
     DOM.discLore.textContent = '"' + cookie.lore + '"';
     DOM.discoveryPopup.classList.add('show');
     
@@ -469,14 +498,23 @@ function renderStats() {
     if (!DOM.statsList) return;
     DOM.statsList.innerHTML = '';
     COOKIES.forEach(cookie => {
-        const key = cookie.id;
-        const count = G.stats[key] || 0;
-        if (count === 0 && !G.discoveries[key]) return;
+        const s = G.stats[cookie.id];
+        if (!s || (s.total === 0 && !G.discoveries[cookie.id])) return;
         const div = document.createElement('div');
         div.className = 'stat-item';
-        let rName = cookie.cls.split('-')[1];
-        rName = rName.charAt(0).toUpperCase() + rName.slice(1);
-        div.innerHTML = '<img src="' + cookie.img + '"><div class="stat-info"><div class="stat-name" style="color:' + cookie.color + '">' + rName + ' ' + cookie.name + '</div><div class="stat-count">Clicked: ' + count + '</div></div>';
+        div.innerHTML = \`
+            <img src="\${cookie.img}">
+            <div class="stat-info">
+                <div class="stat-name" style="color:#FFF">\${cookie.name}</div>
+                <div class="stat-count">Total clicked: \${s.total}</div>
+                <div class="stat-breakdown" style="font-size:10px; margin-top:4px; font-weight:bold;">
+                    <span style="color:#CFCFCF">C: \${s.common||0}</span> | 
+                    <span style="color:#6CDB66">U: \${s.uncommon||0}</span> | 
+                    <span style="color:#566FEB">R: \${s.rare||0}</span> | 
+                    <span style="color:#C24FFF">E: \${s.epic||0}</span> | 
+                    <span style="color:#FFD700">D: \${s.divine||0}</span>
+                </div>
+            </div>\`;
         DOM.statsList.appendChild(div);
     });
     if (DOM.statsList.children.length === 0) {
@@ -607,6 +645,49 @@ window.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', () => {
         if (!bgmStarted && !G.muted) { SFX.bgm.play().catch(()=>{}); bgmStarted = true; }
     }, { once: true });
+
+    // Debug Keys & Popups
+    document.addEventListener('keydown', (e) => {
+        if (e.shiftKey && e.key === 'F1') {
+            e.preventDefault();
+            const amt = prompt('DEBUG: Enter amount of ₡ to add:');
+            if (amt && !isNaN(amt)) {
+                const val = parseFloat(amt);
+                G.bucks += val;
+                G.totalEarned += val;
+                updateHUD();
+                saveGame();
+            }
+        }
+        if (e.shiftKey && e.key === 'F2') {
+            e.preventDefault();
+            const dbg = document.getElementById('debug-menu');
+            if (dbg) dbg.style.display = dbg.style.display === 'none' ? 'block' : 'none';
+        }
+    });
+
+    // Setup Debug Menu
+    const dbgCookie = document.getElementById('debug-cookie');
+    const dbgRarity = document.getElementById('debug-rarity');
+    if (dbgCookie && dbgRarity) {
+        COOKIES.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id; opt.textContent = c.name;
+            dbgCookie.appendChild(opt);
+        });
+        RARITIES.forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r.id; opt.textContent = r.name;
+            dbgRarity.appendChild(opt);
+        });
+        document.getElementById('debug-spawn').onclick = () => {
+            const cId = dbgCookie.value;
+            const rId = dbgRarity.value;
+            const cookie = COOKIES.find(x => x.id === cId);
+            const rarity = RARITIES.find(x => x.id === rId);
+            if (cookie && rarity) spawnCookie(cookie, rarity);
+        };
+    }
 
     G.lastSeen = Date.now();
     saveGame();
