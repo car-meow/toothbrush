@@ -339,8 +339,6 @@ function triggerDivineEvent() {
         document.body.classList.remove('camera-shake');
         DOM.divPart.classList.remove('slam');
         DOM.inePart.classList.remove('slam');
-        DOM.divPart.style.transform = 'translateX(-150vw)';
-        DOM.inePart.style.transform = 'translateX(150vw)';
         DOM.divineOverlay.style.background = 'rgba(0,0,0,0)';
         setTimeout(() => { DOM.divineOverlay.style.display = 'none'; }, 500);
 
