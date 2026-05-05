@@ -533,19 +533,19 @@ function renderStats() {
         if (!s || (s.total === 0 && !G.discoveries[cookie.id])) return;
         const div = document.createElement('div');
         div.className = 'stat-item';
-        div.innerHTML = \`
-            <img src="\${cookie.img}">
+        div.innerHTML = `
+            <img src="${cookie.img}">
             <div class="stat-info">
-                <div class="stat-name" style="color:#FFF">\${cookie.name}</div>
-                <div class="stat-count">Total clicked: \${s.total}</div>
+                <div class="stat-name" style="color:#FFF">${cookie.name}</div>
+                <div class="stat-count">Total clicked: ${s.total}</div>
                 <div class="stat-breakdown" style="font-size:10px; margin-top:4px; font-weight:bold;">
-                    <span style="color:#CFCFCF">C: \${s.common||0}</span> | 
-                    <span style="color:#6CDB66">U: \${s.uncommon||0}</span> | 
-                    <span style="color:#566FEB">R: \${s.rare||0}</span> | 
-                    <span style="color:#C24FFF">E: \${s.epic||0}</span> | 
-                    <span style="color:#FFD700">D: \${s.divine||0}</span>
+                    <span style="color:#CFCFCF">C: ${s.common||0}</span> | 
+                    <span style="color:#6CDB66">U: ${s.uncommon||0}</span> | 
+                    <span style="color:#566FEB">R: ${s.rare||0}</span> | 
+                    <span style="color:#C24FFF">E: ${s.epic||0}</span> | 
+                    <span style="color:#FFD700">D: ${s.divine||0}</span>
                 </div>
-            </div>\`;
+            </div>`;
         DOM.statsList.appendChild(div);
     });
     if (DOM.statsList.children.length === 0) {
