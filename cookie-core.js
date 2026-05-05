@@ -1,24 +1,16 @@
 // ==================== COOKIE CORE: Data, Economy, Save/Load ====================
 
 const COOKIES = [
-    {id:'chocolate_chip', name:'Chocolate Chip', img:'Cookies/chocolate_chip.png', aura:'aura-basic', base:1, lore:"The OG. The one that started it all. Respectable."},
-    {id:'cashew', name:'Cashew', img:'Cookies/cashew.png', aura:'aura-cashew', base:2, lore:"Fancy. Expensive. Probably from Whole Foods."},
-    {id:'oatmeal_raisin', name:'Oatmeal Raisin', img:'Cookies/oatmeal_raisin.png', aura:'aura-oatmeal', base:2, lore:"The betrayal cookie. Looks like chocolate chip. Isn't."},
-    {id:'peanut_butter', name:'Peanut Butter', img:'Cookies/peanut_butter.png', aura:'aura-peanut', base:3, lore:"Sticks to the roof of your mouth AND your heart."},
-    {id:'sugar', name:'Sugar', img:'Cookies/sugar.png', aura:'aura-sugar', base:3, lore:"Pure. Uncut. 100% refined sweetness."},
-    {id:'chocolate', name:'Chocolate', img:'Cookies/chocolate.png', aura:'aura-chocolate', base:4, lore:"Double the chocolate, double the serotonin."},
-    {id:'snickerdoodle', name:'Snickerdoodle', img:'Cookies/snickerdoodle.png', aura:'aura-snickerdoodle', base:5, lore:"Named by a 5-year-old. Perfected by the gods."},
-    {id:'smore', name:"S'more", img:'Cookies/smore.png', aura:'aura-smore', base:6, lore:"Three layers of regret-free indulgence."},
-    {id:'golden', name:'Golden', img:'Cookies/golden.png', aura:'aura-golden', base:10, lore:"Rumored to grant wishes. Results may vary."},
-    {id:'nebula', name:'Nebula', img:'Cookies/nebula.png', aura:'aura-nebula', base:15, lore:"Baked in a dying star. Tastes like infinity."}
-];
-
-const RARITIES = [
-    {id:'common', name:'Common', mult:1, color:'#CFCFCF', cls:'rarity-common', weight:60, vignette:null},
-    {id:'uncommon', name:'Uncommon', mult:2, color:'#6CDB66', cls:'rarity-uncommon', weight:25, vignette:'rgba(108,219,102,0.25)'},
-    {id:'rare', name:'Rare', mult:5, color:'#566FEB', cls:'rarity-rare', weight:10, vignette:'rgba(86,111,235,0.3)'},
-    {id:'epic', name:'Epic', mult:15, color:'#C24FFF', cls:'rarity-epic', weight:4, vignette:'rgba(194,79,255,0.35)'},
-    {id:'divine', name:'Divine', mult:50, color:'#FFD700', cls:'rarity-divine', weight:1, vignette:'rgba(255,215,0,0.4)'}
+    {id:'nebula', name:'Nebula', img:'Cookies/nebula.png', aura:'aura-nebula', base:750, weight: 1/1000, color:'#FFD700', vignette:'rgba(255,215,0,0.4)', cls:'rarity-divine', lore:"Woah, is that a portal to space?"},
+    {id:'golden', name:'Golden', img:'Cookies/golden.png', aura:'aura-golden', base:500, weight: 1/300, color:'#FFD700', vignette:'rgba(255,215,0,0.4)', cls:'rarity-divine', lore:"Thanks, Grandma!"},
+    {id:'sugar', name:'Sugar', img:'Cookies/sugar.png', aura:'aura-sugar', base:45, weight: 1/50, color:'#C24FFF', vignette:'rgba(194,79,255,0.35)', cls:'rarity-epic', lore:"So sweet, my teeth burn!"},
+    {id:'smore', name:"S'more", img:'Cookies/smore.png', aura:'aura-smore', base:90, weight: 1/35, color:'#C24FFF', vignette:'rgba(194,79,255,0.35)', cls:'rarity-epic', lore:"Fresh from the campfire."},
+    {id:'chocolate', name:'Chocolate', img:'Cookies/chocolate.png', aura:'aura-chocolate', base:20, weight: 1/25, color:'#566FEB', vignette:'rgba(86,111,235,0.3)', cls:'rarity-rare', lore:"Are you sure you didn't put a brownie in the cookie cutter?"},
+    {id:'snickerdoodle', name:'Snickerdoodle', img:'Cookies/snickerdoodle.png', aura:'aura-snickerdoodle', base:25, weight: 1/20, color:'#566FEB', vignette:'rgba(86,111,235,0.3)', cls:'rarity-rare', lore:"Soft AND cinnamony- what's not to like?"},
+    {id:'peanut_butter', name:'Peanut Butter', img:'Cookies/peanut_butter.png', aura:'aura-peanut', base:6, weight: 1/15, color:'#6CDB66', vignette:'rgba(108,219,102,0.25)', cls:'rarity-uncommon', lore:"Ooooh, my favorite!"},
+    {id:'cashew', name:'Cashew', img:'Cookies/cashew.png', aura:'aura-cashew', base:4, weight: 1/10, color:'#6CDB66', vignette:'rgba(108,219,102,0.25)', cls:'rarity-uncommon', lore:"Hope you're having a good day!"},
+    {id:'oatmeal_raisin', name:'Oatmeal Raisin', img:'Cookies/oatmeal_raisin.png', aura:'aura-oatmeal', base:2, weight: 1/5, color:'#CFCFCF', vignette:null, cls:'rarity-common', lore:"An under-appreciated classic."},
+    {id:'chocolate_chip', name:'Chocolate Chip', img:'Cookies/chocolate_chip.png', aura:'aura-basic', base:1, weight: 1/2, color:'#CFCFCF', vignette:null, cls:'rarity-common', lore:"You can't go wrong with the basics."}
 ];
 
 const SHOP_ITEMS = [
@@ -117,7 +109,7 @@ function getSpawnInterval() {
 }
 
 function getCookieSize() {
-    return 70;
+    return 140; // Increased size
 }
 
 function getItemCost(item, count) {
@@ -125,28 +117,28 @@ function getItemCost(item, count) {
     return item.baseCost;
 }
 
-function rollRarity() {
-    let weights = RARITIES.map(r => r.weight);
+function rollCookie() {
+    let weights = COOKIES.map(c => c.weight);
+    let goldenIdx = COOKIES.findIndex(c => c.id === 'golden');
+    
     if (G.consumables['glass'] && G.consumables['glass'].active && Date.now() < G.consumables['glass'].endTime) {
-        weights[2] *= 1.25;
-        weights[3] *= 1.25;
-        weights[4] *= 1.25;
+        for (let i=0; i<COOKIES.length; i++) {
+            if (COOKIES[i].cls === 'rarity-rare' || COOKIES[i].cls === 'rarity-epic' || COOKIES[i].cls === 'rarity-divine') {
+                weights[i] *= 1.25;
+            }
+        }
     }
     if (G.consumables['grandma'] && G.consumables['grandma'].active && Date.now() < G.consumables['grandma'].endTime) {
-        weights[4] *= 2.5; 
+        weights[goldenIdx] = 1/40; 
     }
     
     const total = weights.reduce((a, b) => a + b, 0);
     let roll = Math.random() * total;
-    for (let i = 0; i < RARITIES.length; i++) {
+    for (let i = 0; i < COOKIES.length; i++) {
         roll -= weights[i];
-        if (roll <= 0) return RARITIES[i];
+        if (roll <= 0) return COOKIES[i];
     }
-    return RARITIES[0];
-}
-
-function rollCookie() {
-    return COOKIES[Math.floor(Math.random() * COOKIES.length)];
+    return COOKIES[COOKIES.length - 1];
 }
 
 function calcPrestigeGain() {

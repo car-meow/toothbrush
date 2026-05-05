@@ -4,7 +4,7 @@
 const SFX = {};
 function initSounds() {
     ['get1','get2','get3','get4'].forEach(s => SFX[s] = new Audio('Sound/'+s+'.mp3'));
-    ['Common','Uncommon','Rare','Epic','Epic2','divine','divine2','divine3','stop','start','achN'].forEach(s => SFX[s] = new Audio('Sound/'+s+'.mp3'));
+    ['Common','Uncommon','Rare','Epic','Epic2','divine','divine2','divine3','stop','start','achN','achR'].forEach(s => SFX[s] = new Audio('Sound/'+s+'.mp3'));
     SFX.bgm = new Audio('Sound/bgm.mp3'); SFX.bgm.loop = true; SFX.bgm.volume = 0.3;
 }
 function playSound(key) {
@@ -84,7 +84,6 @@ function cycleSplash() {
 function spawnCookie() {
     if (divineActive) return;
     const cookie = rollCookie();
-    const rarity = rollRarity();
     const size = getCookieSize();
 
     const el = document.createElement('div');
@@ -110,14 +109,13 @@ function spawnCookie() {
     const centerY = window.innerHeight / 2;
 
     const data = {
-        el, cookie, rarity, startX, endX, yStart: yPos / 100 * window.innerHeight,
+        el, cookie, startX, endX, yStart: yPos / 100 * window.innerHeight,
         startTime: performance.now(), duration, hasMagnet, centerY, alive: true, size
     };
 
     activeCookies.push(data);
     if (DOM.cookieLayer) DOM.cookieLayer.appendChild(el);
 
-    // Completely bulletproof cross-platform click handler!
     const triggerClick = (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -128,7 +126,6 @@ function spawnCookie() {
     el.onclick = triggerClick;
     el.ontouchstart = triggerClick;
 
-    // Divine Intervention / Calling logic
     const divIntervention = G.upgrades['divine_intervention'] || 0;
     const divCalling = G.upgrades['divine_calling'] || 0;
     
@@ -140,7 +137,6 @@ function spawnCookie() {
     }
 
     if (autoClicked) {
-        // Auto-click it instantly!
         setTimeout(() => {
             if (data.alive) {
                 data.alive = false;
@@ -196,33 +192,34 @@ function handleCookieClick(data, cx, cy) {
     if (!bgmStarted && !G.muted) { SFX.bgm.play().catch(()=>{}); bgmStarted = true; }
     if (data.el && data.el.parentNode) data.el.parentNode.removeChild(data.el);
 
-    const baseVal = data.cookie.base * data.rarity.mult;
-    const value = Math.round(baseVal * getGlobalMult());
+    const value = Math.round(data.cookie.base * getGlobalMult());
 
     G.bucks += value;
     G.totalEarned += value;
 
-    const statKey = data.cookie.id + '_' + data.rarity.id;
+    const statKey = data.cookie.id;
     G.stats[statKey] = (G.stats[statKey] || 0) + 1;
 
     const isNew = !G.discoveries[statKey];
     if (isNew) {
         G.discoveries[statKey] = true;
-        showDiscovery(data.cookie, data.rarity);
+        showDiscovery(data.cookie);
     }
 
     playRandomGet();
-    if (data.rarity.id !== 'common') {
-        const rsnd = data.rarity.id === 'epic' ? (Math.random()>0.5?'Epic':'Epic2') :
-                     data.rarity.id === 'divine' ? 'divine' : data.rarity.name;
-        setTimeout(() => playSound(rsnd), 100);
+    if (data.cookie.cls !== 'rarity-common') {
+        const rsnd = data.cookie.cls === 'rarity-epic' ? (Math.random()>0.5?'Epic':'Epic2') :
+                     data.cookie.cls === 'rarity-divine' ? 'divine' : data.cookie.cls.split('-')[1];
+        let soundKey = data.cookie.cls.split('-')[1];
+        soundKey = soundKey.charAt(0).toUpperCase() + soundKey.slice(1);
+        setTimeout(() => playSound(soundKey), 100);
     }
 
     showPop(cx, cy);
     showFloatingBucks(cx, cy - 20, '+₡' + value);
-    showFloatingRarity(cx, cy + 20, data.rarity);
-    if (data.rarity.vignette) flashVignette(data.rarity.vignette);
-    if (data.rarity.id === 'divine') triggerDivineEvent();
+    showFloatingRarity(cx, cy + 20, data.cookie);
+    if (data.cookie.vignette) flashVignette(data.cookie.vignette);
+    if (data.cookie.cls === 'rarity-divine') triggerDivineEvent();
 
     updateHUD();
     saveGame();
@@ -251,10 +248,12 @@ function showFloatingBucks(x, y, text) {
     setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 1600);
 }
 
-function showFloatingRarity(x, y, rarity) {
+function showFloatingRarity(x, y, cookie) {
     const el = document.createElement('div');
-    el.className = 'floating-rarity ' + rarity.cls;
-    el.textContent = rarity.name;
+    el.className = 'floating-rarity ' + cookie.cls;
+    let rName = cookie.cls.split('-')[1];
+    rName = rName.charAt(0).toUpperCase() + rName.slice(1);
+    el.textContent = rName;
     el.style.left = x + 'px';
     el.style.top = (y + 30) + 'px';
     if (DOM.floatLayer) DOM.floatLayer.appendChild(el);
@@ -268,13 +267,19 @@ function flashVignette(color) {
     setTimeout(() => { DOM.screenBorder.style.opacity = '0'; }, 500);
 }
 
-function showDiscovery(cookie, rarity) {
+function showDiscovery(cookie) {
     if (!DOM.discoveryPopup) return;
-    DOM.discTitle.textContent = '🆕 ' + rarity.name + ' ' + cookie.name + '!';
-    DOM.discTitle.style.color = rarity.color;
+    DOM.discTitle.textContent = '🆕 ' + cookie.name + '!';
+    DOM.discTitle.style.color = cookie.color;
     DOM.discLore.textContent = '"' + cookie.lore + '"';
     DOM.discoveryPopup.classList.add('show');
-    playSound('achN');
+    
+    if (cookie.id === 'nebula' || cookie.id === 'golden') {
+        playSound('achR');
+    } else {
+        playSound('achN');
+    }
+    
     setTimeout(() => DOM.discoveryPopup.classList.remove('show'), 4000);
 }
 
@@ -406,7 +411,6 @@ function renderShop() {
         DOM.shopList.appendChild(div);
     });
 
-    // Incinerate Section - using exactly the layout you requested
     const gain = calcPrestigeGain();
     const magnetVisible = (G.upgrades['magnet'] || 0) > 0;
     const magBtnText = G.magnetEnabled ? 'Disable Magnet' : 'Enable Magnet';
@@ -427,7 +431,6 @@ function renderShop() {
     incinContainer.innerHTML = incinHtml;
     DOM.shopList.appendChild(incinContainer);
 
-    // Bind incinerate
     document.getElementById('btn-incinerate').onclick = (e) => { e.preventDefault(); doIncinerate(); };
     if (magnetVisible) {
         document.getElementById('btn-toggle-magnet').onclick = (e) => { 
@@ -455,7 +458,6 @@ function makeShopCard(name, desc, cost, sub, canBuy, onClickCb) {
     const btn = document.createElement('button');
     btn.className = 'buy-btn' + (canBuy ? '' : ' disabled');
     btn.textContent = canBuy ? 'Buy' : (cost === 'MAXED' || cost === 'OWNED' ? '✓' : 'Can\'t Afford');
-    // Switched to onclick / ontouchstart!
     btn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); onClickCb(); };
     btn.ontouchstart = (e) => { e.preventDefault(); e.stopPropagation(); onClickCb(); };
     div.appendChild(btn);
@@ -467,15 +469,15 @@ function renderStats() {
     if (!DOM.statsList) return;
     DOM.statsList.innerHTML = '';
     COOKIES.forEach(cookie => {
-        RARITIES.forEach(rarity => {
-            const key = cookie.id + '_' + rarity.id;
-            const count = G.stats[key] || 0;
-            if (count === 0 && !G.discoveries[key]) return;
-            const div = document.createElement('div');
-            div.className = 'stat-item';
-            div.innerHTML = '<img src="' + cookie.img + '"><div class="stat-info"><div class="stat-name" style="color:' + rarity.color + '">' + rarity.name + ' ' + cookie.name + '</div><div class="stat-count">Clicked: ' + count + '</div></div>';
-            DOM.statsList.appendChild(div);
-        });
+        const key = cookie.id;
+        const count = G.stats[key] || 0;
+        if (count === 0 && !G.discoveries[key]) return;
+        const div = document.createElement('div');
+        div.className = 'stat-item';
+        let rName = cookie.cls.split('-')[1];
+        rName = rName.charAt(0).toUpperCase() + rName.slice(1);
+        div.innerHTML = '<img src="' + cookie.img + '"><div class="stat-info"><div class="stat-name" style="color:' + cookie.color + '">' + rName + ' ' + cookie.name + '</div><div class="stat-count">Clicked: ' + count + '</div></div>';
+        DOM.statsList.appendChild(div);
     });
     if (DOM.statsList.children.length === 0) {
         DOM.statsList.innerHTML = '<div style="grid-column:span 2;text-align:center;color:#666;padding:40px;">No cookies clicked yet! Click cookies floating across the screen.</div>';
@@ -559,7 +561,6 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('tut-overlay').style.display = 'flex';
     }
 
-    // --- Using standard onclick for 100% universal button support ---
     document.getElementById('toothbrush-logo').onclick = (e) => { e.preventDefault(); cycleSplash(); };
     document.getElementById('btn-nav-games').onclick = () => { location.href='games.html'; };
     document.getElementById('btn-nav-ai').onclick = () => { location.href='ai.html'; };
