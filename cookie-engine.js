@@ -627,7 +627,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if (offline > 0) {
         G.bucks += offline;
         G.totalEarned += offline;
-        setTimeout(() => alert('Welcome back! Your autobakers earned ₡' + formatNum(offline) + ' while you were away.'), 500);
     }
 
     updateHUD();
