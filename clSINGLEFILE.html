@@ -4,8 +4,9 @@
 <head>
     <title>Toothbrush Files</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400..700;1,400..700&display=swap');
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Arimo', sans-serif;
             background: #1a1a1a;
             min-height: 100vh;
             margin: 0;
@@ -202,10 +203,12 @@
                 style="position: sticky; top: 0; padding: 15px 0; background: #1f1f1f; z-index: 900; display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                 <input type="text" placeholder="Search..." id="searchInput"
                     style="padding: 13px; width: 100%; max-width: 420px; border-radius: 8px; border: none; box-shadow: 0 2px 4px rgba(7, 105, 218, 0.1); background: #333; color: white;">
-                <button id="bookmark-btn" style="background: red; border: none; border-radius: 8px; padding: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 45px; height: 45px; flex-shrink: 0; transition: background 0.2s, transform 0.2s;">
-                    <img src="bookmark.png" style="width: 100%; height: 100%; object-fit: contain; border-radius: 4px; pointer-events: none;">
-                </button>
-                <span id="bookmark-hint" style="color: #4CAF50; font-weight: bold; display: none; margin-left: 5px; white-space: nowrap;">Click a game to bookmark</span>
+                <div style="position: relative; display: flex; align-items: center;">
+                    <button id="bookmark-btn" style="background: red; border: none; border-radius: 8px; padding: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 45px; height: 45px; flex-shrink: 0; transition: background 0.2s, transform 0.2s;">
+                        <img src="bookmark.png" style="width: 100%; height: 100%; object-fit: contain; border-radius: 4px; pointer-events: none;">
+                    </button>
+                    <span id="bookmark-hint" style="color: #4CAF50; font-weight: bold; display: none; white-space: nowrap; position: absolute; left: calc(100% + 15px); pointer-events: none;">Click a game to bookmark</span>
+                </div>
                 <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/searchbut.js"></script>
                 <button id="lolbutton"
                     onclick="const script = document.createElement('script');script.src = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@latest/game.js';document.body.appendChild(script);"
@@ -220,7 +223,7 @@
 
     <!-- Bookmark Overlay -->
     <div id="bookmark-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.88); z-index: 30000; align-items: center; justify-content: center;">
-        <div style="background: #1f1f1f; padding: 28px; border-radius: 16px; width: 440px; max-width: 90vw; border: 2px solid #2196F3; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9); font-family: Arial, sans-serif;">
+        <div style="background: #1f1f1f; padding: 28px; border-radius: 16px; width: 440px; max-width: 90vw; border: 2px solid #2196F3; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9); font-family: 'Arimo', sans-serif;">
             <h2 style="color: #2196F3; margin-top: 0; margin-bottom: 12px; font-size: 24px;">Enter a name for this app.</h2>
             <input type="text" id="bookmark-app-name" placeholder="App Title" style="width: 100%; padding: 12px; margin-bottom: 18px; box-sizing: border-box; border-radius: 8px; border: 1px solid #444; background: #333; color: white; font-size: 16px;">
             <button id="confirm-bookmark-btn" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; transition: filter 0.2s;">Bookmark</button>

@@ -9,7 +9,6 @@
     <header>
         <h1 onclick="location.href='index.html'">Toothbrush Games</h1>
         <nav class="top-nav">
-            <button id="custom-app-btn" class="save-btn" style="background-color: #2196F3;">Custom</button>
         </nav>
 		
 		<!-- Put this directly under </nav> and above <div class="controls"> -->
@@ -26,6 +25,8 @@
             <button onclick="document.getElementById('import-btn').click()" class="save-btn" style="background-color: #4CAF50;">Restore</button>
             <input type="file" id="import-btn" accept=".json" style="display:none">
             
+            <button id="custom-app-btn" class="save-btn" style="background-color: #2196F3;">Custom</button>
+
             <!-- Spacer Div -->
             <div style="width: 15px;"></div>
             
@@ -50,7 +51,7 @@
     </main>
     <!-- Custom App Overlay -->
     <div id="custom-app-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.88); z-index: 30000; align-items: center; justify-content: center;">
-        <div style="background: #1f1f1f; padding: 28px; border-radius: 16px; width: 440px; max-width: 90vw; border: 2px solid #2196F3; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9); font-family: Arial, sans-serif;">
+        <div style="background: #1f1f1f; padding: 28px; border-radius: 16px; width: 440px; max-width: 90vw; border: 2px solid #2196F3; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9); font-family: 'Arimo', sans-serif;">
             <h2 style="color: #2196F3; margin-top: 0; margin-bottom: 12px; font-size: 24px;">Add Local App</h2>
             <input type="text" id="new-game-title" placeholder="App Title" style="width: 100%; padding: 12px; margin-bottom: 18px; box-sizing: border-box; border-radius: 8px; border: 1px solid #444; background: #333; color: white; font-size: 16px;">
             <input type="file" id="new-game-file" accept=".html" style="width: 100%; margin-bottom: 18px; color: white; background: #333; padding: 10px; border-radius: 8px; border: 1px solid #444;">

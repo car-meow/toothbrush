@@ -1,7 +1,8 @@
 /* =========================================
    1. GLOBAL & BASE STYLES
 ========================================= */
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+@import url('https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400..700;1,400..700&display=swap');
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Arimo', sans-serif; }
 body { background-color: #121212; color: #e0e0e0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
 /* Zigzag Background (Used on Home & Chat) */
@@ -204,3 +205,51 @@ iframe { width: 100%; height: 100%; border: none; }
 .hud-bottom-right { position: fixed; bottom: 20px; right: 25px; display: flex; gap: 10px; z-index: 11000; }
 .status-header { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 20px; font-size: 11px; }
 .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
+
+/* Forces buttons to the front and ensures they accept clicks */
+.save-btn {
+    pointer-events: auto !important;
+    z-index: 10002 !important;
+}
+
+.hud-top-left {
+    pointer-events: none; /* Allows clicks to pass through the empty space between buttons */
+}
+
+.hud-top-left button {
+    pointer-events: auto; /* Re-enables clicking for the buttons themselves */
+}
+
+/* Forces the tutorial to the center and above everything */
+.tut-overlay {
+    display: none; 
+    position: fixed !important; 
+    top: 0 !important; 
+    left: 0 !important; 
+    width: 100vw !important; 
+    height: 100vh !important; 
+    background: rgba(0, 0, 0, 0.9) !important; 
+    z-index: 99999 !important; /* Highest possible depth */
+    align-items: center; 
+    justify-content: center;
+    pointer-events: auto;
+}
+
+.tut-box {
+    background: #1f1f1f; 
+    padding: 30px; 
+    border-radius: 20px; 
+    width: 450px; 
+    max-width: 90vw; 
+    border: 3px solid #2196F3;
+    text-align: center;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 1);
+}
+
+.tut-text {
+    color: #eee; 
+    margin: 20px 0; 
+    line-height: 1.6; 
+    font-size: 16px;
+    min-height: 80px;
+}
