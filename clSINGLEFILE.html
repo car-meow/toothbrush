@@ -149,6 +149,15 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
+        body.bookmark-mode-active input[type="button"] {
+            background: #4CAF50 !important;
+            color: white;
+        }
+
+        body.bookmark-mode-active input[type="button"]:hover {
+            background: #45a049 !important;
+        }
+
         @media (max-width: 768px) {
             .sidebar {
                 width: 60px;
@@ -225,9 +234,11 @@
         bookmarkBtn.addEventListener('click', () => {
             isBookmarkMode = !isBookmarkMode;
             if (isBookmarkMode) {
-                bookmarkBtn.style.background = '#666666'; // Turn dark gray
+                bookmarkBtn.style.background = '#4CAF50'; // Turn green
+                document.body.classList.add('bookmark-mode-active');
             } else {
                 bookmarkBtn.style.background = 'red'; // Turn back to normal red
+                document.body.classList.remove('bookmark-mode-active');
             }
         });
 
@@ -244,12 +255,19 @@
             }
         }, true);
 
-        // Escape to cancel prompt
+        // Escape to cancel prompt and exit bookmark mode
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && document.getElementById('bookmark-overlay').style.display === 'flex') {
-                document.getElementById('bookmark-overlay').style.display = 'none';
-                document.getElementById('bookmark-app-name').value = '';
-                selectedFile = null;
+            if (e.key === 'Escape') {
+                if (document.getElementById('bookmark-overlay').style.display === 'flex') {
+                    document.getElementById('bookmark-overlay').style.display = 'none';
+                    document.getElementById('bookmark-app-name').value = '';
+                    selectedFile = null;
+                }
+                if (isBookmarkMode) {
+                    isBookmarkMode = false;
+                    bookmarkBtn.style.background = 'red';
+                    document.body.classList.remove('bookmark-mode-active');
+                }
             }
         });
 
@@ -299,6 +317,16 @@
                                 document.getElementById('bookmark-app-name').value = '';
                                 selectedFile = null;
                                 db.close();
+                                
+                                // Tell carmeow.html to reload the sidebar game list
+                                if (window.parent && window.parent !== window) {
+                                    if (typeof window.parent.loadGames === 'function') {
+                                        window.parent.loadGames();
+                                    } else if (window.parent.games && typeof window.parent.renderGameList === 'function') {
+                                        window.parent.games.push(newG);
+                                        window.parent.renderGameList();
+                                    }
+                                }
                             };
                         } catch(err) {
                             console.error("Error saving to DB:", err);
