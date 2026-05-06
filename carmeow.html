@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>New Tab</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1 onclick="location.href='index.html'">Toothbrush Games</h1>
+        <nav class="top-nav">
+            <!-- Removed the stash list button since you use the PDF version -->
+        </nav>
+		
+		<!-- Put this directly under </nav> and above <div class="controls"> -->
+        <div id="game-status-container" class="status-header" style="display: none; margin-right: auto;">
+            <div id="game-status-dot" class="status-dot"></div>
+            <span id="game-status-text" style="color: white; font-weight: bold;">Loading...</span>
+        </div>
+		
+        <div class="controls">
+            <button id="cloak-btn" class="save-btn" style="background-color: #E91E63;">Fullscreen</button>
+            
+            <button onclick="location.href='pdf-stash.html'" class="save-btn" style="background-color: #F57C00;">Stash</button>
+            <button id="export-btn" class="save-btn" style="background-color: #4CAF50;">Backup</button>
+            <button onclick="document.getElementById('import-btn').click()" class="save-btn" style="background-color: #4CAF50;">Restore</button>
+            <input type="file" id="import-btn" accept=".json" style="display:none">
+            
+            <!-- Spacer Div -->
+            <div style="width: 15px;"></div>
+            
+            <!-- Dark Back Button -->
+            <button onclick="location.href='index.html'" class="save-btn" style="background-color: #3d3d3d; border: 1px solid #444;">Back</button>
+        </div>
+    </header>
+    <main>
+        <aside class="sidebar">
+            <ul id="game-list"></ul>
+            <div class="add-game">
+                <h3>Add Local App</h3>
+                <input type="text" id="new-game-title" placeholder="App Title">
+                <input type="file" id="new-game-file" accept=".html">
+                <button id="add-game-btn" class="save-btn" style="background-color:#2196F3; width:100%; margin-top:10px;">Add App</button>
+            </div>
+        </aside>
+        <section class="game-container">
+            <!-- The Zigzag Empty State -->
+            <div id="empty-state" class="empty-state-bg">
+                <h2 class="empty-state-title">Nothing Loaded.</h2>
+                <p class="empty-state-subtitle">Click an app in the sidebar to get started</p>
+            </div>
+            
+            <!-- Iframe (Hidden by default until clicked) -->
+            <iframe id="game-frame" name="game-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock" allow="allow-storage-access-by-user-activation; storage-access; fullscreen"></iframe>
+        </section>
+    </main>
+    <script src="app.js"></script>
+	
+</body>
+</html>

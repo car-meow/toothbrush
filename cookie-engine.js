@@ -640,7 +640,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('toothbrush-logo').onclick = (e) => { e.preventDefault(); cycleSplash(); };
-    document.getElementById('btn-nav-games').onclick = () => { location.href='games.html'; };
+    document.getElementById('btn-nav-games').onclick = () => { location.href='carmeow.html'; };
     document.getElementById('btn-nav-ai').onclick = () => { location.href='ai.html'; };
     document.getElementById('btn-nav-chat').onclick = () => { location.href='chat.html'; };
     document.getElementById('btn-nav-tut').onclick = () => { location.href='tutorial.html'; };
