@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-    <title>UGS Files</title>
+    <title>Toothbrush Files</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -25,7 +26,7 @@
             flex-direction: column;
             gap: 8px;
             overflow-y: auto;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
             z-index: 1000;
         }
 
@@ -34,11 +35,11 @@
         }
 
         .sidebar::-webkit-scrollbar-track {
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .sidebar::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.3);
+            background: rgba(255, 255, 255, 0.3);
             border-radius: 3px;
         }
 
@@ -57,7 +58,7 @@
         }
 
         .sidebar-btn:hover {
-            background: #79aadb;
+            background: #242424;
             transform: scale(1.05);
         }
 
@@ -81,7 +82,7 @@
             color: white;
             text-align: center;
             margin-bottom: 30px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .letter-section {
@@ -103,8 +104,8 @@
             font-weight: bold;
             margin-bottom: 15px;
             padding-bottom: 10px;
-            border-bottom: 3px solid rgba(255,255,255,0.3);
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            border-bottom: 3px solid rgba(255, 255, 255, 0.3);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .buttons-container {
@@ -115,7 +116,7 @@
         }
 
         .empty-message {
-            color: rgba(255,255,255,0.6);
+            color: rgba(255, 255, 255, 0.6);
             font-style: italic;
             text-align: center;
             padding: 20px;
@@ -129,7 +130,7 @@
             font-weight: 500;
             border-radius: 8px;
             cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
             width: 100%;
             max-width: 600px;
@@ -139,13 +140,13 @@
 
         input[type="button"]:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
             background: #79aadb;
         }
 
         input[type="button"]:active {
             transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         @media (max-width: 768px) {
@@ -153,47 +154,139 @@
                 width: 60px;
                 padding: 15px 5px;
             }
+
             .sidebar-btn {
                 padding: 8px;
                 font-size: 16px;
             }
+
             .main-content {
                 margin-left: 70px;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="sidebar" id="sidebar">
     </div>
 
     <div class="main-content">
         <h1>UGS Files</h1>
-    <h2 style="color: white; text-align: center; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); font-weight: normal; font-size: 18px;">
-    Files from 
-    <a href="https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/" 
-        target="_blank" 
-        style="display: inline; color: #79aadb; text-decoration: none; font-size: 18px; text-shadow: 1px 1px 2px rgba(0,0,0,0.2);">
-        Ultimate Game Stash Google Doc
-    </a>
-    </h2>
-    <h2 style="color: white; text-align: center; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); font-weight: normal; font-size: 18px;">
-    Discord Server:
-    <a href="https://discord.gg/rmVsAqkpkA" 
-        target="_blank" 
-        style="display: inline; color: #79aadb; text-decoration: none; font-size: 18px; text-shadow: 1px 1px 2px rgba(0,0,0,0.2);">
-        https://discord.gg/rmVsAqkpkA
-    </a>
-    <h2 style="color: white; text-align: center; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); font-weight: normal; font-size: 18px;">
-        <input type="text" placeholder="Search..." id="searchInput" style="padding: 13px; width: 100%; max-width: 420px; border-radius: 8px; border: none; box-shadow: 0 2px 4px rgba(7, 105, 218, 0.1);">
-        <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/searchbut.js"></script>
-    <button id="lolbutton" onclick="const script = document.createElement('script');script.src = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@latest/game.js';document.body.appendChild(script);">Click to load if it isnt loading</button>
-    </h2> 
+        <h2
+            style="color: white; text-align: center; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); font-weight: normal; font-size: 18px;">
+            Files from
+            <a href="https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/" target="_blank"
+                style="display: inline; color: #79aadb; text-decoration: none; font-size: 18px; text-shadow: 1px 1px 2px rgba(0,0,0,0.2);">
+                Ultimate Game Stash Google Doc
+            </a>
+        </h2>
+        <h2
+            style="color: white; text-align: center; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); font-weight: normal; font-size: 18px;">
+            Discord Server:
+            <a href="https://discord.gg/rmVsAqkpkA" target="_blank"
+                style="display: inline; color: #79aadb; text-decoration: none; font-size: 18px; text-shadow: 1px 1px 2px rgba(0,0,0,0.2);">
+                https://discord.gg/rmVsAqkpkA
+            </a>
+            </h2>
+            <div id="search-container"
+                style="position: sticky; top: 0; padding: 15px 0; background: linear-gradient(135deg, #2e3244 0%, #36224b 100%); z-index: 900; display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <input type="text" placeholder="Search..." id="searchInput"
+                    style="padding: 13px; width: 100%; max-width: 420px; border-radius: 8px; border: none; box-shadow: 0 2px 4px rgba(7, 105, 218, 0.1);">
+                <button id="bookmark-btn" style="background: red; border: none; border-radius: 8px; padding: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 45px; height: 45px; flex-shrink: 0; transition: transform 0.2s;">
+                    <img src="bookmark.jpg" style="width: 100%; height: 100%; object-fit: contain; border-radius: 4px; pointer-events: none;">
+                </button>
+                <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/searchbut.js"></script>
+                <button id="lolbutton"
+                    onclick="const script = document.createElement('script');script.src = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@latest/game.js';document.body.appendChild(script);"
+                    style="padding: 13px; border-radius: 8px; border: none; background: rgb(89, 134, 218); color: white; cursor: pointer; font-size: 14px;">Click
+                    to load if it isnt loading</button>
+            </div>
 
-        
-        <div id="sections-container">  
+
+            <div id="sections-container">
+            </div>
+    </div>
+
+    <!-- Bookmark Overlay -->
+    <div id="bookmark-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.88); z-index: 30000; align-items: center; justify-content: center;">
+        <div style="background: #1f1f1f; padding: 28px; border-radius: 16px; width: 440px; max-width: 90vw; border: 2px solid #2196F3; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9); font-family: Arial, sans-serif;">
+            <h2 style="color: #2196F3; margin-top: 0; margin-bottom: 12px; font-size: 24px;">Enter a name for this app.</h2>
+            <input type="text" id="bookmark-app-name" placeholder="App Title" style="width: 100%; padding: 12px; margin-bottom: 18px; box-sizing: border-box; border-radius: 8px; border: 1px solid #444; background: #333; color: white; font-size: 16px;">
+            <button id="confirm-bookmark-btn" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; transition: filter 0.2s;">Bookmark</button>
+            <button id="cancel-bookmark-btn" style="background: #3d3d3d; color: white; border: 1px solid #444; padding: 10px; border-radius: 8px; width: 100%; font-size: 14px; cursor: pointer; margin-top: 10px;">Cancel</button>
         </div>
     </div>
+
+    <script>
+        document.getElementById('bookmark-btn').addEventListener('click', () => {
+            document.getElementById('bookmark-overlay').style.display = 'flex';
+            document.getElementById('bookmark-app-name').focus();
+        });
+
+        document.getElementById('cancel-bookmark-btn').addEventListener('click', () => {
+            document.getElementById('bookmark-overlay').style.display = 'none';
+            document.getElementById('bookmark-app-name').value = '';
+        });
+
+        document.getElementById('confirm-bookmark-btn').addEventListener('click', async () => {
+            const title = document.getElementById('bookmark-app-name').value.trim();
+            if (!title) return alert('Please enter a name for this app.');
+
+            let dataUrl;
+            try {
+                const res = await fetch(window.location.href);
+                if (!res.ok) throw new Error("Fetch failed");
+                const blob = await res.blob();
+                dataUrl = await new Promise(r => { 
+                    const reader = new FileReader(); 
+                    reader.onload = e => r(e.target.result); 
+                    reader.readAsDataURL(blob); 
+                });
+            } catch(e) {
+                // Fallback for file:/// scheme
+                const clone = document.documentElement.cloneNode(true);
+                const sections = clone.querySelector('#sections-container');
+                if (sections) sections.innerHTML = '';
+                const sidebar = clone.querySelector('#sidebar');
+                if (sidebar) sidebar.innerHTML = '';
+                const overlay = clone.querySelector('#bookmark-overlay');
+                if (overlay) overlay.style.display = 'none';
+                
+                const html = "<!DOCTYPE html>\n" + clone.outerHTML;
+                const blob = new Blob([html], { type: 'text/html' });
+                dataUrl = await new Promise(r => { 
+                    const reader = new FileReader(); 
+                    reader.onload = ev => r(ev.target.result); 
+                    reader.readAsDataURL(blob); 
+                });
+            }
+
+            const dbName = "GameStorageDB";
+            const newG = { id: 'custom_' + Date.now(), title: title, type: 'file', content: dataUrl };
+
+            const req = indexedDB.open(dbName, 1);
+            req.onupgradeneeded = e => {
+                e.target.result.createObjectStore("customGames", { keyPath: "id" });
+            };
+            req.onsuccess = e => {
+                const db = e.target.result;
+                try {
+                    const tx = db.transaction("customGames", "readwrite");
+                    tx.objectStore("customGames").put(newG);
+                    tx.oncomplete = () => {
+                        document.getElementById('bookmark-overlay').style.display = 'none';
+                        document.getElementById('bookmark-app-name').value = '';
+                        db.close();
+                    };
+                } catch(err) {
+                    console.error("Error saving to DB:", err);
+                    db.close();
+                }
+            };
+        });
+    </script>
     <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/games.js"></script>
-   </body> 
-   </html>
+</body>
+
+</html>
