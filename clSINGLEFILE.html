@@ -614,6 +614,49 @@
         refreshBookmarkAvailability();
     </script>
     <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/games.js"></script>
+	<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Find every link in the stash
+            const links = document.querySelectorAll('#sections-container a');
+            
+            links.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault(); // Stop the link from opening a new tab
+                    
+                    const gameUrl = link.href;
+                    
+                    // Create an iframe to load the game inside this window
+                    const gameFrame = document.createElement('iframe');
+                    gameFrame.src = gameUrl;
+                    
+                    // Style it to fill the screen over the stash
+                    Object.assign(gameFrame.style, {
+                        position: 'fixed', top: '0', left: '0', 
+                        width: '100vw', height: '100vh', 
+                        border: 'none', zIndex: '99999', backgroundColor: '#000'
+                    });
+
+                    // Add a close button so the user can get back to the stash
+                    const closeBtn = document.createElement('button');
+                    closeBtn.textContent = "Close Game";
+                    Object.assign(closeBtn.style, {
+                        position: 'fixed', top: '10px', right: '20px',
+                        padding: '10px 15px', backgroundColor: '#B71C1C',
+                        color: 'white', border: 'none', borderRadius: '8px',
+                        cursor: 'pointer', zIndex: '100000', fontWeight: 'bold'
+                    });
+
+                    closeBtn.onclick = () => {
+                        gameFrame.remove();
+                        closeBtn.remove();
+                    };
+
+                    document.body.appendChild(gameFrame);
+                    document.body.appendChild(closeBtn);
+                });
+            });
+        });
+    </script>
 </body>
 
 </html>

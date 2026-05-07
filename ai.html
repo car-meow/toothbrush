@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+	<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <meta charset="UTF-8">
     <title>New Tab</title>
     <link rel="stylesheet" href="style.css">
@@ -16,6 +17,13 @@
         .chat-main { flex: 1; display: flex; flex-direction: column; background: #0a0a0a; }
         #chat-output { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
         .message { padding: 12px; border-radius: 12px; max-width: 80%; line-height: 1.5; white-space: pre-wrap; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); }
+		.message p { margin-bottom: 10px; }
+        .message p:last-child { margin-bottom: 0; }
+        .message strong { font-weight: 900; color: #FFEB3B; }
+        .message em { font-style: italic; color: #ccc; }
+        .message del { text-decoration: line-through; opacity: 0.7; }
+        .message code { background: rgba(0,0,0,0.3); padding: 2px 5px; border-radius: 4px; font-family: monospace; }
+        .message pre { background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; overflow-x: auto; margin-top: 5px; }
         .user-msg { align-self: flex-end; background: #9C27B0; color: white; }
         .ai-msg { align-self: flex-start; background: #333; color: #eee; border: 1px solid #444; }
         .chat-input-area { display: flex; padding: 15px; background: #1f1f1f; gap: 10px; border-top: 1px solid #333; }
@@ -73,28 +81,87 @@
         }
 
         function display() {
-            const out = document.getElementById('chat-output'); out.innerHTML = '';
+            const out = document.getElementById('chat-output'); 
+            out.innerHTML = '';
+            
             activeHistory.forEach(m => {
-                const d = document.createElement('div'); d.className = `message ${m.role === 'user' ? 'user-msg' : 'ai-msg'}`;
-                d.textContent = m.content; out.appendChild(d);
+                const d = document.createElement('div'); 
+                d.className = `message ${m.role === 'user' ? 'user-msg' : 'ai-msg'}`;
+                
+                // Parse markdown if it's the AI, just text if it's the user
+                if (m.role === 'assistant') {
+                    d.innerHTML = marked.parse(m.content);
+                } else {
+                    d.textContent = m.content;
+                }
+                out.appendChild(d);
             });
             out.scrollTop = out.scrollHeight;
         }
 
         async function send() {
-            const input = document.getElementById('user-input'); const val = input.value.trim(); if(!val) return;
+            const input = document.getElementById('user-input'); 
+            const val = input.value.trim(); 
+            if(!val) return;
+
             if(!currentChatId) currentChatId = Date.now();
-            activeHistory.push({role:'user', content:val}); input.value = ''; display();
-            document.getElementById('typing').style.display = 'block';
+            activeHistory.push({role:'user', content:val}); 
+            input.value = ''; 
+            display();
+
+            // --- NEW: "Thinking" Bubble ---
+            const out = document.getElementById('chat-output');
+            const thinkingBubble = document.createElement('div');
+            thinkingBubble.className = "message ai-msg";
+            thinkingBubble.id = "temp-thinking";
+            thinkingBubble.innerHTML = "<span class='typing'>Thinking...</span>";
+            out.appendChild(thinkingBubble);
+            out.scrollTop = out.scrollHeight;
+
             try {
                 const ctx = activeHistory.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n');
                 const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(ctx)}?model=openai`);
-                const text = await res.text();
-                activeHistory.push({role:'assistant', content:text});
-                const tx = db.transaction("chats", "readwrite");
-                tx.objectStore("chats").put({id: currentChatId, title: activeHistory[0].content.substring(0,25), history: activeHistory});
-                document.getElementById('typing').style.display = 'none'; display(); renderSidebar();
-            } catch { document.getElementById('typing').style.display = 'none'; }
+                const fullText = await res.text();
+                
+                // Remove the "Thinking" bubble
+                document.getElementById('temp-thinking').remove();
+
+                // --- NEW: Word-by-Word Typing Animation ---
+                const d = document.createElement('div'); 
+                d.className = "message ai-msg";
+                out.appendChild(d);
+
+                // Split text into words (preserving spaces)
+                const words = fullText.match(/\S+|\s+/g) || [];
+                let currentText = "";
+                let i = 0;
+
+                function typeWord() {
+                    if (i < words.length) {
+                        currentText += words[i];
+                        // Parse markdown live as it types
+                        d.innerHTML = marked.parse(currentText);
+                        out.scrollTop = out.scrollHeight;
+                        i++;
+                        setTimeout(typeWord, 30); // Speed of typing (30ms per word)
+                    } else {
+                        // Finished typing: Save history
+                        activeHistory.push({role:'assistant', content:fullText});
+                        const tx = db.transaction("chats", "readwrite");
+                        tx.objectStore("chats").put({id: currentChatId, title: activeHistory[0].content.substring(0,25), history: activeHistory});
+                        renderSidebar();
+                    }
+                }
+                typeWord(); // Start the animation
+
+            } catch { 
+                document.getElementById('temp-thinking').remove();
+                const d = document.createElement('div'); 
+                d.className = "message ai-msg";
+                d.style.color = "#f44336";
+                d.textContent = "Error connecting to AI. Please try again.";
+                out.appendChild(d);
+            }
         }
 
         document.getElementById('send-btn').onclick = send;
