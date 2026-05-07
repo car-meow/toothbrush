@@ -127,6 +127,11 @@
             position: relative;
             width: 100%;
             max-width: 600px;
+            transition: transform 0.3s ease;
+        }
+
+        .game-btn-wrapper:hover {
+            transform: translateY(-2px);
         }
 
         .game-btn-wrapper input[type="button"] {
@@ -144,14 +149,16 @@
             text-align: left;
         }
 
-        .game-btn-wrapper input[type="button"]:hover {
-            transform: translateY(-2px);
+        .game-btn-wrapper:hover input[type="button"] {
             box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
             background: #3d3d3d;
         }
 
-        .game-btn-wrapper input[type="button"]:active {
+        .game-btn-wrapper:active {
             transform: translateY(0);
+        }
+
+        .game-btn-wrapper:active input[type="button"] {
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
@@ -171,21 +178,13 @@
             align-items: center;
             justify-content: center;
             opacity: 0;
-            transition: opacity 0.25s ease, transform 0.25s ease;
+            transition: opacity 0.25s ease;
             z-index: 2;
             padding: 4px;
         }
 
         .game-btn-wrapper:hover .game-bookmark-btn {
             opacity: 1;
-        }
-
-        .game-bookmark-btn:hover {
-            transform: translateY(calc(-50% - 2px));
-        }
-
-        .game-bookmark-btn:active {
-            transform: translateY(-50%);
         }
 
         .game-bookmark-btn img {
@@ -267,14 +266,6 @@
             <a href="https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/" target="_blank"
                 style="display: inline; color: #79aadb; text-decoration: none; font-size: 18px; text-shadow: 1px 1px 2px rgba(0,0,0,0.2);">
                 Ultimate Game Stash Google Doc
-            </a>
-        </h2>
-        <h2
-            style="color: white; text-align: center; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); font-weight: normal; font-size: 18px;">
-            Discord Server:
-            <a href="https://discord.gg/rmVsAqkpkA" target="_blank"
-                style="display: inline; color: #79aadb; text-decoration: none; font-size: 18px; text-shadow: 1px 1px 2px rgba(0,0,0,0.2);">
-                https://discord.gg/rmVsAqkpkA
             </a>
         </h2>
         <div id="search-container"

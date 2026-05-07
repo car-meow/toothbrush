@@ -71,6 +71,38 @@ main { display: flex; flex: 1; overflow: hidden; }
 #game-list li:hover { background-color: #3d3d3d; transform: translateX(5px); border-color: #444; box-shadow: -5px 5px 5px rgba(0,0,0,0.3); }
 #game-list li:has(.trash-btn:hover) { background-color: #441a1a !important; }
 #game-list li:active { transform: translateX(-5px); filter: brightness(1.5); transition: all 0.1s; }
+body.app-is-dragging .save-btn:hover,
+body.app-is-dragging .nav-btn:hover,
+body.app-is-dragging #game-list li:not(.dragging),
+body.app-is-dragging #game-list li:not(.dragging):hover,
+body.app-is-dragging #game-list li:not(.dragging):active,
+body.app-is-dragging #game-list li:not(.dragging).tutorial-item:hover,
+body.app-is-dragging #game-list li:not(.dragging).ugs-item:hover {
+    transform: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    transition: none !important;
+}
+body.app-is-dragging #game-list li:not(.dragging),
+body.app-is-dragging #game-list li:not(.dragging) * {
+    pointer-events: none !important;
+}
+body.app-is-dragging #game-list li:not(.dragging):has(.trash-btn:hover) {
+    background-color: #2c2c2c !important;
+    border-color: transparent !important;
+}
+body.app-is-dragging #game-list li:not(.dragging).tutorial-item:hover {
+    background-color: #5FC772 !important;
+    border-color: #4CAF50 !important;
+}
+body.app-is-dragging #game-list li:not(.dragging).ugs-item:hover {
+    background-color: #5986da !important;
+    border-color: #153466 !important;
+}
+body.app-is-dragging #game-list li:not(.dragging):not(.tutorial-item):not(.ugs-item):hover {
+    background-color: #2c2c2c !important;
+    border-color: transparent !important;
+}
 
 .tutorial-item { background-color: #5FC772 !important; border: 1px solid #4CAF50 !important; color: white !important; font-weight: bold; }
 .tutorial-item:hover { background-color: #4CAF50 !important; }
@@ -116,12 +148,23 @@ li:hover .trash-btn { opacity: 1; }
 
 /* Drop indicator line */
 .drop-indicator {
-    height: 2px;
-    background: #575757;
+    height: var(--drop-space, 52px);
     margin: 0 15px;
     border-radius: 1px;
     pointer-events: none;
-    transition: opacity 0.15s;
+    position: relative;
+    transition: height 0.16s ease, opacity 0.15s;
+}
+.drop-indicator::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 2px;
+    background: #575757;
+    border-radius: 1px;
+    transform: translateY(-50%);
 }
 
 .add-game { margin-top: 20px; padding-top: 20px; border-top: 1px solid #333; }

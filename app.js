@@ -109,6 +109,7 @@ function startDrag(e, li, index) {
     // Create a placeholder/indicator line
     const indicator = document.createElement('div');
     indicator.className = 'drop-indicator';
+    indicator.style.setProperty('--drop-space', `${liRect.height + 8}px`);
     
     // Calculate offset from mouse to top of the li
     const offsetY = e.clientY - liRect.top;
@@ -120,6 +121,7 @@ function startDrag(e, li, index) {
     li.style.top = liRect.top + 'px';
     li.style.margin = '0';
     li.classList.add('dragging');
+    document.body.classList.add('app-is-dragging');
 
     // Insert the indicator where the li was
     list.insertBefore(indicator, li.nextSibling);
@@ -183,7 +185,7 @@ function onDragEnd(e) {
     document.removeEventListener('mousemove', onDragMove);
     document.removeEventListener('mouseup', onDragEnd);
 
-    const { li, index, currentDropIndex, indicator, list } = dragState;
+    const { li, index, indicator, list } = dragState;
 
     // Clean up the dragged element styles
     li.style.position = '';
@@ -192,29 +194,23 @@ function onDragEnd(e) {
     li.style.top = '';
     li.style.margin = '';
     li.classList.remove('dragging');
+    document.body.classList.remove('app-is-dragging');
 
     // Remove indicator
     if (indicator.parentNode) indicator.parentNode.removeChild(indicator);
 
-    // Calculate the actual new index in the games array
-    // Get all li items in their current DOM order (excluding the dragged one and indicator)
-    const allItems = Array.from(list.querySelectorAll('li:not(.dragging)'));
-    
-    // The currentDropIndex is relative to visible non-dragging items
-    // We need to map it back to the games array
-    let actualNewIndex = currentDropIndex;
-    
-    // If dragging down, account for the removed item shifting indices
-    if (index < actualNewIndex) {
-        // No adjustment needed — the drop index from the non-dragging list is correct
+    // Derive the final insert position from the indicator's actual DOM position.
+    let actualNewIndex = 0;
+    for (let sibling = indicator.previousElementSibling; sibling; sibling = sibling.previousElementSibling) {
+        if (sibling.matches('li:not(.dragging)')) {
+            actualNewIndex++;
+        }
     }
 
     // Move in the games array
     if (index !== actualNewIndex && actualNewIndex >= 0 && actualNewIndex <= games.length) {
         const [moved] = games.splice(index, 1);
-        // If moving down, the target index shifted by one after removal
-        const insertAt = index < actualNewIndex ? actualNewIndex - 1 : actualNewIndex;
-        games.splice(insertAt, 0, moved);
+        games.splice(actualNewIndex, 0, moved);
         saveGameOrder();
     }
 
