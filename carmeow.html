@@ -67,10 +67,12 @@
         </div>
     </div>
 
+    <script src="game-title-utils.js"></script>
     <script src="app.js"></script>
     <script>
         document.getElementById('custom-app-btn').addEventListener('click', () => {
             document.getElementById('custom-app-overlay').style.display = 'flex';
+            if (window.setGamePopupState) window.setGamePopupState('custom-app-overlay', true);
         });
 
         document.getElementById('add-game-btn').addEventListener('click', () => {
@@ -79,6 +81,7 @@
                     document.getElementById('custom-app-overlay').style.display = 'none';
                     document.getElementById('new-game-title').value = '';
                     document.getElementById('new-game-file').value = '';
+                    if (window.setGamePopupState) window.setGamePopupState('custom-app-overlay', false);
                 }
             }, 50);
         });
@@ -88,7 +91,10 @@
             const renameOverlay = document.getElementById('rename-overlay');
 
             if (e.key === 'Escape') {
-                if (customOverlay.style.display === 'flex') customOverlay.style.display = 'none';
+                if (customOverlay.style.display === 'flex') {
+                    customOverlay.style.display = 'none';
+                    if (window.setGamePopupState) window.setGamePopupState('custom-app-overlay', false);
+                }
                 if (renameOverlay && renameOverlay.style.display === 'flex') {
                     document.getElementById('rename-done-btn').dispatchEvent(new Event('rename-cancel'));
                 }

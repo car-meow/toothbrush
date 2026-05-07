@@ -1,5 +1,6 @@
 const dbName = "GameStorageDB";
 let db, games =[], currentGame = null;
+const popupMuteSources = new Set();
 
 async function initDB() {
     return new Promise(r => {
@@ -75,14 +76,13 @@ function renderGameList() {
         if (game.id === "ugs-stash") li.classList.add('ugs-item');
         
         const t = document.createElement('span');
-        t.textContent = game.title; 
-        t.style.flex = "1";
-        t.style.pointerEvents = "none"; // Make sure span clicks pass through to li
+        t.className = "game-title";
+        t.textContent = addSoftBreaks(getSidebarTitle(game));
         
         li.onclick = () => loadGame(game);
         li.appendChild(t);
 
-        if (game.id.toString().startsWith('custom_')) {
+        if (isUserManagedGame(game)) {
             const rename = document.createElement('span');
             rename.innerHTML = "&#128221;";
             rename.className = "app-action-btn rename-btn";
@@ -112,6 +112,36 @@ function renderGameList() {
 
         list.appendChild(li);
     });
+
+    notifyStashBookmarkAvailability();
+}
+
+function isUserManagedGame(game) {
+    const id = game && game.id ? game.id.toString() : "";
+    return id.startsWith("custom_") || id.startsWith("bookmark_");
+}
+
+function getSidebarTitle(game) {
+    if (game && game.sourceKey && !game.userRenamed && typeof humanizeBookmarkDisplayName === "function") {
+        return humanizeBookmarkDisplayName(game.sourceFile || game.title, true);
+    }
+    return game.title;
+}
+
+function addSoftBreaks(value, every = 10) {
+    return (value || "").replace(new RegExp(`(\\S{${every}})`, "g"), "$1\u200b");
+}
+
+function notifyStashBookmarkAvailability() {
+    const frame = document.getElementById('game-frame');
+    if (!frame || !frame.contentWindow) return;
+    try {
+        if (typeof frame.contentWindow.refreshBookmarkAvailability === "function") {
+            frame.contentWindow.refreshBookmarkAvailability();
+        }
+    } catch (err) {
+        // Cross-origin app; nothing to sync.
+    }
 }
 
 /* =========================================
@@ -342,6 +372,7 @@ function openRenamePrompt(game) {
     renameTargetId = game.id;
     input.value = game.title;
     overlay.style.display = 'flex';
+    if (window.setGamePopupState) window.setGamePopupState('rename-overlay', true);
     setTimeout(() => {
         input.focus();
         input.select();
@@ -354,6 +385,7 @@ function closeRenamePrompt() {
     if (overlay) overlay.style.display = 'none';
     if (input) input.value = '';
     renameTargetId = null;
+    if (window.setGamePopupState) window.setGamePopupState('rename-overlay', false);
 }
 
 async function renameGame() {
@@ -362,9 +394,10 @@ async function renameGame() {
     if (!renameTargetId || !title) return;
 
     const game = games.find(g => g.id === renameTargetId);
-    if (!game || !game.id.toString().startsWith('custom_')) return closeRenamePrompt();
+    if (!game || !isUserManagedGame(game)) return closeRenamePrompt();
 
     game.title = title;
+    game.userRenamed = true;
     const tx = db.transaction("customGames", "readwrite");
     tx.objectStore("customGames").put(game);
     await new Promise(resolve => {
@@ -415,6 +448,35 @@ function killMainTab() {
     // UPDATED: Now redirects to about:blank instead of Google Classroom
     setTimeout(() => { window.location.replace("about:blank"); }, 300);
 }
+
+function applyPopupMuteState(muted) {
+    const frame = document.getElementById('game-frame');
+    if (!frame) return;
+
+    try {
+        const frameDoc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+        if (!frameDoc) return;
+
+        frameDoc.querySelectorAll('audio, video').forEach(media => {
+            if (muted) {
+                if (!media.dataset.tbPopupPrevMuted) media.dataset.tbPopupPrevMuted = media.muted ? "1" : "0";
+                media.muted = true;
+            } else if (media.dataset.tbPopupPrevMuted) {
+                media.muted = media.dataset.tbPopupPrevMuted === "1";
+                delete media.dataset.tbPopupPrevMuted;
+            }
+        });
+    } catch (err) {
+        // Cross-origin games cannot be muted from the parent page.
+    }
+}
+
+window.setGamePopupState = function setGamePopupState(sourceId, isOpen) {
+    if (!sourceId) return;
+    if (isOpen) popupMuteSources.add(sourceId);
+    else popupMuteSources.delete(sourceId);
+    applyPopupMuteState(popupMuteSources.size > 0);
+};
 
 const cloakBtn = document.getElementById('cloak-btn');
 if (cloakBtn) {
