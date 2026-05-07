@@ -42,10 +42,25 @@ async function loadGames() {
         } catch(e) { /* ignore bad data */ }
     }
 
+    if (pinMasterStash()) saveGameOrder();
     renderGameList();
 }
 
+function pinMasterStash() {
+    const stashIndex = games.findIndex(g => g.id === "ugs-stash");
+    if (stashIndex <= 0) return false;
+
+    const [stash] = games.splice(stashIndex, 1);
+    games.unshift(stash);
+    return true;
+}
+
+function getFirstMovableIndex() {
+    return games.some(g => g.id === "ugs-stash") ? 1 : 0;
+}
+
 function saveGameOrder() {
+    pinMasterStash();
     const orderIds = games.map(g => g.id.toString());
     localStorage.setItem('sidebar-game-order', JSON.stringify(orderIds));
 }
@@ -99,12 +114,7 @@ let dragState = null;
 
 function startDrag(e, li, index) {
     const list = document.getElementById('game-list');
-    const listRect = list.getBoundingClientRect();
     const liRect = li.getBoundingClientRect();
-
-    // Snapshot all item rects before we start modifying DOM
-    const items = Array.from(list.querySelectorAll('li'));
-    const itemRects = items.map(item => item.getBoundingClientRect());
 
     // Create a placeholder/indicator line
     const indicator = document.createElement('div');
@@ -132,7 +142,6 @@ function startDrag(e, li, index) {
         currentDropIndex: index,
         offsetY,
         indicator,
-        listRect,
         list
     };
 
@@ -161,12 +170,8 @@ function onDragMove(e) {
         }
     }
 
-    // Check if we need to account for the UGS stash being unmovable at index 0
-    // The UGS item should always stay at position 0
-    const firstItem = items[0];
-    if (firstItem && firstItem.classList.contains('ugs-item') && dropIndex === 0) {
-        dropIndex = 1;
-    }
+    const firstMovableIndex = getFirstMovableIndex();
+    dropIndex = Math.max(firstMovableIndex, Math.min(dropIndex, items.length));
 
     if (dropIndex !== dragState.currentDropIndex) {
         dragState.currentDropIndex = dropIndex;
@@ -182,10 +187,20 @@ function onDragMove(e) {
 
 function onDragEnd(e) {
     if (!dragState) return;
+    onDragMove(e);
     document.removeEventListener('mousemove', onDragMove);
     document.removeEventListener('mouseup', onDragEnd);
 
     const { li, index, indicator, list } = dragState;
+
+    let actualNewIndex = 0;
+    for (let sibling = indicator.previousElementSibling; sibling; sibling = sibling.previousElementSibling) {
+        if (sibling.matches('li:not(.dragging)')) actualNewIndex++;
+    }
+
+    const firstMovableIndex = getFirstMovableIndex();
+    const maxInsertIndex = Math.max(firstMovableIndex, games.length - 1);
+    actualNewIndex = Math.max(firstMovableIndex, Math.min(actualNewIndex, maxInsertIndex));
 
     // Clean up the dragged element styles
     li.style.position = '';
@@ -199,18 +214,11 @@ function onDragEnd(e) {
     // Remove indicator
     if (indicator.parentNode) indicator.parentNode.removeChild(indicator);
 
-    // Derive the final insert position from the indicator's actual DOM position.
-    let actualNewIndex = 0;
-    for (let sibling = indicator.previousElementSibling; sibling; sibling = sibling.previousElementSibling) {
-        if (sibling.matches('li:not(.dragging)')) {
-            actualNewIndex++;
-        }
-    }
-
     // Move in the games array
-    if (index !== actualNewIndex && actualNewIndex >= 0 && actualNewIndex <= games.length) {
+    if (index >= firstMovableIndex && index !== actualNewIndex) {
         const [moved] = games.splice(index, 1);
         games.splice(actualNewIndex, 0, moved);
+        pinMasterStash();
         saveGameOrder();
     }
 
