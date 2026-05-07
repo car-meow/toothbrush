@@ -77,7 +77,8 @@ function renderGameList() {
         
         const t = document.createElement('span');
         t.className = "game-title";
-        t.textContent = addSoftBreaks(getSidebarTitle(game));
+        if (game.id === "ugs-stash") t.classList.add("game-title-single-line");
+        t.textContent = game.id === "ugs-stash" ? getSidebarTitle(game) : addSoftBreaks(getSidebarTitle(game), 12);
         
         li.onclick = () => loadGame(game);
         li.appendChild(t);
@@ -128,7 +129,7 @@ function getSidebarTitle(game) {
     return game.title;
 }
 
-function addSoftBreaks(value, every = 10) {
+function addSoftBreaks(value, every = 12) {
     return (value || "").replace(new RegExp(`(\\S{${every}})`, "g"), "$1\u200b");
 }
 

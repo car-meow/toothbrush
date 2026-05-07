@@ -120,6 +120,12 @@ body.app-is-dragging #game-list li:not(.dragging):not(.tutorial-item):not(.ugs-i
     padding-right: 8px;
     pointer-events: none;
 }
+.game-title-single-line {
+    max-width: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 .app-action-btn { opacity: 0; transition: opacity 0.2s, color 0.2s, transform 0.2s; font-size: 18px; padding: 0 3px; line-height: 1; cursor: pointer; }
 li:hover .app-action-btn { opacity: 1; }
