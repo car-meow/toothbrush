@@ -44,7 +44,7 @@
         }
 
         .sidebar-btn {
-            background: rgb(89, 134, 218);
+            background: #2c2c2c;
             border: none;
             padding: 12px;
             font-size: 18px;
@@ -69,7 +69,7 @@
 
         .sidebar-btn.empty:hover {
             transform: none;
-            background: rgb(89, 134, 218);
+            background: #2c2c2c;
         }
 
         .main-content {
@@ -171,7 +171,7 @@
             align-items: center;
             justify-content: center;
             opacity: 0;
-            transition: opacity 0.25s ease, filter 0.2s ease;
+            transition: opacity 0.25s ease, transform 0.25s ease;
             z-index: 2;
             padding: 4px;
         }
@@ -181,11 +181,11 @@
         }
 
         .game-bookmark-btn:hover {
-            filter: brightness(1.2);
+            transform: translateY(calc(-50% - 2px));
         }
 
         .game-bookmark-btn:active {
-            filter: brightness(1.4);
+            transform: translateY(-50%);
         }
 
         .game-bookmark-btn img {
@@ -200,6 +200,41 @@
             color: white;
             font-weight: bold;
             opacity: 1;
+        }
+
+        .search-results-container {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+            max-width: 900px;
+            margin: 0 auto 40px;
+            padding: 0 20px;
+        }
+
+        .search-no-results {
+            color: rgba(255, 255, 255, 0.65);
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+
+        body.stash-searching .main-content > h1,
+        body.stash-searching .main-content > h2 {
+            display: none;
+        }
+
+        body.stash-searching #search-container {
+            margin-bottom: 15px !important;
+        }
+
+        body.stash-searching .search-results-container {
+            display: flex;
+        }
+
+        body.stash-searching .letter-header,
+        body.stash-searching .empty-message {
+            display: none;
         }
 
         @media (max-width: 768px) {
@@ -225,7 +260,7 @@
     </div>
 
     <div class="main-content">
-        <h1>UGS Files</h1>
+        <h1>Toothbrush Files</h1>
         <h2
             style="color: white; text-align: center; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); font-weight: normal; font-size: 18px;">
             Files from
@@ -241,44 +276,176 @@
                 style="display: inline; color: #79aadb; text-decoration: none; font-size: 18px; text-shadow: 1px 1px 2px rgba(0,0,0,0.2);">
                 https://discord.gg/rmVsAqkpkA
             </a>
-            </h2>
-            <div id="search-container"
-                style="position: sticky; top: 0; padding: 15px 0; background: #1f1f1f; z-index: 900; display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                <input type="text" placeholder="Search..." id="searchInput"
-                    style="padding: 13px; width: 100%; max-width: 420px; border-radius: 8px; border: none; box-shadow: 0 2px 4px rgba(7, 105, 218, 0.1); background: #333; color: white;">
-                <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/searchbut.js"></script>
-                <button id="lolbutton"
-                    onclick="const script = document.createElement('script');script.src = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@latest/game.js';document.body.appendChild(script);"
-                    style="padding: 13px; border-radius: 8px; border: none; background: #2c2c2c; color: white; cursor: pointer; font-size: 14px;">Click
-                    to load if it isnt loading</button>
-            </div>
+        </h2>
+        <div id="search-container"
+            style="position: sticky; top: 0; padding: 15px 0; background: #1f1f1f; z-index: 900; display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <input type="text" placeholder="Search..." id="searchInput"
+                style="padding: 13px; width: 100%; max-width: 420px; border-radius: 8px; border: none; box-shadow: 0 2px 4px rgba(7, 105, 218, 0.1); background: #2c2c2c; color: white;">
+            <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/searchbut.js"></script>
+            <button id="lolbutton"
+                onclick="const script = document.createElement('script');script.src = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@latest/game.js';document.body.appendChild(script);"
+                style="padding: 13px; border-radius: 8px; border: none; background: #2c2c2c; color: white; cursor: pointer; font-size: 14px;">Click
+                to load if it isnt loading</button>
+        </div>
 
 
-            <div id="sections-container">
-            </div>
+        <div id="sections-container">
+        </div>
     </div>
 
     <!-- Bookmark Overlay -->
-    <div id="bookmark-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.88); z-index: 30000; align-items: center; justify-content: center;">
-        <div style="background: #1f1f1f; padding: 28px; border-radius: 16px; width: 440px; max-width: 90vw; border: 2px solid #2196F3; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9); font-family: 'Arimo', sans-serif;">
-            <h2 style="color: #2196F3; margin-top: 0; margin-bottom: 12px; font-size: 24px;">Enter a name for this app.</h2>
-            <input type="text" id="bookmark-app-name" placeholder="App Title" style="width: 100%; padding: 12px; margin-bottom: 18px; box-sizing: border-box; border-radius: 8px; border: 1px solid #444; background: #333; color: white; font-size: 16px;">
-            <button id="confirm-bookmark-btn" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; transition: filter 0.2s;">Bookmark</button>
+    <div id="bookmark-overlay"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.88); z-index: 30000; align-items: center; justify-content: center;">
+        <div
+            style="background: #1f1f1f; padding: 28px; border-radius: 16px; width: 440px; max-width: 90vw; border: 2px solid #2196F3; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9); font-family: 'Arimo', sans-serif;">
+            <h2 style="color: #2196F3; margin-top: 0; margin-bottom: 12px; font-size: 24px;">Enter a name for this app.
+            </h2>
+            <input type="text" id="bookmark-app-name" placeholder="App Title"
+                style="width: 100%; padding: 12px; margin-bottom: 18px; box-sizing: border-box; border-radius: 8px; border: 1px solid #444; background: #333; color: white; font-size: 16px;">
+            <button id="confirm-bookmark-btn"
+                style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; transition: filter 0.2s;">Bookmark</button>
         </div>
     </div>
 
     <script>
         let selectedFile = null;
+        let stashButtonIndex = 0;
+
+        const sectionsContainer = document.getElementById('sections-container');
+        const searchInput = document.getElementById('searchInput');
+        const searchResultsContainer = document.createElement('div');
+        searchResultsContainer.id = 'search-results-container';
+        searchResultsContainer.className = 'search-results-container';
+
+        const noResultsMessage = document.createElement('div');
+        noResultsMessage.className = 'search-no-results';
+        noResultsMessage.textContent = 'No matching games found.';
+        noResultsMessage.style.display = 'none';
+        searchResultsContainer.appendChild(noResultsMessage);
+        sectionsContainer.parentNode.insertBefore(searchResultsContainer, sectionsContainer);
+
+        function getStashDisplayName(name, stripExtension = false) {
+            let displayName = name || '';
+            if (displayName.toLowerCase().startsWith('cl')) {
+                displayName = displayName.substring(2);
+            }
+            if (stripExtension && displayName.toLowerCase().endsWith('.html')) {
+                displayName = displayName.substring(0, displayName.length - 5);
+            }
+            return displayName;
+        }
+
+        function prepareGameButton(btn) {
+            if (!btn.dataset.originalValue) {
+                btn.dataset.originalValue = btn.value;
+            }
+
+            const displayName = getStashDisplayName(btn.dataset.originalValue);
+            btn.value = displayName;
+            btn.dataset.searchName = `${displayName} ${btn.dataset.originalValue}`.toLowerCase();
+
+            if (btn.dataset.displayGuardAttached) return;
+            btn.dataset.displayGuardAttached = 'true';
+            btn.addEventListener('click', () => {
+                const originalValue = btn.dataset.originalValue;
+                btn.value = originalValue;
+                setTimeout(() => {
+                    btn.value = getStashDisplayName(originalValue);
+                }, 0);
+            }, true);
+        }
+
+        function getLetterSections() {
+            return Array.from(sectionsContainer.querySelectorAll('.letter-section'));
+        }
+
+        function rememberSectionOrder() {
+            getLetterSections().forEach((section, index) => {
+                if (!section.dataset.stashSectionIndex) {
+                    section.dataset.stashSectionIndex = String(index);
+                }
+            });
+        }
+
+        function restoreSectionOrder() {
+            getLetterSections()
+                .sort((a, b) => Number(a.dataset.stashSectionIndex) - Number(b.dataset.stashSectionIndex))
+                .forEach(section => sectionsContainer.appendChild(section));
+        }
+
+        function resetSearchStyles() {
+            document.querySelectorAll('.letter-section, .letter-header, .empty-message, .game-btn-wrapper, #sections-container input[type="button"], .game-bookmark-btn')
+                .forEach(el => {
+                    el.style.display = '';
+                });
+        }
+
+        function applyStashSearch() {
+            rememberSectionOrder();
+            restoreSectionOrder();
+            resetSearchStyles();
+
+            const query = searchInput.value.trim().toLowerCase();
+            if (!query) {
+                document.body.classList.remove('stash-searching');
+                noResultsMessage.style.display = 'none';
+                return;
+            }
+
+            let matchCount = 0;
+            const matchingSections = [];
+            const sections = getLetterSections();
+
+            sections.forEach(section => {
+                let sectionHasMatch = false;
+                const wrappers = Array.from(section.querySelectorAll('.game-btn-wrapper'));
+
+                wrappers.forEach(wrapper => {
+                    const btn = wrapper.querySelector('input[type="button"]');
+                    const searchName = btn ? (btn.dataset.searchName || btn.value.toLowerCase()) : '';
+                    const isMatch = searchName.includes(query);
+                    wrapper.style.display = isMatch ? '' : 'none';
+
+                    if (isMatch) {
+                        sectionHasMatch = true;
+                        matchCount++;
+                    }
+                });
+
+                section.style.display = sectionHasMatch ? '' : 'none';
+                if (sectionHasMatch) matchingSections.push(section);
+            });
+
+            document.body.classList.add('stash-searching');
+            matchingSections.slice().reverse().forEach(section => {
+                sectionsContainer.insertBefore(section, sectionsContainer.firstChild);
+            });
+
+            noResultsMessage.style.display = matchCount ? 'none' : 'block';
+            searchResultsContainer.appendChild(noResultsMessage);
+            window.scrollTo({ top: 0, behavior: 'auto' });
+        }
+
+        function queueStashSearch() {
+            setTimeout(applyStashSearch, 0);
+            setTimeout(applyStashSearch, 50);
+        }
+
+        searchInput.addEventListener('input', queueStashSearch);
+        searchInput.addEventListener('change', queueStashSearch);
 
         // ---- Wrap every game button that gets loaded by the external script ----
         // We use a MutationObserver to catch buttons as they are injected by games.js
         const observer = new MutationObserver(() => {
             // Find all input[type="button"] that are NOT yet wrapped
             document.querySelectorAll('#sections-container input[type="button"]').forEach(btn => {
-                if (btn.parentElement.classList.contains('game-btn-wrapper')) return; // already wrapped
+                prepareGameButton(btn);
+                if (btn.parentElement && btn.parentElement.classList.contains('game-btn-wrapper')) return; // already wrapped
 
                 const wrapper = document.createElement('div');
                 wrapper.className = 'game-btn-wrapper';
+                wrapper.dataset.stashIndex = String(stashButtonIndex++);
+                wrapper.__stashHomeParent = btn.parentNode;
 
                 const bmBtn = document.createElement('button');
                 bmBtn.className = 'game-bookmark-btn';
@@ -290,14 +457,8 @@
                     e.preventDefault();
                     e.stopPropagation();
 
-                    selectedFile = btn.value;
-                    let displayName = selectedFile;
-                    if (displayName.toLowerCase().startsWith("cl")) {
-                        displayName = displayName.substring(2);
-                    }
-                    if (displayName.toLowerCase().endsWith(".html")) {
-                        displayName = displayName.substring(0, displayName.length - 5);
-                    }
+                    selectedFile = btn.dataset.originalValue || btn.value;
+                    const displayName = getStashDisplayName(selectedFile, true);
 
                     document.getElementById('bookmark-app-name').value = displayName;
                     document.getElementById('bookmark-overlay').style.display = 'flex';
@@ -308,9 +469,11 @@
                 wrapper.appendChild(btn);
                 wrapper.appendChild(bmBtn);
             });
+
+            if (searchInput.value.trim()) queueStashSearch();
         });
 
-        observer.observe(document.getElementById('sections-container'), { childList: true, subtree: true });
+        observer.observe(sectionsContainer, { childList: true, subtree: true });
 
         // Escape to cancel prompt
         document.addEventListener('keydown', (e) => {
@@ -333,7 +496,7 @@
                 if (name.includes(".") && name.lastIndexOf(".") > 0) return name;
                 return name + ".html";
             }
-            
+
             const normalized = normalizeFileName(selectedFile);
             const encoded = encodeURIComponent(normalized);
             const gameUrl = `https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/${encoded}?t=${Date.now()}`;
@@ -343,11 +506,11 @@
                 const response = await fetch(gameUrl);
                 if (!response.ok) throw new Error("Fetch failed: " + response.statusText);
                 const text = await response.text();
-                
+
                 // Convert text into a Data URL
-                const blob = new Blob([text], {type: 'text/html'});
+                const blob = new Blob([text], { type: 'text/html' });
                 const reader = new FileReader();
-                reader.onload = function(e) {
+                reader.onload = function (e) {
                     const dataUrl = e.target.result;
                     const newG = { id: 'custom_' + Date.now(), title: title, type: 'file', content: dataUrl };
 
@@ -366,7 +529,7 @@
                                 document.getElementById('bookmark-app-name').value = '';
                                 selectedFile = null;
                                 db.close();
-                                
+
                                 // Tell carmeow.html to reload the sidebar game list
                                 if (window.parent && window.parent !== window) {
                                     if (typeof window.parent.loadGames === 'function') {
@@ -377,14 +540,14 @@
                                     }
                                 }
                             };
-                        } catch(err) {
+                        } catch (err) {
                             console.error("Error saving to DB:", err);
                             db.close();
                         }
                     };
                 };
                 reader.readAsDataURL(blob);
-            } catch(err) {
+            } catch (err) {
                 console.error("Failed to bookmark:", err);
                 alert("Error fetching game for bookmarking. Please ensure you are connected to the internet.");
             }
