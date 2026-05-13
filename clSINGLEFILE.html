@@ -284,6 +284,26 @@
 
     <script src="game-title-utils.js"></script>
     <script>
+        // --- INTERCEPT NEW TABS: Keep games inside the platform ---
+        window.open = function(url) {
+            if (url && window.parent && typeof window.parent.loadGame === 'function') {
+                // Try to find if this URL matches any button to get a better title
+                let displayTitle = 'Stash Game';
+                const matchedBtn = document.querySelector(`input[data-original-value="${url}"]`);
+                if (matchedBtn) displayTitle = matchedBtn.value;
+
+                window.parent.loadGame({
+                    id: 'ugs_' + encodeURIComponent(url),
+                    title: displayTitle,
+                    type: 'url',
+                    url: url
+                });
+                return { focus: () => {}, close: () => {} }; // Mock window object
+            }
+            window.location.href = url;
+            return null;
+        };
+
         let stashButtonIndex = 0;
         const bookmarkedSourceKeys = new Set();
         const EXTRA_STASH_APPS = [
