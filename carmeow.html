@@ -17,8 +17,6 @@
         </div>
 		
         <div class="controls">
-            <button id="bookmark-active-btn" class="save-btn rainbow-btn" style="display: none;">Bookmark</button>
-            <div id="bookmark-spacer" style="width: 15px; display: none;"></div>
             <button id="cloak-btn" class="save-btn" style="background-color: #E91E63;">Fullscreen</button>
             
             <button onclick="location.href='pdf-stash.html'" class="save-btn" style="background-color: #F57C00;">Stash</button>
@@ -60,8 +58,8 @@
         </div>
     </div>
 
-    <div id="rename-overlay" class="overlay tut-overlay">
-        <div class="tut-box">
+    <div id="rename-overlay" class="overlay">
+        <div style="background: #1f1f1f; padding: 28px; border-radius: 16px; width: 440px; max-width: 90vw; border: 2px solid #2196F3; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9); font-family: 'Segoe UI', Tahoma, sans-serif;">
             <h2 style="color: #2196F3; margin-top: 0; margin-bottom: 12px; font-size: 24px;">Rename App</h2>
             <input type="text" id="rename-app-title" class="rename-input" placeholder="App Title">
             <button id="rename-done-btn" class="rename-done-btn">Done</button>
