@@ -121,8 +121,18 @@ body.app-is-dragging #game-list li:not(.dragging):not(.ugs-item):hover {
     text-overflow: ellipsis;
 }
 
+#game-list li.new-game {
+    background-color: #751717 !important;
+    border-color: #4a0f0f !important;
+}
+
 #game-list li.new-game .game-title {
-    color: #D1B3A5 !important;
+    color: white !important;
+    font-weight: bold;
+}
+
+#game-list li.new-game:hover {
+    background-color: #5a1111 !important;
 }
 
 .app-action-btn { opacity: 0; transition: opacity 0.2s, color 0.2s, transform 0.2s; font-size: 18px; padding: 0 3px; line-height: 1; cursor: pointer; }

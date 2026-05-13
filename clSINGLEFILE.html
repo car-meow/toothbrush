@@ -212,6 +212,21 @@
                 margin-left: 70px;
             }
         }
+
+        @keyframes floatUpFade {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+        .floating-added-text {
+            position: fixed;
+            pointer-events: none;
+            color: #4CAF50;
+            font-weight: bold;
+            font-size: 20px;
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+            z-index: 10000;
+            animation: floatUpFade 1s ease-out forwards;
+        }
     </style>
 </head>
 
@@ -308,7 +323,7 @@
             btn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                addBookmarkToSidebar(btn.dataset.originalValue);
+                addBookmarkToSidebar(btn.dataset.originalValue, e);
             };
             btn.addEventListener('click', () => {
                 const originalValue = btn.dataset.originalValue;
@@ -382,7 +397,7 @@
                 btn.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    addBookmarkToSidebar(btn.dataset.originalValue);
+                    addBookmarkToSidebar(btn.dataset.originalValue, e);
                 };
                 container.appendChild(btn);
                 prepareGameButton(btn);
@@ -509,9 +524,21 @@
             });
         }
 
-        async function addBookmarkToSidebar(originalValue) {
+        async function addBookmarkToSidebar(originalValue, e) {
             const sourceFile = normalizeBookmarkFileName(originalValue);
             const sourceKey = buildBookmarkSourceKey(sourceFile);
+            
+            // Show "Added!" floating text even if already bookmarked for feedback
+            if (e) {
+                const floating = document.createElement('div');
+                floating.className = 'floating-added-text';
+                floating.textContent = 'Added!';
+                floating.style.left = e.clientX + 'px';
+                floating.style.top = e.clientY + 'px';
+                document.body.appendChild(floating);
+                setTimeout(() => floating.remove(), 1000);
+            }
+
             if (bookmarkedSourceKeys.has(sourceKey)) return;
 
             const encoded = encodeURIComponent(sourceFile);
