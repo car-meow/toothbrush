@@ -95,7 +95,7 @@
             .filter(Boolean)
             .flatMap(part => splitAlphaNumericChunk(part));
 
-        return tokens.join(" ").replace(/\s+/g, " ").trim();
+        return tokens.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(" ").replace(/\s+/g, " ").trim();
     }
 
     function buildBookmarkSourceKey(name) {

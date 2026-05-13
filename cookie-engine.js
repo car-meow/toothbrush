@@ -3,16 +3,16 @@
 // --- Sound Manager ---
 const SFX = {};
 function initSounds() {
-    ['get1','get2','get3','get4'].forEach(s => SFX[s] = new Audio('Sound/'+s+'.mp3'));
-    ['Common','Uncommon','Rare','Epic','Epic2','divine','divine2','divine3','stop','start','achN','achR'].forEach(s => SFX[s] = new Audio('Sound/'+s+'.mp3'));
+    ['get1', 'get2', 'get3', 'get4'].forEach(s => SFX[s] = new Audio('Sound/' + s + '.mp3'));
+    ['Common', 'Uncommon', 'Rare', 'Epic', 'Epic2', 'divine', 'divine2', 'divine3', 'stop', 'start', 'achN', 'achR'].forEach(s => SFX[s] = new Audio('Sound/' + s + '.mp3'));
     SFX.bgm = new Audio('Sound/bgm.mp3'); SFX.bgm.loop = true; SFX.bgm.volume = 0.3;
 }
 function playSound(key) {
     if (G.muted || !SFX[key]) return;
-    try { const s = SFX[key]; s.currentTime = 0; s.play().catch(()=>{}); } catch(e) {}
+    try { const s = SFX[key]; s.currentTime = 0; s.play().catch(() => { }); } catch (e) { }
 }
 function playRandomGet() {
-    playSound('get' + (Math.floor(Math.random()*4)+1));
+    playSound('get' + (Math.floor(Math.random() * 4) + 1));
 }
 
 // --- DOM References ---
@@ -54,7 +54,7 @@ let activeCookies = [];
 let discoveryQueue = [];
 let isShowingDiscovery = false;
 
-// Listen to localstorage updates so if tutorial.html clears data, we reset.
+// Listen to localstorage updates so if another tab clears data, we reset.
 window.addEventListener('storage', (e) => {
     if (e.key === 'tb_cookie_save' && !e.newValue) {
         window.location.reload();
@@ -117,7 +117,7 @@ function spawnCookie(forceCookie = null, forceRarity = null) {
     el.style.left = startX + 'px';
 
     const hasMagnet = (G.upgrades['magnet'] || 0) > 0;
-    
+
     const data = {
         el, cookie, rarity, startX, endX, yStart: yPos / 100 * window.innerHeight,
         startTime: performance.now(), duration, hasMagnet, alive: true, size
@@ -138,7 +138,7 @@ function spawnCookie(forceCookie = null, forceRarity = null) {
 
     const divIntervention = G.upgrades['divine_intervention'] || 0;
     const divCalling = G.upgrades['divine_calling'] || 0;
-    
+
     let autoClicked = false;
     if (divCalling > 0) {
         autoClicked = true;
@@ -151,9 +151,9 @@ function spawnCookie(forceCookie = null, forceRarity = null) {
             if (data.alive) {
                 data.alive = false;
                 const rect = el.getBoundingClientRect();
-                handleCookieClick(data, rect.left + size/2, rect.top + size/2);
+                handleCookieClick(data, rect.left + size / 2, rect.top + size / 2);
             }
-        }, 600); 
+        }, 600);
     }
 }
 
@@ -176,16 +176,16 @@ function animateCookies(now) {
             let magProgress = Math.min(elapsed / (c.duration / 2), 1);
             const targetX = window.innerWidth / 2 - c.size / 2;
             const targetY = window.innerHeight / 2 - c.size / 2;
-            
+
             x = c.startX + (targetX - c.startX) * magProgress;
             y = c.yStart + (targetY - c.yStart) * magProgress;
             rot = magProgress * 360 * 2;
-            
+
             if (magProgress >= 1) {
                 c.el.style.left = targetX + 'px';
                 c.el.style.top = targetY + 'px';
                 c.el.style.transform = 'rotate(' + rot + 'deg)';
-                continue; 
+                continue;
             }
         } else {
             if (progress >= 1) {
@@ -212,13 +212,13 @@ function startSpawning() {
     if (spawnTimer) clearInterval(spawnTimer);
     const interval = getSpawnInterval();
     spawnTimer = setInterval(() => {
-        if (Math.random() < 0.85) spawnCookie(); 
+        if (Math.random() < 0.85) spawnCookie();
     }, interval);
 }
 
 // --- Cookie Click Handling ---
 function handleCookieClick(data, cx, cy) {
-    if (!bgmStarted && !G.muted) { SFX.bgm.play().catch(()=>{}); bgmStarted = true; }
+    if (!bgmStarted && !G.muted) { SFX.bgm.play().catch(() => { }); bgmStarted = true; }
     if (data.el && data.el.parentNode) data.el.parentNode.removeChild(data.el);
 
     const cookie = data.cookie;
@@ -227,7 +227,7 @@ function handleCookieClick(data, cx, cy) {
     let variance = 0.20;
     if (['smore', 'sugar', 'golden', 'nebula'].includes(cookie.id)) variance = 0.35;
     let baseVal = cookie.base * (1 + (Math.random() * variance * 2 - variance));
-    
+
     const value = Math.round(baseVal * rarity.mult * getGlobalMult());
 
     G.bucks += value;
@@ -247,8 +247,8 @@ function handleCookieClick(data, cx, cy) {
 
     playRandomGet();
     if (rarity.id !== 'common') {
-        const rsnd = rarity.id === 'epic' ? (Math.random()>0.5?'Epic':'Epic2') :
-                     rarity.id === 'divine' ? 'divine' : rarity.id;
+        const rsnd = rarity.id === 'epic' ? (Math.random() > 0.5 ? 'Epic' : 'Epic2') :
+            rarity.id === 'divine' ? 'divine' : rarity.id;
         let soundKey = rarity.id.charAt(0).toUpperCase() + rarity.id.slice(1);
         if (rsnd === 'Epic2') soundKey = 'Epic2';
         if (rsnd === 'divine') soundKey = 'divine';
@@ -307,33 +307,33 @@ function flashVignette(color) {
 }
 
 function queueDiscovery(cookie, color) {
-    discoveryQueue.push({cookie, color});
+    discoveryQueue.push({ cookie, color });
     processDiscoveryQueue();
 }
 
 function processDiscoveryQueue() {
     if (isShowingDiscovery || discoveryQueue.length === 0 || !DOM.discoveryPopup) return;
     isShowingDiscovery = true;
-    
-    const {cookie, color} = discoveryQueue.shift();
-    
+
+    const { cookie, color } = discoveryQueue.shift();
+
     DOM.discTitle.textContent = 'New ' + cookie.name + '!';
     DOM.discTitle.style.color = color || '#fff';
     DOM.discLore.textContent = '"' + cookie.lore + '"';
     DOM.discoveryPopup.classList.add('show');
-    
+
     if (cookie.id === 'nebula' || cookie.id === 'golden') {
         playSound('achR');
     } else {
         playSound('achN');
     }
-    
+
     setTimeout(() => {
         DOM.discoveryPopup.classList.remove('show');
         setTimeout(() => {
             isShowingDiscovery = false;
             processDiscoveryQueue();
-        }, 600); 
+        }, 600);
     }, 4000);
 }
 
@@ -363,14 +363,14 @@ function triggerDivineEvent() {
     setTimeout(() => {
         document.body.classList.remove('camera-shake');
         DOM.divineOverlay.style.background = 'rgba(0,0,0,0)';
-        
+
         DOM.divPart.style.transition = 'none';
         DOM.inePart.style.transition = 'none';
         DOM.divPart.classList.remove('slam');
         DOM.inePart.classList.remove('slam');
-        
+
         DOM.divineOverlay.style.display = 'none';
-        
+
         setTimeout(() => {
             DOM.divPart.style.transition = '';
             DOM.inePart.style.transition = '';
@@ -397,10 +397,10 @@ function updateHUD() {
 }
 
 function formatNum(n, dec) {
-    if (n >= 1e12) return (n/1e12).toFixed(1) + 'T';
-    if (n >= 1e9) return (n/1e9).toFixed(1) + 'B';
-    if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
-    if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
+    if (n >= 1e12) return (n / 1e12).toFixed(1) + 'T';
+    if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
     return dec !== undefined ? n.toFixed(dec) : Math.floor(n).toString();
 }
 
@@ -415,7 +415,7 @@ function renderShop() {
         const count = G.autobakers[item.id] || 0;
         const cost = getItemCost(item, count);
         const canBuy = G.bucks >= cost;
-        const div = makeShopCard(item.name, item.desc, '₡' + formatNum(cost), 'Owned: ' + count + ' (+'+(item.cps*count).toFixed(1)+'/s)', canBuy, () => {
+        const div = makeShopCard(item.name, item.desc, '₡' + formatNum(cost), 'Owned: ' + count + ' (+' + (item.cps * count).toFixed(1) + '/s)', canBuy, () => {
             if (G.bucks < cost) return;
             G.bucks -= cost;
             G.autobakers[item.id] = count + 1;
@@ -437,17 +437,17 @@ function renderShop() {
             if (G.swag < cost || maxed) return;
             G.swag -= cost;
             G.upgrades[item.id] = count + 1;
-            if (item.id === 'frenzy') startSpawning(); 
+            if (item.id === 'frenzy') startSpawning();
             updateHUD(); renderShop(); saveGame();
         });
-        div.classList.add('swag-item'); 
+        div.classList.add('swag-item');
         DOM.shopList.appendChild(div);
     });
 
     // Consumables
     addShopCategory('⚡ Consumables');
     SHOP_ITEMS.filter(i => i.cat === 'consumable').forEach(item => {
-        const state = G.consumables[item.id] || {active:false, endTime:0, cooldownEnd:0};
+        const state = G.consumables[item.id] || { active: false, endTime: 0, cooldownEnd: 0 };
         const now = Date.now();
         const onCooldown = now < state.cooldownEnd;
         const isActive = state.active && now < state.endTime;
@@ -461,11 +461,11 @@ function renderShop() {
                 const gain = cps * 3600;
                 G.bucks += gain;
                 G.totalEarned += gain;
-                G.consumables[item.id] = {active:false, endTime: now, cooldownEnd: now + item.cooldown*1000};
-                showFloatingBucks(window.innerWidth/2, window.innerHeight/2, '+₡' + formatNum(gain));
+                G.consumables[item.id] = { active: false, endTime: now, cooldownEnd: now + item.cooldown * 1000 };
+                showFloatingBucks(window.innerWidth / 2, window.innerHeight / 2, '+₡' + formatNum(gain));
                 playSound('achN');
             } else {
-                G.consumables[item.id] = {active:true, endTime: now + item.duration*1000, cooldownEnd: now + (item.duration + item.cooldown)*1000};
+                G.consumables[item.id] = { active: true, endTime: now + item.duration * 1000, cooldownEnd: now + (item.duration + item.cooldown) * 1000 };
             }
             updateHUD(); renderShop(); saveGame();
         });
@@ -482,11 +482,11 @@ function renderShop() {
             <div class="item-name" style="color: #f44336; font-size: 18px;">₴${formatNum(G.swag)} Swag Points Owned</div>
             <button id="btn-incinerate" class="save-btn incinerate-btn" style="width:100%;margin-top:10px;">Incinerate Cookies. Send an offering to the Cookie Gods. (+₴${formatNum(gain)})</button>
         </div>`;
-    
+
     if (magnetVisible) {
         incinHtml += `<button id="btn-toggle-magnet" class="save-btn" style="grid-column: span 2; background:${magBtnColor}; margin-top:10px; width: 100%; border:none; padding:10px; border-radius:10px; color:white; font-weight:bold; cursor:pointer;">${magBtnText}</button>`;
     }
-    
+
     const incinContainer = document.createElement('div');
     incinContainer.style.gridColumn = 'span 2';
     incinContainer.innerHTML = incinHtml;
@@ -494,10 +494,10 @@ function renderShop() {
 
     document.getElementById('btn-incinerate').onclick = (e) => { e.preventDefault(); doIncinerate(); };
     if (magnetVisible) {
-        document.getElementById('btn-toggle-magnet').onclick = (e) => { 
-            e.preventDefault(); 
-            G.magnetEnabled = !G.magnetEnabled; 
-            renderShop(); 
+        document.getElementById('btn-toggle-magnet').onclick = (e) => {
+            e.preventDefault();
+            G.magnetEnabled = !G.magnetEnabled;
+            renderShop();
             saveGame();
         };
     }
@@ -540,11 +540,11 @@ function renderStats() {
                 <div class="stat-name" style="color:#FFF">${cookie.name}</div>
                 <div class="stat-count">Total clicked: ${s.total}</div>
                 <div class="stat-breakdown" style="font-size:10px; margin-top:4px; font-weight:bold;">
-                    <span style="color:#CFCFCF">C: ${s.common||0}</span> | 
-                    <span style="color:#6CDB66">U: ${s.uncommon||0}</span> | 
-                    <span style="color:#566FEB">R: ${s.rare||0}</span> | 
-                    <span style="color:#C24FFF">E: ${s.epic||0}</span> | 
-                    <span style="color:#FFD700">D: ${s.divine||0}</span>
+                    <span style="color:#CFCFCF">C: ${s.common || 0}</span> | 
+                    <span style="color:#6CDB66">U: ${s.uncommon || 0}</span> | 
+                    <span style="color:#566FEB">R: ${s.rare || 0}</span> | 
+                    <span style="color:#C24FFF">E: ${s.epic || 0}</span> | 
+                    <span style="color:#FFD700">D: ${s.divine || 0}</span>
                 </div>
             </div>`;
         DOM.statsList.appendChild(div);
@@ -584,7 +584,7 @@ function updateEffects() {
             el.innerHTML = '<div class="effect-name">' + item.name + '</div><div class="effect-timer">' + left + 's</div>';
             DOM.effectsContainer.appendChild(el);
         } else if (state.active) {
-            state.active = false; 
+            state.active = false;
         }
     });
 }
@@ -593,7 +593,7 @@ function updateEffects() {
 function autoTick() {
     const cps = getCPS();
     if (cps > 0) {
-        G.bucks += cps / 10; 
+        G.bucks += cps / 10;
         G.totalEarned += cps / 10;
     }
     updateHUD();
@@ -619,7 +619,7 @@ function closeAllModals() {
 // ==================== INIT ====================
 window.addEventListener('DOMContentLoaded', () => {
     cacheDom();
-    
+
     if (localStorage.getItem('tb_cookie_disabled') === 'true') {
         if (DOM.cookieLayer) DOM.cookieLayer.style.display = 'none';
         if (DOM.floatLayer) DOM.floatLayer.style.display = 'none';
@@ -644,16 +644,16 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
     document.getElementById('toothbrush-logo').onclick = (e) => { e.preventDefault(); cycleSplash(); };
-    document.getElementById('btn-nav-games').onclick = () => { location.href='carmeow.html'; };
-    document.getElementById('btn-nav-ai').onclick = () => { location.href='ai.html'; };
-    document.getElementById('btn-nav-chat').onclick = () => { location.href='chat.html'; };
-    document.getElementById('btn-nav-tut').onclick = () => { location.href='settings.html'; };
+    document.getElementById('btn-nav-games').onclick = () => { location.href = 'carmeow.html'; };
+    document.getElementById('btn-nav-ai').onclick = () => { location.href = 'ai.html'; };
+    document.getElementById('btn-nav-chat').onclick = () => { location.href = 'chat.html'; };
+    document.getElementById('btn-nav-tut').onclick = () => { location.href = 'settings.html'; };
     document.getElementById('proxy-btn').onclick = () => {
-        const win = window.open('helios.html','_blank');
-        if(!win) return alert("Pop-up Blocked!");
-        document.title="New Tab"; document.body.innerHTML="";
-        window.open('','_self'); window.close();
-        setTimeout(()=>{ window.location.replace("about:blank"); },300);
+        const win = window.open('helios.html', '_blank');
+        if (!win) return alert("Pop-up Blocked!");
+        document.title = "New Tab"; document.body.innerHTML = "";
+        window.open('', '_self'); window.close();
+        setTimeout(() => { window.location.replace("about:blank"); }, 300);
     };
 
 
@@ -661,28 +661,28 @@ window.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-shop').onclick = (e) => { e.preventDefault(); renderShop(); DOM.shopModal.classList.add('open'); };
     document.getElementById('shop-close').onclick = (e) => { e.preventDefault(); DOM.shopModal.classList.remove('open'); };
-    DOM.shopModal.onclick = (e) => { if(e.target===DOM.shopModal) DOM.shopModal.classList.remove('open'); };
+    DOM.shopModal.onclick = (e) => { if (e.target === DOM.shopModal) DOM.shopModal.classList.remove('open'); };
 
     document.getElementById('btn-stats').onclick = (e) => { e.preventDefault(); renderStats(); DOM.statsModal.classList.add('open'); };
     document.getElementById('stats-close').onclick = (e) => { e.preventDefault(); DOM.statsModal.classList.remove('open'); };
-    DOM.statsModal.onclick = (e) => { if(e.target===DOM.statsModal) DOM.statsModal.classList.remove('open'); };
+    DOM.statsModal.onclick = (e) => { if (e.target === DOM.statsModal) DOM.statsModal.classList.remove('open'); };
 
     DOM.muteBtn.onclick = (e) => {
         e.preventDefault();
         G.muted = !G.muted;
         DOM.muteBtn.textContent = G.muted ? '🔇' : '🔊';
-        if (G.muted) { SFX.bgm.pause(); } else if (bgmStarted) { SFX.bgm.play().catch(()=>{}); }
+        if (G.muted) { SFX.bgm.pause(); } else if (bgmStarted) { SFX.bgm.play().catch(() => { }); }
         saveGame();
     };
     if (G.muted) DOM.muteBtn.textContent = '🔇';
 
-    setInterval(autoTick, 100);       
-    setInterval(updateEffects, 1000); 
-    setInterval(saveGame, 15000);     
-    setInterval(() => { updateHUD(); if(DOM.shopModal.classList.contains('open')) renderShop(); }, 1000);
+    setInterval(autoTick, 100);
+    setInterval(updateEffects, 1000);
+    setInterval(saveGame, 15000);
+    setInterval(() => { updateHUD(); if (DOM.shopModal.classList.contains('open')) renderShop(); }, 1000);
 
     document.addEventListener('click', () => {
-        if (!bgmStarted && !G.muted) { SFX.bgm.play().catch(()=>{}); bgmStarted = true; }
+        if (!bgmStarted && !G.muted) { SFX.bgm.play().catch(() => { }); bgmStarted = true; }
     }, { once: true });
 
     // Keybinds & Debug

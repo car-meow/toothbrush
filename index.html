@@ -300,17 +300,7 @@ body {
 @keyframes shake { 0%,100%{transform:translate(0,0)} 25%{transform:translate(-5px,5px)} 50%{transform:translate(5px,-5px)} 75%{transform:translate(-5px,-5px)} }
 .camera-shake { animation: shake 0.1s infinite !important; }
 
-/* ============================================
-   TUTORIAL OVERLAY
-============================================ */
-.overlay {
-    display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0,0,0,0.88); z-index: 30000; align-items: center; justify-content: center;
-}
-.tut-box {
-    background: #1f1f1f; padding: 28px; border-radius: 16px; width: 440px; max-width: 90vw;
-    border: 2px solid #2196F3; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9);
-}
+
 </style>
 </head>
 <body class="chat-bg">
@@ -365,7 +355,7 @@ body {
         <button id="btn-nav-ai" class="home-btn" style="background:#f57c00;">AI Chat</button>
         <button id="proxy-btn" class="home-btn" style="background:#00BCD4;">Proxy</button>
         <button id="btn-nav-chat" class="home-btn" style="background:#9C27B0;">Chat Room</button>
-        <button id="btn-nav-tut" class="home-btn" style="background:#06402B;">Settings</button>
+        <button id="btn-nav-settings" class="home-btn" style="background:#06402B;">Settings</button>
     </div>
 </div>
 
