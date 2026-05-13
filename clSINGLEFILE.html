@@ -284,20 +284,13 @@
 
     <script src="game-title-utils.js"></script>
     <script>
+        const UGS_CDN_BASE = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/';
+
         // --- INTERCEPT NEW TABS: Keep games inside the platform ---
         window.open = function(url) {
             if (url && window.parent && typeof window.parent.loadGame === 'function') {
-                // Try to find if this URL matches any button to get a better title
-                let displayTitle = 'Stash Game';
-                const matchedBtn = document.querySelector(`input[data-original-value="${url}"]`);
-                if (matchedBtn) displayTitle = matchedBtn.value;
-
-                window.parent.loadGame({
-                    id: 'ugs_' + encodeURIComponent(url),
-                    title: displayTitle,
-                    type: 'url',
-                    url: url
-                });
+                // Auto-bookmark and open
+                addBookmarkToSidebar(url, true);
                 return { focus: () => {}, close: () => {} }; // Mock window object
             }
             window.location.href = url;
@@ -386,17 +379,7 @@
         }
 
         function openExtraStashApp(extraApp) {
-            if (window.parent && window.parent !== window && typeof window.parent.loadGame === 'function') {
-                window.parent.loadGame({
-                    id: `local_${extraApp.sourceFile}`,
-                    title: extraApp.displayName,
-                    type: 'url',
-                    url: extraApp.sourceFile
-                });
-                return;
-            }
-
-            window.location.href = extraApp.sourceFile;
+            addBookmarkToSidebar(extraApp.sourceFile, true);
         }
 
         function ensureExtraStashButtons(allowCreate = false) {
@@ -531,25 +514,27 @@
             customGames.forEach(game => {
                 if (game && game.sourceKey) bookmarkedSourceKeys.add(game.sourceKey);
             });
-
-            document.querySelectorAll('.game-bookmark-btn').forEach(btn => {
-                const isBookmarked = bookmarkedSourceKeys.has(btn.dataset.sourceKey);
-                btn.disabled = isBookmarked;
-                btn.classList.toggle('bookmarked', isBookmarked);
-                btn.title = isBookmarked ? 'Already in sidebar' : 'Add to sidebar';
-            });
         }
 
-        async function addBookmarkToSidebar(originalValue) {
+        async function addBookmarkToSidebar(originalValue, autoOpen = false) {
             const sourceFile = normalizeBookmarkFileName(originalValue);
             const sourceKey = buildBookmarkSourceKey(sourceFile);
-            if (bookmarkedSourceKeys.has(sourceKey)) return;
+            
+            // If already bookmarked and we want to auto-open, just open it
+            if (bookmarkedSourceKeys.has(sourceKey) && autoOpen) {
+                const customGames = await getCustomGamesFromDb();
+                const existing = customGames.find(g => g.sourceKey === sourceKey);
+                if (existing && window.parent && typeof window.parent.loadGame === 'function') {
+                    window.parent.loadGame(existing);
+                    return;
+                }
+            }
 
             const encoded = encodeURIComponent(sourceFile);
             const isExtraStashApp = EXTRA_STASH_APPS.some(app => app.sourceFile === sourceFile);
             const gameUrl = isExtraStashApp
                 ? `${sourceFile}?t=${Date.now()}`
-                : `https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/${encoded}?t=${Date.now()}`;
+                : `${UGS_CDN_BASE}${encoded}?t=${Date.now()}`;
 
             try {
                 const response = await fetch(gameUrl);
@@ -585,13 +570,25 @@
                             if (window.parent && window.parent !== window && typeof window.parent.loadGames === 'function') {
                                 window.parent.loadGames();
                             }
+                            
+                            if (autoOpen && window.parent && typeof window.parent.loadGame === 'function') {
+                                window.parent.loadGame(newG);
+                            }
                         };
                     };
                 };
                 reader.readAsDataURL(blob);
             } catch (err) {
                 console.error("Failed to bookmark:", err);
-                alert("Error fetching game for bookmarking. Please ensure you are connected to the internet.");
+                // If fetching fails, still try to load it as a URL if autoOpen is true
+                if (autoOpen && window.parent && typeof window.parent.loadGame === 'function') {
+                    window.parent.loadGame({
+                        id: 'ugs_' + Date.now(),
+                        title: getStashDisplayName(sourceFile, true),
+                        type: 'url',
+                        url: gameUrl
+                    });
+                }
             }
         }
 
@@ -635,17 +632,8 @@
                 if (link) {
                     e.preventDefault();
                     e.stopPropagation();
-                    const gameUrl = link.href;
-                    if (window.parent && window.parent !== window && typeof window.parent.loadGame === 'function') {
-                        window.parent.loadGame({
-                            id: 'ugs_' + encodeURIComponent(gameUrl),
-                            title: link.textContent.trim(),
-                            type: 'url',
-                            url: gameUrl
-                        });
-                    } else {
-                        window.location.href = gameUrl;
-                    }
+                    let gameUrl = link.getAttribute('href');
+                    addBookmarkToSidebar(gameUrl, true);
                 }
             });
         });

@@ -1,30 +1,6 @@
 const dbName = "GameStorageDB";
 let db, games =[], currentGame = null;
 const popupMuteSources = new Set();
-let recents = JSON.parse(localStorage.getItem('tb_recents') || '[]');
-
-function addToRecents(game) {
-    const limitStr = localStorage.getItem('tb_recents_limit') || '5';
-    let limit = limitStr === 'unlimited' ? Infinity : parseInt(limitStr);
-    
-    // Check if it's already a bookmark. If so, don't add to recents.
-    if (typeof buildBookmarkSourceKey === "function") {
-        const sourceKey = buildBookmarkSourceKey(game.url);
-        const bmId = buildBookmarkIdFromSourceKey(sourceKey);
-        if (games.some(g => g.id === bmId)) {
-            recents = recents.filter(r => r.url !== game.url);
-            localStorage.setItem('tb_recents', JSON.stringify(recents));
-            return;
-        }
-    }
-
-    recents = recents.filter(r => r.url !== game.url); // Remove existing to move to top
-    recents.unshift({ id: 'recent_' + Date.now(), title: game.title, type: 'url', url: game.url, isRecent: true });
-    
-    if (recents.length > limit) recents.length = limit;
-    localStorage.setItem('tb_recents', JSON.stringify(recents));
-    renderGameList();
-}
 
 async function addCurrentUGSToBookmarks(game) {
     const sourceFile = game.url;
@@ -58,9 +34,7 @@ async function addCurrentUGSToBookmarks(game) {
             games.push(newG);
             saveGameOrder();
             
-            // Remove from recents if it's there
-            recents = recents.filter(r => r.url !== sourceFile);
-            localStorage.setItem('tb_recents', JSON.stringify(recents));
+            saveGameOrder();
             
             renderGameList();
             
@@ -192,36 +166,6 @@ function renderGameList() {
 
         list.appendChild(li);
     });
-
-    // Add Divider and Recents if they exist
-    if (recents.length > 0) {
-        // Medium thickness grey dividing line
-        const divider = document.createElement('div');
-        divider.style.borderBottom = '3px solid #444';
-        divider.style.margin = '15px 15px 10px 15px';
-        list.appendChild(divider);
-        
-        // Recents Header
-        const header = document.createElement('div');
-        header.textContent = 'RECENTS';
-        header.style.color = '#777';
-        header.style.fontSize = '10px';
-        header.style.fontWeight = 'bold';
-        header.style.margin = '0 15px 8px 25px';
-        header.style.letterSpacing = '1px';
-        list.appendChild(header);
-        
-        recents.forEach((game, i) => {
-            const li = document.createElement('li');
-            li.style.borderLeft = '3px solid #F57C00'; 
-            const t = document.createElement('span');
-            t.className = "game-title";
-            t.textContent = addSoftBreaks(game.title, 12);
-            li.onclick = () => loadGame(game);
-            li.appendChild(t);
-            list.appendChild(li);
-        });
-    }
 
     notifyStashBookmarkAvailability();
 }
@@ -407,19 +351,10 @@ function loadGame(game) {
                 bmBtn.style.cursor = 'pointer';
                 bmBtn.onclick = () => addCurrentUGSToBookmarks(game);
             }
-        } else if (game.isRecent) {
-            bmBtn.style.display = 'none';
-            spacer.style.display = 'none';
         } else {
             bmBtn.style.display = 'none';
             spacer.style.display = 'none';
         }
-    }
-
-    if (game.id && game.id.startsWith('ugs_')) {
-        addToRecents(game);
-    } else if (game.isRecent) {
-        addToRecents(game);
     }
 
     // 1. UI Updates: Hide empty state, show frame, show emergency btn
