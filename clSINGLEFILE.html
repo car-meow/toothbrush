@@ -217,6 +217,10 @@
             0% { transform: translateY(0); opacity: 1; }
             100% { transform: translateY(-50px); opacity: 0; }
         }
+        @keyframes floatUpFadeSlow {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-40px); opacity: 0; }
+        }
         .floating-added-text {
             position: fixed;
             pointer-events: none;
@@ -226,6 +230,16 @@
             text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
             z-index: 10000;
             animation: floatUpFade 1s ease-out forwards;
+        }
+        .floating-already-added-text {
+            position: fixed;
+            pointer-events: none;
+            color: #FF9800;
+            font-weight: bold;
+            font-size: 20px;
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+            z-index: 10000;
+            animation: floatUpFadeSlow 2s ease-out forwards;
         }
     </style>
 </head>
@@ -527,19 +541,24 @@
         async function addBookmarkToSidebar(originalValue, e) {
             const sourceFile = normalizeBookmarkFileName(originalValue);
             const sourceKey = buildBookmarkSourceKey(sourceFile);
+            const isAlreadyAdded = bookmarkedSourceKeys.has(sourceKey);
             
-            // Show "Added!" floating text even if already bookmarked for feedback
             if (e) {
                 const floating = document.createElement('div');
-                floating.className = 'floating-added-text';
-                floating.textContent = 'Added!';
+                if (isAlreadyAdded) {
+                    floating.className = 'floating-already-added-text';
+                    floating.textContent = 'Already Added!';
+                } else {
+                    floating.className = 'floating-added-text';
+                    floating.textContent = 'Added!';
+                }
                 floating.style.left = e.clientX + 'px';
                 floating.style.top = e.clientY + 'px';
                 document.body.appendChild(floating);
-                setTimeout(() => floating.remove(), 1000);
+                setTimeout(() => floating.remove(), isAlreadyAdded ? 2000 : 1000);
             }
 
-            if (bookmarkedSourceKeys.has(sourceKey)) return;
+            if (isAlreadyAdded) return;
 
             const encoded = encodeURIComponent(sourceFile);
             const isExtraStashApp = EXTRA_STASH_APPS.some(app => app.sourceFile === sourceFile);
