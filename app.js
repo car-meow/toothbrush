@@ -1,6 +1,18 @@
 const dbName = "GameStorageDB";
 let db, games =[], currentGame = null;
 const popupMuteSources = new Set();
+const loadingGames = new Map();
+
+
+window.showAddingState = function(sourceKey, title) {
+    loadingGames.set(sourceKey, title);
+    renderGameList();
+};
+
+window.hideAddingState = function(sourceKey) {
+    loadingGames.delete(sourceKey);
+    renderGameList();
+};
 
 
 async function initDB() {
@@ -121,6 +133,20 @@ function renderGameList() {
             li.appendChild(dragZone);
         }
 
+        list.appendChild(li);
+    });
+
+    // Render loading states
+    loadingGames.forEach((title, sourceKey) => {
+        const li = document.createElement('li');
+        li.style.cursor = 'default';
+        li.style.pointerEvents = 'none';
+        
+        const loader = document.createElement('div');
+        loader.className = 'sidebar-loading-text';
+        loader.innerHTML = `Adding <div class="spinner"></div>`;
+        
+        li.appendChild(loader);
         list.appendChild(li);
     });
 

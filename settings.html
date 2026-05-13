@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <title>Settings - Toothbrush</title>
-    <link rel="stylesheet" href="style.css?v=45">
+    <link rel="stylesheet" href="style.css?v=47">
     <style>
         body {
-            background-color: #1a1a1a;
-            background-image: linear-gradient(135deg,#1f1f1f 25%,transparent 25%),linear-gradient(225deg,#1f1f1f 25%,transparent 25%),linear-gradient(45deg,#1f1f1f 25%,transparent 25%),linear-gradient(315deg,#1f1f1f 25%,transparent 25%);
-            background-position: 40px 0,40px 0,0 0,0 0;
+            background-color: var(--zigzag-bg);
+            background-image: linear-gradient(135deg, var(--zigzag-line) 25%, transparent 25%), linear-gradient(225deg, var(--zigzag-line) 25%, transparent 25%), linear-gradient(45deg, var(--zigzag-line) 25%, transparent 25%), linear-gradient(315deg, var(--zigzag-line) 25%, transparent 25%);
+            background-position: 40px 0, 40px 0, 0 0, 0 0;
             background-size: 80px 80px;
             animation: moveBackground 40s linear infinite;
             margin: 0; overflow: hidden; width: 100vw; height: 100vh;
@@ -18,7 +18,7 @@
             to { background-position: 540px 500px, 540px 500px, 500px 500px, 500px 500px; }
         }
         .modal-box {
-            background: #1a1a1a; padding: 24px; border-radius: 18px;
+            background: var(--modal-bg); padding: 24px; border-radius: 18px;
             width: 500px; max-width: 95vw;
             border: 2px solid #5fc772; text-align: center;
             box-shadow: 0 0 60px rgba(0,0,0,0.9);
@@ -26,10 +26,10 @@
         .modal-box h2 { color: #5fc772; margin: 0 0 20px 0; font-size: 24px; }
         .setting-row {
             display: flex; justify-content: space-between; align-items: center;
-            background: #222; padding: 12px 18px; border-radius: 12px; border: 1px solid #444;
+            background: var(--settings-row-bg); padding: 12px 18px; border-radius: 12px; border: 1px solid var(--border-color);
             margin-bottom: 12px;
         }
-        .setting-label { color: #fff; font-size: 16px; font-weight: bold; }
+        .setting-label { color: var(--settings-label-color); font-size: 16px; font-weight: bold; }
         
         /* Toggle Switch */
         .toggle-switch {
@@ -53,10 +53,10 @@
             transition: transform 0.15s, filter 0.15s;
         }
         .action-btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
-        .back-btn { background: #3d3d3d; border: 1px solid #555; margin-top: 10px; width: 100%; padding: 12px; font-size: 16px; }
+        .back-btn { background: var(--panel-bg-alt); color: var(--text-color); border: 1px solid var(--border-color); margin-top: 10px; width: 100%; padding: 12px; font-size: 16px; }
         
         .custom-select {
-            background: #333; color: white; border: 1px solid #555;
+            background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color);
             padding: 6px 12px; border-radius: 8px; font-weight: bold; cursor: pointer;
         }
     </style>

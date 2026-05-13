@@ -18,6 +18,10 @@
     --zigzag-line: #1f1f1f;
     --input-bg: #121212;
     --modal-bg: #1f1f1f;
+    --title-color: #e0e0e0;
+    --splash-color: #FFEB3B;
+    --settings-row-bg: #222;
+    --settings-label-color: #ffffff;
 }
 
 html.light-mode {
@@ -30,6 +34,10 @@ html.light-mode {
     --zigzag-line: #ffffff;
     --input-bg: #ffffff;
     --modal-bg: #ffffff;
+    --title-color: #222;
+    --splash-color: #6B6929;
+    --settings-row-bg: #e0e0e0;
+    --settings-label-color: #121212;
 }
 
 body {
@@ -178,7 +186,7 @@ h1 {
 
 .home-title {
     font-size: 80px;
-    color: var(--text-color);
+    color: var(--title-color);
     text-shadow: 4px 4px 15px rgba(0, 0, 0, 0.8);
     margin: 0;
     letter-spacing: 2px;
@@ -188,7 +196,7 @@ h1 {
 .home-splash {
     font-size: 20px;
     font-style: italic;
-    color: #FFEB3B;
+    color: var(--splash-color);
     font-weight: bold;
     text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.8);
     margin-top: 10px;
@@ -329,9 +337,40 @@ body.app-is-dragging #game-list li:not(.dragging):not(.ugs-item):hover {
     text-overflow: ellipsis;
 }
 
-#game-list li.new-game {
-    background-color: #707320 !important;
     border-color: #4d4f16 !important;
+}
+
+#game-list li.new-game {
+    background-color: #2f972c !important;
+    border-color: #1a5e18 !important;
+}
+
+.sidebar-loading-text {
+    color: #2f972c;
+    font-weight: bold;
+    font-style: italic;
+    text-shadow: 
+        -1px -1px 0 var(--panel-bg),  
+         1px -1px 0 var(--panel-bg),
+        -1px  1px 0 var(--panel-bg),
+         1px  1px 0 var(--panel-bg);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(47, 151, 44, 0.3);
+    border-top: 2px solid #2f972c;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 #game-list li.new-game .game-title {
@@ -340,7 +379,7 @@ body.app-is-dragging #game-list li:not(.dragging):not(.ugs-item):hover {
 }
 
 #game-list li.new-game:hover {
-    background-color: #5c5e1a !important;
+    background-color: #2f972c !important;
 }
 
 .app-action-btn {

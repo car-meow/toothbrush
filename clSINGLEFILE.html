@@ -303,7 +303,7 @@
         </div>
     </div>
 
-    <script src="game-title-utils.js?v=45"></script>
+    <script src="game-title-utils.js?v=47"></script>
     <script>
         // --- INTERCEPT NEW TABS: Keep games inside the platform ---
         window.open = function(url) {
@@ -580,6 +580,10 @@
                 } else {
                     floating.className = 'floating-added-text';
                     floating.textContent = 'Added!';
+                    // Trigger sidebar loading state
+                    if (window.parent && typeof window.parent.showAddingState === 'function') {
+                        window.parent.showAddingState(sourceKey, getStashDisplayName(sourceFile, true));
+                    }
                 }
                 floating.style.left = e.clientX + 'px';
                 floating.style.top = e.clientY + 'px';
@@ -630,12 +634,20 @@
                             if (window.parent && window.parent !== window && typeof window.parent.loadGames === 'function') {
                                 window.parent.loadGames();
                             }
+
+                            // Remove sidebar loading state
+                            if (window.parent && typeof window.parent.hideAddingState === 'function') {
+                                window.parent.hideAddingState(sourceKey);
+                            }
                         };
                     };
                 };
                 reader.readAsDataURL(blob);
             } catch (err) {
                 console.error("Failed to bookmark:", err);
+                if (window.parent && typeof window.parent.hideAddingState === 'function') {
+                    window.parent.hideAddingState(sourceKey);
+                }
                 alert("Error fetching game for bookmarking. Please ensure you are connected to the internet.");
             }
         }
