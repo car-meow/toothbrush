@@ -15,12 +15,6 @@
       gtag('config', 'G-8VVWXBH142');
     </script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script>
-        (function() {
-            const theme = localStorage.getItem('tb_theme') || 'dark';
-            if (theme === 'light') document.documentElement.classList.add('light-mode');
-        })();
-    </script>
     <style>
         :root {
             --h-bg: #202124;
@@ -29,15 +23,6 @@
             --h-panel-alt: #242729;
             --h-input: #52565b;
             --h-border: #4dffa6;
-        }
-
-        html.light-mode {
-            --h-bg: #bbbbbb;
-            --h-text: #121212;
-            --h-panel: #e0e0e0;
-            --h-panel-alt: #bbbbbb;
-            --h-input: #ffffff;
-            --h-border: #2196F3;
         }
 
         body {
