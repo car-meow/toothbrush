@@ -284,6 +284,8 @@
 
     <script src="game-title-utils.js"></script>
     <script>
+        const UGS_CDN_BASE = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/';
+
         // --- INTERCEPT NEW TABS: Keep games inside the platform ---
         window.open = function(url) {
             if (url && window.parent && typeof window.parent.loadGame === 'function') {
@@ -292,11 +294,17 @@
                 const matchedBtn = document.querySelector(`input[data-original-value="${url}"]`);
                 if (matchedBtn) displayTitle = matchedBtn.value;
 
+                // Fully qualify relative URLs with CDN base so the iframe can load them
+                let fullUrl = url;
+                if (!url.startsWith('http') && !url.startsWith('//') && !url.startsWith('data:')) {
+                    fullUrl = UGS_CDN_BASE + url;
+                }
+
                 window.parent.loadGame({
-                    id: 'ugs_' + encodeURIComponent(url),
+                    id: 'ugs_' + encodeURIComponent(fullUrl),
                     title: displayTitle,
                     type: 'url',
-                    url: url
+                    url: fullUrl
                 });
                 return { focus: () => {}, close: () => {} }; // Mock window object
             }
@@ -549,7 +557,7 @@
             const isExtraStashApp = EXTRA_STASH_APPS.some(app => app.sourceFile === sourceFile);
             const gameUrl = isExtraStashApp
                 ? `${sourceFile}?t=${Date.now()}`
-                : `https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/${encoded}?t=${Date.now()}`;
+                : `${UGS_CDN_BASE}${encoded}?t=${Date.now()}`;
 
             try {
                 const response = await fetch(gameUrl);
@@ -619,7 +627,7 @@
                 // Create the bookmark icon button
                 const bmBtn = document.createElement('button');
                 bmBtn.className = 'game-bookmark-btn';
-                bmBtn.innerHTML = '🔖';
+                bmBtn.innerHTML = '<img src="Assets/bookmark.png" alt="bookmark">';
                 bmBtn.dataset.sourceKey = btn.dataset.sourceKey;
                 bmBtn.title = 'Add to sidebar';
                 bmBtn.onclick = (e) => {
