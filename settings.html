@@ -83,10 +83,6 @@
             </select>
         </div>
 
-        <div class="setting-row">
-            <span class="setting-label">In-App Tutorial</span>
-            <button class="action-btn" style="background: #2196F3;" id="btn-show-tutorial">Start Tutorial</button>
-        </div>
 
         <div class="setting-row">
             <span class="setting-label">Reset Progress</span>
@@ -128,15 +124,6 @@
             }
         };
 
-        // Show Tutorial
-        document.getElementById('btn-show-tutorial').onclick = () => {
-            localStorage.setItem('tb_tutorial_active', 'true');
-            localStorage.removeItem('tb_tut_home_done');
-            localStorage.removeItem('tb_tut_games_done');
-            localStorage.removeItem('tb_tut_ai_done');
-            localStorage.removeItem('tb_tut_chat_done');
-            location.href = 'index.html';
-        };
     </script>
 </body>
 </html>

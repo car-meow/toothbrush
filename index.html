@@ -418,51 +418,5 @@ body {
 
 <!-- ========== JAVASCRIPT ========== -->
 <script src="cookie-core.js"></script>
-<script src="cookie-engine.js"></script>
-<script>
-    // Simple Interactive Tutorial Logic
-    if (!localStorage.getItem('tb_first_visit_done') && !localStorage.getItem('tb_tutorial_active')) {
-        localStorage.setItem('tb_tutorial_active', 'true');
-    }
-
-    if (localStorage.getItem('tb_tutorial_active') === 'true' && !localStorage.getItem('tb_tut_home_done')) {
-        setTimeout(() => {
-            const popup = document.createElement('div');
-            popup.className = 'tut-box-rainbow';
-            popup.style.left = '50%';
-            popup.style.top = '50%';
-            popup.style.transform = 'translate(-50%, -50%)';
-            popup.style.width = '400px';
-            popup.innerHTML = `
-                <p style="color:#eee; font-size:16px; margin-bottom:15px; line-height:1.5;">
-                    Welcome to Toothbrush! This in-app tutorial will guide you along. Get started by clicking any main menu buttons! To skip this tutorial, check the box below. You can re-activate this tutorial in Settings.
-                </p>
-                <label style="display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; font-size:14px; color:#aaa;">
-                    <input type="checkbox" id="skip-tut-cb" style="width:16px; height:16px; cursor:pointer;">
-                    Skip Tutorial
-                </label>
-            `;
-            
-            document.body.appendChild(popup);
-
-            document.getElementById('skip-tut-cb').addEventListener('change', (e) => {
-                if(e.target.checked) {
-                    localStorage.setItem('tb_first_visit_done', 'true');
-                    localStorage.removeItem('tb_tutorial_active');
-                    localStorage.setItem('tb_tut_home_done', 'true');
-                    popup.remove();
-                }
-            });
-
-            // If they click any button, mark home as done
-            const buttons = document.querySelectorAll('.home-btn');
-            buttons.forEach(b => {
-                b.addEventListener('click', () => {
-                    localStorage.setItem('tb_tut_home_done', 'true');
-                });
-            });
-        }, 500);
-    }
-</script>
-</body>
+<script src="cookie-engine.js"></script></body>
 </html>

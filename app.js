@@ -193,11 +193,23 @@ function renderGameList() {
         list.appendChild(li);
     });
 
+    // Add Divider and Recents if they exist
     if (recents.length > 0) {
+        // Medium thickness grey dividing line
         const divider = document.createElement('div');
-        divider.style.borderBottom = '2px solid #555';
-        divider.style.margin = '10px 15px';
+        divider.style.borderBottom = '3px solid #444';
+        divider.style.margin = '15px 15px 10px 15px';
         list.appendChild(divider);
+        
+        // Recents Header
+        const header = document.createElement('div');
+        header.textContent = 'RECENTS';
+        header.style.color = '#777';
+        header.style.fontSize = '10px';
+        header.style.fontWeight = 'bold';
+        header.style.margin = '0 15px 8px 25px';
+        header.style.letterSpacing = '1px';
+        list.appendChild(header);
         
         recents.forEach((game, i) => {
             const li = document.createElement('li');
@@ -419,7 +431,8 @@ function loadGame(game) {
     frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock');
 	
     // 2. Set Status to Loading (Yellow)
-    if (statusContainer) {
+    const statusDot = document.getElementById('game-status-dot');
+    if (statusContainer && statusDot) {
         statusContainer.style.display = 'flex';
         statusDot.style.background = '#FFEB3B';
         statusDot.style.boxShadow = '0 0 8px #FFEB3B';
@@ -428,7 +441,7 @@ function loadGame(game) {
 
     // 3. Listen for Iframe to finish loading (Set Status to Green)
     frame.onload = () => {
-        if (statusContainer) {
+        if (statusContainer && statusDot) {
             statusDot.style.background = '#4CAF50';
             statusDot.style.boxShadow = '0 0 8px #4CAF50';
             statusText.textContent = 'Loaded';
@@ -781,89 +794,3 @@ if (importBtn) {
 }
 
 loadGames();
-
-// --- Interactive Tutorial Logic ---
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        // Check if tutorial is running
-        const step = localStorage.getItem('tb_tutorial_step');
-        if (!step) return;
-
-        let cursor, popup;
-        function createTutElements(title, text) {
-            if(cursor) cursor.remove(); if(popup) popup.remove();
-            cursor = document.createElement('img');
-            cursor.src = 'Assets/cursor.png';
-            cursor.style = 'position:fixed; z-index:40001; pointer-events:none; width:45px; animation: tutBob 1s infinite alternate; filter: drop-shadow(0 0 10px white);';
-            
-            popup = document.createElement('div');
-            popup.style = 'position:fixed; z-index:40000; left:50%; top:20%; transform:translateX(-50%); border:4px solid transparent; border-image:linear-gradient(45deg,#ff0000,#00ffd5,#002bff,#ff00c8) 1; background:#111; color:white; font-weight:bold; box-shadow: 0 0 50px rgba(0,0,0,0.8); padding:20px; text-align:center; border-radius:12px; width:300px; pointer-events:auto;';
-            popup.innerHTML = `<h3 style="color:#2196F3; margin:0 0 10px 0;">${title}</h3><p style="color:#ccc; font-size:14px; margin:0;">${text}</p>`;
-            
-            document.body.appendChild(popup);
-            document.body.appendChild(cursor);
-
-            const style = document.createElement('style');
-            style.innerHTML = '@keyframes tutBob { from { transform: translate(-10px, 0); } to { transform: translate(10px, 15px); } }';
-            document.head.appendChild(style);
-        }
-
-        function pointAt(target, offsetX=0, offsetY=0) {
-            if(!target) return null;
-            const pos = () => {
-                const rect = target.getBoundingClientRect();
-                cursor.style.left = (rect.right + offsetX) + 'px';
-                cursor.style.top = (rect.bottom + offsetY) + 'px';
-            };
-            pos();
-            window.addEventListener('resize', pos);
-            return target;
-        }
-
-        if (step === '1') {
-            createTutElements('The Master Stash', 'This is where all your games live. Click the <b>Master Stash</b> button in the sidebar to open the library.');
-            const list = document.getElementById('game-list');
-            if (list && list.firstElementChild) {
-                const t = pointAt(list.firstElementChild, -20, -10);
-                if (t) {
-                    t.addEventListener('click', () => {
-                        localStorage.setItem('tb_tutorial_step', '2');
-                        setTimeout(() => location.reload(), 500);
-                    });
-                }
-            }
-        } else if (step === '2') {
-            createTutElements('Search & Play', 'Search for a game, or just click any game to launch it.');
-            cursor.style.display = 'none'; // Hide cursor, wait for game load
-            const originalLoadGame = window.loadGame;
-            window.loadGame = function(...args) {
-                localStorage.setItem('tb_tutorial_step', '3');
-                originalLoadGame.apply(this, args);
-                setTimeout(() => location.reload(), 500);
-            };
-        } else if (step === '3') {
-            createTutElements('Bookmarking', 'To save a game to your sidebar, click the <b>Bookmark</b> button. Click it now!');
-            const bm = document.getElementById('bookmark-active-btn');
-            if (bm && bm.style.display !== 'none') {
-                const t = pointAt(bm, -10, 10);
-                t.addEventListener('click', () => {
-                    localStorage.setItem('tb_tutorial_step', '4');
-                    setTimeout(() => location.reload(), 500);
-                });
-            } else {
-                // If it's already bookmarked or hidden, just skip
-                localStorage.setItem('tb_tutorial_step', '4');
-                setTimeout(() => location.reload(), 500);
-            }
-        } else if (step === '4') {
-            createTutElements('All Done!', 'You can also press F2 to hide the Proxy header. Have fun!');
-            popup.innerHTML += '<br><button id="end-tut" style="margin-top:15px; background:#2196F3; color:white; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-weight:bold;">Finish Tutorial</button>';
-            cursor.style.display = 'none';
-            document.getElementById('end-tut').onclick = () => {
-                localStorage.setItem('tb_first_visit_done', 'true');
-                localStorage.removeItem('tb_tutorial_step');
-                popup.remove();
-            };
-        }
-    }, 800);
-});

@@ -614,8 +614,6 @@ function closeAllModals() {
     DOM.statsModal.classList.remove('open');
     const dbg = document.getElementById('debug-menu');
     if (dbg) dbg.style.display = 'none';
-    const tut = document.getElementById('tut-overlay');
-    if (tut) tut.style.display = 'none';
 }
 
 // ==================== INIT ====================
@@ -644,9 +642,6 @@ window.addEventListener('DOMContentLoaded', () => {
     startSpawning();
     requestAnimationFrame(animateCookies);
 
-    if (!localStorage.getItem('tb_tut_welcome')) {
-        document.getElementById('tut-overlay').style.display = 'flex';
-    }
 
     document.getElementById('toothbrush-logo').onclick = (e) => { e.preventDefault(); cycleSplash(); };
     document.getElementById('btn-nav-games').onclick = () => { location.href='carmeow.html'; };
@@ -661,11 +656,6 @@ window.addEventListener('DOMContentLoaded', () => {
         setTimeout(()=>{ window.location.replace("about:blank"); },300);
     };
 
-    document.getElementById('tut-btn').onclick = (e) => {
-        e.preventDefault();
-        document.getElementById('tut-overlay').style.display='none';
-        localStorage.setItem('tb_tut_welcome','done');
-    };
 
     DOM.hideMenuBtn.onclick = (e) => { e.preventDefault(); toggleMenus(); };
 
@@ -701,13 +691,6 @@ window.addEventListener('DOMContentLoaded', () => {
             closeAllModals();
         }
 
-        if (e.key === 'Enter') {
-            const tut = document.getElementById('tut-overlay');
-            if (tut && tut.style.display === 'flex') {
-                e.preventDefault();
-                document.getElementById('tut-btn').click();
-            }
-        }
 
         if (e.key === 'm' || e.key === 'M') {
             DOM.muteBtn.click();

@@ -278,30 +278,6 @@
             else localStorage.removeItem('tb_groq_key');
             document.getElementById('settings-modal').style.display = 'none';
         };
-
-        // Interactive Tutorial for AI Chat
-        if (localStorage.getItem('tb_tutorial_active') === 'true' && !localStorage.getItem('tb_tut_ai_done')) {
-            setTimeout(() => {
-                const popup = document.createElement('div');
-                popup.className = 'tut-box-rainbow';
-                popup.style.left = '50%';
-                popup.style.top = '50%';
-                popup.style.transform = 'translate(-50%, -50%)';
-                popup.style.width = '400px';
-                popup.innerHTML = `
-                    <p style="color:#eee; font-size:16px; margin-bottom:15px; line-height:1.5;">
-                        This is your AI chatbot. It will save previous chats in the sidebar for you to go back to. You can delete chats by pressing the Trashcan icon on them in the sidebar. That's it!
-                    </p>
-                    <button id="close-ai-tut" class="save-btn rainbow-btn">Got it</button>
-                `;
-                document.body.appendChild(popup);
-
-                document.getElementById('close-ai-tut').addEventListener('click', () => {
-                    localStorage.setItem('tb_tut_ai_done', 'true');
-                    popup.remove();
-                });
-            }, 500);
-        }
     </script>
 </body>
 </html>
