@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <title>New Tab</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=45">
+    <script>
+        (function() {
+            const theme = localStorage.getItem('tb_theme') || 'dark';
+            if (theme === 'light') document.documentElement.classList.add('light-mode');
+        })();
+    </script>
 </head>
 <body>
     <header>
@@ -12,7 +18,7 @@
             <button onclick="location.href='index.html'" class="save-btn" style="background-color: #555;">Back</button>
         </div>
     </header>
-    <main style="background:#333;">
+    <main style="background: var(--bg-color);">
         <embed src="stash.pdf" type="application/pdf" width="100%" height="100%">
     </main>
 </body>

@@ -17,8 +17,13 @@
     ></script>
     <!-- ES module stub: satisfies ECMAScript 6 Modules feature detection -->
     <script type="module">window._esModulesSupported = true;</script>
+    <script>
+        (function() {
+            const theme = localStorage.getItem('tb_theme') || 'dark';
+            if (theme === 'light') document.documentElement.classList.add('light-mode');
+        })();
+    </script>
     <style>
-
         :root {
             --bg0: #0d0f12;
             --bg1: #181c21;
@@ -46,6 +51,23 @@
             --ui-lh: 1.5;
             --ui: 'Space Grotesk', 'Segoe UI', sans-serif;
             --mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+        }
+
+        html.light-mode {
+            --bg0: #bbbbbb;
+            --bg1: #e0e0e0;
+            --bg2: #ffffff;
+            --bg3: #ffffff;
+            --bg-elevated: #ffffff;
+            --surface: rgba(0, 0, 0, .05);
+            --surface2: rgba(0, 0, 0, .1);
+            --bd: #ccc;
+            --bd2: #aaa;
+            --tx: #121212;
+            --tx2: #333;
+            --tx3: #666;
+            --ac: #2196F3;
+            --ac2: #1976D2;
         }
 
         * {
