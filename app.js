@@ -111,6 +111,7 @@ function renderGameList() {
             li.appendChild(dragZone);
         }
 
+        if (game.isNew) li.classList.add('new-game-added');
         list.appendChild(li);
     });
 
@@ -265,6 +266,14 @@ function onDragEnd(e) {
 }
 
 function loadGame(game) {
+    if (game.isNew) {
+        game.isNew = false;
+        const tx = db.transaction("customGames", "readwrite");
+        tx.objectStore("customGames").put(game);
+        // We don't necessarily need to call renderGameList here as the item will stay selected
+        // but if we want the tint to disappear immediately, we can.
+        renderGameList();
+    }
     currentGame = game;
     const frame = document.getElementById('game-frame');
     const emergencyBtn = document.getElementById('emergency-open-btn');

@@ -286,10 +286,91 @@
     <script>
         const UGS_CDN_BASE = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/';
 
-        // --- INTERCEPT NEW TABS: Bookmark + launch inside the platform ---
+        // --- INTERCEPT NEW TABS: Add to sidebar inside the platform ---
+        window.addGameToSidebar = async function(url) {
+            const sourceFile = normalizeBookmarkFileName(url);
+            const sourceKey = buildBookmarkSourceKey(sourceFile);
+
+            if (bookmarkedSourceKeys.has(sourceKey)) {
+                // If already bookmarked, do nothing or just show it's already there
+                return;
+            }
+
+            // Find the button to update its state
+            const matchedBtn = document.querySelector(`input[data-original-value="${url}"]`);
+            let oldVal = "";
+            if (matchedBtn) {
+                oldVal = matchedBtn.value;
+                matchedBtn.value = "Adding...";
+                matchedBtn.disabled = true;
+            }
+
+            const encoded = encodeURIComponent(sourceFile);
+            const isExtraStashApp = EXTRA_STASH_APPS.some(app => app.sourceFile === sourceFile);
+            const gameUrl = isExtraStashApp
+                ? `${sourceFile}?t=${Date.now()}`
+                : `${UGS_CDN_BASE}${encoded}?t=${Date.now()}`;
+
+            try {
+                const response = await fetch(gameUrl, { mode: 'cors' });
+                if (!response.ok) throw new Error("Fetch failed: " + response.statusText);
+                const text = await response.text();
+
+                const blob = new Blob([text], { type: 'text/html' });
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const dataUrl = e.target.result;
+                    const newG = {
+                        id: buildBookmarkIdFromSourceKey(sourceKey),
+                        sourceKey,
+                        sourceFile,
+                        title: getStashDisplayName(sourceFile, true),
+                        userRenamed: false,
+                        type: 'file',
+                        content: dataUrl,
+                        isNew: true // Flag for special tint
+                    };
+
+                    const req = indexedDB.open("GameStorageDB", 1);
+                    req.onupgradeneeded = ev => {
+                        ev.target.result.createObjectStore("customGames", { keyPath: "id" });
+                    };
+                    req.onsuccess = ev => {
+                        const db = ev.target.result;
+                        const tx = db.transaction("customGames", "readwrite");
+                        tx.objectStore("customGames").put(newG);
+                        tx.oncomplete = async () => {
+                            db.close();
+                            await refreshBookmarkAvailability();
+
+                            if (window.parent && window.parent !== window && typeof window.parent.loadGames === 'function') {
+                                window.parent.loadGames();
+                            }
+
+                            if (matchedBtn) {
+                                matchedBtn.value = "Added!";
+                                setTimeout(() => {
+                                    matchedBtn.value = oldVal;
+                                    matchedBtn.disabled = false;
+                                }, 2000);
+                            }
+                        };
+                    };
+                };
+                reader.readAsDataURL(blob);
+            } catch (err) {
+                console.error("Failed to add game:", err);
+                alert("Error: Could not add game. This might be a temporary issue with the file source or connection.");
+                if (matchedBtn) {
+                    matchedBtn.value = oldVal;
+                    matchedBtn.disabled = false;
+                }
+            }
+        };
+
         window.open = function(url) {
             if (url && window.parent && typeof window.parent.loadGame === 'function') {
-                addBookmarkAndLaunch(url);
+                window.addGameToSidebar(url);
                 return { focus: () => {}, close: () => {} };
             }
             window.location.href = url;
@@ -532,76 +613,7 @@
             });
         }
 
-        async function addBookmarkAndLaunch(originalValue) {
-            const sourceFile = normalizeBookmarkFileName(originalValue);
-            const sourceKey = buildBookmarkSourceKey(sourceFile);
 
-            // If already bookmarked, just launch the existing copy
-            if (bookmarkedSourceKeys.has(sourceKey)) {
-                const customGames = await getCustomGamesFromDb();
-                const existing = customGames.find(g => g.sourceKey === sourceKey);
-                if (existing && window.parent && typeof window.parent.loadGame === 'function') {
-                    window.parent.loadGame(existing);
-                }
-                return;
-            }
-
-            const encoded = encodeURIComponent(sourceFile);
-            const isExtraStashApp = EXTRA_STASH_APPS.some(app => app.sourceFile === sourceFile);
-            const gameUrl = isExtraStashApp
-                ? `${sourceFile}?t=${Date.now()}`
-                : `${UGS_CDN_BASE}${encoded}?t=${Date.now()}`;
-
-            try {
-                const response = await fetch(gameUrl);
-                if (!response.ok) throw new Error("Fetch failed: " + response.statusText);
-                const text = await response.text();
-
-                const blob = new Blob([text], { type: 'text/html' });
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    const dataUrl = e.target.result;
-                    const newG = {
-                        id: buildBookmarkIdFromSourceKey(sourceKey),
-                        sourceKey,
-                        sourceFile,
-                        title: getStashDisplayName(sourceFile, true),
-                        userRenamed: false,
-                        type: 'file',
-                        content: dataUrl
-                    };
-
-                    const req = indexedDB.open("GameStorageDB", 1);
-                    req.onupgradeneeded = ev => {
-                        ev.target.result.createObjectStore("customGames", { keyPath: "id" });
-                    };
-                    req.onsuccess = ev => {
-                        const db = ev.target.result;
-                        const tx = db.transaction("customGames", "readwrite");
-                        tx.objectStore("customGames").put(newG);
-                        tx.oncomplete = async () => {
-                            db.close();
-                            await refreshBookmarkAvailability();
-
-                            if (window.parent && window.parent !== window && typeof window.parent.loadGames === 'function') {
-                                window.parent.loadGames();
-                            }
-
-                            // Launch the game after sidebar refreshes
-                            setTimeout(() => {
-                                if (window.parent && typeof window.parent.loadGame === 'function') {
-                                    window.parent.loadGame(newG);
-                                }
-                            }, 100);
-                        };
-                    };
-                };
-                reader.readAsDataURL(blob);
-            } catch (err) {
-                console.error("Failed to bookmark:", err);
-                alert("Error fetching game. Please ensure you are connected to the internet.");
-            }
-        }
 
         window.refreshBookmarkAvailability = refreshBookmarkAvailability;
 
@@ -644,7 +656,7 @@
                     e.preventDefault();
                     e.stopPropagation();
                     const gameUrl = link.getAttribute('href') || link.href;
-                    addBookmarkAndLaunch(gameUrl);
+                    window.addGameToSidebar(gameUrl);
                 }
             });
         });

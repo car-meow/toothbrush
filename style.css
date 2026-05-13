@@ -72,6 +72,15 @@ main { display: flex; flex: 1; overflow: hidden; }
 #game-list li:has(.trash-btn:hover) { background-color: #441a1a !important; }
 #game-list li:active { transform: translateX(-5px); filter: brightness(1.5); transition: all 0.1s; }
 
+#game-list li.new-game-added {
+    background-color: #D1B3A5 !important;
+    border-color: #bfa397 !important;
+}
+
+#game-list li.new-game-added .game-title {
+    color: #1a1a1a !important;
+}
+
 body.app-is-dragging .save-btn:hover,
 body.app-is-dragging .nav-btn:hover,
 body.app-is-dragging #game-list li:not(.dragging),
