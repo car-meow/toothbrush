@@ -646,6 +646,7 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-nav-games').onclick = () => { location.href = 'carmeow.html'; };
     document.getElementById('btn-nav-ai').onclick = () => { location.href = 'ai.html'; };
     document.getElementById('btn-nav-chat').onclick = () => { location.href = 'chat.html'; };
+    document.getElementById('btn-nav-media').onclick = () => { location.href = 'media.html'; };
     document.getElementById('btn-nav-settings').onclick = () => { location.href = 'settings.html'; };
     document.getElementById('proxy-btn').onclick = () => {
         const source = localStorage.getItem('tb_proxy_source') || 'gust.html';
