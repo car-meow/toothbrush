@@ -12,14 +12,7 @@
     </script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
-        body {
-            background-color: var(--bg-color);
-            background-image: linear-gradient(135deg, var(--zigzag-line) 25%, transparent 25%), linear-gradient(225deg, var(--zigzag-line) 25%, transparent 25%), linear-gradient(45deg, var(--zigzag-line) 25%, transparent 25%), linear-gradient(315deg, var(--zigzag-line) 25%, transparent 25%);
-            background-position: 40px 0, 40px 0, 0 0, 0 0; background-size: 80px 80px;
-            animation: moveBg 40s linear infinite; display: flex; flex-direction: column;
-            color: var(--text-color);
-        }
-        @keyframes moveBg { from { background-position: 40px 0; } to { background-position: 540px 500px; } }
+        /* Use global .chat-bg for background */
 
         .status-header { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 20px; font-size: 11px; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
@@ -56,7 +49,7 @@
         #pin-wrapper.revealed #pin-cover { opacity: 0; }
     </style>
 </head>
-<body>
+<body class="chat-bg">
     <header>
         <h1 onclick="location.href='index.html'" style="cursor:pointer">Toothbrush Chat</h1>
         
@@ -114,7 +107,7 @@
             <label for="img-upload" style="cursor:pointer; font-size:24px; color:#aaa; transition:color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#aaa'">🖼️</label>
             <input type="file" id="img-upload" accept="image/*" style="display:none;">
             <input type="text" id="msg-input" placeholder="Type a message..." style="flex:1; background: var(--input-bg); border:1px solid var(--border-color); color: var(--text-color); padding:15px; border-radius:12px; outline:none;">
-            <button id="send-btn" class="save-btn" style="background:#2E7D32; padding:0 30px;">Send</button>
+            <button id="send-btn" class="save-btn" style="background:#2E7D32; padding: 12px 30px; border-radius: 12px; height: 50px;">Send</button>
         </div>
     </main>
 
