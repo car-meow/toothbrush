@@ -459,11 +459,11 @@
   * { box-sizing: border-box; }
   html { height: 100%; }
   body { margin: 0; height: 100vh; overflow: hidden; background: #0a0a0a; color: #fff; font-family: 'Space Grotesk', sans-serif; display: flex; flex-direction: column; }
-  #main-row { display: flex; flex: 1; min-height: 0; width: 100%; position: relative; height: 100%; }
+  #main-row { display: flex; flex: 1; min-height: 0; width: 100%; position: relative; height: 100%; flex-direction: row; }
   
-  /* Sidebar styles */
-  #sidebar { width: 300px; min-width: 300px; flex-shrink: 0; background: #141414; height: 100%; border-right: 1px solid #333; display: flex; flex-direction: column; transition: transform 0.28s ease, opacity 0.2s ease, min-width 0.28s ease, width 0.28s ease; z-index: 50; }
-  body.sidebar-collapsed #sidebar { transform: translateX(-100%); opacity: 0; pointer-events: none; min-width: 0; width: 0; border: none; }
+  /* Sidebar styles - MOVED TO RIGHT */
+  #sidebar { width: 300px; min-width: 300px; flex-shrink: 0; background: #141414; height: 100%; border-left: 1px solid #333; display: flex; flex-direction: column; transition: transform 0.28s ease, opacity 0.2s ease, min-width 0.28s ease, width 0.28s ease; z-index: 50; }
+  body.sidebar-collapsed #sidebar { transform: translateX(100%); opacity: 0; pointer-events: none; min-width: 0; width: 0; border: none; }
   
   .sb-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #333; position: sticky; top: 0; background: #141414; z-index: 5; font-weight: 700; }
   #btn-collapse-sb { border: none; background: #2a2a2a; color: #fff; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; font-size: 18px; font-family: 'Space Grotesk', sans-serif; }
@@ -496,17 +496,20 @@
   .server-check.def { color: #4CAF50; }
   .server-check.act { color: #a244b2; }
 
+  .proxy-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #111; border-top: 1px solid #333; font-size: 11px; color: #aaa; cursor: pointer; }
+  .proxy-row input { cursor: pointer; margin-right: 6px; transform: scale(1.1); }
+
   #player-container { flex: 1; position: relative; background: #000; }
   #main-player { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   
-  /* The popup overlay buttons */
-  #hover-catcher { position: absolute; left: 0; top: 0; bottom: 0; width: 60px; z-index: 199; display: none; pointer-events: auto; }
+  /* The popup overlay buttons - MOVED TO RIGHT */
+  #hover-catcher { position: absolute; right: 0; top: 0; bottom: 0; width: 60px; z-index: 199; display: none; pointer-events: auto; }
   body.sidebar-collapsed #hover-catcher { display: block; }
 
   #peek-zone { 
-      position: fixed; left: 0; top: 0; bottom: 0; width: 80px; z-index: 200; 
-      display: none; flex-direction: column; align-items: flex-start; 
-      padding: 12px 0 0 10px; pointer-events: none;
+      position: fixed; right: 0; top: 0; bottom: 0; width: 80px; z-index: 200; 
+      display: none; flex-direction: column; align-items: flex-end; 
+      padding: 12px 10px 0 0; pointer-events: none;
       transition: opacity 0.5s ease; opacity: 1;
   }
   body.sidebar-collapsed #peek-zone { display: flex; }
@@ -516,9 +519,9 @@
   .peek-ico-btn { 
       opacity: 0.85; transition: opacity 0.2s, transform 0.2s; 
       border: none; background: #a244b2; color: #fff; 
-      width: 44px; height: 44px; border-radius: 8px; 
+      width: 44px; height: 44px; border-radius: 8px 0 0 8px; 
       cursor: pointer; font-size: 20px; font-weight: bold; 
-      box-shadow: 2px 4px 12px rgba(0,0,0,0.4);
+      box-shadow: -2px 4px 12px rgba(0,0,0,0.4);
       display: flex; align-items: center; justify-content: center;
   }
   .peek-ico-btn:hover { opacity: 1; transform: scale(1.05); }
@@ -537,10 +540,14 @@
 </div>
 
 <div id="main-row">
+  <div id="player-container">
+    <!-- SANDBOX REMOVED COMPLETELY -->
+    <iframe id="main-player" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+  </div>
   <aside id="sidebar">
     <div class="sb-head">
       <span id="sb-title">${type === 'tv' ? 'Episodes' : 'Player Options'}</span>
-      <button type="button" id="btn-collapse-sb" title="Hide sidebar">◀</button>
+      <button type="button" id="btn-collapse-sb" title="Hide sidebar">▶</button>
     </div>
     
     <div id="episode-wrap"><div id="episode-list"></div></div>
@@ -550,12 +557,13 @@
         <span>⚙️</span> <span id="settings-text">Settings</span>
       </div>
       <div id="server-list"></div>
+      
+      <!-- Option 3: Third Party Proxy Toggle -->
+      <label class="proxy-row" title="Strips malicious code. Warning: May break some video streams!">
+         <span><input type="checkbox" id="proxy-toggle">🛡️ Experimental Proxy Mode</span>
+      </label>
     </div>
   </aside>
-  
-  <div id="player-container">
-    <iframe id="main-player" allowfullscreen allow="autoplay; encrypted-media"></iframe>
-  </div>
 </div>
 
 <script>
@@ -566,9 +574,23 @@
   let currentS = ${firstSeasonNum};
   let currentE = 1;
 
+  // Option 2: Anti-Redirect Trap (Strict browser intercept)
+  let userWantsToLeave = false;
+  window.addEventListener('beforeunload', function (e) {
+      if (!userWantsToLeave) {
+          e.preventDefault();
+          e.returnValue = 'Warning: A script in the player is trying to hijack this tab. Stay here to block it.';
+          return e.returnValue;
+      }
+  });
+
   // Servers List Array
   const SERVERS = [
     { id: 'vidlink', name: 'VidLink (Best)' },
+    { id: 'vidsrcpro', name: 'VidSrc Pro' },
+    { id: 'autoembed', name: 'AutoEmbed' },
+    { id: 'smashystream', name: 'SmashyStream' },
+    { id: 'vidsrcme', name: 'VidSrc.me' },
     { id: 'twoembed', name: '2Embed (Unblocked but Sus)' }
   ];
 
@@ -577,22 +599,30 @@
 
   function embedUrl() {
     const sid = encodeURIComponent(id);
+    let url = '';
+    
     if (type === 'movie') {
-      if (currentLoader === 'vidlink') return 'https://vidlink.pro/movie/' + sid + '?primaryColor=a244b2&autoplay=1';
-      if (currentLoader === 'vidsrcpro') return 'https://vidsrc.pro/embed/movie/' + sid;
-      if (currentLoader === 'autoembed') return 'https://autoembed.co/movie/tmdb/' + sid;
-      if (currentLoader === 'smashystream') return 'https://player.smashy.stream/movie/' + sid;
-      if (currentLoader === 'vidsrcme') return 'https://vidsrc.to/embed/movie/' + sid;
-      if (currentLoader === 'twoembed') return 'https://www.2embed.cc/embed/' + sid;
+      if (currentLoader === 'vidlink') url = 'https://vidlink.pro/movie/' + sid + '?primaryColor=a244b2&autoplay=1';
+      else if (currentLoader === 'vidsrcpro') url = 'https://vidsrc.pro/embed/movie/' + sid;
+      else if (currentLoader === 'autoembed') url = 'https://autoembed.co/movie/tmdb/' + sid;
+      else if (currentLoader === 'smashystream') url = 'https://player.smashy.stream/movie/' + sid;
+      else if (currentLoader === 'vidsrcme') url = 'https://vidsrc.to/embed/movie/' + sid;
+      else if (currentLoader === 'twoembed') url = 'https://www.2embed.cc/embed/' + sid;
     } else {
-      if (currentLoader === 'vidlink') return 'https://vidlink.pro/tv/' + sid + '/' + currentS + '/' + currentE + '?primaryColor=a244b2&autoplay=1';
-      if (currentLoader === 'vidsrcpro') return 'https://vidsrc.pro/embed/tv/' + sid + '/' + currentS + '/' + currentE;
-      if (currentLoader === 'autoembed') return 'https://autoembed.co/tv/tmdb/' + sid + '-' + currentS + '-' + currentE;
-      if (currentLoader === 'smashystream') return 'https://player.smashy.stream/tv/' + sid + '?s=' + currentS + '&e=' + currentE;
-      if (currentLoader === 'vidsrcme') return 'https://vidsrc.to/embed/tv/' + sid + '/' + currentS + '/' + currentE;
-      if (currentLoader === 'twoembed') return 'https://www.2embed.cc/embedtv/' + sid + '?s=' + currentS + '&e=' + currentE;
+      if (currentLoader === 'vidlink') url = 'https://vidlink.pro/tv/' + sid + '/' + currentS + '/' + currentE + '?primaryColor=a244b2&autoplay=1';
+      else if (currentLoader === 'vidsrcpro') url = 'https://vidsrc.pro/embed/tv/' + sid + '/' + currentS + '/' + currentE;
+      else if (currentLoader === 'autoembed') url = 'https://autoembed.co/tv/tmdb/' + sid + '-' + currentS + '-' + currentE;
+      else if (currentLoader === 'smashystream') url = 'https://player.smashy.stream/tv/' + sid + '?s=' + currentS + '&e=' + currentE;
+      else if (currentLoader === 'vidsrcme') url = 'https://vidsrc.to/embed/tv/' + sid + '/' + currentS + '/' + currentE;
+      else if (currentLoader === 'twoembed') url = 'https://www.2embed.cc/embedtv/' + sid + '?s=' + currentS + '&e=' + currentE;
     }
-    return '';
+
+    // Option 3: Apply Proxy Mode logic
+    const useProxy = document.getElementById('proxy-toggle') && document.getElementById('proxy-toggle').checked;
+    if (useProxy && url) {
+        return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+    }
+    return url;
   }
 
   function updatePlayer() {
@@ -627,7 +657,6 @@
       checkSpan.innerHTML = '&#10004;'; // Checkmark
       checkSpan.title = 'Set as Default';
       
-      // Color Logic (Active takes precedence)
       if (isAct) checkSpan.classList.add('act');
       else if (isDef) checkSpan.classList.add('def');
       
@@ -661,7 +690,17 @@
     });
   }
 
-  // Fade Out Logic
+  // Proxy toggle persistence logic
+  const proxyToggle = document.getElementById('proxy-toggle');
+  if (proxyToggle) {
+      proxyToggle.checked = localStorage.getItem('tb_use_proxy') === 'true';
+      proxyToggle.addEventListener('change', function(e) {
+          localStorage.setItem('tb_use_proxy', e.target.checked);
+          updatePlayer();
+      });
+  }
+
+  // Fade Out Logic for peek buttons
   let hideTimer;
   const peekZone = document.getElementById('peek-zone');
   const hoverCatcher = document.getElementById('hover-catcher');
@@ -679,7 +718,7 @@
   if (peekZone) peekZone.addEventListener('mousemove', resetFade);
   resetFade();
 
-  // Sidebar Controls
+  // Sidebar controls logic
   function setCollapsed(on) { document.body.classList.toggle('sidebar-collapsed', on); }
   const btnCollapse = document.getElementById('btn-collapse-sb');
   if (btnCollapse) btnCollapse.addEventListener('click', () => setCollapsed(true));
@@ -687,7 +726,7 @@
   const peekOpenBtn = document.getElementById('peek-open');
   if (peekOpenBtn) peekOpenBtn.addEventListener('click', () => setCollapsed(false));
 
-  // Settings Toggle
+  // Settings toggle UI logic
   const btnSettings = document.getElementById('settings-header');
   if (btnSettings) {
     btnSettings.addEventListener('click', function() {
@@ -698,11 +737,16 @@
     });
   }
 
-  // Back Button
+  // Back Button Logic: Disable the redirect trap before closing
   const btnBack = document.getElementById('btn-back');
-  if (btnBack) btnBack.addEventListener('click', () => window.close());
+  if (btnBack) {
+      btnBack.addEventListener('click', () => {
+          userWantsToLeave = true;
+          window.close();
+      });
+  }
 
-  // Initialization
+  // Initialization logic
   if (type === 'tv' && episodes.length) {
     currentE = episodes[0].episode_number || 1;
     renderEpisodes();
