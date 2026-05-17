@@ -461,9 +461,11 @@
   body { margin: 0; height: 100vh; overflow: hidden; background: #0a0a0a; color: #fff; font-family: 'Space Grotesk', sans-serif; display: flex; flex-direction: column; }
   #main-row { display: flex; flex: 1; min-height: 0; width: 100%; position: relative; height: 100%; flex-direction: row; }
   
-  /* Sidebar styles - MOVED TO RIGHT */
+  /* Sidebar styles */
   #sidebar { width: 300px; min-width: 300px; flex-shrink: 0; background: #141414; height: 100%; border-left: 1px solid #333; display: flex; flex-direction: column; transition: transform 0.28s ease, opacity 0.2s ease, min-width 0.28s ease, width 0.28s ease; z-index: 50; }
   body.sidebar-collapsed #sidebar { transform: translateX(100%); opacity: 0; pointer-events: none; min-width: 0; width: 0; border: none; }
+  body.movie-mode #sidebar { display: none; }
+  body.movie-mode #peek-open { display: none; }
   
   .sb-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #333; position: sticky; top: 0; background: #141414; z-index: 5; font-weight: 700; }
   #btn-collapse-sb { border: none; background: #2a2a2a; color: #fff; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; font-size: 18px; font-family: 'Space Grotesk', sans-serif; }
@@ -476,20 +478,10 @@
   .episode.active { background: #a244b2; font-weight: 700; }
   .episode-num { color: #9e9e9e; font-size: 11px; margin-bottom: 4px; font-weight: 600; }
 
-  .source-panel { flex-shrink: 0; background: #121212; border-top: 1px solid #333; padding: 12px; display: flex; flex-direction: column; gap: 9px; }
-  .source-field { display: flex; flex-direction: column; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0; color: #bbb; }
-  #source-select { width: 100%; height: 38px; border: 1px solid #3a3a3a; border-radius: 8px; background: #202020; color: #fff; padding: 0 10px; font: inherit; font-size: 13px; outline: none; }
-  #source-select:focus { border-color: #a244b2; box-shadow: 0 0 0 2px rgba(162, 68, 178, 0.22); }
-  #source-select:disabled { color: #d8d8d8; opacity: 0.72; cursor: not-allowed; }
-  .auto-row, .shield-row { display: flex; align-items: center; gap: 8px; color: #ddd; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; }
-  .shield-row { color: #cfcfcf; }
-  .auto-row input, .shield-row input { accent-color: #a244b2; width: 15px; height: 15px; cursor: pointer; }
-  .source-status { min-height: 14px; color: #888; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
   #player-container { flex: 1; position: relative; background: #000; }
   #main-player { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   
-  /* The popup overlay buttons - MOVED TO RIGHT */
+  /* The popup overlay buttons */
   #hover-catcher { position: absolute; right: 0; top: 0; bottom: 0; width: 60px; z-index: 199; display: none; pointer-events: auto; }
   body.sidebar-collapsed #hover-catcher { display: block; }
 
@@ -532,27 +524,11 @@
   </div>
   <aside id="sidebar">
     <div class="sb-head">
-      <span id="sb-title">${type === 'tv' ? 'Episodes' : 'Player Options'}</span>
+      <span id="sb-title">${type === 'tv' ? 'Episodes' : 'Player'}</span>
       <button type="button" id="btn-collapse-sb" title="Hide sidebar">▶</button>
     </div>
     
     <div id="episode-wrap"><div id="episode-list"></div></div>
-    
-    <div class="source-panel">
-      <label class="source-field" for="source-select">
-        <span>Source</span>
-        <select id="source-select"></select>
-      </label>
-      <div id="source-status" class="source-status">Blocked? Try different providers!</div>
-      <label class="auto-row" title="Choose the strongest source for quality and captions">
-        <input type="checkbox" id="auto-choice-toggle">
-        <span>Auto-Choose</span>
-      </label>
-      <label class="shield-row" title="Allows provider popups and redirects">
-        <input type="checkbox" id="remove-shield-toggle">
-        <span>Remove Shield (Unsafe)</span>
-      </label>
-    </div>
   </aside>
 </div>
 
@@ -570,7 +546,7 @@
   const PREF_SHIELD_KEY = 'tb_media_remove_shield';
 
   let userWantsToLeave = false;
-  let removeShieldUnsafe = localStorage.getItem(PREF_SHIELD_KEY) === 'true';
+  let removeShieldUnsafe = false;
   const originalWindowOpen = window.open ? window.open.bind(window) : null;
 
   window.open = function() {
@@ -607,9 +583,16 @@
       tv: function(sid, s, e) { return 'https://www.2embed.cc/embedtv/' + sid + '?s=' + s + '&e=' + e; } }
   ];
 
-  let manualLoader = localStorage.getItem(PREF_SOURCE_KEY) || localStorage.getItem(OLD_PREF_SOURCE_KEY) || 'cinemaos';
-  let autoChoose = localStorage.getItem(PREF_AUTO_KEY) !== 'false';
-  let currentLoader = '';
+  let manualLoader = '';
+  let autoChoose = true;
+
+  function readMediaPreferences() {
+    manualLoader = localStorage.getItem(PREF_SOURCE_KEY) || localStorage.getItem(OLD_PREF_SOURCE_KEY) || 'cinemaos';
+    autoChoose = localStorage.getItem(PREF_AUTO_KEY) !== 'false';
+    removeShieldUnsafe = localStorage.getItem(PREF_SHIELD_KEY) === 'true';
+  }
+
+  readMediaPreferences();
 
   function supportsProvider(provider) {
     return provider && typeof provider[type] === 'function';
@@ -643,7 +626,6 @@
     var sid = encodeURIComponent(id);
     var s = encodeURIComponent(String(currentS));
     var e = encodeURIComponent(String(currentE));
-    currentLoader = provider.id;
     return provider[type](sid, s, e);
   }
 
@@ -653,41 +635,14 @@
     frame.src = 'about:blank';
     setTimeout(function() {
       frame.src = embedUrl();
-      renderSourceControls();
     }, 20);
   }
 
-  function saveManualProvider(providerId) {
-    manualLoader = providerId;
-    localStorage.setItem(PREF_SOURCE_KEY, providerId);
-    localStorage.setItem(OLD_PREF_SOURCE_KEY, providerId);
-  }
-
-  function renderSourceControls() {
-    var select = document.getElementById('source-select');
-    var toggle = document.getElementById('auto-choice-toggle');
-    var shieldToggle = document.getElementById('remove-shield-toggle');
-    var status = document.getElementById('source-status');
-    var effective = getEffectiveProvider();
-
-    if (select) {
-      var previous = select.value;
-      select.innerHTML = '';
-      PROVIDERS.filter(supportsProvider).forEach(function(provider) {
-        var option = document.createElement('option');
-        option.value = provider.id;
-        option.textContent = provider.name;
-        select.appendChild(option);
-      });
-      select.value = effective.id || previous;
-      select.disabled = autoChoose;
-      select.title = autoChoose ? 'Auto-Choose is active' : 'Saved source';
-    }
-
-    if (toggle) toggle.checked = autoChoose;
-    if (shieldToggle) shieldToggle.checked = removeShieldUnsafe;
-    if (status) status.textContent = 'Blocked? Try different providers!';
-  }
+  window.addEventListener('storage', function(e) {
+    if ([PREF_SOURCE_KEY, OLD_PREF_SOURCE_KEY, PREF_AUTO_KEY, PREF_SHIELD_KEY].indexOf(e.key) === -1) return;
+    readMediaPreferences();
+    updatePlayer();
+  });
 
   function renderEpisodes() {
     var list = document.getElementById('episode-list');
@@ -703,35 +658,6 @@
         renderEpisodes();
       });
       list.appendChild(div);
-    });
-  }
-
-  const sourceSelect = document.getElementById('source-select');
-  if (sourceSelect) {
-    sourceSelect.addEventListener('change', function(e) {
-      saveManualProvider(e.target.value);
-      updatePlayer();
-    });
-  }
-
-  const autoChoiceToggle = document.getElementById('auto-choice-toggle');
-  if (autoChoiceToggle) {
-    autoChoiceToggle.addEventListener('change', function(e) {
-      autoChoose = e.target.checked;
-      localStorage.setItem(PREF_AUTO_KEY, autoChoose ? 'true' : 'false');
-      if (!autoChoose && !findProvider(manualLoader)) {
-        saveManualProvider(currentLoader || chooseBestProvider().id);
-      }
-      updatePlayer();
-    });
-  }
-
-  const removeShieldToggle = document.getElementById('remove-shield-toggle');
-  if (removeShieldToggle) {
-    removeShieldToggle.addEventListener('change', function(e) {
-      removeShieldUnsafe = e.target.checked;
-      localStorage.setItem(PREF_SHIELD_KEY, removeShieldUnsafe ? 'true' : 'false');
-      renderSourceControls();
     });
   }
 
@@ -776,7 +702,6 @@
     renderEpisodes();
   }
   
-  renderSourceControls();
   updatePlayer();
 })();
 <\/script>
