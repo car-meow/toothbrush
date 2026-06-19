@@ -934,17 +934,7 @@ function startTutorial() {
 function goToGamesStep() {
     isTutorialCentered = false;
     const popup = document.getElementById('tutorial-popup');
-    if (popup) {
-        popup.classList.remove('centered');
-        popup.innerHTML = `
-            <div class="tutorial-content">Click Games to get started.</div>
-            <span class="tutorial-skip" id="tutorial-skip-btn">Skip</span>
-        `;
-        document.getElementById('tutorial-skip-btn').onclick = (e) => {
-            e.stopPropagation();
-            skipTutorial();
-        };
-    }
+    if (popup) popup.remove();
 
     const btn = document.getElementById('btn-nav-games');
     if (btn) {
@@ -957,7 +947,6 @@ function goToGamesStep() {
             document.body.classList.remove('tutorial-active');
             const overlay = document.getElementById('tutorial-overlay');
             if (overlay) overlay.style.display = 'none';
-            if (popup) popup.remove();
             
             const ringEl = document.getElementById('tutorial-highlight-ring');
             if (ringEl) ringEl.remove();
@@ -974,10 +963,6 @@ function goToGamesStep() {
             }
         };
     }
-
-    // Position popup next to Games button
-    setTimeout(positionTutorialPopup, 50);
-    window.addEventListener('resize', positionTutorialPopup);
 }
 
 function skipTutorial() {

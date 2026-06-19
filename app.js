@@ -930,15 +930,15 @@ function positionControlsPopup() {
 
     const rect = controls.getBoundingClientRect();
     
-    // Position to the left of the header controls
-    const left = rect.left - popup.offsetWidth - 40 + window.scrollX;
-    const top = rect.top + (rect.height / 2) + window.scrollY;
+    // Position below the header controls, centered relative to them
+    const left = rect.left + (rect.width / 2) - (popup.offsetWidth / 2) + window.scrollX;
+    const top = rect.bottom + 25 + window.scrollY;
 
     popup.style.left = left + 'px';
     popup.style.top = top + 'px';
-    popup.style.transform = 'translateY(-50%)';
+    popup.style.transform = 'none'; // reset transform since it's centered directly
 
-    // Draw curved line connecting them
+    // Draw curved line connecting them (from top edge of popup to bottom edge of controls)
     let svg = document.getElementById('tutorial-svg');
     if (!svg) {
         svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -958,14 +958,14 @@ function positionControlsPopup() {
     const popupRect = popup.getBoundingClientRect();
     const targetRect = controls.getBoundingClientRect();
 
-    const px1 = popupRect.right + window.scrollX;
-    const py1 = popupRect.top + popupRect.height / 2 + window.scrollY;
+    const px1 = popupRect.left + popupRect.width / 2 + window.scrollX; // center X of popup
+    const py1 = popupRect.top + window.scrollY; // top edge of popup
 
-    const px2 = targetRect.left + window.scrollX;
-    const py2 = targetRect.top + targetRect.height / 2 + window.scrollY;
+    const px2 = targetRect.left + targetRect.width / 2 + window.scrollX; // center X of controls
+    const py2 = targetRect.bottom + window.scrollY; // bottom edge of controls
 
     const cx = (px1 + px2) / 2;
-    const cy = (py1 + py2) / 2 - 25;
+    const cy = (py1 + py2) / 2;
 
     svg.innerHTML = `
         <path d="M ${px1} ${py1} Q ${cx} ${cy} ${px2} ${py2}" 
