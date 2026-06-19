@@ -199,7 +199,7 @@
     function showHomeOpening() {
         ensureOverlay();
         createPopup(
-            '<strong>"Welcome to Nexus! Click the Games button to get started."</strong> But if you\'re a rebel, click Skip to figure stuff out on your own. If you want to come back to this tutorial, head to Settings.',
+            '<strong>Welcome to Nexus! Click the Games button to get started.</strong> But if you\'re a rebel, click Skip to figure stuff out on your own. If you want to come back to this tutorial, head to Settings.',
             {
                 centered: true,
                 showSkip: true
@@ -232,7 +232,7 @@
     function showHomePostGames() {
         ensureOverlay();
         createPopup(
-            '<strong>"You\'re done playing for now? I\'ll show you around the rest of the website! Let\'s start with the AI chatbot."</strong>',
+            '<strong>You\'re done playing for now? I\'ll show you around the rest of the website! Let\'s start with the AI chatbot.</strong>',
             { centered: false }
         );
 
@@ -258,7 +258,7 @@
     function showHomePostAI() {
         ensureOverlay();
         createPopup(
-            '<strong>"Hopefully the AI wasn\'t too slow, was it?"</strong>',
+            '<strong>Hopefully the AI wasn\'t too slow, was it?</strong>',
             {
                 btn: { label: 'For sure, bro', cb: () => {
                     setStep('home_proxy_skip');
@@ -272,7 +272,7 @@
     function showHomeProxySkip() {
         ensureOverlay();
         createPopup(
-            '<strong>"Whatever. Anyway, I would tell you how to use the proxy, but it has its own built in tutorial because I didn\'t make it— NautilusLabs did! Check it out later. But for now, let\'s get to the Chat Rooms!"</strong>',
+            '<strong>Whatever. Anyway, I would tell you how to use the proxy, but it has its own built in tutorial because I didn\'t make it— NautilusLabs did! Check it out later. But for now, let\'s get to the Chat Rooms!</strong>',
             { centered: false }
         );
 
@@ -298,7 +298,7 @@
     function showHomePostChat() {
         ensureOverlay();
         createPopup(
-            '<strong>"Hope you had some fun chatting. Now we come to the last stop on our tour: Media!"</strong>',
+            '<strong>Hope you had some fun chatting. Now we come to the last stop on our tour: Media!</strong>',
             { centered: false }
         );
 
@@ -324,7 +324,7 @@
     function showHomeWrapUp() {
         ensureOverlay();
         createPopup(
-            '<strong>"Alrighty! You\'ve checked out most of the stuff here, and sadly, our tour is coming to a close."</strong>',
+            '<strong>Alrighty! You\'ve checked out most of the stuff here, and sadly, our tour is coming to a close.</strong>',
             {
                 btn: { label: 'Aww, so soon?', cb: () => {
                     setStep('home_farewell');
@@ -338,7 +338,7 @@
     function showHomeFarewell() {
         ensureOverlay();
         createPopup(
-            '<strong>"Indeed. If you have any concerns or requests, click the red question mark at the top right of settings. And with that, I will leave you. See ya!"</strong>',
+            '<strong>Indeed. If you have any concerns or requests, click the red question mark at the top right of settings. And with that, I will leave you. See ya!</strong>',
             {
                 btn: { label: 'Bye!', cb: () => {
                     finish();
@@ -367,7 +367,7 @@
     function showGamesMain() {
         ensureOverlay();
         createPopup(
-            '<strong>"This is your hub for all games and apps. The Master Stash has tons of games. Click a game to add it to sidebar. Click the sidebar icon to play it."</strong>',
+            '<strong>This is your hub for all games and apps. The Master Stash has tons of games. Click a game to add it to sidebar. Click the sidebar icon to play it.</strong>',
             {
                 btn: { label: 'Alright', cb: () => {
                     setStep('games_utilities');
@@ -381,12 +381,12 @@
     function showGamesUtilities() {
         ensureOverlay();
 
-        const defaultText = '<strong>"These are your utilities. Hover over each button to learn about it."</strong>';
+        const defaultText = '<strong>These are your utilities. Hover over each button to learn about it.</strong>';
 
         const hoverTexts = {
-            'cloak-btn': '<strong>"Fullscreen opens a sidebar game in a full about:blank window. You can\'t do this for the Stash though."</strong>',
-            'export-btn': '<strong>"Don\'t worry, your progress auto-saves. These are if you want to backup your progress in the form of one file to restore on other devices."</strong>',
-            'custom-app-btn': '<strong>"This is for adding any HTML file you have to the sidebar as an app."</strong>'
+            'cloak-btn': '<strong>Fullscreen opens a sidebar game in a full about:blank window. You can\'t do this for the Stash though.</strong>',
+            'export-btn': '<strong>Don\'t worry, your progress auto-saves. These are if you want to backup your progress in the form of one file to restore on other devices.</strong>',
+            'custom-app-btn': '<strong>This is for adding any HTML file you have to the sidebar as an app.</strong>'
         };
 
         // The Restore button doesn't have a unique id — it's the button wrapping #import-btn
@@ -401,9 +401,12 @@
             }}
         });
 
-        // Highlight the controls area
-        const controls = document.querySelector('header .controls');
-        if (controls) controls.classList.add('tutorial-highlight');
+        // Highlight each individual button in controls so pointer-events pass through
+        const controlBtns = document.querySelectorAll('header .controls .material-nav-btn');
+        controlBtns.forEach(btn => {
+            btn.classList.add('tutorial-highlight');
+            btn.style.pointerEvents = 'auto';
+        });
 
         // Set up hover listeners on the utility buttons
         const popup = document.getElementById('tut-popup');
@@ -413,7 +416,6 @@
             if (contentEl) contentEl.innerHTML = html;
         }
 
-        const controlBtns = document.querySelectorAll('header .controls .material-nav-btn');
         const hoverHandlers = [];
 
         controlBtns.forEach((btn) => {
@@ -427,7 +429,7 @@
             } else if (spanText === 'restore') {
                 hoverHTML = hoverTexts['export-btn']; // same text as backup
             } else if (spanText === 'home') {
-                hoverHTML = '<strong>"Go back to the home screen."</strong>';
+                hoverHTML = '<strong>Go back to the home screen.</strong>';
             }
 
             if (hoverHTML) {
@@ -448,38 +450,30 @@
             window._tutHoverHandlers.forEach(h => {
                 h.el.removeEventListener('mouseenter', h.enter);
                 h.el.removeEventListener('mouseleave', h.leave);
+                h.el.classList.remove('tutorial-highlight');
+                h.el.style.pointerEvents = '';
             });
             window._tutHoverHandlers = null;
         }
-        const controls = document.querySelector('header .controls');
-        if (controls) controls.classList.remove('tutorial-highlight');
+        // Also clean up any remaining highlights on control buttons
+        document.querySelectorAll('header .controls .material-nav-btn').forEach(btn => {
+            btn.classList.remove('tutorial-highlight');
+            btn.style.pointerEvents = '';
+        });
     }
 
     function showGamesDone() {
         ensureOverlay();
         createPopup(
-            '<strong>"Alright! Explore around here and I\'ll meet you back at the homepage whenever you\'re ready."</strong>',
-            { centered: false }
+            '<strong>Alright! Explore around here and whenever you head back to the homepage, I\'ll be there.</strong>',
+            {
+                centered: false,
+                btn: { label: "Alrighty! Let's game", cb: () => {
+                    setStep('games_done');
+                    clearAll();
+                }}
+            }
         );
-
-        // Highlight the Home button (last material-nav-btn in controls)
-        const controlBtns = document.querySelectorAll('header .controls .material-nav-btn');
-        const homeBtn = controlBtns[controlBtns.length - 1]; // last one is Home
-
-        if (homeBtn) {
-            homeBtn.classList.add('tutorial-highlight');
-            const origClick = homeBtn.getAttribute('onclick');
-            // Override onclick to set step and navigate
-            homeBtn.onclick = (e) => {
-                setStep('home_post_games');
-                clearAll();
-                if (window.navigateWithFade) {
-                    window.navigateWithFade('index.html');
-                } else {
-                    location.href = 'index.html';
-                }
-            };
-        }
     }
 
     // ===========================
@@ -500,7 +494,7 @@
     function showAIMain() {
         ensureOverlay();
         createPopup(
-            '<strong>"This is an AI chatbot for your convenience! Type an answer in and expect a response in 3-5 business days!"</strong> In all seriousness, if it\'s slow, just hang in there— the API I\'m using is free but not that fast!',
+            '<strong>This is an AI chatbot for your convenience! Type an answer in and expect a response in 3-5 business days!</strong> In all seriousness, if it\'s slow, just hang in there— the API I\'m using is free but not that fast!',
             {
                 btn: { label: "I'll try", cb: () => {
                     setStep('ai_sidebar');
@@ -514,7 +508,7 @@
     function showAISidebar() {
         ensureOverlay();
         createPopup(
-            '<strong>"Good, good. The sidebar contains your previous chats which you can delete via the button on them. You can go back to them as well."</strong> Currently, though, you\'re on a new chat, so type something in if you want and it\'ll show up in the sidebar. Alright, I\'ll leave you to it!',
+            '<strong>Good, good. The sidebar contains your previous chats which you can delete via the button on them. You can go back to them as well.</strong> Currently, though, you\'re on a new chat, so type something in if you want and it\'ll show up in the sidebar. Alright, I\'ll leave you to it!',
             {
                 btn: { label: 'Bet', cb: () => {
                     setStep('ai_done');
@@ -540,7 +534,7 @@
     function showChatMain() {
         ensureOverlay();
         createPopup(
-            '<strong>"Nexus Chat Rooms are completely anonymous, meaning you have to give your peers the 6-digit code in person and they\'ll be able to join."</strong> Keep in mind the host is literally hosting the server, so if they close their tab the room gets disbanded! Anyway, why don\'t you try it out?',
+            '<strong>Nexus Chat Rooms are completely anonymous, meaning you have to give your peers the 6-digit code in person and they\'ll be able to join.</strong> Keep in mind the host is literally hosting the server, so if they close their tab the room gets disbanded! Anyway, why don\'t you try it out?',
             {
                 btn: { label: 'Okay', cb: () => {
                     setStep('chat_done');
@@ -566,7 +560,7 @@
     function showMediaMain() {
         ensureOverlay();
         createPopup(
-            '<strong>"Here you can watch all the latest movies and TV shows. You can scroll through the list or search for anything, from actors in a movie to a genre to the title. Try it out and watch something cool!"</strong>',
+            '<strong>Here you can watch all the latest movies and TV shows. You can scroll through the list or search for anything, from actors in a movie to a genre to the title. Try it out and watch something cool!</strong>',
             {
                 btn: { label: 'Awesome!', cb: () => {
                     setStep('media_done');
