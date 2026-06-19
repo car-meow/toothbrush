@@ -1341,3 +1341,108 @@ html:not(.light-mode) .item-owned img {
     opacity: 0;
 }
 
+/* =========================================
+   14. TUTORIAL SYSTEM
+   ========================================= */
+.tutorial-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 99990;
+    pointer-events: auto;
+}
+
+.tutorial-highlight {
+    position: relative !important;
+    z-index: 100000 !important;
+}
+
+body.tutorial-active .home-container {
+    z-index: 100002 !important;
+}
+body.tutorial-active .material-nav-btn:not(.tutorial-highlight) {
+    pointer-events: none !important;
+    opacity: 0.3;
+}
+body.tutorial-active #nexus-logo {
+    pointer-events: none !important;
+}
+
+.tutorial-popup {
+    position: absolute;
+    z-index: 100003;
+    background: rgba(20, 20, 30, 0.35);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1.5px solid #ffffff;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    color: #fff;
+    width: max-content;
+    max-width: 280px;
+    font-size: 14px;
+    line-height: 1.4;
+    font-weight: bold;
+    pointer-events: auto;
+    animation: popupFadeIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.tutorial-popup.centered {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    animation: popupFadeInCentered 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+@keyframes popupFadeIn {
+    from { opacity: 0; transform: translate(-10px, -50%) scale(0.95); }
+    to { opacity: 1; transform: translate(0, -50%) scale(1); }
+}
+
+@keyframes popupFadeInCentered {
+    from { opacity: 0; transform: translate(-50%, -45%) scale(0.95); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.tutorial-popup button {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 1.5px solid #ffffff !important;
+    color: #ffffff !important;
+    border-radius: 6px !important;
+    font-size: 12px !important;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-shadow: none !important;
+}
+
+.tutorial-popup button:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.tutorial-skip {
+    display: block;
+    text-align: right;
+    margin-top: 8px;
+    color: #888;
+    font-size: 11px;
+    cursor: pointer;
+    text-decoration: underline;
+    font-weight: 600;
+    user-select: none;
+    transition: color 0.2s;
+}
+
+.tutorial-skip:hover {
+    color: #bbb;
+}
+

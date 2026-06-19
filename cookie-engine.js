@@ -825,7 +825,10 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==================== IN-APP TUTORIAL SYSTEM ====================
+let isTutorialCentered = true;
+
 function positionTutorialPopup() {
+    if (isTutorialCentered) return;
     const btn = document.getElementById('btn-nav-games');
     const popup = document.getElementById('tutorial-popup');
     if (!btn || !popup) return;
@@ -844,6 +847,7 @@ function positionTutorialPopup() {
 }
 
 function drawCurvedLine() {
+    if (isTutorialCentered) return;
     const btn = document.getElementById('btn-nav-games');
     const popup = document.getElementById('tutorial-popup');
     let svg = document.getElementById('tutorial-svg');
@@ -901,19 +905,58 @@ function startTutorial() {
     overlay.style.display = 'block';
     document.body.classList.add('tutorial-active');
 
-    // Highlight button
+    // Create centered opening popup
+    isTutorialCentered = true;
+    let popup = document.getElementById('tutorial-popup');
+    if (!popup) {
+        popup = document.createElement('div');
+        popup.id = 'tutorial-popup';
+        popup.className = 'tutorial-popup centered';
+        popup.innerHTML = `
+            <div class="tutorial-content">Welcome to Nexus Unblocked! This tour will guide you. Click any button to get started.</div>
+            <button id="tutorial-ok-btn">OK</button>
+            <span class="tutorial-skip" id="tutorial-skip-btn">Skip</span>
+        `;
+        document.body.appendChild(popup);
+
+        document.getElementById('tutorial-skip-btn').onclick = (e) => {
+            e.stopPropagation();
+            skipTutorial();
+        };
+
+        document.getElementById('tutorial-ok-btn').onclick = (e) => {
+            e.stopPropagation();
+            goToGamesStep();
+        };
+    }
+}
+
+function goToGamesStep() {
+    isTutorialCentered = false;
+    const popup = document.getElementById('tutorial-popup');
+    if (popup) {
+        popup.classList.remove('centered');
+        popup.innerHTML = `
+            <div class="tutorial-content">Click Games to get started.</div>
+            <span class="tutorial-skip" id="tutorial-skip-btn">Skip</span>
+        `;
+        document.getElementById('tutorial-skip-btn').onclick = (e) => {
+            e.stopPropagation();
+            skipTutorial();
+        };
+    }
+
     const btn = document.getElementById('btn-nav-games');
     if (btn) {
         btn.classList.add('tutorial-highlight');
         
         const originalOnClick = btn.onclick;
         btn.onclick = (e) => {
-            localStorage.setItem('tb_tutorial_played', 'true');
+            localStorage.setItem('tb_tutorial_step', 'games_clicked');
             btn.classList.remove('tutorial-highlight');
             document.body.classList.remove('tutorial-active');
+            const overlay = document.getElementById('tutorial-overlay');
             if (overlay) overlay.style.display = 'none';
-            
-            const popup = document.getElementById('tutorial-popup');
             if (popup) popup.remove();
             
             const ringEl = document.getElementById('tutorial-highlight-ring');
@@ -932,25 +975,7 @@ function startTutorial() {
         };
     }
 
-    // Create popup window next to Games button
-    let popup = document.getElementById('tutorial-popup');
-    if (!popup) {
-        popup = document.createElement('div');
-        popup.id = 'tutorial-popup';
-        popup.className = 'tutorial-popup';
-        popup.innerHTML = `
-            <div class="tutorial-content">Welcome to Nexus! Click Games to get started.</div>
-            <span class="tutorial-skip" id="tutorial-skip-btn">Skip</span>
-        `;
-        document.body.appendChild(popup);
-        
-        document.getElementById('tutorial-skip-btn').onclick = (e) => {
-            e.stopPropagation();
-            skipTutorial();
-        };
-    }
-    
-    // Position popup and set up listeners
+    // Position popup next to Games button
     setTimeout(positionTutorialPopup, 50);
     window.addEventListener('resize', positionTutorialPopup);
 }

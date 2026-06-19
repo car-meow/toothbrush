@@ -63,6 +63,8 @@ async function loadGames() {
     // Fade page in once list is loaded and rendered
     const overlay = document.getElementById('page-fade-overlay');
     if (overlay) overlay.classList.add('fade-out');
+
+    initCarmeowTutorial();
 }
 
 function openDefaultGame() {
@@ -535,12 +537,11 @@ if (cloakBtn) {
         if (currentGame.id === "ugs-stash") {
             const icon = cloakBtn.querySelector('img');
             if (icon) {
-                icon.style.transition = 'filter 0.15s ease';
-                icon.style.filter = 'brightness(0) saturate(100%) invert(20%) sepia(95%) saturate(6000%) hue-rotate(0deg) brightness(95%)';
+                icon.style.transition = 'filter 0.2s ease';
+                icon.style.filter = 'brightness(0) saturate(100%) invert(18%) sepia(97%) saturate(7359%) hue-rotate(359deg) brightness(96%) contrast(114%)';
                 setTimeout(() => {
-                    icon.style.transition = 'filter 0.5s ease';
                     icon.style.filter = '';
-                }, 200);
+                }, 400);
             }
             return;
         }
@@ -842,3 +843,157 @@ if (importBtn) {
 }
 
 loadGames();
+
+/* =========================================
+   GAMES PAGE TUTORIAL SYSTEM
+   ========================================= */
+let carmeowResizeListener = null;
+
+function initCarmeowTutorial() {
+    const step = localStorage.getItem('tb_tutorial_step');
+    if (step !== 'games_clicked') return;
+
+    // Show Overlay
+    let overlay = document.getElementById('tutorial-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'tutorial-overlay';
+        overlay.className = 'tutorial-overlay';
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'block';
+    document.body.classList.add('tutorial-active');
+
+    // Create popup (centered initially)
+    let popup = document.getElementById('tutorial-popup');
+    if (!popup) {
+        popup = document.createElement('div');
+        popup.id = 'tutorial-popup';
+        popup.className = 'tutorial-popup centered';
+        popup.innerHTML = `
+            <div class="tutorial-content">This is where all your games are. Search through the Stash and click on a game to add it to sidebar. To play, click on the game in sidebar. Don't worry, your progress saves automatically.</div>
+            <button id="tutorial-next-btn">Next</button>
+            <span class="tutorial-skip" id="tutorial-skip-btn" style="display:block; text-align:right; margin-top:8px; color:#888; font-size:11px; cursor:pointer; text-decoration:underline;">Skip</span>
+        `;
+        document.body.appendChild(popup);
+
+        document.getElementById('tutorial-skip-btn').onclick = (e) => {
+            e.stopPropagation();
+            endCarmeowTutorial();
+        };
+
+        document.getElementById('tutorial-next-btn').onclick = (e) => {
+            e.stopPropagation();
+            goToControlsStep();
+        };
+    }
+}
+
+function goToControlsStep() {
+    const popup = document.getElementById('tutorial-popup');
+    if (!popup) return;
+
+    popup.classList.remove('centered');
+    popup.innerHTML = `
+        <div class="tutorial-content">These icons are useful. Fullscreen opens the current game in a blank tab. Backup and Restore are used if you want to transfer saves to another device. Custom allows you to add any file as a sidebar icon. And Home goes back to the home screen.</div>
+        <button id="tutorial-happy-btn">Happy gaming!</button>
+        <span class="tutorial-skip" id="tutorial-skip-btn" style="display:block; text-align:right; margin-top:8px; color:#888; font-size:11px; cursor:pointer; text-decoration:underline;">Skip</span>
+    `;
+
+    document.getElementById('tutorial-skip-btn').onclick = (e) => {
+        e.stopPropagation();
+        endCarmeowTutorial();
+    };
+
+    document.getElementById('tutorial-happy-btn').onclick = (e) => {
+        e.stopPropagation();
+        localStorage.setItem('tb_tutorial_played', 'true');
+        endCarmeowTutorial();
+    };
+
+    // Highlight controls in header
+    const controls = document.querySelector('header .controls');
+    if (controls) {
+        controls.classList.add('tutorial-highlight');
+    }
+
+    // Position popup next to header controls
+    positionControlsPopup();
+    carmeowResizeListener = () => positionControlsPopup();
+    window.addEventListener('resize', carmeowResizeListener);
+}
+
+function positionControlsPopup() {
+    const popup = document.getElementById('tutorial-popup');
+    const controls = document.querySelector('header .controls');
+    if (!popup || !controls) return;
+
+    const rect = controls.getBoundingClientRect();
+    
+    // Position to the left of the header controls
+    const left = rect.left - popup.offsetWidth - 40 + window.scrollX;
+    const top = rect.top + (rect.height / 2) + window.scrollY;
+
+    popup.style.left = left + 'px';
+    popup.style.top = top + 'px';
+    popup.style.transform = 'translateY(-50%)';
+
+    // Draw curved line connecting them
+    let svg = document.getElementById('tutorial-svg');
+    if (!svg) {
+        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.id = 'tutorial-svg';
+        Object.assign(svg.style, {
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            zIndex: '100004',
+            pointerEvents: 'none'
+        });
+        document.body.appendChild(svg);
+    }
+
+    const popupRect = popup.getBoundingClientRect();
+    const targetRect = controls.getBoundingClientRect();
+
+    const px1 = popupRect.right + window.scrollX;
+    const py1 = popupRect.top + popupRect.height / 2 + window.scrollY;
+
+    const px2 = targetRect.left + window.scrollX;
+    const py2 = targetRect.top + targetRect.height / 2 + window.scrollY;
+
+    const cx = (px1 + px2) / 2;
+    const cy = (py1 + py2) / 2 - 25;
+
+    svg.innerHTML = `
+        <path d="M ${px1} ${py1} Q ${cx} ${cy} ${px2} ${py2}" 
+              fill="none" 
+              stroke="rgba(255, 255, 255, 0.45)" 
+              stroke-width="3" 
+              stroke-linecap="round" />
+    `;
+}
+
+function endCarmeowTutorial() {
+    localStorage.removeItem('tb_tutorial_step');
+    document.body.classList.remove('tutorial-active');
+    
+    const overlay = document.getElementById('tutorial-overlay');
+    if (overlay) overlay.style.display = 'none';
+
+    const popup = document.getElementById('tutorial-popup');
+    if (popup) popup.remove();
+
+    const svg = document.getElementById('tutorial-svg');
+    if (svg) svg.remove();
+
+    const controls = document.querySelector('header .controls');
+    if (controls) controls.classList.remove('tutorial-highlight');
+
+    if (carmeowResizeListener) {
+        window.removeEventListener('resize', carmeowResizeListener);
+        carmeowResizeListener = null;
+    }
+}
