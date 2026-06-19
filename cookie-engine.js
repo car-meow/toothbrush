@@ -5,7 +5,7 @@ const SFX = {};
 function initSounds() {
     ['get1', 'get2', 'get3', 'get4'].forEach(s => SFX[s] = new Audio('Sound/' + s + '.mp3'));
     ['Common', 'Uncommon', 'Rare', 'Epic', 'Epic2', 'divine', 'divine2', 'divine3', 'stop', 'start', 'achN', 'achR'].forEach(s => SFX[s] = new Audio('Sound/' + s + '.mp3'));
-    SFX.bgm = new Audio('Sound/bgm.mp3'); SFX.bgm.loop = true; SFX.bgm.volume = 0.3;
+    SFX.bgm = window.globalBGM || new Audio('Sound/bgm1.mp3');
 }
 function playSound(key) {
     if (G.muted || !SFX[key]) return;
@@ -68,8 +68,10 @@ window.addEventListener('storage', (e) => {
                 G.muted = muted;
                 if (G.muted) {
                     if (SFX.bgm) SFX.bgm.pause();
-                } else if (bgmStarted && SFX.bgm) {
-                    SFX.bgm.play().catch(() => { });
+                } else if (SFX.bgm) {
+                    SFX.bgm.play().then(() => {
+                        bgmStarted = true;
+                    }).catch(() => { });
                 }
             }
         } catch (err) { }
@@ -748,17 +750,10 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('stats-close').onclick = (e) => { e.preventDefault(); DOM.statsModal.classList.remove('open'); };
     DOM.statsModal.onclick = (e) => { if (e.target === DOM.statsModal) DOM.statsModal.classList.remove('open'); };
 
-    if (G.muted && bgmStarted) SFX.bgm.pause();
-    else if (!G.muted && bgmStarted) SFX.bgm.play().catch(() => {});
-
     setInterval(autoTick, 100);
     setInterval(updateEffects, 1000);
     setInterval(saveGame, 15000);
     setInterval(() => { updateHUD(); if (DOM.shopModal.classList.contains('open')) renderShop(); }, 1000);
-
-    document.addEventListener('click', () => {
-        if (!bgmStarted && !G.muted) { SFX.bgm.play().catch(() => { }); bgmStarted = true; }
-    }, { once: true });
 
     // Keybinds & Debug
     document.addEventListener('keydown', (e) => {
@@ -769,7 +764,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
         if (e.key === 'm' || e.key === 'M') {
             G.muted = !G.muted;
-            if (G.muted) { SFX.bgm.pause(); } else if (bgmStarted) { SFX.bgm.play().catch(() => { }); }
+            if (G.muted) {
+                SFX.bgm.pause();
+            } else {
+                SFX.bgm.play().then(() => {
+                    bgmStarted = true;
+                }).catch(() => {});
+            }
             saveGame();
         }
         if (e.key === 'h' || e.key === 'H') {
@@ -820,168 +821,10 @@ window.addEventListener('DOMContentLoaded', () => {
     G.lastSeen = Date.now();
     saveGame();
     
-    // Launch the in-app tutorial
-    startTutorial();
+    // Launch the in-app tutorial (new engine)
+    if (window.TutorialEngine) TutorialEngine.initHome();
 });
 
-// ==================== IN-APP TUTORIAL SYSTEM ====================
-let isTutorialCentered = true;
 
-function positionTutorialPopup() {
-    if (isTutorialCentered) return;
-    const btn = document.getElementById('btn-nav-games');
-    const popup = document.getElementById('tutorial-popup');
-    if (!btn || !popup) return;
+// Old tutorial system removed — now handled by tutorial-engine.js
 
-    const btnRect = btn.getBoundingClientRect();
-    
-    // Position to the left of the Games button
-    const left = btnRect.left - popup.offsetWidth - 40 + window.scrollX;
-    const top = btnRect.top + (btnRect.height / 2) + window.scrollY;
-
-    popup.style.left = left + 'px';
-    popup.style.top = top + 'px';
-    popup.style.transform = 'translateY(-50%)';
-
-    drawCurvedLine();
-}
-
-function drawCurvedLine() {
-    if (isTutorialCentered) return;
-    const btn = document.getElementById('btn-nav-games');
-    const popup = document.getElementById('tutorial-popup');
-    let svg = document.getElementById('tutorial-svg');
-    
-    if (!btn || !popup) return;
-    
-    if (!svg) {
-        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.id = 'tutorial-svg';
-        svg.style.position = 'absolute';
-        svg.style.top = '0';
-        svg.style.left = '0';
-        svg.style.width = '100%';
-        svg.style.height = '100%';
-        svg.style.zIndex = '100004';
-        svg.style.pointerEvents = 'none';
-        document.body.appendChild(svg);
-    }
-    
-    const btnRect = btn.getBoundingClientRect();
-    const popupRect = popup.getBoundingClientRect();
-    
-    // From right edge of popup to left edge of button
-    const x1 = popupRect.right + window.scrollX;
-    const y1 = popupRect.top + popupRect.height / 2 + window.scrollY;
-    
-    const x2 = btnRect.left + window.scrollX;
-    const y2 = btnRect.top + btnRect.height / 2 + window.scrollY;
-    
-    const cx = (x1 + x2) / 2;
-    const cy = (y1 + y2) / 2 - 25;
-    
-    svg.innerHTML = `
-        <path d="M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}" 
-              fill="none" 
-              stroke="rgba(255, 255, 255, 0.45)" 
-              stroke-width="3" 
-              stroke-linecap="round" />
-    `;
-}
-
-function startTutorial() {
-    const played = localStorage.getItem('tb_tutorial_played') === 'true';
-    const skipped = localStorage.getItem('tb_tutorial_skipped') === 'true';
-    if (played || skipped) return;
-
-    // Show Overlay
-    let overlay = document.getElementById('tutorial-overlay');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'tutorial-overlay';
-        overlay.className = 'tutorial-overlay';
-        document.body.appendChild(overlay);
-    }
-    overlay.style.display = 'block';
-    document.body.classList.add('tutorial-active');
-
-    // Create centered opening popup
-    isTutorialCentered = true;
-    let popup = document.getElementById('tutorial-popup');
-    if (!popup) {
-        popup = document.createElement('div');
-        popup.id = 'tutorial-popup';
-        popup.className = 'tutorial-popup centered';
-        popup.innerHTML = `
-            <div class="tutorial-content">Welcome to Nexus Unblocked! This tour will guide you. Click any button to get started.</div>
-            <button id="tutorial-ok-btn">OK</button>
-            <span class="tutorial-skip" id="tutorial-skip-btn">Skip</span>
-        `;
-        document.body.appendChild(popup);
-
-        document.getElementById('tutorial-skip-btn').onclick = (e) => {
-            e.stopPropagation();
-            skipTutorial();
-        };
-
-        document.getElementById('tutorial-ok-btn').onclick = (e) => {
-            e.stopPropagation();
-            goToGamesStep();
-        };
-    }
-}
-
-function goToGamesStep() {
-    isTutorialCentered = false;
-    const popup = document.getElementById('tutorial-popup');
-    if (popup) popup.remove();
-
-    const btn = document.getElementById('btn-nav-games');
-    if (btn) {
-        btn.classList.add('tutorial-highlight');
-        
-        const originalOnClick = btn.onclick;
-        btn.onclick = (e) => {
-            localStorage.setItem('tb_tutorial_step', 'games_clicked');
-            btn.classList.remove('tutorial-highlight');
-            document.body.classList.remove('tutorial-active');
-            const overlay = document.getElementById('tutorial-overlay');
-            if (overlay) overlay.style.display = 'none';
-            
-            const ringEl = document.getElementById('tutorial-highlight-ring');
-            if (ringEl) ringEl.remove();
-            
-            const svgEl = document.getElementById('tutorial-svg');
-            if (svgEl) svgEl.remove();
-            
-            window.removeEventListener('resize', positionTutorialPopup);
-            
-            if (typeof originalOnClick === 'function') {
-                originalOnClick.call(btn, e);
-            } else {
-                location.href = 'carmeow.html';
-            }
-        };
-    }
-}
-
-function skipTutorial() {
-    localStorage.setItem('tb_tutorial_skipped', 'true');
-    document.body.classList.remove('tutorial-active');
-    const overlay = document.getElementById('tutorial-overlay');
-    if (overlay) overlay.style.display = 'none';
-    
-    const btn = document.getElementById('btn-nav-games');
-    if (btn) btn.classList.remove('tutorial-highlight');
-    
-    const popup = document.getElementById('tutorial-popup');
-    if (popup) popup.remove();
-    
-    const ringEl = document.getElementById('tutorial-highlight-ring');
-    if (ringEl) ringEl.remove();
-    
-    const svgEl = document.getElementById('tutorial-svg');
-    if (svgEl) svgEl.remove();
-    
-    window.removeEventListener('resize', positionTutorialPopup);
-}

@@ -104,6 +104,11 @@
         .media-home-back { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background-color: #3d3d3d; border: none; }
         .media-home-back img { width: 22px; height: 22px; display: block; }
         .search-hint { text-align: center; font-size: 12px; color: #888; margin-top: 4px; margin-bottom: 16px; }
+
+        #search-results-view { display: none; }
+        #search-results-view .media-section { animation: searchFadeUp 0.4s ease both; }
+        #search-results-view .media-section:nth-child(2) { animation-delay: 0.15s; }
+        @keyframes searchFadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
     </style>
 </head>
 <body class="media-bg chat-bg">
@@ -150,6 +155,21 @@
                 <div class="media-row" id="row-favorites"></div>
             </div>
             <div id="categories-container"></div>
+        </div>
+
+        <div id="search-results-view" style="display: none;">
+            <div id="exact-matches-section" class="media-section" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title" style="border-left-color: #4CAF50;">Exact Matches</div>
+                </div>
+                <div class="media-row" id="row-exact-matches"></div>
+            </div>
+            <div id="related-section" class="media-section" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title" style="border-left-color: #FF9800;">Related</div>
+                </div>
+                <div class="media-row" id="row-related"></div>
+            </div>
         </div>
 
         <div id="grid-panel">
@@ -418,8 +438,10 @@
             const gridView = document.getElementById('grid-view');
             const backBtn = document.getElementById('back-btn');
             const searchHint = document.getElementById('search-hint');
+            const srv = document.getElementById('search-results-view');
 
             browseView.style.display = 'none';
+            if (srv) srv.style.display = 'none';
             gridPanel.classList.add('active');
             backBtn.classList.add('visible');
             if (searchHint) searchHint.style.display = 'none';
@@ -467,11 +489,44 @@
             window.scrollTo(0, 0);
         }
 
+        function showGridWithResults(results, title) {
+            const browseView = document.getElementById('browse-view');
+            const gridPanel = document.getElementById('grid-panel');
+            const gridView = document.getElementById('grid-view');
+            const backBtn = document.getElementById('back-btn');
+            const srv = document.getElementById('search-results-view');
+
+            browseView.style.display = 'none';
+            if (srv) srv.style.display = 'none';
+            gridPanel.classList.add('active');
+            backBtn.classList.add('visible');
+
+            document.getElementById('grid-view-title').textContent = title || 'Browse';
+            gridView.innerHTML = '';
+
+            const playable = results.filter(it => {
+                const t = inferMediaType(it);
+                return t === 'movie' || t === 'tv';
+            });
+            playable.forEach(item => {
+                const c = createCard(item);
+                if (c) gridView.appendChild(c);
+            });
+            document.getElementById('grid-meta').textContent = playable.length + ' titles';
+            if (!playable.length) {
+                gridView.innerHTML = '<div class="loading-wrap" style="color:#aaa;font-weight:bold;">No results.</div>';
+                document.getElementById('grid-meta').textContent = '';
+            }
+            window.scrollTo(0, 0);
+        }
+
         function resetView() {
             document.getElementById('browse-view').style.display = 'block';
             document.getElementById('grid-panel').classList.remove('active');
             document.getElementById('back-btn').classList.remove('visible');
             document.getElementById('grid-view').innerHTML = '';
+            const srv = document.getElementById('search-results-view');
+            if (srv) srv.style.display = 'none';
             const searchHint = document.getElementById('search-hint');
             if (searchHint) searchHint.style.display = '';
             renderFavoritesRow();
@@ -479,17 +534,293 @@
 
         document.getElementById('back-btn').onclick = resetView;
 
+        // ═══════════════════════════════════════════════════
+        //  INTELLIGENT SEARCH ENGINE
+        // ═══════════════════════════════════════════════════
+        const MOVIE_GENRES = {
+            'action': 28, 'adventure': 12, 'animation': 16, 'animated': 16,
+            'comedy': 35, 'crime': 80, 'documentary': 99, 'drama': 18,
+            'family': 10751, 'fantasy': 14, 'history': 36, 'historical': 36,
+            'horror': 27, 'music': 10402, 'musical': 10402, 'mystery': 9648,
+            'romance': 10749, 'romantic': 10749, 'sci-fi': 878, 'scifi': 878,
+            'science fiction': 878, 'thriller': 53, 'war': 10752, 'western': 37
+        };
+        const TV_GENRES = {
+            'action': 10759, 'adventure': 10759, 'animation': 16, 'animated': 16,
+            'comedy': 35, 'crime': 80, 'documentary': 99, 'drama': 18,
+            'family': 10751, 'fantasy': 10765, 'kids': 10762, 'mystery': 9648,
+            'news': 10763, 'reality': 10764, 'sci-fi': 10765, 'scifi': 10765,
+            'science fiction': 10765, 'soap': 10766, 'talk': 10767,
+            'war': 10768, 'western': 37
+        };
+
+        function parseSearchIntent(query) {
+            const intent = { originalQuery: query, years: [], genres: [], mediaType: null, sortBy: null, keywords: [] };
+            let text = query.toLowerCase().trim();
+
+            // Extract years (1900-2099)
+            const yearRe = /\b(19\d{2}|20\d{2})\b/g;
+            let ym;
+            while ((ym = yearRe.exec(text)) !== null) intent.years.push(parseInt(ym[1]));
+            text = text.replace(yearRe, ' ');
+
+            // Extract media type
+            if (/\b(movies?|films?)\b/.test(text)) {
+                intent.mediaType = 'movie';
+                text = text.replace(/\b(movies?|films?)\b/g, ' ');
+            } else if (/\b(tv|television|shows?|series)\b/.test(text)) {
+                intent.mediaType = 'tv';
+                text = text.replace(/\b(tv|television|shows?|series)\b/g, ' ');
+            }
+
+            // Extract genres (multi-word first, then single-word)
+            const multiWord = ['science fiction', 'sci-fi'];
+            for (const g of multiWord) {
+                if (text.includes(g)) {
+                    intent.genres.push({ name: g, movieId: MOVIE_GENRES[g], tvId: TV_GENRES[g] || MOVIE_GENRES[g] });
+                    text = text.replace(new RegExp(g.replace(/-/g, '[-\\s]?'), 'g'), ' ');
+                }
+            }
+            for (const [g, id] of Object.entries(MOVIE_GENRES)) {
+                if (multiWord.includes(g)) continue;
+                if (new RegExp('\\b' + g + '\\b').test(text)) {
+                    if (!intent.genres.some(x => x.movieId === id)) {
+                        intent.genres.push({ name: g, movieId: id, tvId: TV_GENRES[g] || id });
+                    }
+                    text = text.replace(new RegExp('\\b' + g + '\\b', 'g'), ' ');
+                }
+            }
+
+            // Extract sort/quality modifiers
+            if (/\b(best|top[\s-]?rated|highest[\s-]?rated)\b/.test(text)) {
+                intent.sortBy = 'vote_average.desc';
+                text = text.replace(/\b(best|top[\s-]?rated|highest[\s-]?rated)\b/g, ' ');
+            } else if (/\b(popular|trending|hot)\b/.test(text)) {
+                intent.sortBy = 'popularity.desc';
+                text = text.replace(/\b(popular|trending|hot)\b/g, ' ');
+            } else if (/\b(new|newest|latest|recent)\b/.test(text)) {
+                intent.sortBy = intent.mediaType === 'tv' ? 'first_air_date.desc' : 'primary_release_date.desc';
+                text = text.replace(/\b(new|newest|latest|recent)\b/g, ' ');
+            }
+
+            // Remove filler words
+            text = text.replace(/\b(in|the|a|an|of|from|about|with|and|or|for|on|at|to|by|is|are|was|were|made|released|like|featuring|starring|set|during|era|based|between)\b/g, ' ');
+            text = text.replace(/\s+/g, ' ').trim();
+            if (text.length > 1) intent.keywords = text.split(' ').filter(w => w.length > 1);
+
+            return intent;
+        }
+
+        async function fetchRelatedResults(intent, exactIds) {
+            const promises = [];
+            const exactIdSet = new Set(exactIds.map(String));
+
+            // Strategy 1: Discover with genres / years
+            if (intent.genres.length > 0 || intent.years.length > 0) {
+                const types = intent.mediaType ? [intent.mediaType] : ['movie', 'tv'];
+                for (const type of types) {
+                    const params = { sort_by: intent.sortBy || 'popularity.desc' };
+                    if (intent.genres.length) {
+                        params.with_genres = intent.genres.map(g => type === 'tv' ? g.tvId : g.movieId).filter(Boolean).join(',');
+                    }
+                    if (intent.years.length) {
+                        if (type === 'movie') params.primary_release_year = intent.years[0];
+                        else params.first_air_date_year = intent.years[0];
+                    }
+                    if (intent.sortBy === 'vote_average.desc') params['vote_count.gte'] = 100;
+                    promises.push(
+                        fetchTMDB('discover/' + type, Object.assign({ page: 1 }, params))
+                            .then(d => (d.results || []).map(it => { if (!it.media_type) it.media_type = type; return it; }))
+                            .catch(() => [])
+                    );
+                }
+            }
+
+            // Strategy 2: Keyword discovery
+            if (intent.keywords.length > 0) {
+                promises.push(
+                    fetchTMDB('search/keyword', { query: intent.keywords.join(' ') })
+                        .then(async data => {
+                            const kwIds = (data.results || []).slice(0, 3).map(k => k.id);
+                            if (!kwIds.length) return [];
+                            const types = intent.mediaType ? [intent.mediaType] : ['movie', 'tv'];
+                            const out = [];
+                            for (const type of types) {
+                                const p = { with_keywords: kwIds.join('|'), sort_by: intent.sortBy || 'popularity.desc' };
+                                if (intent.years.length) {
+                                    if (type === 'movie') p.primary_release_year = intent.years[0];
+                                    else p.first_air_date_year = intent.years[0];
+                                }
+                                try {
+                                    const d = await fetchTMDB('discover/' + type, Object.assign({ page: 1 }, p));
+                                    (d.results || []).forEach(it => { if (!it.media_type) it.media_type = type; out.push(it); });
+                                } catch(e) {}
+                            }
+                            return out;
+                        }).catch(() => [])
+                );
+            }
+
+            // Strategy 3: Person search (actors, directors)
+            if (intent.keywords.length > 0) {
+                promises.push(
+                    fetchTMDB('search/person', { query: intent.keywords.join(' ') })
+                        .then(async data => {
+                            const people = (data.results || []).filter(p => p.popularity > 5).slice(0, 2);
+                            const credits = [];
+                            for (const person of people) {
+                                try {
+                                    const c = await fetchTMDB('person/' + person.id + '/combined_credits');
+                                    credits.push(...(c.cast || []).sort((a, b) => (b.popularity || 0) - (a.popularity || 0)).slice(0, 20));
+                                } catch(e) {}
+                            }
+                            return credits;
+                        }).catch(() => [])
+                );
+            }
+
+            const batches = await Promise.all(promises);
+            const merged = [];
+            const seen = new Set();
+            for (const batch of batches) {
+                for (const item of batch) {
+                    const mt = inferMediaType(item);
+                    if (mt !== 'movie' && mt !== 'tv') continue;
+                    const key = mt + ':' + item.id;
+                    if (seen.has(key) || exactIdSet.has(String(item.id))) continue;
+                    seen.add(key);
+                    merged.push(item);
+                }
+            }
+            merged.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+            return merged;
+        }
+
+        let searchAbortId = 0;
+
+        async function performSmartSearch(query) {
+            const myId = ++searchAbortId;
+            const browseView = document.getElementById('browse-view');
+            const gridPanel = document.getElementById('grid-panel');
+            const searchResultsView = document.getElementById('search-results-view');
+            const backBtn = document.getElementById('back-btn');
+
+            browseView.style.display = 'none';
+            gridPanel.classList.remove('active');
+            searchResultsView.style.display = 'block';
+            backBtn.classList.add('visible');
+
+            const exactSection = document.getElementById('exact-matches-section');
+            const relatedSection = document.getElementById('related-section');
+            const exactRow = document.getElementById('row-exact-matches');
+            const relatedRow = document.getElementById('row-related');
+
+            // Loading state
+            exactSection.style.display = 'block';
+            relatedSection.style.display = 'block';
+            exactRow.innerHTML = '<div class="loading-wrap"><div class="loading-spinner"></div></div>';
+            relatedRow.innerHTML = '<div class="loading-wrap"><div class="loading-spinner"></div></div>';
+
+            try {
+                // Fetch exact matches via search/multi
+                const searchData = await fetchTMDB('search/multi', { query: query, page: 1 });
+                if (myId !== searchAbortId) return;
+
+                let page2 = [];
+                if (searchData.total_pages > 1) {
+                    try { const p2 = await fetchTMDB('search/multi', { query: query, page: 2 }); page2 = p2.results || []; } catch(e) {}
+                }
+                if (myId !== searchAbortId) return;
+
+                const allSearch = dedupeResults([...(searchData.results || []), ...page2]);
+                const qLower = query.toLowerCase();
+
+                // Exact = title/name contains the query string
+                const exactMatches = allSearch.filter(item => (item.title || item.name || '').toLowerCase().includes(qLower));
+                const exactIds = exactMatches.map(item => item.id);
+
+                // Render exact matches
+                if (exactMatches.length > 0) {
+                    exactSection.style.display = 'block';
+                    exactRow.innerHTML = '';
+                    exactMatches.slice(0, 6).forEach(item => { const c = createCard(item); if (c) exactRow.appendChild(c); });
+                    if (exactMatches.length > 6) {
+                        const allExact = [...exactMatches];
+                        const btn = document.createElement('div');
+                        btn.className = 'show-all-btn';
+                        btn.innerHTML = '<span style="font-size:28px;line-height:1;">+</span><span>Show All</span>';
+                        btn.setAttribute('role', 'button');
+                        btn.tabIndex = 0;
+                        btn.onclick = () => showGridWithResults(allExact, 'Exact Matches: \u201c' + query + '\u201d');
+                        exactRow.appendChild(btn);
+                    }
+                } else {
+                    exactSection.style.display = 'none';
+                }
+
+                // Fetch related results using intelligent parsing
+                const intent = parseSearchIntent(query);
+                const relatedResults = await fetchRelatedResults(intent, exactIds);
+                if (myId !== searchAbortId) return;
+
+                // Also fold in non-exact search results as lower-priority related
+                const exactIdSet = new Set(exactIds.map(String));
+                const seenRelated = new Set(relatedResults.map(r => inferMediaType(r) + ':' + r.id));
+                allSearch.filter(item => !(item.title || item.name || '').toLowerCase().includes(qLower))
+                    .forEach(item => {
+                        const key = inferMediaType(item) + ':' + item.id;
+                        if (!seenRelated.has(key) && !exactIdSet.has(String(item.id))) {
+                            seenRelated.add(key);
+                            relatedResults.push(item);
+                        }
+                    });
+
+                // Render related
+                if (relatedResults.length > 0) {
+                    relatedSection.style.display = 'block';
+                    relatedRow.innerHTML = '';
+                    relatedResults.slice(0, 12).forEach(item => { const c = createCard(item); if (c) relatedRow.appendChild(c); });
+                    if (relatedResults.length > 12) {
+                        const allRelated = [...relatedResults];
+                        const btn = document.createElement('div');
+                        btn.className = 'show-all-btn';
+                        btn.innerHTML = '<span style="font-size:28px;line-height:1;">+</span><span>Show All</span>';
+                        btn.setAttribute('role', 'button');
+                        btn.tabIndex = 0;
+                        btn.onclick = () => showGridWithResults(allRelated, 'Related: \u201c' + query + '\u201d');
+                        relatedRow.appendChild(btn);
+                    }
+                } else {
+                    relatedSection.style.display = 'none';
+                }
+
+                // Both empty
+                if (exactMatches.length === 0 && relatedResults.length === 0) {
+                    exactSection.style.display = 'none';
+                    relatedSection.style.display = 'block';
+                    relatedRow.innerHTML = '<div class="loading-wrap" style="color:#aaa;font-weight:bold;">No results found.</div>';
+                }
+
+            } catch(e) {
+                if (myId !== searchAbortId) return;
+                exactSection.style.display = 'none';
+                relatedSection.style.display = 'block';
+                relatedRow.innerHTML = '<div class="loading-wrap" style="color:#f44336;font-weight:bold;">Error: ' + (e.message || String(e)) + '</div>';
+            }
+        }
+
         const searchInput = document.getElementById('media-search');
         let searchTimeout;
         searchInput.addEventListener('input', (e) => {
             clearTimeout(searchTimeout);
             const query = e.target.value.trim();
             if (query.length < 2) {
+                searchAbortId++;
                 resetView();
                 return;
             }
             searchTimeout = setTimeout(() => {
-                showGrid('search/multi?query=' + encodeURIComponent(query), 'Search: “' + query + '”', { maxPages: 5 });
+                performSmartSearch(query);
             }, 450);
         });
 
@@ -507,6 +838,8 @@
         }
 
         async function openPlayer(item, type) {
+            localStorage.setItem('tb_bgm_stopped_by_media', Date.now().toString());
+            if (window.BGMManager) window.BGMManager.updateState();
             const id = item.id;
             const title = item.title || item.name;
             const savedProgress = getSavedMediaProgress(type, id);
@@ -723,9 +1056,21 @@
     if (seconds !== null || duration !== null) saveProgress();
   });
 
-  window.addEventListener('pagehide', function() { saveProgress(); });
-  window.addEventListener('beforeunload', function() { saveProgress(); });
+  window.addEventListener('pagehide', function() {
+    saveProgress();
+    localStorage.removeItem('tb_bgm_stopped_by_media');
+  });
+  window.addEventListener('beforeunload', function() {
+    saveProgress();
+    localStorage.removeItem('tb_bgm_stopped_by_media');
+  });
   setInterval(saveProgress, 10000);
+
+  // BGM stopped heartbeat
+  setInterval(function() {
+    localStorage.setItem('tb_bgm_stopped_by_media', Date.now().toString());
+  }, 2000);
+  localStorage.setItem('tb_bgm_stopped_by_media', Date.now().toString());
 
   const PROVIDERS = [
     { id: 'cinemaos', name: 'CinemaOS', quality: 98, captions: 92, reliability: 98, popupRisk: 10,
@@ -902,5 +1247,13 @@
 
         init();
     </script>
+    <script src="tutorial-engine.js?v=1"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.TutorialEngine) TutorialEngine.initMedia();
+        });
+    </script>
+    <script src="bgm-manager.js?v=55"></script>
 </body>
 </html>
+

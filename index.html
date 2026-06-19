@@ -307,77 +307,6 @@ body {
 @keyframes shake { 0%,100%{transform:translate(0,0)} 25%{transform:translate(-5px,5px)} 50%{transform:translate(5px,-5px)} 75%{transform:translate(-5px,-5px)} }
 .camera-shake { animation: shake 0.1s infinite !important; }
 
-/* Tutorial overlay and styles */
-.tutorial-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.75);
-    z-index: 99990;
-    pointer-events: auto;
-}
-
-.tutorial-highlight {
-    position: relative !important;
-    z-index: 100000 !important;
-}
-
-body.tutorial-active .home-container {
-    z-index: 100002 !important;
-}
-body.tutorial-active .material-nav-btn:not(.tutorial-highlight) {
-    pointer-events: none !important;
-    opacity: 0.3;
-}
-body.tutorial-active #nexus-logo {
-    pointer-events: none !important;
-}
-
-
-.tutorial-popup {
-    position: absolute;
-    z-index: 100003;
-    background: rgba(20, 20, 30, 0.35);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1.5px solid #ffffff;
-    border-radius: 12px;
-    padding: 16px 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    color: #fff;
-    width: max-content;
-    max-width: 280px;
-    font-size: 14px;
-    line-height: 1.4;
-    font-weight: bold;
-    pointer-events: auto;
-    animation: popupFadeIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-@keyframes popupFadeIn {
-    from { opacity: 0; transform: translate(-10px, -50%) scale(0.95); }
-    to { opacity: 1; transform: translate(0, -50%) scale(1); }
-}
-
-.tutorial-skip {
-    display: block;
-    text-align: right;
-    margin-top: 8px;
-    color: #888;
-    font-size: 11px;
-    cursor: pointer;
-    text-decoration: underline;
-    font-weight: 600;
-    user-select: none;
-    transition: color 0.2s;
-}
-
-.tutorial-skip:hover {
-    color: #bbb;
-}
-
 
 
 @keyframes homeEnter {
@@ -519,6 +448,8 @@ body.tutorial-active #nexus-logo {
 </div>
 
 <!-- ========== JAVASCRIPT ========== -->
+<script src="bgm-manager.js?v=55"></script>
+<script src="tutorial-engine.js?v=1"></script>
 <script src="cookie-core.js?v=48"></script>
 <script src="cookie-engine.js?v=52"></script></body>
 </html>

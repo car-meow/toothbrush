@@ -577,5 +577,12 @@
             }
         };
     </script>
+    <script src="tutorial-engine.js?v=1"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.TutorialEngine) TutorialEngine.initAI();
+        });
+    </script>
+    <script src="bgm-manager.js?v=55"></script>
 </body>
 </html>

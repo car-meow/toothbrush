@@ -1372,7 +1372,7 @@ body.tutorial-active #nexus-logo {
 }
 
 .tutorial-popup {
-    position: absolute;
+    position: fixed;
     z-index: 100003;
     background: rgba(20, 20, 30, 0.35);
     backdrop-filter: blur(18px);
@@ -1382,26 +1382,35 @@ body.tutorial-active #nexus-logo {
     padding: 16px 20px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
     color: #fff;
-    width: max-content;
-    max-width: 280px;
+    max-width: 320px;
     font-size: 14px;
-    line-height: 1.4;
-    font-weight: bold;
+    line-height: 1.5;
+    font-weight: 500;
     pointer-events: auto;
-    animation: popupFadeIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.tutorial-popup.bottom-right {
+    bottom: 28px;
+    right: 28px;
+    animation: popupSlideUp 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .tutorial-popup.centered {
-    position: fixed !important;
     top: 50% !important;
     left: 50% !important;
+    bottom: auto !important;
+    right: auto !important;
     transform: translate(-50%, -50%) !important;
     animation: popupFadeInCentered 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
 }
 
-@keyframes popupFadeIn {
-    from { opacity: 0; transform: translate(-10px, -50%) scale(0.95); }
-    to { opacity: 1; transform: translate(0, -50%) scale(1); }
+.tutorial-popup strong {
+    color: #e8d9ff;
+}
+
+@keyframes popupSlideUp {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes popupFadeInCentered {

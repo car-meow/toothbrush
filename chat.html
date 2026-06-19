@@ -516,7 +516,7 @@
             if (data.type === 'disband') {
                 if (isDisconnecting) return;
                 isDisconnecting = true;
-                alert('Room Disbanded.');
+                // Removed redundant alert to avoid double prompt
                 location.reload();
             }
 
@@ -756,5 +756,12 @@
         if (overlay) overlay.classList.add('fade-out');
     });
     </script>
+    <script src="tutorial-engine.js?v=1"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.TutorialEngine) TutorialEngine.initChat();
+        });
+    </script>
+    <script src="bgm-manager.js?v=55"></script>
 </body>
 </html>

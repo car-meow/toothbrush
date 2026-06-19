@@ -315,6 +315,14 @@ function onDragEnd(e) {
 
 function loadGame(game) {
     currentGame = game;
+    if (game.id !== "ugs-stash") {
+        localStorage.setItem('tb_bgm_stopped_by_game', 'true');
+    } else {
+        localStorage.removeItem('tb_bgm_stopped_by_game');
+    }
+    if (window.BGMManager) {
+        window.BGMManager.updateState();
+    }
     const frame = document.getElementById('game-frame');
     const emergencyBtn = document.getElementById('emergency-open-btn');
     const emptyState = document.getElementById('empty-state');
