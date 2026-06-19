@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>New Tab</title>
+    <title>Nexus Chat</title>
     <link rel="stylesheet" href="style.css?v=54">
     <script>
         (function() {
@@ -12,8 +12,6 @@
     </script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
-        /* Use global .chat-bg for background */
-
         .status-header { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 20px; font-size: 11px; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
         .online-stats { display: flex; align-items: center; gap: 10px; margin-left: 15px; }
@@ -22,8 +20,9 @@
 
         .chat-msg {
             padding: 12px 18px; border-radius: 15px; background: rgba(0,0,0,0.6);
-            border: 4px solid; max-width: 80%; margin-bottom: 12px; color: white;
+            border: 2.5px solid white; max-width: 80%; margin-bottom: 12px; color: white;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            word-break: break-word; overflow-wrap: anywhere;
         }
 
         .list-modal {
@@ -38,7 +37,7 @@
         
         .pin-input-large { font-size: 28px; text-align: center; letter-spacing: 5px; background: var(--input-bg); border: 2px solid var(--border-color); color: var(--text-color); width: 100%; border-radius: 12px; padding: 15px; outline: none; }
         .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; align-items: center; justify-content: center; }
-		
+
         #pin-wrapper { position: relative; display: inline-block; cursor: pointer; user-select: none; padding: 0 5px; min-width: 130px; text-align: center; }
         #pin-cover {
             position: absolute; top: -4px; left: 0; right: 0; bottom: -4px;
@@ -47,6 +46,15 @@
             transition: opacity 0.15s ease-in-out; opacity: 1;
         }
         #pin-wrapper.revealed #pin-cover { opacity: 0; }
+
+        /* Username assignment pending overlay */
+        #waiting-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            z-index: 9000; align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+        }
+        #waiting-overlay p { color: #fff; font-size: 1.2rem; font-weight: bold; }
+        .spinner { width: 48px; height: 48px; border: 5px solid #444; border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
     <link rel="prefetch" href="index.html">
     <link rel="prefetch" href="cookie-engine.js">
@@ -67,6 +75,13 @@
             };
         })();
     </script>
+
+    <!-- Waiting for username assignment -->
+    <div id="waiting-overlay">
+        <div class="spinner"></div>
+        <p>Connecting — assigning your username…</p>
+    </div>
+
     <header>
         <h1 onclick="navigateWithFade('index.html')" style="cursor:pointer">Nexus Chat</h1>
         
@@ -143,444 +158,557 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            // --- 1. BAN CHECK ---
-            const timeoutEnd = localStorage.getItem('tb_chat_timeout');
-            if (timeoutEnd && Date.now() < parseInt(timeoutEnd)) {
-                const timeLeft = Math.ceil((parseInt(timeoutEnd) - Date.now()) / 1000);
-                alert(`You are currently in a timeout from being kicked. Please wait ${timeLeft} seconds.`);
-                navigateWithFade('index.html'); return; 
-            } else if (timeoutEnd) { localStorage.removeItem('tb_chat_timeout'); }
+    document.addEventListener('DOMContentLoaded', async () => {
 
-            // --- 2. IDENTITY PERSISTENCE ---
-            const colorMap = {"#F44336":"Crimson","#E91E63":"Rose","#9C27B0":"Purple","#673AB7":"Indigo","#2196F3":"Azure","#00BCD4":"Cyan","#009688":"Teal","#4CAF50":"Leaf","#8BC34A":"Lime","#FFEB3B":"Gold","#FF9800":"Orange","#795548":"Cedar","#607D8B":"Steel","#636B2F":"Olive","#D4E157":"Pear","#26C6DA":"Sky"};
-            const colors = Object.keys(colorMap);
-            
-            let myColor, myName, myUuid;
-            const savedIdentity = JSON.parse(localStorage.getItem('tb_identity') || 'null');
-            const now = Date.now();
-            
-            if (savedIdentity && savedIdentity.lastActive && (now - savedIdentity.lastActive < 300000)) {
-                myColor = savedIdentity.color; 
-                myName = savedIdentity.name;
-                myUuid = savedIdentity.uuid || Math.random().toString(36).substr(2, 9);
-            } else {
-                generateNewIdentity();
+        // ═══════════════════════════════════════════════════
+        //  0. BAN CHECK
+        // ═══════════════════════════════════════════════════
+        const timeoutEnd = localStorage.getItem('tb_chat_timeout');
+        if (timeoutEnd && Date.now() < parseInt(timeoutEnd)) {
+            const timeLeft = Math.ceil((parseInt(timeoutEnd) - Date.now()) / 1000);
+            alert(`You are currently in a timeout from being kicked. Please wait ${timeLeft} seconds.`);
+            navigateWithFade('index.html'); return;
+        } else if (timeoutEnd) { localStorage.removeItem('tb_chat_timeout'); }
+
+        // ═══════════════════════════════════════════════════
+        //  1. USERNAME POOL  (100 animal names)
+        // ═══════════════════════════════════════════════════
+        const USERNAME_POOL = [
+            "Red Fox","Blue Whale","Green Gecko","Black Panther","White Wolf",
+            "Silver Hawk","Golden Eagle","Crimson Cobra","Violet Viper","Orange Otter",
+            "Yellow Yak","Pink Flamingo","Gray Gorilla","Brown Bear","Cyan Cheetah",
+            "Indigo Iguana","Scarlet Sparrow","Amber Antelope","Jade Jaguar","Ivory Owl",
+            "Teal Tiger","Bronze Buffalo","Ruby Raven","Sapphire Shark","Emerald Elk",
+            "Lavender Lynx","Coral Crow","Onyx Octopus","Pearl Penguin","Copper Cougar",
+            "Mint Mongoose","Navy Narwhal","Maroon Moose","Turquoise Turtle","Magenta Mantis",
+            "Charcoal Chameleon","Lime Leopard","Plum Panda","Gold Gazelle","Azure Alligator",
+            "Crimson Crane","Silver Snake","White Weasel","Black Badger","Green Falcon",
+            "Blue Bison","Orange Orca","Red Rabbit","Yellow Zebra","Purple Parrot",
+            "Gray Gator","Brown Bat","Cyan Camel","Indigo Impala","Scarlet Scorpion",
+            "Amber Ape","Jade Jellyfish","Ivory Ibex","Teal Tortoise","Bronze Beetle",
+            "Ruby Raccoon","Sapphire Seal","Emerald Eel","Lavender Lizard","Coral Cat",
+            "Onyx Owl","Pearl Puma","Copper Crab","Mint Macaw","Navy Newt",
+            "Maroon Moth","Turquoise Toucan","Magenta Monkey","Charcoal Cheetah","Lime Lemur",
+            "Plum Pigeon","Gold Gibbon","Azure Axolotl","Crimson Capybara","Silver Sloth",
+            "White Walrus","Black Bison","Green Gorilla","Blue Beetle","Orange Ocelot",
+            "Red Rhino","Yellow Yeti","Purple Platypus","Gray Grouse","Brown Boar",
+            "Cyan Condor","Indigo Ibis","Scarlet Stork","Amber Armadillo","Jade Jackal",
+            "Ivory Impala","Teal Tapir","Bronze Boar","Ruby Rooster","Sapphire Skunk"
+        ];
+
+        // Color palette for name pills (one per username, deterministic from index)
+        const NAME_COLORS = [
+            "#F44336","#E91E63","#9C27B0","#673AB7","#3F51B5","#2196F3","#03A9F4",
+            "#00BCD4","#009688","#4CAF50","#8BC34A","#CDDC39","#FFC107","#FF9800",
+            "#FF5722","#795548","#607D8B","#26C6DA","#00E676","#FFEA00"
+        ];
+        function colorForName(name) {
+            let h = 0;
+            for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+            return NAME_COLORS[h % NAME_COLORS.length];
+        }
+
+        // ═══════════════════════════════════════════════════
+        //  2. STATE
+        // ═══════════════════════════════════════════════════
+        let mqttClient = null;
+        let currentTopic = null;
+        let isHost = false;
+        let isDisconnecting = false;
+        let hostWaitTimeout = null;
+        let isModalAdmin = false;
+
+        // My own identity (assigned by host)
+        let myUuid = Math.random().toString(36).substr(2, 9);
+        let myName = null;      // assigned after join acknowledged
+        let myColor = null;
+
+        // Host-side: tracks assigned names  { peerId -> { name, color, ip } }
+        let registry = {};
+        // Host-side: set of currently used names
+        let usedNames = new Set();
+
+        // Everyone's view of user list (received via registry-sync)
+        let globalUserList = [];
+
+        let myIP = "Hidden";
+        try {
+            const res = await fetch('https://api.ipify.org?format=json');
+            const data = await res.json(); myIP = data.ip;
+        } catch(e) {}
+
+        const VERSION = "tb-pool-v1-";
+
+        // ═══════════════════════════════════════════════════
+        //  3. HELPERS
+        // ═══════════════════════════════════════════════════
+        function setStatus(type, text) {
+            const dot = document.getElementById('status-dot');
+            const txt = document.getElementById('status-text');
+            if (!dot || !txt) return;
+            txt.textContent = text;
+            dot.style.background = type === 'ready' ? '#4CAF50' : type === 'loading' ? '#FFEB3B' : '#f44336';
+            dot.style.boxShadow = type === 'ready' ? "0 0 10px #4CAF50" : "none";
+        }
+
+        function showWaiting(show) {
+            const ov = document.getElementById('waiting-overlay');
+            ov.style.display = show ? 'flex' : 'none';
+        }
+
+        function publish(data) {
+            if (mqttClient && mqttClient.connected) mqttClient.publish(currentTopic, JSON.stringify(data));
+        }
+
+        // Pick a free name from the pool. Falls back to random animal if pool exhausted.
+        function pickFreeName() {
+            const available = USERNAME_POOL.filter(n => !usedNames.has(n));
+            if (available.length === 0) {
+                // Pool exhausted — reuse any name (shouldn't happen under 100 users)
+                return USERNAME_POOL[Math.floor(Math.random() * USERNAME_POOL.length)];
             }
+            return available[Math.floor(Math.random() * available.length)];
+        }
 
-            function generateNewIdentity() {
-                myColor = colors[Math.floor(Math.random()*colors.length)];
-                myName = colorMap[myColor] + "_" + Math.floor(Math.random()*999);
-                myUuid = Math.random().toString(36).substr(2, 9);
+        // Release a name back to the pool (host only)
+        function releaseName(name) {
+            usedNames.delete(name);
+        }
+
+        function broadcastRegistry() {
+            const list = Object.values(registry);
+            publish({ type: 'registry-sync', list });
+        }
+
+        function updateOccupancy() {
+            document.getElementById('count-num').textContent = globalUserList.length;
+            refreshModalIfOpen();
+        }
+
+        // ═══════════════════════════════════════════════════
+        //  4. USER LIST MODAL
+        // ═══════════════════════════════════════════════════
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) { e.preventDefault(); openUserModal(false); }
+            if (e.ctrlKey && e.shiftKey && (e.key === '0' || e.key === ')')) { e.preventDefault(); openUserModal(true); }
+
+            const hostModal = document.getElementById('host-modal');
+            const userListModal = document.getElementById('user-list-modal');
+
+            if (e.key === 'Escape') {
+                if (hostModal.style.display === 'flex') { e.preventDefault(); hostModal.style.display = 'none'; }
+                if (userListModal.style.display === 'block') { e.preventDefault(); userListModal.style.display = 'none'; }
             }
-
-            function updateActiveTimer() { localStorage.setItem('tb_identity', JSON.stringify({ color: myColor, name: myName, uuid: myUuid, lastActive: Date.now() })); }
-            updateActiveTimer(); setInterval(updateActiveTimer, 60000); window.addEventListener('beforeunload', updateActiveTimer); 
-
-            let myIP = "Hidden";
-            try {
-                const res = await fetch('https://api.ipify.org?format=json');
-                const data = await res.json(); myIP = data.ip;
-            } catch(e) {}
-
-            // --- 3. MQTT ENGINE ---
-            let mqttClient = null;
-            let currentTopic = null;
-            let isHost = false;
-            let globalUserList =[]; 
-            let isModalAdmin = false; 
-            let hostWaitTimeout = null;
-            let isDisconnecting = false; 
-
-            const VERSION = "tb-wss-v5-"; // Incremented version to ensure clean slate
-
-            function setStatus(type, text) {
-                const dot = document.getElementById('status-dot');
-                const txt = document.getElementById('status-text');
-                if(!dot || !txt) return; 
-                txt.textContent = text;
-                dot.style.background = (type === 'ready') ? '#4CAF50' : (type === 'loading') ? '#FFEB3B' : '#f44336';
-                dot.style.boxShadow = (type === 'ready') ? "0 0 10px #4CAF50" : "none";
+            if (e.key === 'Enter') {
+                if (hostModal.style.display === 'flex') { e.preventDefault(); document.getElementById('start-host-btn').click(); }
+                else if (userListModal.style.display === 'block') { e.preventDefault(); userListModal.style.display = 'none'; }
             }
+        });
 
-            // --- 4. KEYBINDS & LISTS ---
-            document.addEventListener('keydown', (e) => {
-                if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) { e.preventDefault(); openUserModal(false); }
-                if (e.ctrlKey && e.shiftKey && (e.key === '0' || e.key === ')')) { e.preventDefault(); openUserModal(true); }
+        function openUserModal(isAdmin) {
+            isModalAdmin = isAdmin;
+            const modal = document.getElementById('user-list-modal');
+            const list = document.getElementById('list-content');
+            document.getElementById('modal-title').textContent = isAdmin ? "Admin Backdoor (IPs)" : "Active Users";
+            list.innerHTML = "";
 
-                const hostModal = document.getElementById('host-modal');
-                const userListModal = document.getElementById('user-list-modal');
-
-                if (e.key === 'Escape') {
-                    if (hostModal.style.display === 'flex') {
-                        e.preventDefault();
-                        hostModal.style.display = 'none';
-                    }
-                    if (userListModal.style.display === 'block') {
-                        e.preventDefault();
-                        userListModal.style.display = 'none';
-                    }
+            globalUserList.forEach(user => {
+                const row = document.createElement('div');
+                row.className = "user-row";
+                let innerHTML = `<div class="user-pill" style="background:${user.color}">${user.name}</div>`;
+                if (isAdmin) innerHTML += `<span class="ip-text">${user.ip}</span>`;
+                if (isHost && user.peerId !== myUuid) {
+                    innerHTML += `<span onclick="kickById('${user.peerId}', '${user.name}')" style="cursor:pointer;"><img src="Assets/Delete.svg" alt="Kick" style="width:18px;height:18px;filter:brightness(0) invert(1);vertical-align:middle;"></span>`;
                 }
+                row.innerHTML = innerHTML;
+                list.appendChild(row);
+            });
+            modal.style.display = 'block';
+        }
 
-                if (e.key === 'Enter') {
-                    if (hostModal.style.display === 'flex') {
-                        e.preventDefault();
-                        document.getElementById('start-host-btn').click();
-                    } else if (userListModal.style.display === 'block') {
-                        e.preventDefault();
-                        userListModal.style.display = 'none';
+        function refreshModalIfOpen() {
+            if (document.getElementById('user-list-modal').style.display === 'block') openUserModal(isModalAdmin);
+        }
+
+        document.getElementById('pin-wrapper').onclick = function() { this.classList.toggle('revealed'); };
+
+        // ═══════════════════════════════════════════════════
+        //  5. NETWORK — START
+        // ═══════════════════════════════════════════════════
+        document.getElementById('open-host-panel').onclick = () => document.getElementById('host-modal').style.display = 'flex';
+
+        document.getElementById('start-host-btn').onclick = () => {
+            const name = document.getElementById('host-name-input').value.trim();
+            const pin = document.getElementById('host-pin-input').value.trim();
+            if (name && pin.length === 6) { isHost = true; startNetwork(pin, name); }
+        };
+
+        document.getElementById('join-btn').onclick = () => {
+            const pin = document.getElementById('pin-entry').value.trim();
+            if (pin.length === 6) { isHost = false; startNetwork(pin, null); }
+        };
+
+        function startNetwork(pin, roomName) {
+            setStatus('loading', 'Connecting to secure relay...');
+            if (mqttClient) mqttClient.end();
+
+            currentTopic = VERSION + pin;
+            mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+
+            mqttClient.on('connect', () => {
+                mqttClient.subscribe(currentTopic, (err) => {
+                    if (!err) {
+                        if (isHost) {
+                            // Host assigns themselves a name from the pool
+                            myName = pickFreeName();
+                            myColor = colorForName(myName);
+                            usedNames.add(myName);
+
+                            registry[myUuid] = { name: myName, color: myColor, ip: myIP, peerId: myUuid };
+                            globalUserList = Object.values(registry);
+
+                            setStatus('ready', 'Room Live');
+                            updateOccupancy();
+                            setupUI(roomName, pin);
+                        } else {
+                            // Guest sends a join request
+                            showWaiting(true);
+                            setStatus('loading', 'Locating Host…');
+                            publish({ type: 'join', peerId: myUuid, ip: myIP });
+
+                            hostWaitTimeout = setTimeout(() => {
+                                if (!myName) {
+                                    showWaiting(false);
+                                    setStatus('error', 'Host Offline');
+                                    document.getElementById('pin-error').style.display = 'block';
+                                    mqttClient.end();
+                                }
+                            }, 8000);
+                        }
                     }
-                }
+                });
             });
 
-            function openUserModal(isAdmin) {
-                isModalAdmin = isAdmin;
-                const modal = document.getElementById('user-list-modal');
-                const list = document.getElementById('list-content');
-                document.getElementById('modal-title').textContent = isAdmin ? "Admin Backdoor (IPs)" : "Active Users";
-                list.innerHTML = "";
+            mqttClient.on('message', (topic, message) => {
+                try {
+                    const data = JSON.parse(message.toString());
+                    handleData(data);
+                } catch(e) {}
+            });
 
-                globalUserList.forEach(user => {
-                    const row = document.createElement('div');
-                    row.className = "user-row";
-                    
-                    let innerHTML = `<div class="user-pill" style="background:${user.color}">${user.name}</div>`;
-                    if(isAdmin) innerHTML += `<span class="ip-text">${user.ip}</span>`;
-                    
-                    if(isHost && user.name !== myName) {
-                        innerHTML += `<span onclick="kickById('${user.peerId}', '${user.name}')" style="cursor:pointer;"><img src="Assets/Delete.svg" alt="Kick" style="width:18px;height:18px;filter:brightness(0) invert(1);vertical-align:middle;"></span>`;
+            mqttClient.on('error', () => { setStatus('error', 'Network Blocked'); showWaiting(false); });
+        }
+
+        // ═══════════════════════════════════════════════════
+        //  6. MESSAGE HANDLER
+        // ═══════════════════════════════════════════════════
+        function handleData(data) {
+
+            // ── HOST: incoming join request ──────────────────
+            if (isHost && data.type === 'join' && data.peerId !== myUuid) {
+                // Idempotent: ignore duplicate joins
+                if (registry[data.peerId]) {
+                    // Re-send registry in case they missed it
+                    broadcastRegistry();
+                    publish({ type: 'room-info', name: document.getElementById('display-room-name').textContent, pin: document.getElementById('display-pin').textContent });
+                    return;
+                }
+
+                const assignedName = pickFreeName();
+                const assignedColor = colorForName(assignedName);
+                usedNames.add(assignedName);
+
+                registry[data.peerId] = { name: assignedName, color: assignedColor, ip: data.ip, peerId: data.peerId };
+                globalUserList = Object.values(registry);
+
+                // Tell the joiner who they are
+                publish({ type: 'name-assign', targetPeerId: data.peerId, name: assignedName, color: assignedColor });
+                // Broadcast room info and updated registry
+                publish({ type: 'room-info', name: document.getElementById('display-room-name').textContent, pin: document.getElementById('display-pin').textContent });
+                broadcastRegistry();
+
+                appendSystemMessage(`${assignedName} joined.`);
+                publish({ type: 'msg', name: 'System', color: '#777', text: `${assignedName} joined.` });
+                updateOccupancy();
+            }
+
+            // ── GUEST: receive name assignment ───────────────
+            if (!isHost && data.type === 'name-assign' && data.targetPeerId === myUuid && !myName) {
+                if (hostWaitTimeout) clearTimeout(hostWaitTimeout);
+                myName = data.name;
+                myColor = data.color;
+                showWaiting(false);
+            }
+
+            // ── GUEST: receive room info ──────────────────────
+            if (!isHost && data.type === 'room-info') {
+                // Only set up UI once we have a name
+                if (myName) setupUI(data.name, data.pin);
+            }
+
+            // ── Everyone: registry sync ───────────────────────
+            if (data.type === 'registry-sync') {
+                if (hostWaitTimeout) clearTimeout(hostWaitTimeout);
+                globalUserList = data.list;
+                updateOccupancy();
+                // If guest has name now, and room is not shown yet, show it
+                if (!isHost && myName) {
+                    const room = document.getElementById('chat-room');
+                    if (room.style.display === 'none' || room.style.display === '') {
+                        // room-info may come before or after registry; defer
                     }
-                    
-                    row.innerHTML = innerHTML;
-                    list.appendChild(row);
-                });
-                modal.style.display = 'block';
-            }
-
-            function refreshModalIfOpen() {
-                if (document.getElementById('user-list-modal').style.display === 'block') openUserModal(isModalAdmin);
-            }
-
-            document.getElementById('pin-wrapper').onclick = function() { this.classList.toggle('revealed'); };
-
-            // --- 5. NETWORK LOGIC ---
-            document.getElementById('open-host-panel').onclick = () => document.getElementById('host-modal').style.display='flex';
-            document.getElementById('start-host-btn').onclick = () => {
-                const name = document.getElementById('host-name-input').value.trim();
-                const pin = document.getElementById('host-pin-input').value.trim();
-                if(name && pin.length === 6) { isHost = true; startNetwork(pin, name); }
-            };
-            document.getElementById('join-btn').onclick = () => {
-                const pin = document.getElementById('pin-entry').value.trim();
-                if(pin.length === 6) { isHost = false; startNetwork(pin, null); }
-            };
-
-            function publish(data) {
-                if(mqttClient && mqttClient.connected) mqttClient.publish(currentTopic, JSON.stringify(data));
-            }
-
-            function startNetwork(pin, roomName) {
-                setStatus('loading', 'Connecting to secure relay...');
-                if(mqttClient) mqttClient.end();
-                
-                currentTopic = VERSION + pin;
-                mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
-
-                mqttClient.on('connect', () => {
-                    mqttClient.subscribe(currentTopic, (err) => {
-                        if (!err) {
-                            if (isHost) {
-                                setStatus('ready', 'Room Live');
-                                globalUserList =[{ name: myName, color: myColor, ip: myIP, peerId: myName }];
-                                updateOccupancy();
-                                setupUI(roomName, pin);
-                            } else {
-                                setStatus('loading', 'Locating Host...');
-                                publish({type: 'join', name: myName, color: myColor, ip: myIP, peerId: myName});
-                                
-                                hostWaitTimeout = setTimeout(() => {
-                                    if(globalUserList.length === 0) {
-                                        setStatus('error', 'Host Offline');
-                                        document.getElementById('pin-error').style.display = 'block';
-                                        mqttClient.end();
-                                    }
-                                }, 6000);
-                            }
-                        }
-                    });
-                });
-
-                mqttClient.on('message', (topic, message) => {
-                    try {
-                        const data = JSON.parse(message.toString());
-                        handleData(data);
-                    } catch(e) {}
-                });
-
-                mqttClient.on('error', () => {
-                    setStatus('error', 'Network Blocked');
-                });
-            }
-
-            function handleData(data) {
-                // NAME CHANGE LOGIC
-                if (data.type === 'name-change') {
-                    appendSystemMessage(`${data.oldName} changed their name to ${data.newName}`);
-                    updateMessagesInUI(data.uuid, data.newName, data.newColor);
-
-                    if (isHost) {
-                        const targetUser = globalUserList.find(u => u.peerId === data.senderId);
-                        if (targetUser) {
-                            targetUser.name = data.newName;
-                            targetUser.color = data.newColor;
-                            broadcastRegistry();
-                        }
-                    }
-                    return; // Done handling name change
                 }
-				
-                // NORMAL MESSAGES
-                if (data.type === 'msg' && data.name !== myName) {
-                    appendMessage(data.name, data.color, data.text, data.uuid);
+                setStatus('ready', 'Joined Room');
+            }
+
+            // ── Regular chat message ─────────────────────────
+            if (data.type === 'msg' && data.name !== myName) {
+                appendMessage(data.name, data.color, data.text, data.uuid || data.name);
+            }
+
+            // ── Disband ───────────────────────────────────────
+            if (data.type === 'disband') {
+                if (isDisconnecting) return;
+                isDisconnecting = true;
+                alert("Room Disbanded.");
+                location.reload();
+            }
+
+            // ── Kick ─────────────────────────────────────────
+            if (data.type === 'kick') {
+                if (isHost) {
+                    appendSystemMessage(`${data.targetName} was kicked from the room.`);
+                    publish({ type: 'msg', name: 'System', color: '#777', text: `${data.targetName} was kicked from the room.` });
                 }
-                
-                if (data.type === 'room-info' && !isHost) {
-                    setupUI(data.name, data.pin);
-                }
-                
-                if (data.type === 'disband') { 
+                if (data.targetPeerId === myUuid) {
                     if (isDisconnecting) return;
                     isDisconnecting = true;
-                    alert("Room Disbanded."); 
-                    location.reload(); 
+                    localStorage.setItem('tb_chat_timeout', Date.now() + 60000);
+                    alert("You have been kicked! You are timed out for 1 minute.");
+                    navigateWithFade('index.html');
                 }
-                
-                // KICK LOGIC
-                if (data.type === 'kick') {
-                    // Tell everyone the user was kicked
-                    if (isHost) {
-                        appendSystemMessage(`${data.targetName} was kicked from the room.`);
-                        publish({type: 'msg', name: 'System', color: '#777', text: `${data.targetName} was kicked from the room.`});
-                    }
-                    
-                    // The victim's browser kicks them out
-                    if (data.targetId === myName) {
-                        if (isDisconnecting) return;
-                        isDisconnecting = true;
-                        localStorage.setItem('tb_chat_timeout', Date.now() + 60000); 
-                        alert("You have been kicked! You are timed out for 1 minute."); 
-                        navigateWithFade('index.html'); 
-                    }
-                }
-                
-                if (data.type === 'registry-sync') {
-                    if (hostWaitTimeout) clearTimeout(hostWaitTimeout);
-                    setStatus('ready', 'Joined Room');
-                    globalUserList = data.list;
+            }
+
+            // ── HOST: member leave ────────────────────────────
+            if (isHost && data.type === 'leave' && data.peerId !== myUuid) {
+                const departed = registry[data.peerId];
+                if (departed) {
+                    releaseName(departed.name);
+                    delete registry[data.peerId];
+                    globalUserList = Object.values(registry);
+                    appendSystemMessage(`${departed.name} left the room.`);
+                    publish({ type: 'msg', name: 'System', color: '#777', text: `${departed.name} left.` });
                     updateOccupancy();
+                    broadcastRegistry();
                 }
-                
-                // Host manages joins
-                if (isHost && data.type === 'join' && data.name !== myName) {
-                    if (!globalUserList.find(u => u.peerId === data.peerId)) {
-                        globalUserList.push({ name: data.name, color: data.color, ip: data.ip, peerId: data.peerId });
-                        appendSystemMessage(`${data.name} joined.`);
-                        publish({type: 'msg', name: 'System', color: '#777', text: data.name + " joined."});
-                        publish({type: 'room-info', name: document.getElementById('display-room-name').textContent, pin: document.getElementById('display-pin').textContent.replace('PIN: ','')});
-                        updateOccupancy();
+            }
+
+            // ── Name change ───────────────────────────────────
+            if (data.type === 'name-change') {
+                appendSystemMessage(`${data.oldName} changed their name to ${data.newName}`);
+                updateMessagesInUI(data.uuid, data.newName, data.newColor);
+                if (isHost) {
+                    const entry = registry[data.peerId];
+                    if (entry) {
+                        releaseName(entry.name);
+                        entry.name = data.newName;
+                        entry.color = data.newColor;
+                        usedNames.add(data.newName);
                         broadcastRegistry();
                     }
                 }
-
-                // Host manages leaves
-                if (isHost && data.type === 'leave' && data.name !== myName) {
-                    globalUserList = globalUserList.filter(u => u.peerId !== data.peerId);
-                    appendSystemMessage(`${data.name} left the room.`);
-                    publish({type: 'msg', name: 'System', color: '#777', text: data.name + " left."});
-                    updateOccupancy();
-                    broadcastRegistry();
-                }
             }
+        }
 
-            function broadcastRegistry() {
-                publish({type: 'registry-sync', list: globalUserList});
+        // ═══════════════════════════════════════════════════
+        //  7. UI SETUP
+        // ═══════════════════════════════════════════════════
+        function setupUI(name, pin) {
+            document.getElementById('chat-home').style.display = 'none';
+            document.getElementById('host-modal').style.display = 'none';
+            document.getElementById('chat-room').style.display = 'flex';
+            document.getElementById('room-header-info').style.display = 'block';
+            document.getElementById('stats-area').style.display = 'flex';
+            document.getElementById('reroll-btn').style.display = 'inline-flex';
+            document.getElementById('display-room-name').textContent = name;
+            document.getElementById('display-pin').textContent = pin;
+            document.getElementById('pin-wrapper').classList.remove('revealed');
+
+            const backBtn = document.getElementById('chat-back-btn');
+            if (isHost) {
+                document.getElementById('disband-btn').style.display = 'inline-flex';
+                if (backBtn) backBtn.style.display = 'none';
+            } else {
+                if (backBtn && backBtn.querySelector('span')) backBtn.querySelector('span').textContent = 'Leave';
             }
+        }
 
-            function updateOccupancy() {
-                document.getElementById('count-num').textContent = globalUserList.length;
-                refreshModalIfOpen(); 
-            }
+        // ═══════════════════════════════════════════════════
+        //  8. MESSAGE RENDERING
+        // ═══════════════════════════════════════════════════
+        function appendSystemMessage(text) {
+            const area = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.style.cssText = "color:#777;font-weight:bold;text-align:center;margin:10px 0;font-size:12px;";
+            div.textContent = text;
+            area.appendChild(div);
+            area.scrollTop = area.scrollHeight;
+        }
 
-            window.kickById = (pid, targetName) => {
-                publish({type: 'kick', targetId: pid, targetName: targetName});
-                globalUserList = globalUserList.filter(u => u.peerId !== pid);
-                updateOccupancy();
-                broadcastRegistry();
-            };
+        function updateMessagesInUI(uuid, newName, newColor) {
+            document.querySelectorAll(`.msg-uuid-${uuid}`).forEach(el => {
+                el.style.borderColor = newColor;
+                const tag = el.querySelector('.name-tag');
+                if (tag) { tag.textContent = newName; tag.style.color = newColor; }
+            });
+        }
 
-            function setupUI(name, pin) {
-                document.getElementById('chat-home').style.display = 'none';
-                document.getElementById('host-modal').style.display = 'none';
-                document.getElementById('chat-room').style.display = 'flex';
-                document.getElementById('room-header-info').style.display = 'block';
-                document.getElementById('stats-area').style.display = 'flex';
-                document.getElementById('reroll-btn').style.display = 'inline-flex';
-                document.getElementById('display-room-name').textContent = name;
-                document.getElementById('display-pin').textContent = pin;
-                document.getElementById('pin-wrapper').classList.remove('revealed'); 
-                
-                const backBtn = document.getElementById('chat-back-btn');
-                if(isHost) {
-                    document.getElementById('disband-btn').style.display = 'inline-flex';
-                    if(backBtn) backBtn.style.display = 'none';
-                } else {
-                    if(backBtn) {
-                        if(backBtn.querySelector('span')) backBtn.querySelector('span').textContent = 'Leave';
-                    }
-                }
-            }
+        function appendMessage(name, color, text, uuid) {
+            const area = document.getElementById('messages');
+            const div = document.createElement('div');
+            const safeUuid = (uuid || name).replace(/[^a-zA-Z0-9_-]/g, '_');
+            div.className = `chat-msg msg-uuid-${safeUuid}`;
+            div.style.borderColor = color;
+            div.style.alignSelf = (name === myName) ? "flex-end" : "flex-start";
+            div.innerHTML = `<div class="name-tag" style="font-size:10px;font-weight:bold;color:${color};margin-bottom:4px;">${name}</div><div>${text}</div>`;
+            area.appendChild(div);
+            area.scrollTop = area.scrollHeight;
+        }
 
-            // UI UPDATES FOR MESSAGES
-            function appendSystemMessage(text) {
-                const area = document.getElementById('messages');
-                const div = document.createElement('div');
-                div.style.color = "#777";
-                div.style.fontWeight = "bold";
-                div.style.textAlign = "center";
-                div.style.margin = "10px 0";
-                div.style.fontSize = "12px";
-                div.textContent = text;
-                area.appendChild(div);
-                area.scrollTop = area.scrollHeight;
-            }
+        // ═══════════════════════════════════════════════════
+        //  9. SEND / INPUT
+        // ═══════════════════════════════════════════════════
+        document.getElementById('send-btn').onclick = () => {
+            const val = document.getElementById('msg-input').value.trim();
+            if (!val || !myName) return;
+            appendMessage(myName, myColor, val, myUuid);
+            publish({ type: 'msg', name: myName, color: myColor, text: val, uuid: myUuid });
+            document.getElementById('msg-input').value = "";
+        };
 
-            function updateMessagesInUI(uuid, newName, newColor) {
-                const elements = document.querySelectorAll(`.msg-uuid-${uuid}`);
-                elements.forEach(el => {
-                    el.style.borderColor = newColor;
-                    const nameTag = el.querySelector('.name-tag');
-                    if (nameTag) {
-                        nameTag.textContent = newName;
-                        nameTag.style.color = newColor;
-                    }
-                });
-            }
+        document.getElementById('msg-input').onkeypress = (e) => { if (e.key === 'Enter') document.getElementById('send-btn').click(); };
+        document.getElementById('pin-entry').onkeypress = (e) => { if (e.key === 'Enter') document.getElementById('join-btn').click(); };
 
-            function appendMessage(name, color, text, uuid) {
-                const area = document.getElementById('messages');
-                const div = document.createElement('div');
-                div.className = `chat-msg msg-uuid-${uuid}`; 
-                div.style.borderColor = color;
-                div.style.alignSelf = (name === myName) ? "flex-end" : "flex-start";
-                div.innerHTML = `<div class="name-tag" style="font-size:10px; font-weight:bold; color:${color}; margin-bottom:4px; cursor:pointer;">${name}</div><div>${text}</div>`;
-                area.appendChild(div); area.scrollTop = area.scrollHeight;
-            }
-
-            // BUTTON LOGIC
-            document.getElementById('send-btn').onclick = () => {
-                const val = document.getElementById('msg-input').value.trim();
-                if(!val) return;
-                appendMessage(myName, myColor, val, myUuid);
-                publish({type: 'msg', name: myName, color: myColor, text: val, uuid: myUuid});
-                document.getElementById('msg-input').value = "";
-            };
-            
-            document.getElementById('msg-input').onkeypress = (e) => { if(e.key === 'Enter') document.getElementById('send-btn').click(); };
-            document.getElementById('pin-entry').onkeypress = (e) => { if(e.key === 'Enter') document.getElementById('join-btn').click(); };
-            
-            // IMAGE UPLOAD LOGIC
-            document.getElementById('img-upload').onchange = function(e) {
-                const file = e.target.files[0];
-                if(!file) return;
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const img = new Image();
-                    img.onload = function() {
-                        const canvas = document.createElement('canvas');
-                        let width = img.width;
-                        let height = img.height;
-                        const MAX = 400;
-                        if (width > height && width > MAX) { height *= MAX / width; width = MAX; }
-                        else if (height > MAX) { width *= MAX / height; height = MAX; }
-                        canvas.width = width; canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-                        const b64 = canvas.toDataURL('image/jpeg', 0.6); // Compress to save payload size
-                        
-                        appendMessage(myName, myColor, `<img src="${b64}" style="max-width:100%; border-radius:8px; margin-top:5px; cursor:pointer;" onclick="window.open(this.src)">`, myUuid);
-                        publish({type: 'msg', name: myName, color: myColor, text: `<img src="${b64}" style="max-width:100%; border-radius:8px; margin-top:5px; cursor:pointer;" onclick="window.open(this.src)">`, uuid: myUuid});
-                    };
-                    img.src = event.target.result;
+        // ═══════════════════════════════════════════════════
+        //  10. IMAGE UPLOAD
+        // ═══════════════════════════════════════════════════
+        document.getElementById('img-upload').onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file || !myName) return;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let w = img.width, h = img.height;
+                    const MAX = 400;
+                    if (w > h && w > MAX) { h *= MAX / w; w = MAX; }
+                    else if (h > MAX) { w *= MAX / h; h = MAX; }
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    const b64 = canvas.toDataURL('image/jpeg', 0.6);
+                    const imgTag = `<img src="${b64}" style="max-width:100%;border-radius:8px;margin-top:5px;cursor:pointer;" onclick="window.open(this.src)">`;
+                    appendMessage(myName, myColor, imgTag, myUuid);
+                    publish({ type: 'msg', name: myName, color: myColor, text: imgTag, uuid: myUuid });
                 };
-                reader.readAsDataURL(file);
-                this.value = ''; // Reset
+                img.src = event.target.result;
             };
-            
-            document.getElementById('disband-btn').onclick = () => {
-                if(confirm("Disband Room?")) {
-                    if (isDisconnecting) return;
-                    isDisconnecting = true;
-                    publish({type: 'disband'});
-                    alert("Room Disbanded.");
-                    setTimeout(() => location.reload(), 500);
-                }
-            };
+            reader.readAsDataURL(file);
+            this.value = '';
+        };
 
-            // Reroll Button
-            let rerollCooldown = false;
-            document.getElementById('reroll-btn').onclick = () => {
-                if (rerollCooldown) return alert("You must wait 3 minutes between name changes.");
-
-                const oldName = myName;
-                generateNewIdentity(); 
-                updateActiveTimer();
-
-                appendSystemMessage(`${oldName} changed their name to ${myName}`);
-                updateMessagesInUI(myUuid, myName, myColor);
-
-                publish({
-                    type: 'name-change',
-                    oldName: oldName,
-                    newName: myName,
-                    newColor: myColor,
-                    uuid: myUuid,
-                    senderId: myName // In MQTT, peerId is myName
-                });
-
-                if (isHost) {
-                    const meInRegistry = globalUserList.find(u => u.peerId === oldName);
-                    if (meInRegistry) { meInRegistry.name = myName; meInRegistry.color = myColor; meInRegistry.peerId = myName; }
-                    broadcastRegistry();
-                }
-
-                rerollCooldown = true;
-                const btn = document.getElementById('reroll-btn');
-                btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; btn.querySelector('span').textContent = "Cooldown (3m)";
-                
-                setTimeout(() => {
-                    rerollCooldown = false;
-                    btn.style.opacity = '1'; btn.style.cursor = 'pointer'; btn.querySelector('span').textContent = "Re-Roll Username";
-                }, 180000); 
-            };
-
-            document.getElementById('pin-entry').oninput = () => {
-                document.getElementById('pin-entry').style.color = "white";
-                document.getElementById('pin-error').style.display = "none";
-            };
-
-            window.addEventListener('beforeunload', () => {
+        // ═══════════════════════════════════════════════════
+        //  11. DISBAND / KICK / RE-ROLL
+        // ═══════════════════════════════════════════════════
+        document.getElementById('disband-btn').onclick = () => {
+            if (confirm("Disband Room?")) {
                 if (isDisconnecting) return;
                 isDisconnecting = true;
-                if (mqttClient && mqttClient.connected) {
-                    if (isHost) publish({type: 'disband'});
-                    else publish({type: 'leave', name: myName, peerId: myName});
-                }
-            });
+                publish({ type: 'disband' });
+                alert("Room Disbanded.");
+                setTimeout(() => location.reload(), 500);
+            }
+        };
 
-            // Fade page in once chat initialization is complete
-            const overlay = document.getElementById('page-fade-overlay');
-            if (overlay) overlay.classList.add('fade-out');
+        window.kickById = (targetPeerId, targetName) => {
+            publish({ type: 'kick', targetPeerId, targetName });
+            if (registry[targetPeerId]) {
+                releaseName(registry[targetPeerId].name);
+                delete registry[targetPeerId];
+            }
+            globalUserList = Object.values(registry);
+            updateOccupancy();
+            broadcastRegistry();
+        };
+
+        // Re-Roll: request a new name from the pool
+        let rerollCooldown = false;
+        document.getElementById('reroll-btn').onclick = () => {
+            if (rerollCooldown) return alert("You must wait 3 minutes between name changes.");
+            if (!myName) return;
+
+            // Build the list of available names (excluding current user's name so they don't re-get it)
+            const available = USERNAME_POOL.filter(n => !usedNames.has(n));
+            if (available.length === 0) return alert("No usernames available right now. Try again later.");
+
+            const oldName = myName;
+            const oldColor = myColor;
+            const newName = available[Math.floor(Math.random() * available.length)];
+            const newColor = colorForName(newName);
+
+            if (isHost) {
+                releaseName(oldName);
+                usedNames.add(newName);
+                if (registry[myUuid]) { registry[myUuid].name = newName; registry[myUuid].color = newColor; }
+                globalUserList = Object.values(registry);
+            }
+
+            myName = newName;
+            myColor = newColor;
+
+            appendSystemMessage(`${oldName} changed their name to ${myName}`);
+            updateMessagesInUI(myUuid, myName, myColor);
+
+            publish({ type: 'name-change', oldName, newName: myName, newColor: myColor, uuid: myUuid, peerId: myUuid });
+
+            rerollCooldown = true;
+            const btn = document.getElementById('reroll-btn');
+            btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed';
+            if (btn.querySelector('span')) btn.querySelector('span').textContent = "Cooldown (3m)";
+            setTimeout(() => {
+                rerollCooldown = false;
+                btn.style.opacity = '1'; btn.style.cursor = 'pointer';
+                if (btn.querySelector('span')) btn.querySelector('span').textContent = "Re-Roll Username";
+            }, 180000);
+        };
+
+        // ═══════════════════════════════════════════════════
+        //  12. LEAVE ON UNLOAD
+        // ═══════════════════════════════════════════════════
+        window.addEventListener('beforeunload', () => {
+            if (isDisconnecting) return;
+            isDisconnecting = true;
+            if (mqttClient && mqttClient.connected) {
+                if (isHost) {
+                    publish({ type: 'disband' });
+                } else {
+                    publish({ type: 'leave', peerId: myUuid, name: myName });
+                }
+                // Give MQTT a tiny window to flush before tab closes
+                // (synchronous XHR trick not needed — MQTT usually flushes within ~50ms)
+            }
         });
+
+        // Misc UI
+        document.getElementById('pin-entry').oninput = () => {
+            document.getElementById('pin-entry').style.color = "white";
+            document.getElementById('pin-error').style.display = "none";
+        };
+
+        // Fade page in
+        const overlay = document.getElementById('page-fade-overlay');
+        if (overlay) overlay.classList.add('fade-out');
+    });
     </script>
 </body>
 </html>
