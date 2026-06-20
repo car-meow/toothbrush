@@ -28,6 +28,23 @@
 
     // ---- DOM Helpers ----
     let overlayEl = null;
+    let overriddenButtons = []; // Array of { el: Element, origClick: Function }
+
+    function overrideClick(id, newClick) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (!overriddenButtons.some(item => item.el === el)) {
+            overriddenButtons.push({ el: el, origClick: el.onclick });
+        }
+        el.onclick = newClick;
+    }
+
+    function restoreClicks() {
+        overriddenButtons.forEach(item => {
+            item.el.onclick = item.origClick;
+        });
+        overriddenButtons = [];
+    }
 
     function ensureOverlay() {
         overlayEl = document.getElementById('tutorial-overlay');
@@ -50,8 +67,28 @@
         const popup = document.getElementById('tut-popup');
         if (popup) popup.remove();
         removeOverlay();
-        // Remove any highlight
-        document.querySelectorAll('.tutorial-highlight').forEach(el => el.classList.remove('tutorial-highlight'));
+        
+        // Restore all overridden clicks
+        restoreClicks();
+
+        // Restore home navigation styling & pointer-events/opacity
+        unlockHomeNav();
+
+        // Restore header utility buttons hover and pointer-events/opacity
+        removeUtilityHovers();
+
+        // Restore logo pointer-events
+        const logo = document.getElementById('nexus-logo');
+        if (logo) logo.style.pointerEvents = '';
+
+        // Remove any remaining highlight
+        document.querySelectorAll('.tutorial-highlight').forEach(el => {
+            el.classList.remove('tutorial-highlight');
+            if (el.classList.contains('material-nav-btn') || el.classList.contains('home-btn')) {
+                el.style.pointerEvents = '';
+                el.style.opacity = '';
+            }
+        });
     }
 
     /**
@@ -215,18 +252,14 @@
         if (logo) logo.style.pointerEvents = 'none';
 
         // When the Games button is clicked, navigate normally
-        const gamesBtn = document.getElementById('btn-nav-games');
-        if (gamesBtn) {
-            const origClick = gamesBtn.onclick;
-            gamesBtn.onclick = (e) => {
-                setStep('games_main');
-                clearAll();
-                unlockHomeNav();
-                if (logo) logo.style.pointerEvents = '';
-                if (typeof origClick === 'function') origClick.call(gamesBtn, e);
-                else location.href = 'carmeow.html';
-            };
-        }
+        overrideClick('btn-nav-games', (e) => {
+            setStep('games_main');
+            const item = overriddenButtons.find(x => x.el.id === 'btn-nav-games');
+            const orig = item ? item.origClick : null;
+            clearAll();
+            if (typeof orig === 'function') orig.call(document.getElementById('btn-nav-games'), e);
+            else location.href = 'carmeow.html';
+        });
     }
 
     function showHomePostGames() {
@@ -241,18 +274,14 @@
         const logo = document.getElementById('nexus-logo');
         if (logo) logo.style.pointerEvents = 'none';
 
-        const aiBtn = document.getElementById('btn-nav-ai');
-        if (aiBtn) {
-            const origClick = aiBtn.onclick;
-            aiBtn.onclick = (e) => {
-                setStep('ai_main');
-                clearAll();
-                unlockHomeNav();
-                if (logo) logo.style.pointerEvents = '';
-                if (typeof origClick === 'function') origClick.call(aiBtn, e);
-                else location.href = 'ai.html';
-            };
-        }
+        overrideClick('btn-nav-ai', (e) => {
+            setStep('ai_main');
+            const item = overriddenButtons.find(x => x.el.id === 'btn-nav-ai');
+            const orig = item ? item.origClick : null;
+            clearAll();
+            if (typeof orig === 'function') orig.call(document.getElementById('btn-nav-ai'), e);
+            else location.href = 'ai.html';
+        });
     }
 
     function showHomePostAI() {
@@ -281,18 +310,14 @@
         const logo = document.getElementById('nexus-logo');
         if (logo) logo.style.pointerEvents = 'none';
 
-        const chatBtn = document.getElementById('btn-nav-chat');
-        if (chatBtn) {
-            const origClick = chatBtn.onclick;
-            chatBtn.onclick = (e) => {
-                setStep('chat_main');
-                clearAll();
-                unlockHomeNav();
-                if (logo) logo.style.pointerEvents = '';
-                if (typeof origClick === 'function') origClick.call(chatBtn, e);
-                else location.href = 'chat.html';
-            };
-        }
+        overrideClick('btn-nav-chat', (e) => {
+            setStep('chat_main');
+            const item = overriddenButtons.find(x => x.el.id === 'btn-nav-chat');
+            const orig = item ? item.origClick : null;
+            clearAll();
+            if (typeof orig === 'function') orig.call(document.getElementById('btn-nav-chat'), e);
+            else location.href = 'chat.html';
+        });
     }
 
     function showHomePostChat() {
@@ -307,18 +332,14 @@
         const logo = document.getElementById('nexus-logo');
         if (logo) logo.style.pointerEvents = 'none';
 
-        const mediaBtn = document.getElementById('btn-nav-media');
-        if (mediaBtn) {
-            const origClick = mediaBtn.onclick;
-            mediaBtn.onclick = (e) => {
-                setStep('media_main');
-                clearAll();
-                unlockHomeNav();
-                if (logo) logo.style.pointerEvents = '';
-                if (typeof origClick === 'function') origClick.call(mediaBtn, e);
-                else location.href = 'media.html';
-            };
-        }
+        overrideClick('btn-nav-media', (e) => {
+            setStep('media_main');
+            const item = overriddenButtons.find(x => x.el.id === 'btn-nav-media');
+            const orig = item ? item.origClick : null;
+            clearAll();
+            if (typeof orig === 'function') orig.call(document.getElementById('btn-nav-media'), e);
+            else location.href = 'media.html';
+        });
     }
 
     function showHomeWrapUp() {

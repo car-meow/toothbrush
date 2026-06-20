@@ -47,9 +47,35 @@
         .message del { text-decoration: line-through; opacity: 0.7; }
         .message code { background: rgba(0,0,0,0.3); padding: 2px 5px; border-radius: 4px; font-family: monospace; word-break: break-word; white-space: pre-wrap; }
         .message pre { background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; overflow-x: auto; margin-top: 5px; max-width: 100%; }
+        .message ul, .message ol { padding-left: 24px; margin: 8px 0; }
+        .message li { margin-bottom: 4px; }
         
         .user-msg { align-self: flex-end; background: rgba(156, 39, 176, 0.9); color: white; }
         .ai-msg { align-self: flex-start; background: var(--panel-bg-alt); color: var(--text-color); border: 1px solid var(--border-color); backdrop-filter: blur(4px); }
+        
+        /* AI Loading phrases styling */
+        #loading-phrase {
+            color: #ffffff;
+            font-style: italic;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        /* AI streaming word fade styling */
+        @keyframes word-fade-in {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .word-fade {
+            display: none;
+            opacity: 0;
+        }
+        .word-fade.reveal {
+            display: inline;
+            animation: word-fade-in 0.25s ease forwards;
+        }
+
         .chat-input-area { display: flex; padding: 15px; background: var(--panel-bg-alt); gap: 10px; border-top: 1px solid var(--border-color); }
         .chat-input-area input:disabled { opacity: 0.6; cursor: not-allowed; }
         .chat-input-area button:disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none !important; }
@@ -208,6 +234,82 @@
         let typeTimeoutId = null;
         let isGenerating = false;
 
+        const LOADING_PHRASES = [
+            "Generating...", "Thinking...", "Considering...", "Reasoning...", "Writing...", "Checking...",
+            "Editing...", "Polishing...", "Analyzing...", "Parsing...", "Interpreting...", "Evaluating...",
+            "Planning...", "Inferring...", "Estimating...", "Comparing...", "Filtering...", "Selecting...",
+            "Retrieving...", "Recalling...", "Synthesizing...", "Connecting...", "Linking...", "Structuring...",
+            "Formulating...", "Calculating...", "Testing...", "Verifying...", "Validating...", "Refining...",
+            "Revising...", "Expanding...", "Condensing...", "Transforming...", "Optimizing...", "Balancing...",
+            "Prioritizing...", "Sequencing...", "Iterating...", "Correcting...", "Debugging...", "Aligning...",
+            "Clarifying...", "Summarizing...", "Concluding...", "Formatting...", "Finalizing...", "Reviewing...",
+            "Crosschecking...", "Rechecking...", "Delivering..."
+        ];
+
+        let loadingTimeoutId = null;
+        let phraseChangeTimeoutId = null;
+
+        function clearLoadingTimers() {
+            if (loadingTimeoutId) {
+                clearTimeout(loadingTimeoutId);
+                loadingTimeoutId = null;
+            }
+            if (phraseChangeTimeoutId) {
+                clearTimeout(phraseChangeTimeoutId);
+                phraseChangeTimeoutId = null;
+            }
+        }
+
+        function scheduleNextPhraseChange(phraseEl, out) {
+            const duration = 3000 + Math.random() * 4000;
+            phraseChangeTimeoutId = setTimeout(() => {
+                const bubble = document.getElementById('temp-thinking');
+                const currentPhraseEl = document.getElementById('loading-phrase');
+                if (!bubble || !currentPhraseEl) return;
+
+                currentPhraseEl.style.opacity = "0";
+
+                setTimeout(() => {
+                    const innerBubble = document.getElementById('temp-thinking');
+                    const innerPhraseEl = document.getElementById('loading-phrase');
+                    if (!innerBubble || !innerPhraseEl) return;
+
+                    const randomPhrase = LOADING_PHRASES[Math.floor(Math.random() * LOADING_PHRASES.length)];
+                    innerPhraseEl.textContent = randomPhrase;
+                    innerPhraseEl.style.opacity = "1";
+                    out.scrollTop = out.scrollHeight;
+
+                    scheduleNextPhraseChange(innerPhraseEl, out);
+                }, 500);
+            }, duration);
+        }
+
+        function wrapTextNodes(element, spanList = []) {
+            if (element.tagName === 'SCRIPT' || element.tagName === 'STYLE') return spanList;
+            
+            const children = Array.from(element.childNodes);
+            for (let child of children) {
+                if (child.nodeType === 3) { // TEXT_NODE
+                    const text = child.textContent;
+                    const tokens = text.match(/(\$\$.*?\$\$|\$.*?\$|\s+|\S+)/g) || [];
+                    if (tokens.length > 0) {
+                        const fragment = document.createDocumentFragment();
+                        for (let token of tokens) {
+                            const span = document.createElement('span');
+                            span.className = 'word-fade';
+                            span.textContent = token;
+                            fragment.appendChild(span);
+                            spanList.push(span);
+                        }
+                        element.replaceChild(fragment, child);
+                    }
+                } else if (child.nodeType === 1) { // ELEMENT_NODE
+                    wrapTextNodes(child, spanList);
+                }
+            }
+            return spanList;
+        }
+
         const req = indexedDB.open("AIChatDB", 1);
         req.onupgradeneeded = e => e.target.result.createObjectStore("chats", { keyPath: "id" });
         req.onsuccess = e => { db = e.target.result; renderSidebar(); };
@@ -273,6 +375,7 @@
         async function loadChat(id) {
             if (currentChatId === id) return;
             if (typeTimeoutId) clearTimeout(typeTimeoutId);
+            clearLoadingTimers();
             isGenerating = false;
             enableInputControls();
             
@@ -288,6 +391,7 @@
             if(!confirm("Delete chat?")) return;
             if(currentChatId === id) { 
                 if (typeTimeoutId) clearTimeout(typeTimeoutId);
+                clearLoadingTimers();
                 isGenerating = false;
                 enableInputControls();
                 currentChatId = null; 
@@ -409,10 +513,35 @@
             const thinkingBubble = document.createElement('div');
             thinkingBubble.className = "message ai-msg";
             thinkingBubble.id = "temp-thinking";
+            thinkingBubble.style.display = "flex";
+            thinkingBubble.style.flexDirection = "row";
+            thinkingBubble.style.alignItems = "center";
+            thinkingBubble.style.gap = "8px";
             // Replace standard Thinking with the Assets/loadingRoll.gif
             thinkingBubble.innerHTML = `<img src="Assets/loadingRoll.gif" alt="Thinking..." style="width: 24px; height: 24px; border-radius: 4px; display: block;">`;
             out.appendChild(thinkingBubble);
             out.scrollTop = out.scrollHeight;
+
+            // Start 5-second timer for loading phrases
+            clearLoadingTimers();
+            loadingTimeoutId = setTimeout(() => {
+                const bubble = document.getElementById('temp-thinking');
+                if (!bubble) return;
+
+                const phraseEl = document.createElement('div');
+                phraseEl.id = "loading-phrase";
+                const randomPhrase = LOADING_PHRASES[Math.floor(Math.random() * LOADING_PHRASES.length)];
+                phraseEl.textContent = randomPhrase;
+                bubble.appendChild(phraseEl);
+                out.scrollTop = out.scrollHeight;
+
+                setTimeout(() => {
+                    const el = document.getElementById('loading-phrase');
+                    if (el) el.style.opacity = "1";
+                }, 50);
+
+                scheduleNextPhraseChange(phraseEl, out);
+            }, 5000);
 
             const sysPrompt = "Use Markdown formatting. Use $...$ for inline math and $$...$$ for block math.";
             let fullText = null;
@@ -479,6 +608,7 @@
             }
 
             // Clean thinking bubble
+            clearLoadingTimers();
             if (document.getElementById('temp-thinking')) document.getElementById('temp-thinking').remove();
 
             if (!fullText) {
@@ -497,18 +627,22 @@
             d.className = "message ai-msg";
             out.appendChild(d);
 
-            const words = fullText.match(/\S+|\s+/g) || [];
-            let currentText = "";
-            let i = 0;
+            // Parse full markdown to HTML first
+            let processed = fullText.replace(/\\\(/g, '$').replace(/\\\)/g, '$').replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
+            d.innerHTML = marked.parse(processed);
+            out.scrollTop = out.scrollHeight;
 
-            function typeWord() {
-                if (i < words.length) {
-                    currentText += words[i];
-                    let processed = currentText.replace(/\\\(/g, '$').replace(/\\\)/g, '$').replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
-                    d.innerHTML = marked.parse(processed);
+            // Wrap all text content in d in spans
+            const wordSpans = wrapTextNodes(d);
+
+            // Reveal them one by one
+            let wordIndex = 0;
+            function revealNextWord() {
+                if (wordIndex < wordSpans.length) {
+                    wordSpans[wordIndex].classList.add('reveal');
                     out.scrollTop = out.scrollHeight;
-                    i++;
-                    typeTimeoutId = setTimeout(typeWord, 20); 
+                    wordIndex++;
+                    typeTimeoutId = setTimeout(revealNextWord, 20); 
                 } else {
                     activeHistory.push({role:'assistant', content:fullText});
                     
@@ -540,7 +674,7 @@
                     enableInputControls();
                 }
             }
-            typeWord(); 
+            revealNextWord(); 
         }
 
         document.getElementById('send-btn').onclick = send;
@@ -548,6 +682,7 @@
         
         document.getElementById('sidebar-new-chat-btn').onclick = () => {
             if (typeTimeoutId) clearTimeout(typeTimeoutId);
+            clearLoadingTimers();
             isGenerating = false;
             enableInputControls();
             
