@@ -734,6 +734,11 @@ function closeAllModals() {
 window.addEventListener('DOMContentLoaded', () => {
     cacheDom();
 
+    // Ensure default option for cookies is disabled (true) if not set
+    if (localStorage.getItem('tb_cookie_disabled') === null) {
+        localStorage.setItem('tb_cookie_disabled', 'true');
+    }
+
     // Initialize stealth cookie button state
     const cookieDisabled = localStorage.getItem('tb_cookie_disabled') !== 'false';
     const cookieBtn = document.getElementById('cookie-btn');
