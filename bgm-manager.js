@@ -1,3 +1,12 @@
+// Register Service Worker for offline support
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('Service Worker registered successfully. Scope:', reg.scope))
+            .catch(err => console.log('Service Worker registration failed:', err));
+    });
+}
+
 (function () {
     const TRACKS_COUNT = 12;
     let bgmAudio = new Audio();

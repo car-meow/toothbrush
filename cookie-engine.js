@@ -652,11 +652,75 @@ function autoTick() {
 // --- Toggle Menus ---
 function toggleMenus() {
     menusHidden = !menusHidden;
-    DOM.menuWrapper.style.opacity = menusHidden ? '0' : '1';
-    DOM.menuWrapper.style.visibility = menusHidden ? 'hidden' : 'visible';
-    DOM.hideMenuBtn.textContent = menusHidden ? 'Show Menu' : 'Hide Menu';
-    DOM.hideMenuBtn.style.backgroundColor = menusHidden ? '#c8e6c9' : '#ffcdd2';
-    DOM.hideMenuBtn.style.color = menusHidden ? '#2e7d32' : '#b71c1c';
+    if (DOM.menuWrapper) {
+        if (menusHidden) {
+            DOM.menuWrapper.classList.add('menu-hidden');
+        } else {
+            DOM.menuWrapper.classList.remove('menu-hidden');
+        }
+    }
+    if (DOM.hideMenuBtn) {
+        DOM.hideMenuBtn.textContent = menusHidden ? 'Show Menu' : 'Hide Menu';
+        DOM.hideMenuBtn.style.backgroundColor = menusHidden ? '#c8e6c9' : '#ffcdd2';
+        DOM.hideMenuBtn.style.color = menusHidden ? '#2e7d32' : '#b71c1c';
+    }
+}
+
+// --- Toggle Cookie Game ---
+function toggleCookieGame() {
+    const disabled = localStorage.getItem('tb_cookie_disabled') !== 'false';
+    const newDisabled = !disabled;
+    localStorage.setItem('tb_cookie_disabled', newDisabled);
+
+    const btn = document.getElementById('cookie-btn');
+    if (btn) {
+        if (newDisabled) {
+            btn.classList.remove('active');
+        } else {
+            btn.classList.add('active');
+        }
+    }
+
+    const styleNode = document.getElementById('tb-cookie-disabled-styles');
+    if (newDisabled) {
+        // Stop gameplay
+        if (spawnTimer) clearInterval(spawnTimer);
+        activeCookies.forEach(c => { if (c.el && c.el.parentNode) c.el.parentNode.removeChild(c.el); });
+        activeCookies = [];
+        if (DOM.cookieLayer) DOM.cookieLayer.style.display = 'none';
+        if (DOM.floatLayer) DOM.floatLayer.style.display = 'none';
+        const hudTopLeft = document.getElementById('hud-top-left');
+        if (hudTopLeft) hudTopLeft.style.display = 'none';
+
+        // Recreate style node if it doesn't exist
+        if (!styleNode) {
+            const style = document.createElement('style');
+            style.id = 'tb-cookie-disabled-styles';
+            style.innerHTML = '#hud-top-left, .hud-bottom-right, #cookie-layer, #float-layer, #effects-container, #discovery-popup { display: none !important; }';
+            document.head.appendChild(style);
+        }
+
+        // Show menu
+        if (menusHidden) {
+            toggleMenus();
+        }
+    } else {
+        // Remove style node
+        if (styleNode) styleNode.remove();
+
+        // Start gameplay
+        if (DOM.cookieLayer) DOM.cookieLayer.style.display = 'block';
+        if (DOM.floatLayer) DOM.floatLayer.style.display = 'block';
+        const hudTopLeft = document.getElementById('hud-top-left');
+        if (hudTopLeft) hudTopLeft.style.display = 'flex';
+
+        startSpawning();
+
+        // Hide menu
+        if (!menusHidden) {
+            toggleMenus();
+        }
+    }
 }
 
 function closeAllModals() {
@@ -669,6 +733,26 @@ function closeAllModals() {
 // ==================== INIT ====================
 window.addEventListener('DOMContentLoaded', () => {
     cacheDom();
+
+    // Initialize stealth cookie button state
+    const cookieDisabled = localStorage.getItem('tb_cookie_disabled') !== 'false';
+    const cookieBtn = document.getElementById('cookie-btn');
+    if (cookieBtn) {
+        if (cookieDisabled) {
+            cookieBtn.classList.remove('active');
+        } else {
+            cookieBtn.classList.add('active');
+            menusHidden = true;
+            if (DOM.menuWrapper) {
+                DOM.menuWrapper.classList.add('menu-hidden');
+            }
+        }
+        cookieBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleCookieGame();
+        };
+    }
 
     // Fade page in from black on load
     const overlay = document.getElementById('page-fade-overlay');
@@ -740,7 +824,7 @@ window.addEventListener('DOMContentLoaded', () => {
     };
 
 
-    DOM.hideMenuBtn.onclick = (e) => { e.preventDefault(); toggleMenus(); };
+    if (DOM.hideMenuBtn) DOM.hideMenuBtn.onclick = (e) => { e.preventDefault(); toggleMenus(); };
 
     document.getElementById('btn-shop').onclick = (e) => { e.preventDefault(); renderShop(); DOM.shopModal.classList.add('open'); };
     document.getElementById('shop-close').onclick = (e) => { e.preventDefault(); DOM.shopModal.classList.remove('open'); };

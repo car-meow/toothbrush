@@ -12,7 +12,7 @@
     </script>
     <script>
         if (localStorage.getItem('tb_cookie_disabled') !== 'false') {
-            document.write('<style>#hud-top-left, .hud-bottom-right, #cookie-layer, #float-layer, #effects-container, #discovery-popup { display: none !important; }</style>');
+            document.write('<style id="tb-cookie-disabled-styles">#hud-top-left, .hud-bottom-right, #cookie-layer, #float-layer, #effects-container, #discovery-popup { display: none !important; }</style>');
         }
     </script>
     <script>
@@ -76,8 +76,16 @@ body {
 .home-container {
     position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    z-index: 5; transition: opacity 0.5s, visibility 0.5s; width: 90%;
+    z-index: 5; transition: opacity 0.5s ease, visibility 0.5s ease; width: 90%;
     pointer-events: none;
+}
+.home-container.menu-hidden {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+.home-container.menu-hidden * {
+    pointer-events: none !important;
 }
 .title-area { display: flex; flex-direction: column; align-items: center; margin-bottom: 10px; }
 .home-title {
@@ -116,10 +124,16 @@ body {
     -webkit-tap-highlight-color: transparent;
     will-change: transform;
     transition: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
 }
 .cookie-entity img {
     width: 100%; height: 100%; object-fit: contain;
     pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
 }
 
 /* Auras */
@@ -400,10 +414,13 @@ body {
     </div>
 </div>
 
-<!-- ========== HUD: BOTTOM RIGHT ========== -->
-<div class="hud-bottom-right">
-    <button class="hud-btn" id="hide-menu-btn" style="background:#ffcdd2;color:#b71c1c;">Hide Menu</button>
-</div>
+<!-- ========== STEALTH COOKIE GAME TOGGLE ========== -->
+<div id="cookie-btn-trigger"></div>
+<button id="cookie-btn" aria-label="Toggle Cookie Game">
+    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor">
+        <path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-75 29-147t81-128.5q52-56.5 125-91T475-881q21 0 43 2t45 7q-9 45 6 85t45 66.5q30 26.5 71.5 36.5t85.5-5q-26 59 7.5 113t99.5 56q1 11 1.5 20.5t.5 20.5q0 82-31.5 154.5t-85.5 127q-54 54.5-127 86T480-80Zm-60-480q25 0 42.5-17.5T480-620q0-25-17.5-42.5T420-680q-25 0-42.5 17.5T360-620q0 25 17.5 42.5T420-560Zm-80 200q25 0 42.5-17.5T400-420q0-25-17.5-42.5T340-480q-25 0-42.5 17.5T280-420q0 25 17.5 42.5T340-360Zm260 40q17 0 28.5-11.5T640-360q0-17-11.5-28.5T600-400q-17 0-28.5 11.5T560-360q0 17 11.5 28.5T600-320ZM480-160q122 0 216.5-84T800-458q-50-22-78.5-60T683-603q-77-11-132-66t-68-132q-80-2-140.5 29t-101 79.5Q201-644 180.5-587T160-480q0 133 93.5 226.5T480-160Zm0-324Z"/>
+    </svg>
+</button>
 
 <!-- ========== SHOP MODAL ========== -->
 <div class="modal-overlay" id="shop-modal">

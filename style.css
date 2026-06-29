@@ -1481,3 +1481,67 @@ body.tutorial-active #nexus-logo {
     color: #bbb;
 }
 
+/* =========================================
+   6. STEALTH COOKIE GAME TOGGLE BUTTON
+========================================= */
+#cookie-btn-trigger {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 150px;
+    height: 150px;
+    z-index: 11999;
+    pointer-events: auto;
+}
+
+#cookie-btn {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    width: 52px;
+    height: 52px;
+    z-index: 12000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50% !important;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease, color 0.3s ease, border-color 0.3s ease, background-color 0.3s ease, transform 0.2s ease;
+    
+    /* Default Red state (Inactive) */
+    color: #ef5350 !important;
+    border: 2.5px solid #ef5350 !important;
+    background-color: rgba(239, 83, 80, 0.2) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    pointer-events: auto;
+}
+
+#cookie-btn:hover {
+    transform: scale(1.1);
+}
+
+/* Green state (Active) */
+#cookie-btn.active {
+    color: #4CAF50 !important;
+    border: 2.5px solid #4CAF50 !important;
+    background-color: rgba(76, 175, 80, 0.25) !important;
+}
+
+#cookie-btn svg {
+    width: 24px;
+    height: 24px;
+    transition: transform 0.2s ease;
+}
+
+#cookie-btn:active svg {
+    transform: scale(0.9);
+}
+
+#cookie-btn-trigger:hover ~ #cookie-btn,
+#cookie-btn:hover {
+    opacity: 1;
+    visibility: visible;
+}
+

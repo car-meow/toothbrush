@@ -129,14 +129,6 @@
             </div>
 
             <div class="setting-row">
-                <span class="setting-label">Enable Cookie Game</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggle-cookie-game" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <div class="setting-row">
                 <span class="setting-label">Sounds</span>
                 <label class="toggle-switch">
                     <input type="checkbox" id="toggle-mute">
@@ -286,13 +278,7 @@
 
         renderMediaSettings();
 
-        // Cookie Game Toggle
-        const toggleCookie = document.getElementById('toggle-cookie-game');
-        const cookieDisabled = localStorage.getItem('tb_cookie_disabled') !== 'false';
-        toggleCookie.checked = !cookieDisabled;
-        toggleCookie.addEventListener('change', (e) => {
-            localStorage.setItem('tb_cookie_disabled', !e.target.checked);
-        });
+
 
         // Sounds Toggle
         const toggleMute = document.getElementById('toggle-mute');
