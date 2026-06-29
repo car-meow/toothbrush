@@ -458,7 +458,7 @@
     function showGamesUtilities() {
         ensureOverlay();
 
-        const defaultText = '<strong>These are your utilities. Hover over each button to learn about it.</strong>';
+        const defaultText = '<strong>In the top right are your utilities. Hover over each button to learn about it.</strong>';
 
         const hoverTexts = {
             'cloak-btn': '<strong>Fullscreen opens a sidebar game in a full about:blank window. You can\'t do this for the Stash though.</strong>',
