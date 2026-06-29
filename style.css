@@ -387,6 +387,32 @@ body:not(.media-bg) .rename-done-btn:hover {
     font-size: 21px;
 }
 
+/* Backup and Restore buttons customized layout */
+.btn-backup,
+.btn-restore {
+    width: 60px;
+    min-width: 60px;
+    padding: 0;
+    justify-content: center;
+}
+
+body:not(.media-bg) button.btn-backup {
+    border-radius: 26px 0 0 26px !important;
+    margin-right: -4px;
+}
+
+body:not(.media-bg) button.btn-restore {
+    border-radius: 0 26px 26px 0 !important;
+}
+
+.btn-backup:hover,
+.btn-backup:focus-visible,
+.btn-restore:hover,
+.btn-restore:focus-visible {
+    width: var(--expanded-width);
+    justify-content: center;
+}
+
 /* =========================================
    5. GAMES TAB & SIDEBAR
 ========================================= */

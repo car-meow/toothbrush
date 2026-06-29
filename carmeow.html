@@ -30,11 +30,11 @@
             <button id="cloak-btn" class="material-nav-btn" style="--expanded-width: 155px;">
                 <img src="Assets/Fullscreen.svg" alt=""><span>Fullscreen</span>
             </button>
-            <button id="export-btn" class="material-nav-btn" style="--expanded-width: 120px;">
+            <button id="export-btn" class="material-nav-btn btn-backup" style="--expanded-width: 125px;">
                 <img src="Assets/Backup.svg" alt=""><span>Backup</span>
             </button>
-            <button onclick="document.getElementById('import-btn').click()" class="material-nav-btn" style="--expanded-width: 124px;">
-                <img src="Assets/Restore.svg" alt=""><span>Restore</span>
+            <button id="restore-btn" onclick="document.getElementById('import-btn').click()" class="material-nav-btn btn-restore" style="--expanded-width: 125px;">
+                <span>Restore</span><img src="Assets/Restore.svg" alt="">
             </button>
             <input type="file" id="import-btn" accept=".json" style="display:none">
             <button id="custom-app-btn" class="material-nav-btn" style="--expanded-width: 124px;">

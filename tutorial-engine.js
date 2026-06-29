@@ -188,7 +188,12 @@
         const step = getStep();
 
         // First ever visit — no step set yet
-        if (step === '') {
+        if (step === '' || step === 'home_welcome') {
+            showHomeWelcome();
+            return;
+        }
+
+        if (step === 'home_opening') {
             showHomeOpening();
             return;
         }
@@ -233,12 +238,63 @@
         }
     }
 
+    function showHomeWelcome() {
+        ensureOverlay();
+        const popup = createPopup(
+            '<strong>Welcome to Nexus! Would you like a guided walkthrough or can you figure it out?</strong>',
+            {
+                centered: true,
+                showSkip: false
+            }
+        );
+
+        setStep('home_welcome');
+
+        const walkthroughBtn = document.createElement('button');
+        walkthroughBtn.id = 'tut-walkthrough-btn';
+        walkthroughBtn.textContent = 'Walkthrough!';
+        walkthroughBtn.onclick = (e) => {
+            e.stopPropagation();
+            showHomeOpening();
+        };
+
+        const skipBtn = document.createElement('button');
+        skipBtn.id = 'tut-welcome-skip-btn';
+        skipBtn.textContent = 'Skip';
+        skipBtn.onclick = (e) => {
+            e.stopPropagation();
+            showSkipGoodbye();
+        };
+
+        popup.appendChild(walkthroughBtn);
+        popup.appendChild(skipBtn);
+    }
+
+    function showSkipGoodbye() {
+        localStorage.setItem(SKIP_KEY, 'true');
+        clearAll();
+        ensureOverlay();
+        createPopup(
+            '<strong>Alright, do as you wish. But if you want to come back to this tutorial, look in Settings.</strong>',
+            {
+                centered: true,
+                showSkip: false,
+                btn: {
+                    label: 'Got it',
+                    cb: () => {
+                        clearAll();
+                    }
+                }
+            }
+        );
+    }
+
     function showHomeOpening() {
         ensureOverlay();
         createPopup(
-            '<strong>Welcome to Nexus! Click the Games button to get started.</strong> But if you\'re a rebel, click Skip to figure stuff out on your own. If you want to come back to this tutorial, head to Settings.',
+            '<strong>Alright! Click the Games button to get started.</strong>',
             {
-                centered: true,
+                centered: false,
                 showSkip: true
             }
         );
