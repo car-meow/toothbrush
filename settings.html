@@ -143,11 +143,10 @@
             <div id="bookmarklet-row" class="setting-row" style="display: none; flex-direction: column; align-items: flex-start; gap: 10px;">
                 <div class="setting-label-group">
                     <span class="setting-label">URL Cloaking Bookmarklet</span>
-                    <span class="setting-hint" style="max-width: 100%;">Drag the button below to your bookmarks bar. Visit the target site (e.g. <code>wikipedia.org</code>) and click the bookmark to cloak the URL bar.</span>
+                    <span class="setting-hint" style="max-width: 100%;">Add the button below to your bookmarks bar (right click -> Bookmark). Visit the target site (ex. <code>wikipedia.org</code>) and then click the bookmark you added. Voila, cloaked! (Tip: Don't refresh!)</span>
                 </div>
                 <div style="display: flex; gap: 10px; width: 100%; margin-top: 6px;">
                     <a id="cloak-bookmarklet-btn" href="#" class="nav-btn" style="padding: 8px 16px; font-size: 13px; text-decoration: none; display: inline-block;" onclick="return false;">Nexus Cloaker</a>
-                    <button id="btn-copy-bookmarklet" class="nav-btn" style="padding: 8px 16px; font-size: 13px;">Copy Code</button>
                 </div>
             </div>
 
@@ -306,7 +305,6 @@
         const selectCloak = document.getElementById('select-cloak');
         const bookmarkletRow = document.getElementById('bookmarklet-row');
         const bookmarkletBtn = document.getElementById('cloak-bookmarklet-btn');
-        const copyBookmarkletBtn = document.getElementById('btn-copy-bookmarklet');
 
         // Initialize state
         const savedCloak = localStorage.getItem('tb_cloak_preset') || 'none';
@@ -334,17 +332,6 @@
                 bookmarkletBtn.setAttribute('href', bookmarkletCode);
             }
         }
-
-        copyBookmarkletBtn.onclick = () => {
-            const mainUrl = window.location.href.replace('settings.html', 'index.html');
-            const bookmarkletCode = `javascript:(function(){document.documentElement.innerHTML='';document.body.style.margin='0';document.body.style.padding='0';document.body.style.overflow='hidden';var iframe=document.createElement('iframe');iframe.src='${mainUrl}';iframe.style.position='fixed';iframe.style.top='0';iframe.style.left='0';iframe.style.width='100%';iframe.style.height='100%';iframe.style.border='none';iframe.style.zIndex='999999';document.body.appendChild(iframe);})()`;
-            
-            navigator.clipboard.writeText(bookmarkletCode).then(() => {
-                alert('Bookmarklet code copied to clipboard!');
-            }).catch(err => {
-                console.error('Could not copy text: ', err);
-            });
-        };
 
         // Sounds Toggle
         const toggleMute = document.getElementById('toggle-mute');
