@@ -7,6 +7,77 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+// App Cloaking Support
+(function() {
+    let originalTitle = document.title;
+    let originalFavicon = '';
+    const origLink = document.querySelector("link[rel*='icon']");
+    if (origLink) {
+        originalFavicon = origLink.getAttribute('href');
+    }
+
+    function applyTabCloak() {
+        const preset = localStorage.getItem('tb_cloak_preset');
+        if (!preset || preset === 'none') {
+            document.title = originalTitle;
+            let link = document.querySelector("link[rel*='icon']");
+            if (link && originalFavicon) {
+                link.href = originalFavicon;
+            }
+            return;
+        }
+
+        const presets = {
+            wikipedia: {
+                title: 'Wikipedia, the free encyclopedia',
+                icon: 'https://en.wikipedia.org/favicon.ico'
+            },
+            drive: {
+                title: 'My Drive - Google Drive',
+                icon: 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png'
+            },
+            classroom: {
+                title: 'Classes',
+                icon: 'https://ssl.gstatic.com/images/branding/product/1x/classroom_2020q4_48dp.png'
+            },
+            canvas: {
+                title: 'Dashboard',
+                icon: 'https://du11hjcvx0uqb.cloudfront.net/dist/images/favicon-e05d51a1d4.ico'
+            }
+        };
+
+        const data = presets[preset];
+        if (!data) return;
+
+        document.title = data.title;
+        let link = document.querySelector("link[rel*='icon']");
+        if (!link) {
+            link = document.createElement('link');
+            link.type = 'image/x-icon';
+            link.rel = 'shortcut icon';
+            document.head.appendChild(link);
+        }
+        link.href = data.icon;
+    }
+
+    // Run immediately on parse
+    applyTabCloak();
+
+    // Also run on DOMContentLoaded to capture post-load title/favicon changes
+    window.addEventListener('DOMContentLoaded', () => {
+        if (!originalTitle || originalTitle === 'New Tab' || originalTitle === '') {
+            originalTitle = document.title;
+        }
+        const currentLink = document.querySelector("link[rel*='icon']");
+        if (currentLink && !originalFavicon) {
+            originalFavicon = currentLink.getAttribute('href');
+        }
+        applyTabCloak();
+    });
+
+    window.applyTabCloak = applyTabCloak;
+})();
+
 (function () {
     const TRACKS_COUNT = 12;
     let bgmAudio = new Audio();
