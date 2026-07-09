@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Settings - Nexus</title>
     <link rel="stylesheet" href="style.css?v=54">
+    <script src="bgm-manager.js?v=55"></script>
     <style>
         body {
             margin: 0; overflow: hidden; width: 100vw; height: 100vh;
@@ -205,6 +206,7 @@
     </main>
 
     <script>
+        const localStorage = window.nexusStorage;
         // Theme
         const selectTheme = document.getElementById('select-theme');
         const savedTheme = localStorage.getItem('tb_theme') || 'dark';
@@ -392,6 +394,5 @@
 
     </script>
     <script src="tutorial-engine.js?v=1"></script>
-    <script src="bgm-manager.js?v=55"></script>
 </body>
 </html>

@@ -5,6 +5,7 @@
 (function() {
     'use strict';
 
+    const localStorage = window.nexusStorage;
     const STEP_KEY = 'tb_tutorial_step';
     const SKIP_KEY = 'tb_tutorial_skipped';
     const PLAYED_KEY = 'tb_tutorial_played';

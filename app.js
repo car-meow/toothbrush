@@ -24,6 +24,7 @@ async function initDB() {
 }
 
 async function loadGames() {
+    const localStorage = window.nexusStorage;
     await initDB();
     const tx = db.transaction("customGames", "readonly");
     const custom = await new Promise(r => {
@@ -87,6 +88,7 @@ function getFirstMovableIndex() {
 }
 
 function saveGameOrder() {
+    const localStorage = window.nexusStorage;
     pinMasterStash();
     const orderIds = games.map(g => g.id.toString());
     localStorage.setItem('sidebar-game-order', JSON.stringify(orderIds));
@@ -314,6 +316,7 @@ function onDragEnd(e) {
 }
 
 function loadGame(game) {
+    const localStorage = window.nexusStorage;
     currentGame = game;
     if (game.id !== "ugs-stash") {
         localStorage.setItem('tb_bgm_stopped_by_game', 'true');
@@ -600,6 +603,7 @@ if (exportBtn) {
         }
 
         try {
+            const localStorage = window.nexusStorage;
             // Gather custom games
             const tx = db.transaction('customGames', 'readonly');
             const customGames = await new Promise(r => {
@@ -718,6 +722,7 @@ if (proxyBtn) {
 const importBtn = document.getElementById('import-btn');
 if (importBtn) {
     importBtn.onchange = (e) => {
+        const localStorage = window.nexusStorage;
         const file = e.target.files[0];
         if (!file) return;
 
@@ -858,6 +863,7 @@ loadGames();
 let carmeowResizeListener = null;
 
 function initCarmeowTutorial() {
+    const localStorage = window.nexusStorage;
     const step = localStorage.getItem('tb_tutorial_step');
     if (step !== 'games_clicked') return;
 
@@ -898,6 +904,7 @@ function initCarmeowTutorial() {
 }
 
 function goToControlsStep() {
+    const localStorage = window.nexusStorage;
     const popup = document.getElementById('tutorial-popup');
     if (!popup) return;
 
@@ -985,6 +992,7 @@ function positionControlsPopup() {
 }
 
 function endCarmeowTutorial() {
+    const localStorage = window.nexusStorage;
     localStorage.removeItem('tb_tutorial_step');
     document.body.classList.remove('tutorial-active');
     

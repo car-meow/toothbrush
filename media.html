@@ -7,6 +7,7 @@
     <link rel="prefetch" href="index.html">
     <link rel="prefetch" href="cookie-engine.js">
     <link rel="prefetch" href="cookie-core.js">
+    <script src="bgm-manager.js?v=55"></script>
     <style>
         body.media-bg {
             overflow-x: hidden;
@@ -182,6 +183,7 @@
     </div>
 
     <script>
+        const localStorage = window.nexusStorage;
         const TMDB_API_KEY = '1a7373301961d03f97f853a876dd1212';
         const IMG_URL = 'https://image.tmdb.org/t/p/w500';
 
@@ -1253,7 +1255,6 @@
             if (window.TutorialEngine) TutorialEngine.initMedia();
         });
     </script>
-    <script src="bgm-manager.js?v=55"></script>
 </body>
 </html>
 

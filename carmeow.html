@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <title>New Tab</title>
     <link rel="stylesheet" href="style.css?v=54">
+    <script src="bgm-manager.js?v=55"></script>
     <script>
         (function() {
+            const localStorage = window.nexusStorage;
             const theme = localStorage.getItem('tb_theme') || 'dark';
             if (theme === 'light') document.documentElement.classList.add('light-mode');
         })();
@@ -79,7 +81,6 @@
     </div>
 
     <script src="tutorial-engine.js?v=1"></script>
-    <script src="bgm-manager.js?v=55"></script>
     <script src="game-title-utils.js?v=48"></script>
     <script src="app.js?v=49"></script>
     <script>

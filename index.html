@@ -4,19 +4,25 @@
 <meta charset="UTF-8">
 <title>New Tab</title>
 <link rel="stylesheet" href="style.css?v=54">
+    <script src="bgm-manager.js?v=55"></script>
     <script>
         (function() {
+            const localStorage = window.nexusStorage;
             const theme = localStorage.getItem('tb_theme') || 'dark';
             if (theme === 'light') document.write('<style>body { background-color: #bbbbbb; }</style>');
         })();
     </script>
     <script>
-        if (localStorage.getItem('tb_cookie_disabled') !== 'false') {
-            document.write('<style id="tb-cookie-disabled-styles">#hud-top-left, .hud-bottom-right, #cookie-layer, #float-layer, #effects-container, #discovery-popup { display: none !important; }</style>');
-        }
+        (function() {
+            const localStorage = window.nexusStorage;
+            if (localStorage.getItem('tb_cookie_disabled') !== 'false') {
+                document.write('<style id="tb-cookie-disabled-styles">#hud-top-left, .hud-bottom-right, #cookie-layer, #float-layer, #effects-container, #discovery-popup { display: none !important; }</style>');
+            }
+        })();
     </script>
     <script>
         (function() {
+            const localStorage = window.nexusStorage;
             const theme = localStorage.getItem('tb_theme') || 'dark';
             if (theme === 'light') document.documentElement.classList.add('light-mode');
         })();
@@ -465,7 +471,6 @@ body {
 </div>
 
 <!-- ========== JAVASCRIPT ========== -->
-<script src="bgm-manager.js?v=55"></script>
 <script src="tutorial-engine.js?v=1"></script>
 <script src="cookie-core.js?v=48"></script>
 <script src="cookie-engine.js?v=52"></script></body>

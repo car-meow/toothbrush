@@ -7,8 +7,104 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+// Nexus Custom Storage Wrapper (for URL cloaking storage proxy support)
+(function() {
+    let mockStore = null;
+    let useProxy = false;
+    let fallbackStore = {};
+
+    try {
+        // Parse storage from window.name synchronously
+        if (window.name && window.name.startsWith('{') && window.name.includes('tb_')) {
+            mockStore = JSON.parse(window.name);
+            useProxy = true;
+            console.log('Nexus Storage initialized from window.name');
+        }
+    } catch(e) {}
+
+    let nativeStorage = null;
+    try {
+        nativeStorage = window.localStorage;
+    } catch (e) {
+        console.warn('Native localStorage is blocked.');
+    }
+
+    const storageObj = {
+        getItem: function(key) {
+            if (useProxy && mockStore) return mockStore[key] !== undefined ? mockStore[key] : null;
+            if (nativeStorage) {
+                try { return nativeStorage.getItem(key); } catch(e) {}
+            }
+            return fallbackStore[key] !== undefined ? fallbackStore[key] : null;
+        },
+        setItem: function(key, val) {
+            const strVal = String(val);
+            if (useProxy && mockStore) {
+                mockStore[key] = strVal;
+                window.name = JSON.stringify(mockStore);
+                try {
+                    window.parent.postMessage({ type: 'nexus-storage-save', key: key, value: strVal }, '*');
+                } catch(e) {}
+                return;
+            }
+            if (nativeStorage) {
+                try { nativeStorage.setItem(key, strVal); return; } catch(e) {}
+            }
+            fallbackStore[key] = strVal;
+        },
+        removeItem: function(key) {
+            if (useProxy && mockStore) {
+                delete mockStore[key];
+                window.name = JSON.stringify(mockStore);
+                try {
+                    window.parent.postMessage({ type: 'nexus-storage-delete', key: key }, '*');
+                } catch(e) {}
+                return;
+            }
+            if (nativeStorage) {
+                try { nativeStorage.removeItem(key); return; } catch(e) {}
+            }
+            delete fallbackStore[key];
+        },
+        key: function(i) {
+            if (useProxy && mockStore) return Object.keys(mockStore)[i] || null;
+            if (nativeStorage) {
+                try { return nativeStorage.key(i); } catch(e) {}
+            }
+            return Object.keys(fallbackStore)[i] || null;
+        },
+        clear: function() {
+            if (useProxy && mockStore) {
+                mockStore = {};
+                window.name = JSON.stringify(mockStore);
+                try {
+                    window.parent.postMessage({ type: 'nexus-storage-clear' }, '*');
+                } catch(e) {}
+                return;
+            }
+            if (nativeStorage) {
+                try { nativeStorage.clear(); return; } catch(e) {}
+            }
+            fallbackStore = {};
+        }
+    };
+
+    Object.defineProperty(storageObj, 'length', {
+        get: function() {
+            if (useProxy && mockStore) return Object.keys(mockStore).length;
+            if (nativeStorage) {
+                try { return nativeStorage.length; } catch(e) {}
+            }
+            return Object.keys(fallbackStore).length;
+        }
+    });
+
+    window.nexusStorage = storageObj;
+})();
+
 // App Cloaking Support
 (function() {
+    const localStorage = window.nexusStorage;
     let originalTitle = document.title;
     let originalFavicon = '';
     const origLink = document.querySelector("link[rel*='icon']");
@@ -79,6 +175,7 @@ if ('serviceWorker' in navigator) {
 })();
 
 (function () {
+    const localStorage = window.nexusStorage;
     const TRACKS_COUNT = 12;
     let bgmAudio = new Audio();
     bgmAudio.loop = false; // We use 'ended' event to advance to the next track sequentially

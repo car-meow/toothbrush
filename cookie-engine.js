@@ -55,6 +55,7 @@ let isShowingDiscovery = false;
 
 // Listen to localstorage updates so if another tab clears data, we reset.
 window.addEventListener('storage', (e) => {
+    const localStorage = window.nexusStorage;
     if (e.key === 'tb_cookie_save') {
         if (!e.newValue) {
             window.location.reload();
@@ -258,6 +259,7 @@ function animateCookies(now) {
 }
 
 function startSpawning() {
+    const localStorage = window.nexusStorage;
     if (localStorage.getItem('tb_cookie_disabled') !== 'false') return;
     if (spawnTimer) clearInterval(spawnTimer);
     const interval = getSpawnInterval();
@@ -668,6 +670,7 @@ function toggleMenus() {
 
 // --- Toggle Cookie Game ---
 function toggleCookieGame() {
+    const localStorage = window.nexusStorage;
     const disabled = localStorage.getItem('tb_cookie_disabled') !== 'false';
     const newDisabled = !disabled;
     localStorage.setItem('tb_cookie_disabled', newDisabled);
@@ -732,6 +735,7 @@ function closeAllModals() {
 
 // ==================== INIT ====================
 window.addEventListener('DOMContentLoaded', () => {
+    const localStorage = window.nexusStorage;
     cacheDom();
 
     // Ensure default option for cookies is disabled (true) if not set

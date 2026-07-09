@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <title>New Tab</title>
     <link rel="stylesheet" href="style.css?v=54">
+    <script src="bgm-manager.js?v=55"></script>
     <script>
         (function() {
+            const localStorage = window.nexusStorage;
             const theme = localStorage.getItem('tb_theme') || 'dark';
             if (theme === 'light') document.documentElement.classList.add('light-mode');
         })();
@@ -230,6 +232,7 @@
     </main>
 
     <script>
+        const localStorage = window.nexusStorage;
         let db, currentChatId = null, activeHistory = [];
         let typeTimeoutId = null;
         let isGenerating = false;
@@ -718,6 +721,5 @@
             if (window.TutorialEngine) TutorialEngine.initAI();
         });
     </script>
-    <script src="bgm-manager.js?v=55"></script>
 </body>
 </html>

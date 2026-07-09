@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <title>Nexus Chat</title>
     <link rel="stylesheet" href="style.css?v=54">
+    <script src="bgm-manager.js?v=55"></script>
     <script>
         (function() {
+            const localStorage = window.nexusStorage;
             const theme = localStorage.getItem('tb_theme') || 'dark';
             if (theme === 'light') document.documentElement.classList.add('light-mode');
         })();
@@ -158,7 +160,8 @@
     </div>
 
     <script>
-    document.addEventListener('DOMContentLoaded', async () => {
+        const localStorage = window.nexusStorage;
+        document.addEventListener('DOMContentLoaded', async () => {
 
         // ═══════════════════════════════════════════════════
         //  0.  BAN CHECK
@@ -762,6 +765,5 @@
             if (window.TutorialEngine) TutorialEngine.initChat();
         });
     </script>
-    <script src="bgm-manager.js?v=55"></script>
 </body>
 </html>

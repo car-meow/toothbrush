@@ -59,11 +59,13 @@ let G = {
 const SAVE_KEY = 'tb_cookie_save';
 
 function saveGame() {
+    const localStorage = window.nexusStorage;
     G.lastSeen = Date.now();
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch(e) {}
 }
 
 function loadGame() {
+    const localStorage = window.nexusStorage;
     try {
         const raw = localStorage.getItem(SAVE_KEY);
         if (raw) {
@@ -92,6 +94,7 @@ function loadGame() {
 }
 
 function resetAllData() {
+    const localStorage = window.nexusStorage;
     localStorage.removeItem(SAVE_KEY);
     G = {bucks:0,totalEarned:0,swag:0,autobakers:{},upgrades:{},stats:{},discoveries:{},consumables:{},lastSeen:Date.now(),muted:false, magnetEnabled:true};
 }
