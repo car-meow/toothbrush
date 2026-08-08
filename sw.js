@@ -47,7 +47,9 @@ const ASSETS_TO_CACHE = [
     './Assets/nexus-settings.svg',
     // Assets PNGs/GIFs
     './Assets/bookmark.png',
+    './Assets/canvas_cloak.png',
     './Assets/cursor.png',
+    './Assets/drive_cloak.png',
     './Assets/loadingRoll.gif',
     './Assets/magnet.png',
     './Assets/mediaP.png',
@@ -57,37 +59,7 @@ const ASSETS_TO_CACHE = [
     './Assets/tutorial.pdf',
     // Assets Videos
     './Assets/loopBG.mp4',
-    './Assets/purpleBG2.mp4',
-    // Sounds
-    './Sound/Common.mp3',
-    './Sound/Epic.mp3',
-    './Sound/Epic2.mp3',
-    './Sound/Rare.mp3',
-    './Sound/Uncommon.mp3',
-    './Sound/achN.mp3',
-    './Sound/achR.mp3',
-    './Sound/divine.mp3',
-    './Sound/divine2.mp3',
-    './Sound/divine3.mp3',
-    './Sound/get1.mp3',
-    './Sound/get2.mp3',
-    './Sound/get3.mp3',
-    './Sound/get4.mp3',
-    './Sound/start.mp3',
-    './Sound/stop.mp3',
-    // BGMs
-    './Sound/bgm1.mp3',
-    './Sound/bgm2.mp3',
-    './Sound/bgm3.mp3',
-    './Sound/bgm4.mp3',
-    './Sound/bgm5.mp3',
-    './Sound/bgm6.mp3',
-    './Sound/bgm7.mp3',
-    './Sound/bgm8.mp3',
-    './Sound/bgm9.mp3',
-    './Sound/bgm10.mp3',
-    './Sound/bgm11.mp3',
-    './Sound/bgm12.mp3'
+    './Assets/purpleBG2.mp4'
 ];
 
 // Install Event - Pre-cache Core Assets

@@ -14,7 +14,6 @@ if ('serviceWorker' in navigator) {
     let fallbackStore = {};
 
     try {
-        // Parse storage from window.name synchronously
         if (window.name && window.name.startsWith('{') && window.name.includes('tb_')) {
             mockStore = JSON.parse(window.name);
             useProxy = true;
@@ -62,7 +61,7 @@ if ('serviceWorker' in navigator) {
                 return;
             }
             if (nativeStorage) {
-                try { nativeStorage.removeItem(key); return; } catch(e) {}
+                try { nativeStorage.removeItem(key); } catch(e) {}
             }
             delete fallbackStore[key];
         },
@@ -114,11 +113,15 @@ if ('serviceWorker' in navigator) {
 
     function applyTabCloak() {
         const preset = localStorage.getItem('tb_cloak_preset');
-        if (!preset || preset === 'none') {
-            document.title = originalTitle;
+        if (!preset || preset === 'none' || preset === 'default') {
+            document.title = 'New Tab';
             let link = document.querySelector("link[rel*='icon']");
-            if (link && originalFavicon) {
-                link.href = originalFavicon;
+            if (link) {
+                if (originalFavicon) {
+                    link.href = originalFavicon;
+                } else {
+                    link.href = 'Assets/nexusLogo.png';
+                }
             }
             return;
         }
@@ -130,15 +133,11 @@ if ('serviceWorker' in navigator) {
             },
             drive: {
                 title: 'My Drive - Google Drive',
-                icon: 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png'
-            },
-            classroom: {
-                title: 'Classes',
-                icon: 'https://ssl.gstatic.com/images/branding/product/1x/classroom_2020q4_48dp.png'
+                icon: 'Assets/drive_cloak.png'
             },
             canvas: {
                 title: 'Dashboard',
-                icon: 'https://du11hjcvx0uqb.cloudfront.net/dist/images/favicon-e05d51a1d4.ico'
+                icon: 'Assets/canvas_cloak.png'
             }
         };
 
@@ -156,10 +155,8 @@ if ('serviceWorker' in navigator) {
         link.href = data.icon;
     }
 
-    // Run immediately on parse
     applyTabCloak();
 
-    // Also run on DOMContentLoaded to capture post-load title/favicon changes
     window.addEventListener('DOMContentLoaded', () => {
         if (!originalTitle || originalTitle === 'New Tab' || originalTitle === '') {
             originalTitle = document.title;
@@ -174,261 +171,131 @@ if ('serviceWorker' in navigator) {
     window.applyTabCloak = applyTabCloak;
 })();
 
-(function () {
-    const localStorage = window.nexusStorage;
-    const TRACKS_COUNT = 12;
-    let bgmAudio = new Audio();
-    bgmAudio.loop = false; // We use 'ended' event to advance to the next track sequentially
-    bgmAudio.volume = 0.3;
+// BGM Mock Interface for backward compatibility
+window.BGMManager = {
+    toggleMute: function() {},
+    updateState: function() {},
+    playNextTrack: function() {}
+};
 
-    // Expose globally so cookie-engine can bind to it
-    window.globalBGM = bgmAudio;
-
-    let bgmStarted = false;
-    let isNavigating = false;
-
-    function isMuted() {
-        try {
-            const raw = localStorage.getItem('tb_cookie_save');
-            if (raw) {
-                const d = JSON.parse(raw);
-                return !!d.muted;
-            }
-        } catch (e) {}
-        return false;
-    }
-
-    function setMuted(muted) {
-        try {
-            const raw = localStorage.getItem('tb_cookie_save');
-            let d = raw ? JSON.parse(raw) : {};
-            d.muted = muted;
-            localStorage.setItem('tb_cookie_save', JSON.stringify(d));
-            // Trigger storage event manually for this page
-            window.dispatchEvent(new Event('storage'));
-        } catch (e) {}
-    }
-
-    function isStoppedByMedia() {
-        const stoppedTime = localStorage.getItem('tb_bgm_stopped_by_media');
-        if (!stoppedTime) return false;
-        const isActivelyOpen = (Date.now() - Number(stoppedTime)) < 4000;
-        if (!isActivelyOpen) {
-            localStorage.removeItem('tb_bgm_stopped_by_media');
-            return false;
-        }
-        return true;
-    }
-
-    function isStopped() {
-        return isStoppedByMedia() || localStorage.getItem('tb_bgm_stopped_by_game') === 'true';
-    }
-
-    function getSavedTrackInfo() {
-        const track = Number(localStorage.getItem('tb_bgm_track'));
-        const time = Number(localStorage.getItem('tb_bgm_time')) || 0;
-        const timestamp = Number(localStorage.getItem('tb_bgm_timestamp')) || 0;
-        const playing = localStorage.getItem('tb_bgm_playing') !== 'false';
-
-        if (!track || track < 1 || track > TRACKS_COUNT) {
-            // Select random track if none is saved
-            const randomTrack = Math.floor(Math.random() * TRACKS_COUNT) + 1;
-            return { track: randomTrack, time: 0, timestamp: Date.now(), playing: true };
-        }
-        return { track, time, timestamp, playing };
-    }
-
-    function saveTrackInfo(navigating) {
-        if (!bgmStarted || isMuted() || isStopped() || (document.hidden && !navigating)) {
-            localStorage.setItem('tb_bgm_playing', 'false');
-            return;
-        }
-        localStorage.setItem('tb_bgm_track', localStorage.getItem('tb_bgm_track') || '1');
-        localStorage.setItem('tb_bgm_time', bgmAudio.currentTime.toString());
-        localStorage.setItem('tb_bgm_timestamp', Date.now().toString());
-        localStorage.setItem('tb_bgm_playing', 'true');
-    }
-
-    function loadTrack(trackNum, time, shouldPlay) {
-        bgmAudio.src = 'Sound/bgm' + trackNum + '.mp3';
-        bgmAudio.currentTime = time;
-        localStorage.setItem('tb_bgm_track', trackNum.toString());
-        if (shouldPlay && !isMuted() && !isStopped() && (!document.hidden || isNavigating)) {
-            playBGM();
-        }
-    }
-
-    function playBGM() {
-        if (isMuted() || isStopped() || (document.hidden && !isNavigating)) return;
-        bgmAudio.play().then(() => {
-            bgmStarted = true;
-            localStorage.setItem('tb_bgm_playing', 'true');
-        }).catch(() => {
-            console.log("BGM autoplay blocked or interrupted.");
-        });
-    }
-
-    function pauseBGM() {
-        bgmAudio.pause();
-        localStorage.setItem('tb_bgm_playing', 'false');
-    }
-
-    function toggleMute() {
-        const currentMute = isMuted();
-        setMuted(!currentMute);
-        updateState();
-    }
-
-    function playNextTrack() {
-        let trackNum = Number(localStorage.getItem('tb_bgm_track')) || 1;
-        trackNum = (trackNum % TRACKS_COUNT) + 1;
-        loadTrack(trackNum, 0, true);
-        saveTrackInfo();
-    }
-
-    function updateState() {
-        const muted = isMuted();
-        const stopped = isStopped();
-
-        if (muted || stopped || (document.hidden && !isNavigating)) {
-            bgmAudio.pause();
-        } else {
-            const playing = localStorage.getItem('tb_bgm_playing') !== 'false';
-            if (playing) {
-                playBGM();
+// =========================================================================
+// IN-APP POPUP DIALOG ENGINE
+// Replaces in-browser dialogs (alert, confirm, prompt) with formatted in-app modals.
+// =========================================================================
+(function() {
+    function getDialogElements() {
+        let overlay = document.getElementById('nexus-inapp-dialog-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'nexus-inapp-dialog-overlay';
+            overlay.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.86); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px);';
+            
+            overlay.innerHTML = `
+                <div style="background:var(--modal-bg, #18102b); padding:28px; border-radius:20px; width:460px; max-width:92vw; max-height:85vh; border:2px solid #2196F3; text-align:center; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 0 50px rgba(0,0,0,0.9); color:var(--text-color, #fff); font-family:'Space Grotesk', sans-serif;">
+                    <div id="nexus-dialog-title" style="color:#2196F3; font-size:22px; font-weight:bold; margin-bottom:14px;">Nexus</div>
+                    <div id="nexus-dialog-msg" style="font-size:15px; line-height:1.5; color:var(--text-color, #e2dcf0); margin-bottom:18px; white-space:pre-wrap; max-height:50vh; overflow-y:auto; word-break:break-word;"></div>
+                    <input type="text" id="nexus-dialog-input" style="display:none; width:100%; padding:12px; margin-bottom:18px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color, #362854); background:var(--input-bg, #0d0818); color:var(--text-color, #fff); font-size:15px; outline:none;">
+                    <div style="display:flex; gap:12px; justify-content:center; margin-top:8px;">
+                        <button id="nexus-dialog-ok" class="save-btn" style="background:#2196F3 !important; border:2.5px solid #ffffff !important; padding:10px 24px; border-radius:999px; font-weight:bold; color:white; cursor:pointer; flex:1; min-width:90px; text-shadow:none;">OK</button>
+                        <button id="nexus-dialog-cancel" class="save-btn" style="background:rgba(255,255,255,0.1) !important; border:2.5px solid rgba(255,255,255,0.5) !important; padding:10px 24px; border-radius:999px; font-weight:bold; color:#ccc; cursor:pointer; flex:1; min-width:90px; text-shadow:none;">Cancel</button>
+                    </div>
+                </div>
+            `;
+            if (document.body) {
+                document.body.appendChild(overlay);
+            } else {
+                window.addEventListener('DOMContentLoaded', () => document.body.appendChild(overlay));
             }
         }
+        return {
+            overlay: overlay,
+            title: overlay.querySelector('#nexus-dialog-title'),
+            msg: overlay.querySelector('#nexus-dialog-msg'),
+            input: overlay.querySelector('#nexus-dialog-input'),
+            okBtn: overlay.querySelector('#nexus-dialog-ok'),
+            cancelBtn: overlay.querySelector('#nexus-dialog-cancel')
+        };
     }
 
-    function handleVisibilityChange() {
-        if (isNavigating) return;
-        if (document.hidden) {
-            pauseBGM();
-            saveTrackInfo();
-        } else {
-            const info = getSavedTrackInfo();
-            let resumeTime = info.time;
-            if (info.playing && info.timestamp > 0) {
-                const elapsed = (Date.now() - info.timestamp) / 1000;
-                if (elapsed > 0 && elapsed < 5) {
-                    resumeTime += elapsed;
+    function showDialog(options) {
+        return new Promise((resolve) => {
+            const els = getDialogElements();
+            if (!els.overlay.parentNode) document.body.appendChild(els.overlay);
+            
+            els.title.textContent = options.title || 'Nexus';
+            els.msg.textContent = options.message || '';
+            
+            if (options.isPrompt) {
+                els.input.style.display = 'block';
+                els.input.value = options.defaultValue || '';
+            } else {
+                els.input.style.display = 'none';
+            }
+
+            els.okBtn.style.display = 'inline-block';
+            els.cancelBtn.style.display = 'inline-block';
+            els.overlay.style.display = 'flex';
+            
+            if (options.isPrompt) {
+                setTimeout(() => { els.input.focus(); els.input.select(); }, 50);
+            } else {
+                setTimeout(() => { els.okBtn.focus(); }, 50);
+            }
+
+            const cleanup = () => {
+                els.overlay.style.display = 'none';
+                els.okBtn.onclick = null;
+                els.cancelBtn.onclick = null;
+                document.removeEventListener('keydown', keyHandler);
+            };
+
+            const keyHandler = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    cleanup();
+                    resolve(options.isPrompt ? els.input.value : true);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cleanup();
+                    resolve(options.isPrompt ? null : false);
                 }
-            }
+            };
 
-            const currentSrc = 'Sound/bgm' + info.track + '.mp3';
-            if (!bgmAudio.src.endsWith(currentSrc)) {
-                loadTrack(info.track, resumeTime, info.playing);
-            } else {
-                bgmAudio.currentTime = resumeTime;
-                updateState();
-            }
-        }
-    }
+            document.addEventListener('keydown', keyHandler);
 
-    // Initialize track
-    const info = getSavedTrackInfo();
-    localStorage.setItem('tb_bgm_track', info.track.toString());
+            els.okBtn.onclick = (e) => {
+                e.preventDefault();
+                cleanup();
+                resolve(options.isPrompt ? els.input.value : true);
+            };
 
-    // Calculate elapsed time for seamless resume
-    let resumeTime = info.time;
-    if (info.playing && info.timestamp > 0) {
-        const elapsed = (Date.now() - info.timestamp) / 1000;
-        if (elapsed > 0 && elapsed < 5) {
-            resumeTime += elapsed;
-        }
-    }
-
-    if (!document.hidden) {
-        loadTrack(info.track, resumeTime, info.playing);
-    } else {
-        loadTrack(info.track, resumeTime, false);
-    }
-
-    // Sync state periodically
-    setInterval(() => {
-        if (bgmStarted && !bgmAudio.paused && !document.hidden) {
-            saveTrackInfo();
-        }
-    }, 300);
-
-    // Auto-advance to next track when it finishes
-    bgmAudio.addEventListener('ended', () => {
-        playNextTrack();
-    });
-
-    // Cleanup and Sync stopped_by_game
-    if (!window.location.pathname.endsWith('carmeow.html')) {
-        localStorage.removeItem('tb_bgm_stopped_by_game');
-    } else {
-        window.addEventListener('pagehide', () => {
-            localStorage.removeItem('tb_bgm_stopped_by_game');
+            els.cancelBtn.onclick = (e) => {
+                e.preventDefault();
+                cleanup();
+                resolve(options.isPrompt ? null : false);
+            };
         });
     }
 
-    // Unload listeners to save state on page navigation
-    window.addEventListener('beforeunload', () => {
-        isNavigating = true;
-        saveTrackInfo(true);
-    });
-    window.addEventListener('pagehide', () => {
-        isNavigating = true;
-        saveTrackInfo(true);
-    });
-
-    // Listen to interaction for autoplay fallback
-    const startBgmOnInteraction = () => {
-        if (!bgmStarted && !isMuted() && !isStopped() && !document.hidden) {
-            playBGM();
-        }
-        if (bgmStarted || isMuted() || isStopped() || document.hidden) {
-            cleanupInteractionListeners();
-        }
+    window.nexusAlert = function(msg, title) {
+        return showDialog({ message: String(msg), title: title || 'Nexus', isConfirm: false });
     };
-    const interactionEvents = ['click', 'mousedown', 'touchstart', 'keydown'];
-    const cleanupInteractionListeners = () => {
-        interactionEvents.forEach(evt => {
-            document.removeEventListener(evt, startBgmOnInteraction);
-        });
+    window.nexusConfirm = function(msg, title) {
+        return showDialog({ message: String(msg), title: title || 'Nexus', isConfirm: true });
     };
-    interactionEvents.forEach(evt => {
-        document.addEventListener(evt, startBgmOnInteraction, { once: true, passive: true });
-    });
+    window.nexusPrompt = function(msg, defaultVal, title) {
+        return showDialog({ message: String(msg), defaultValue: defaultVal, title: title || 'Nexus', isPrompt: true });
+    };
 
-    // Storage event syncing across tabs
-    window.addEventListener('storage', (e) => {
-        if (e.key === 'tb_cookie_save' || e.key === 'tb_bgm_stopped_by_media' || e.key === 'tb_bgm_stopped_by_game') {
-            updateState();
-        }
-        if (e.key === 'tb_bgm_track' || e.key === 'tb_bgm_playing') {
-            const currentTrack = Number(localStorage.getItem('tb_bgm_track')) || 1;
-            const currentSrc = 'Sound/bgm' + currentTrack + '.mp3';
-            const playing = localStorage.getItem('tb_bgm_playing') !== 'false';
-
-            // Check if track changed in another tab
-            if (!bgmAudio.src.endsWith(currentSrc)) {
-                loadTrack(currentTrack, 0, playing);
-            } else {
-                updateState();
-            }
-        }
-    });
-
-    // Visibility change listener
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Keybind registration for other pages
-    if (!window.location.pathname.endsWith('index.html') && !window.location.pathname.endsWith('/')) {
-        document.addEventListener('keydown', (e) => {
-            if ((e.key === 'm' || e.key === 'M') && !e.target.matches('input, textarea, select, [contenteditable]')) {
-                toggleMute();
-            }
-        });
-    }
-
-    // Expose manager interface
-    window.BGMManager = {
-        toggleMute: toggleMute,
-        updateState: updateState,
-        playNextTrack: playNextTrack
+    window.alert = function(msg) {
+        window.nexusAlert(msg);
+    };
+    window.confirm = function(msg) {
+        window.nexusConfirm(msg);
+        return true;
+    };
+    window.prompt = function(msg, defaultVal) {
+        window.nexusPrompt(msg, defaultVal);
+        return null;
     };
 })();
