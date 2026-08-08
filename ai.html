@@ -391,7 +391,8 @@
         }
 
         async function deleteChat(id) {
-            if(!confirm("Delete chat?")) return;
+            const ok = await nexusConfirm("Delete chat?");
+            if(!ok) return;
             if(currentChatId === id) { 
                 if (typeTimeoutId) clearTimeout(typeTimeoutId);
                 clearLoadingTimers();

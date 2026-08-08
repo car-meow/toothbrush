@@ -359,20 +359,21 @@
         });
 
         // Reset Stats
-        document.getElementById('btn-reset-stats').onclick = () => {
-            if (confirm('This will erase ALL cookie game data (money, upgrades, stats, discoveries). Are you sure?')) {
+        document.getElementById('btn-reset-stats').onclick = async () => {
+            const ok = await nexusConfirm('This will erase ALL cookie game data (money, upgrades, stats, discoveries). Are you sure?');
+            if (ok) {
                 const keys = ['tb_cookie_save', 'tb_cookie_stats', 'tb_cookie_discoveries'];
                 keys.forEach(k => localStorage.removeItem(k));
-                alert('All cookie data has been reset!');
+                await nexusAlert('All cookie data has been reset!');
             }
         };
 
         // Reset Tutorial
-        document.getElementById('btn-reset-tutorial').onclick = () => {
+        document.getElementById('btn-reset-tutorial').onclick = async () => {
             localStorage.removeItem('tb_tutorial_played');
             localStorage.removeItem('tb_tutorial_skipped');
             localStorage.removeItem('tb_tutorial_step');
-            alert('Tutorial progress has been reset!');
+            await nexusAlert('Tutorial progress has been reset!');
         };
 
         // Fade page in once settings are fully rendered

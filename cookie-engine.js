@@ -1,20 +1,3 @@
-// ==================== COOKIE ENGINE: Spawning, Clicking, Effects, UI ====================
-
-// --- Sound Manager ---
-const SFX = {};
-function initSounds() {
-    ['get1', 'get2', 'get3', 'get4'].forEach(s => SFX[s] = new Audio('Sound/' + s + '.mp3'));
-    ['Common', 'Uncommon', 'Rare', 'Epic', 'Epic2', 'divine', 'divine2', 'divine3', 'stop', 'start', 'achN', 'achR'].forEach(s => SFX[s] = new Audio('Sound/' + s + '.mp3'));
-    SFX.bgm = window.globalBGM || new Audio('Sound/bgm1.mp3');
-}
-function playSound(key) {
-    if (G.muted || !SFX[key]) return;
-    try { const s = SFX[key]; s.currentTime = 0; s.play().catch(() => { }); } catch (e) { }
-}
-function playRandomGet() {
-    playSound('get' + (Math.floor(Math.random() * 4) + 1));
-}
-
 // --- DOM References ---
 let DOM = {};
 function cacheDom() {
@@ -55,27 +38,11 @@ let isShowingDiscovery = false;
 
 // Listen to localstorage updates so if another tab clears data, we reset.
 window.addEventListener('storage', (e) => {
-    const localStorage = window.nexusStorage;
     if (e.key === 'tb_cookie_save') {
         if (!e.newValue) {
             window.location.reload();
             return;
         }
-
-        try {
-            const data = JSON.parse(e.newValue);
-            const muted = data.muted || false;
-            if (G.muted !== muted) {
-                G.muted = muted;
-                if (G.muted) {
-                    if (SFX.bgm) SFX.bgm.pause();
-                } else if (SFX.bgm) {
-                    SFX.bgm.play().then(() => {
-                        bgmStarted = true;
-                    }).catch(() => { });
-                }
-            }
-        } catch (err) { }
     }
 });
 
@@ -289,7 +256,6 @@ function startSpawning() {
 
 // --- Cookie Click Handling ---
 function handleCookieClick(data, cx, cy) {
-    if (!bgmStarted && !G.muted) { SFX.bgm.play().catch(() => { }); bgmStarted = true; }
     if (data.el && data.el.parentNode) data.el.parentNode.removeChild(data.el);
 
     const cookie = data.cookie;
@@ -314,16 +280,6 @@ function handleCookieClick(data, cx, cy) {
     if (isNew) {
         G.discoveries[cookie.id] = true;
         queueDiscovery(cookie, rarity.color);
-    }
-
-    playRandomGet();
-    if (rarity.id !== 'common') {
-        const rsnd = rarity.id === 'epic' ? (Math.random() > 0.5 ? 'Epic' : 'Epic2') :
-            rarity.id === 'divine' ? 'divine' : rarity.id;
-        let soundKey = rarity.id.charAt(0).toUpperCase() + rarity.id.slice(1);
-        if (rsnd === 'Epic2') soundKey = 'Epic2';
-        if (rsnd === 'divine') soundKey = 'divine';
-        setTimeout(() => playSound(soundKey), 100);
     }
 
     showPop(cx, cy);
@@ -393,12 +349,6 @@ function processDiscoveryQueue() {
     DOM.discLore.textContent = '"' + cookie.lore + '"';
     DOM.discoveryPopup.classList.add('show');
 
-    if (cookie.id === 'nebula' || cookie.id === 'golden') {
-        playSound('achR');
-    } else {
-        playSound('achN');
-    }
-
     setTimeout(() => {
         DOM.discoveryPopup.classList.remove('show');
         setTimeout(() => {
@@ -413,14 +363,6 @@ function triggerDivineEvent() {
     if (divineActive) return;
     divineActive = true;
 
-    if (SFX.bgm && !G.muted) {
-        const fade = setInterval(() => {
-            if (SFX.bgm.volume > 0.05) SFX.bgm.volume -= 0.05;
-            else { SFX.bgm.volume = 0; clearInterval(fade); }
-        }, 100);
-    }
-    playSound('stop');
-
     DOM.divineOverlay.style.display = 'flex';
     DOM.divineOverlay.style.background = 'rgba(0,0,0,0.6)';
 
@@ -428,7 +370,6 @@ function triggerDivineEvent() {
         DOM.divPart.classList.add('slam');
         DOM.inePart.classList.add('slam');
         document.body.classList.add('camera-shake');
-        playSound('divine2');
     }, 600);
 
     setTimeout(() => {
@@ -448,14 +389,6 @@ function triggerDivineEvent() {
         }, 50);
 
         divineActive = false;
-
-        if (!G.muted && bgmStarted) {
-            const fadeIn = setInterval(() => {
-                if (SFX.bgm.volume < 0.25) SFX.bgm.volume += 0.05;
-                else { SFX.bgm.volume = 0.3; clearInterval(fadeIn); }
-            }, 100);
-        }
-        playSound('start');
     }, 3000);
 }
 
@@ -534,7 +467,6 @@ function renderShop() {
                 G.totalEarned += gain;
                 G.consumables[item.id] = { active: false, endTime: now, cooldownEnd: now + item.cooldown * 1000 };
                 showFloatingBucks(window.innerWidth / 2, window.innerHeight / 2, '+₡' + formatNum(gain));
-                playSound('achN');
             } else {
                 G.consumables[item.id] = { active: true, endTime: now + item.duration * 1000, cooldownEnd: now + (item.duration + item.cooldown) * 1000 };
             }
@@ -626,17 +558,17 @@ function renderStats() {
 }
 
 // --- Prestige ---
-function doIncinerate() {
+async function doIncinerate() {
     const gain = calcPrestigeGain();
-    if (gain < 1) { alert('You need ₡1,000,000 total earnings to Incinerate! Keep clicking.'); return; }
-    if (!confirm('INCINERATE?\n\nYou will lose ALL ₡' + formatNum(G.bucks) + ' and all Autobakers.\nYou will gain ' + gain + ' Swag Points (₴).\n\nSwag upgrades are permanent.')) return;
+    if (gain < 1) { await nexusAlert('You need ₡1,000,000 total earnings to Incinerate! Keep clicking.'); return; }
+    const ok = await nexusConfirm('INCINERATE?\n\nYou will lose ALL ₡' + formatNum(G.bucks) + ' and all Autobakers.\nYou will gain ' + gain + ' Swag Points (₴).\n\nSwag upgrades are permanent.');
+    if (!ok) return;
     G.swag += gain;
     G.bucks = 0;
     G.totalEarned = 0;
     G.autobakers = {};
     G.consumables = {};
     updateHUD(); renderShop(); startSpawning(); saveGame();
-    playSound('divine3');
     flashVignette('rgba(183,28,28,0.5)');
 }
 
@@ -799,7 +731,6 @@ window.addEventListener('DOMContentLoaded', () => {
         if (DOM.hideMenuBtn) DOM.hideMenuBtn.style.display = 'none';
     }
 
-    initSounds();
     loadGame();
 
     const offline = calcOfflineEarnings();
@@ -848,7 +779,7 @@ window.addEventListener('DOMContentLoaded', () => {
             iframe.src = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1) + 'gust.html';
             win.document.body.appendChild(iframe);
         } else {
-            alert('Pop-up blocked! Please allow pop-ups to open the proxy.');
+            nexusAlert('Pop-up blocked! Please allow pop-ups to open the proxy.');
         }
     };
 
@@ -869,30 +800,18 @@ window.addEventListener('DOMContentLoaded', () => {
     setInterval(() => { updateHUD(); if (DOM.shopModal.classList.contains('open')) renderShop(); }, 1000);
 
     // Keybinds & Debug
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', async (e) => {
         if (e.key === 'Escape') {
             closeAllModals();
         }
 
-
-        if (e.key === 'm' || e.key === 'M') {
-            G.muted = !G.muted;
-            if (G.muted) {
-                SFX.bgm.pause();
-            } else {
-                SFX.bgm.play().then(() => {
-                    bgmStarted = true;
-                }).catch(() => {});
-            }
-            saveGame();
-        }
         if (e.key === 'h' || e.key === 'H') {
             toggleMenus();
         }
 
         if (e.shiftKey && e.key === 'F1') {
             e.preventDefault();
-            const amt = prompt('DEBUG: Enter amount of ₡ to add:');
+            const amt = await nexusPrompt('DEBUG: Enter amount of ₡ to add:');
             if (amt && !isNaN(amt)) {
                 const val = parseFloat(amt);
                 G.bucks += val;

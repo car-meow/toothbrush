@@ -12830,7 +12830,8 @@ _VIEWER_DL_JS +
                 const resetBtn = $("settingsResetEverything");
                 if (resetBtn) {
                     resetBtn.onclick = async () => {
-                        if (confirm("Are you sure you want to RESET EVERYTHING? This will clear all settings, bookmarks, history, and cache. This action cannot be undone.")) {
+                        const ok = await nexusConfirm("Are you sure you want to RESET EVERYTHING? This will clear all settings, bookmarks, history, and cache. This action cannot be undone.");
+                        if (ok) {
                             // Kill the iframe immediately so the page stops posting messages
                             // that could re-trigger fetches while we're tearing down.
                             try { frame.onload = null; frame.src = 'about:blank'; } catch(e) {}
@@ -12878,14 +12879,14 @@ _VIEWER_DL_JS +
 
                 const saveFiltersBtn = $("settingsSaveFilters");
                 if (saveFiltersBtn) {
-                    saveFiltersBtn.onclick = () => {
+                    saveFiltersBtn.onclick = async () => {
                         const area = $("settingsCustomFilters");
                         if (area) {
                             try {
                                 ls.setItem(FILTER_KEY, area.value);
                                 cachedCustomFilters = null;
                                 log("Custom filters saved", "ok");
-                                alert("Adblock filter rules saved successfully!");
+                                await nexusAlert("Adblock filter rules saved successfully!");
                             } catch (e) {
                                 log("Failed to save filters", "err");
                             }
