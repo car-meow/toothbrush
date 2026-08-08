@@ -43,7 +43,7 @@
         }
         .media-search:focus { border-color: #D083DE; }
 
-        .media-section { margin-bottom: 36px; }
+        .media-section { margin-bottom: 36px; content-visibility: auto; contain-intrinsic-size: 1px 280px; }
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-right: 8px; flex-wrap: wrap; gap: 8px; }
         .section-title { font-size: 22px; font-weight: bold; color: #fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); padding-left: 10px; border-left: 4px solid #9C27B0; }
         
@@ -52,7 +52,7 @@
         .media-card {
             flex: 0 0 auto; width: 160px; height: 240px; position: relative; border-radius: 12px; overflow: hidden;
             cursor: pointer; transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s;
-            background: #1a1a1a; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            background: #1a1a1a; box-shadow: 0 4px 10px rgba(0,0,0,0.3); contain: layout paint;
         }
 
         .poster-img { width: 100%; height: 100%; object-fit: cover; transition: filter 0.4s; display: block; }
@@ -329,7 +329,7 @@
 
             card.innerHTML = `
                 <div class="fav-btn ${isFav ? 'active' : ''}" title="Toggle Favorite">★</div>
-                <img src="${posterSources[0]}" class="poster-img${posterSources[0].startsWith('data:') ? ' is-fallback' : ''}" alt="${escapeHtml(title)}">
+                <img src="${posterSources[0]}" class="poster-img${posterSources[0].startsWith('data:') ? ' is-fallback' : ''}" alt="${escapeHtml(title)}" loading="lazy" decoding="async">
                 <div class="media-overlay">
                     <div class="media-date">${year}</div>
                     <img src="Assets/mediaP.png" class="play-icon" alt="Play">
@@ -393,29 +393,60 @@
             });
         }
 
+        async function loadSectionData(sec) {
+            const row = document.getElementById(sec.id);
+            if (!row || row.dataset.loaded === 'true') return;
+            row.dataset.loaded = 'true';
+            try {
+                const data = await fetchTMDB(sec.endpoint, { page: 1 });
+                row.innerHTML = '';
+                const slice = (data.results || []).filter((it) => inferMediaType(it) === 'movie' || inferMediaType(it) === 'tv').slice(0, sec.preview);
+                slice.forEach((item) => {
+                    const c = createCard(item);
+                    if (c) row.appendChild(c);
+                });
+                row.appendChild(createShowAllBtn(sec.endpoint, sec.title));
+            } catch (err) {
+                row.innerHTML = '<div style="color:#f44336;padding:12px;">Failed to load: ' + sec.title + '</div>';
+            }
+        }
+
         async function init() {
             renderFavoritesRow();
             buildBrowseDOM();
-            for (const s of BROWSE_SECTIONS) {
-                const row = document.getElementById(s.id);
-                if (!row) continue;
-                try {
-                    const data = await fetchTMDB(s.endpoint, { page: 1 });
-                    row.innerHTML = '';
-                    const slice = (data.results || []).filter((it) => inferMediaType(it) === 'movie' || inferMediaType(it) === 'tv').slice(0, s.preview);
-                    slice.forEach((item) => {
-                        const c = createCard(item);
-                        if (c) row.appendChild(c);
-                    });
-                    row.appendChild(createShowAllBtn(s.endpoint, s.title));
-                } catch (err) {
-                    row.innerHTML = '<div style="color:#f44336;padding:12px;">Failed to load: ' + s.title + '</div>';
-                }
-            }
 
-            // Fade page in once TMDB initialization is complete
+            const initialSections = BROWSE_SECTIONS.slice(0, 4);
+            const remainingSections = BROWSE_SECTIONS.slice(4);
+
+            // Fetch top 4 visible categories in parallel for instant rendering
+            await Promise.all(initialSections.map(s => loadSectionData(s)));
+
+            // Fade page in immediately after initial visible rows are ready
             const overlay = document.getElementById('page-fade-overlay');
             if (overlay) overlay.classList.add('fade-out');
+
+            // Lazy-load remaining rows on scroll
+            if ('IntersectionObserver' in window) {
+                const observer = new IntersectionObserver((entries, obs) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const secId = entry.target.id.replace('sec-', '');
+                            const sec = BROWSE_SECTIONS.find(s => s.id === secId);
+                            if (sec) loadSectionData(sec);
+                            obs.unobserve(entry.target);
+                        }
+                    });
+                }, { rootMargin: '400px 0px' });
+
+                remainingSections.forEach(s => {
+                    const el = document.getElementById('sec-' + s.id);
+                    if (el) observer.observe(el);
+                });
+            } else {
+                for (const s of remainingSections) {
+                    await loadSectionData(s);
+                }
+            }
         }
 
         async function collectPagedResults(endpoint, maxPages) {

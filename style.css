@@ -115,10 +115,11 @@ h1 {
     text-decoration: none;
     font-size: 14px;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.2s, box-shadow 0.2s;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    contain: layout paint;
 }
 
 body:not(.media-bg) button,
@@ -162,7 +163,7 @@ body:not(.media-bg) .rename-done-btn:hover {
 .nav-btn:active {
     transform: translateY(2px);
     filter: brightness(1.5);
-    transition: all 0.1s;
+    transition: transform 0.1s;
 }
 
 .nav-btn {
@@ -300,6 +301,8 @@ body:not(.media-bg) .rename-done-btn:hover {
     vertical-align: middle;
     pointer-events: auto !important;
     z-index: 10002 !important;
+    contain: layout paint;
+    will-change: transform, width;
     /* Unhover: text fades first (0s), then width shrinks (0.15s delay) */
     transition:
         width 0.3s cubic-bezier(0.2, 0, 0, 1) 0.15s,

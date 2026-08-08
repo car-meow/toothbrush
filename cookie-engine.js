@@ -208,7 +208,22 @@ function spawnCookie(forceCookie = null, forceRarity = null) {
     }
 }
 
+let cookieAnimFrameId = null;
+
+function ensureCookieLoop() {
+    const localStorage = window.nexusStorage;
+    const isDisabled = localStorage.getItem('tb_cookie_disabled') !== 'false';
+    if (!isDisabled && !document.hidden && !cookieAnimFrameId) {
+        cookieAnimFrameId = requestAnimationFrame(animateCookies);
+    }
+}
+
 function animateCookies(now) {
+    cookieAnimFrameId = null;
+    const localStorage = window.nexusStorage;
+    const isDisabled = localStorage.getItem('tb_cookie_disabled') !== 'false';
+    if (isDisabled || document.hidden) return;
+
     if (DOM.magnetVisual) {
         DOM.magnetVisual.style.display = ((G.upgrades['magnet'] || 0) > 0 && G.magnetEnabled && menusHidden) ? 'block' : 'none';
     }
@@ -216,7 +231,7 @@ function animateCookies(now) {
     for (let i = activeCookies.length - 1; i >= 0; i--) {
         const c = activeCookies[i];
         if (!c.alive) continue;
-        if (divineActive) { requestAnimationFrame(animateCookies); return; }
+        if (divineActive) { cookieAnimFrameId = requestAnimationFrame(animateCookies); return; }
 
         const elapsed = now - c.startTime;
         let progress = Math.min(elapsed / c.duration, 1);
@@ -255,8 +270,12 @@ function animateCookies(now) {
         c.el.style.transform = 'rotate(' + rot + 'deg)';
     }
     activeCookies = activeCookies.filter(c => c.alive);
-    requestAnimationFrame(animateCookies);
+    cookieAnimFrameId = requestAnimationFrame(animateCookies);
 }
+
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) ensureCookieLoop();
+});
 
 function startSpawning() {
     const localStorage = window.nexusStorage;
@@ -718,6 +737,7 @@ function toggleCookieGame() {
         if (hudTopLeft) hudTopLeft.style.display = 'flex';
 
         startSpawning();
+        ensureCookieLoop();
 
         // Hide menu
         if (!menusHidden) {
@@ -791,7 +811,7 @@ window.addEventListener('DOMContentLoaded', () => {
     updateHUD();
     cycleSplash();
     startSpawning();
-    requestAnimationFrame(animateCookies);
+    ensureCookieLoop();
 
 
     // Smooth fade-out before navigation
