@@ -117,11 +117,7 @@ if ('serviceWorker' in navigator) {
             document.title = 'New Tab';
             let link = document.querySelector("link[rel*='icon']");
             if (link) {
-                if (originalFavicon) {
-                    link.href = originalFavicon;
-                } else {
-                    link.href = 'Assets/nexusLogo.png';
-                }
+                link.href = 'data:,';
             }
             return;
         }
