@@ -389,17 +389,17 @@ body {
 <!-- ========== CENTER: Title + Navigation ========== -->
 <div class="home-container" id="menu-items-wrapper">
     <div class="title-area">
-        <div class="logo-wrapper">
+        <div class="logo-wrapper" style="pointer-events: auto !important;">
             <img src="Assets/nexusLogo.png" id="nexus-logo" class="home-title-img" alt="Nexus" style="cursor: pointer; pointer-events: auto !important;">
-            <div class="nexus-version-container">
-                <span class="nexus-version-tag">v3.5.04</span>
-                <div class="nexus-update-card">
+            <div class="nexus-version-container" style="pointer-events: auto !important;">
+                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: #ffffff !important; opacity: 1 !important;">v3.5.04</span>
+                <div class="nexus-update-card" style="pointer-events: auto !important;">
                     <div class="nexus-update-title">What's New</div>
                     <div class="nexus-update-body">
                         The 3.0 update is here! Added tons of backend optimization for some insanely slow Chromebooks and some QoL changes.
                     </div>
                     <div class="nexus-update-footer">
-                        <a href="https://docs.google.com/forms/d/e/1FAIpQLSdcKa51l2lPC8BYXKA164MJe2ilxPSmkIT_C87REfbhtdri3g/viewform?usp=dialog" target="_blank" class="nexus-request-btn">Request Stuff</a>
+                        <a href="https://docs.google.com/forms/d/e/1FAIpQLSdcKa51l2lPC8BYXKA164MJe2ilxPSmkIT_C87REfbhtdri3g/viewform?usp=dialog" target="_blank" class="nexus-request-btn" style="pointer-events: auto !important;">Request Stuff</a>
                     </div>
                 </div>
             </div>
@@ -487,5 +487,34 @@ body {
 <!-- ========== JAVASCRIPT ========== -->
 <script src="tutorial-engine.js?v=1"></script>
 <script src="cookie-core.js?v=48"></script>
-<script src="cookie-engine.js?v=52"></script></body>
+<script src="cookie-engine.js?v=52"></script>
+<script>
+    (function() {
+        const verContainer = document.querySelector('.nexus-version-container');
+        const updateCard = document.querySelector('.nexus-update-card');
+        if (verContainer && updateCard) {
+            let hideTimer = null;
+            function showCard() {
+                clearTimeout(hideTimer);
+                updateCard.style.opacity = '1';
+                updateCard.style.visibility = 'visible';
+                updateCard.style.transform = 'translateY(0)';
+                updateCard.style.pointerEvents = 'auto';
+            }
+            function hideCard() {
+                hideTimer = setTimeout(() => {
+                    updateCard.style.opacity = '0';
+                    updateCard.style.visibility = 'hidden';
+                    updateCard.style.transform = 'translateY(6px)';
+                    updateCard.style.pointerEvents = 'none';
+                }, 200);
+            }
+            verContainer.addEventListener('mouseenter', showCard);
+            verContainer.addEventListener('mouseleave', hideCard);
+            updateCard.addEventListener('mouseenter', showCard);
+            updateCard.addEventListener('mouseleave', hideCard);
+        }
+    })();
+</script>
+</body>
 </html>
