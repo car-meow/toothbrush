@@ -242,8 +242,8 @@ body:not(.media-bg) .rename-done-btn:hover {
 
 .nexus-version-container {
     position: absolute;
-    bottom: 8px;
-    right: 4px;
+    bottom: -6px;
+    right: -72px;
     display: inline-block;
     z-index: 100;
 }
@@ -255,9 +255,9 @@ body:not(.media-bg) .rename-done-btn:hover {
     font-weight: 700;
     cursor: pointer;
     user-select: none;
-    padding: 2px 7px;
+    padding: 3px 8px;
     border-radius: 6px;
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(0, 0, 0, 0.55);
     border: 1px solid rgba(255, 255, 255, 0.25);
     transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
     white-space: nowrap;
@@ -265,15 +265,15 @@ body:not(.media-bg) .rename-done-btn:hover {
 
 .nexus-version-container:hover .nexus-version-tag {
     color: #ffffff;
-    background: rgba(33, 150, 243, 0.55);
+    background: rgba(33, 150, 243, 0.6);
     border-color: #2196F3;
 }
 
 .nexus-update-card {
     position: absolute;
     top: calc(100% + 8px);
-    right: 0;
-    width: 270px;
+    right: -20px;
+    width: 280px;
     background: rgba(18, 18, 28, 0.96);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
