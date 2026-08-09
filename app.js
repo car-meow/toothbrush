@@ -315,16 +315,66 @@ function onDragEnd(e) {
     renderGameList();
 }
 
-function loadGame(game) {
-    const localStorage = window.nexusStorage;
-    currentGame = game;
-    if (game.id !== "ugs-stash") {
-        localStorage.setItem('tb_bgm_stopped_by_game', 'true');
-    } else {
-        localStorage.removeItem('tb_bgm_stopped_by_game');
+function launchGameFullscreen(game) {
+    if (!game || game.id === "ugs-stash") return;
+    const win = window.open('about:blank', '_blank');
+    if (!win) {
+        nexusAlert("Pop-up blocked! Please allow pop-ups to open games.");
+        return;
     }
-    if (window.BGMManager) {
-        window.BGMManager.updateState();
+    const gameSrc = game.type === 'file' 
+        ? URL.createObjectURL(new Blob([atob(game.content.split(',')[1])], { type: 'text/html' })) 
+        : game.url;
+
+    const localStorage = window.nexusStorage;
+    const preset = localStorage.getItem('tb_cloak_preset');
+    if (preset === 'drive') {
+        win.document.title = "My Drive - Google Drive";
+        const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'Assets/drive_cloak.png';
+        win.document.head.appendChild(link);
+    } else if (preset === 'wikipedia') {
+        win.document.title = "Wikipedia, the free encyclopedia";
+        const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'https://en.wikipedia.org/favicon.ico';
+        win.document.head.appendChild(link);
+    } else if (preset === 'canvas') {
+        win.document.title = "Dashboard";
+        const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'Assets/canvas_cloak.png';
+        win.document.head.appendChild(link);
+    } else {
+        win.document.title = game.title || "Game";
+        const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'data:,';
+        win.document.head.appendChild(link);
+    }
+
+    const ifr = win.document.createElement('iframe');
+    Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
+    ifr.src = gameSrc;
+    win.document.body.style.margin = '0';
+    win.document.body.style.padding = '0';
+    win.document.body.style.overflow = 'hidden';
+    win.document.body.appendChild(ifr);
+}
+
+function loadGame(game, forceInternal = false) {
+    const localStorage = window.nexusStorage;
+    const isDebugFS = localStorage.getItem('tb_debug_fullscreen') === 'true';
+
+    // If Debug Fullscreen is OFF (default) and launching a non-stash game from sidebar
+    if (!isDebugFS && !forceInternal && game && game.id !== "ugs-stash") {
+        launchGameFullscreen(game);
+        const stash = games.find(g => g.id === "ugs-stash");
+        if (stash) loadGame(stash, true);
+        return;
+    }
+
+    currentGame = game;
+    const cloakBtn = document.getElementById('cloak-btn');
+    if (cloakBtn) {
+        if (isDebugFS && game && game.id !== "ugs-stash") {
+            cloakBtn.style.display = 'inline-flex';
+        } else {
+            cloakBtn.style.display = 'none';
+        }
     }
     const frame = document.getElementById('game-frame');
     const emergencyBtn = document.getElementById('emergency-open-btn');
@@ -366,7 +416,7 @@ function loadGame(game) {
     if (game.type === 'file') {
         const base64Data = game.content.split(',')[1];
         let htmlContent;
-        try { htmlContent = atob(base64Data); } catch(e) { return alert("File corrupted."); }
+        try { htmlContent = atob(base64Data); } catch(e) { nexusAlert("File corrupted."); return; }
         
         const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
         const finalHTML = persistenceScript + htmlContent;
@@ -395,7 +445,7 @@ if (emgBtn) {
     emgBtn.onclick = () => {
         if (!currentGame) return;
         const win = window.open();
-        if (!win) return alert("Allow popups for emergency open!");
+        if (!win) return nexusAlert("Allow popups for emergency open!");
         if (currentGame.type === 'file') win.document.write(atob(currentGame.content.split(',')[1]));
         else win.location.href = currentGame.url;
     };
@@ -406,7 +456,7 @@ if (addGameBtn) {
     addGameBtn.onclick = () => {
         const title = document.getElementById('new-game-title').value;
         const file = document.getElementById('new-game-file').files[0];
-        if (!title || !file) return alert("Missing data");
+        if (!title || !file) return nexusAlert("Missing data");
         const reader = new FileReader();
         reader.onload = async e => {
             const newG = { id: 'custom_' + Date.now(), title, type: 'file', content: e.target.result };
@@ -419,7 +469,8 @@ if (addGameBtn) {
 }
 
 async function deleteGame(id, index) {
-    if (!confirm("Delete? You can always re-bookmark app, and progress will not be removed.")) return;
+    const ok = await nexusConfirm("Delete? You can always re-bookmark app, and progress will not be removed.");
+    if (!ok) return;
     const tx = db.transaction("customGames", "readwrite");
     await tx.objectStore("customGames").delete(id);
     games.splice(index, 1); 
@@ -543,7 +594,7 @@ window.setGamePopupState = function setGamePopupState(sourceId, isOpen) {
 const cloakBtn = document.getElementById('cloak-btn');
 if (cloakBtn) {
     cloakBtn.onclick = () => {
-        if (!currentGame) return alert("Select game");
+        if (!currentGame) return nexusAlert("Select game");
         // Block fullscreen for Game Stash — flash icon red and fade back
         if (currentGame.id === "ugs-stash") {
             const icon = cloakBtn.querySelector('img');
@@ -556,18 +607,11 @@ if (cloakBtn) {
             }
             return;
         }
-        const win = window.open('about:blank', '_blank');
-        const gameSrc = currentGame.type === 'file' ? URL.createObjectURL(new Blob([atob(currentGame.content.split(',')[1])], {type:'text/html'})) : currentGame.url;
-        win.document.title = "My Drive - Google Drive";
-        const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png';
-        win.document.head.appendChild(link);
-        const ifr = win.document.createElement('iframe');
-        Object.assign(ifr.style, { position:'fixed', top:0, left:0, width:'100%', height:'100%', border:'none' });
-        ifr.src = gameSrc; win.document.body.appendChild(ifr);
+        launchGameFullscreen(currentGame);
         killMainTab();
         // Navigate main tab back to Game Stash
         const stash = games.find(g => g.id === "ugs-stash");
-        if (stash) loadGame(stash);
+        if (stash) loadGame(stash, true);
     };
 }
 
@@ -687,7 +731,7 @@ if (exportBtn) {
             }
         } catch (e) {
             console.error("Backup failed:", e);
-            alert("Backup failed: " + e.message);
+            nexusAlert("Backup failed: " + e.message);
         } finally {
             exportBtn.disabled = false;
             exportBtn.textContent = originalText;
@@ -714,7 +758,7 @@ if (proxyBtn) {
             iframe.src = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1) + 'gust.html';
             win.document.body.appendChild(iframe);
         } else {
-            alert('Pop-up blocked! Please allow pop-ups to open the proxy.');
+            nexusAlert('Pop-up blocked! Please allow pop-ups to open the proxy.');
         }
     };
 }
@@ -732,7 +776,7 @@ if (importBtn) {
             try {
                 data = JSON.parse(ev.target.result);
             } catch (err) {
-                alert("Invalid backup file: " + err.message);
+                nexusAlert("Invalid backup file: " + err.message);
                 return;
             }
 
@@ -844,11 +888,11 @@ if (importBtn) {
                     }
                 }
 
-                alert("Successfully loaded. Press OK to apply.");
+                await nexusAlert("Successfully loaded. Press OK to apply.");
                 location.reload();
             } catch (err) {
                 console.error("Restoration failed:", err);
-                alert("Restoration failed: " + err.message);
+                nexusAlert("Restoration failed: " + err.message);
             }
         };
         reader.readAsText(file);
