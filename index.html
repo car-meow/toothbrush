@@ -392,7 +392,7 @@ body {
         <div class="logo-wrapper" style="pointer-events: auto !important;">
             <img src="Assets/nexusLogo.png" id="nexus-logo" class="home-title-img" alt="Nexus" style="cursor: pointer; pointer-events: auto !important;">
             <div class="nexus-version-container" style="pointer-events: auto !important;">
-                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: #ffffff !important; opacity: 1 !important;">v3.5.04</span>
+                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: #ffffff !important; opacity: 1 !important;">v3.5.07</span>
                 <div class="nexus-update-card" style="pointer-events: auto !important;">
                     <div class="nexus-update-title">What's New</div>
                     <div class="nexus-update-body">
@@ -498,14 +498,14 @@ body {
                 clearTimeout(hideTimer);
                 updateCard.style.opacity = '1';
                 updateCard.style.visibility = 'visible';
-                updateCard.style.transform = 'translateY(0)';
+                updateCard.style.transform = 'translateY(-50%) translateX(0)';
                 updateCard.style.pointerEvents = 'auto';
             }
             function hideCard() {
                 hideTimer = setTimeout(() => {
                     updateCard.style.opacity = '0';
                     updateCard.style.visibility = 'hidden';
-                    updateCard.style.transform = 'translateY(6px)';
+                    updateCard.style.transform = 'translateY(-50%) translateX(6px)';
                     updateCard.style.pointerEvents = 'none';
                 }, 200);
             }
