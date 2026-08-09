@@ -416,7 +416,7 @@
     function showHomeFarewell() {
         ensureOverlay();
         createPopup(
-            '<strong>Indeed. If you have any concerns or requests, click the red question mark at the top right of settings. And with that, I will leave you. See ya!</strong>',
+            '<strong>Indeed. If you have any concerns or requests, hover over the version tag next to the logo on the home page and click Request Stuff. And with that, I will leave you. See ya!</strong>',
             {
                 btn: { label: 'Bye!', cb: () => {
                     finish();
