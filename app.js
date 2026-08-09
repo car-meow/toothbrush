@@ -322,9 +322,38 @@ function launchGameFullscreen(game) {
         nexusAlert("Pop-up blocked! Please allow pop-ups to open games.");
         return;
     }
-    const gameSrc = game.type === 'file' 
-        ? URL.createObjectURL(new Blob([atob(game.content.split(',')[1])], { type: 'text/html' })) 
-        : game.url;
+    
+    // Focus tab instantly on launch
+    try { win.focus(); } catch(e) {}
+
+    let gameSrc;
+    if (game.type === 'file') {
+        const rawHtml = atob(game.content.split(',')[1]);
+        const autoFocusScript = `<script>
+        (function(){
+            function triggerClickFocus() {
+                try {
+                    window.focus();
+                    const target = document.body || document.documentElement;
+                    if (target) {
+                        target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                        target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                        target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                    }
+                } catch(e){}
+            }
+            if (document.readyState === 'complete') {
+                setTimeout(triggerClickFocus, 500);
+            } else {
+                window.addEventListener('load', function() { setTimeout(triggerClickFocus, 500); });
+                setTimeout(triggerClickFocus, 500);
+            }
+        })();
+        <\/script>`;
+        gameSrc = URL.createObjectURL(new Blob([autoFocusScript + rawHtml], { type: 'text/html' }));
+    } else {
+        gameSrc = game.url;
+    }
 
     const localStorage = window.nexusStorage;
     const preset = localStorage.getItem('tb_cloak_preset');
@@ -348,11 +377,36 @@ function launchGameFullscreen(game) {
 
     const ifr = win.document.createElement('iframe');
     Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
+    ifr.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock');
+    ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen');
     ifr.src = gameSrc;
     win.document.body.style.margin = '0';
     win.document.body.style.padding = '0';
     win.document.body.style.overflow = 'hidden';
     win.document.body.appendChild(ifr);
+
+    // Auto-focus and simulate mouse click 0.5 seconds after launch
+    function doFocusAndClick() {
+        try {
+            win.focus();
+            ifr.focus();
+            if (ifr.contentWindow) {
+                ifr.contentWindow.focus();
+                try {
+                    const doc = ifr.contentDocument || ifr.contentWindow.document;
+                    if (doc && doc.body) {
+                        doc.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: ifr.contentWindow }));
+                        doc.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: ifr.contentWindow }));
+                        doc.body.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: ifr.contentWindow }));
+                    }
+                } catch(e) {}
+            }
+        } catch(e) {}
+    }
+
+    setTimeout(doFocusAndClick, 100);
+    setTimeout(doFocusAndClick, 500); // 0.5s after launch
+    setTimeout(doFocusAndClick, 1000);
 }
 
 function loadGame(game, forceInternal = false) {
