@@ -409,9 +409,65 @@ function launchGameFullscreen(game) {
     setTimeout(doFocusAndClick, 1000);
 }
 
+let gameStatusFadeTimer = null;
+let isStashPreloaded = false;
+
+function updateGameStatusUI(state) {
+    const container = document.getElementById('game-status-container');
+    const icon = document.getElementById('game-status-icon');
+    const text = document.getElementById('game-status-text');
+
+    if (!container || !icon || !text) return;
+
+    if (gameStatusFadeTimer) {
+        clearTimeout(gameStatusFadeTimer);
+        gameStatusFadeTimer = null;
+    }
+
+    if (state === 'loading') {
+        icon.src = 'Assets/loadingRoll.gif';
+        text.textContent = 'Loading...';
+        container.style.opacity = '1';
+        container.style.visibility = 'visible';
+        container.classList.add('active');
+    } else if (state === 'loaded') {
+        icon.src = 'Assets/Game.svg';
+        text.textContent = 'Loaded';
+        container.style.opacity = '1';
+        container.style.visibility = 'visible';
+        container.classList.add('active');
+
+        gameStatusFadeTimer = setTimeout(() => {
+            container.style.opacity = '0';
+            container.style.visibility = 'hidden';
+            setTimeout(() => {
+                container.classList.remove('active');
+            }, 400);
+        }, 1800);
+    } else if (state === 'hidden') {
+        container.style.opacity = '0';
+        container.style.visibility = 'hidden';
+        container.classList.remove('active');
+    }
+}
+
+function ensureStashPreloaded() {
+    const localStorage = window.nexusStorage;
+    const isPreloadEnabled = localStorage.getItem('tb_preload_stash') === 'true';
+    const stashFrame = document.getElementById('stash-frame');
+
+    if (isPreloadEnabled && stashFrame && !isStashPreloaded) {
+        stashFrame.src = 'clSINGLEFILE.html';
+        stashFrame.onload = () => {
+            isStashPreloaded = true;
+        };
+    }
+}
+
 function loadGame(game, forceInternal = false) {
     const localStorage = window.nexusStorage;
     const isDebugFS = localStorage.getItem('tb_debug_fullscreen') === 'true';
+    const isPreloadEnabled = localStorage.getItem('tb_preload_stash') === 'true';
 
     // If Debug Fullscreen is OFF (default) and launching a non-stash game from sidebar
     if (!isDebugFS && !forceInternal && game && game.id !== "ugs-stash") {
@@ -430,67 +486,81 @@ function loadGame(game, forceInternal = false) {
             cloakBtn.style.display = 'none';
         }
     }
+
     const frame = document.getElementById('game-frame');
+    const stashFrame = document.getElementById('stash-frame');
     const emergencyBtn = document.getElementById('emergency-open-btn');
     const emptyState = document.getElementById('empty-state');
-    const statusContainer = document.getElementById('game-status-container');
-    const statusText = document.getElementById('game-status-text');
 
-    // 1. UI Updates: Hide empty state, show frame, show emergency btn
     if (emptyState) emptyState.style.display = 'none';
     if (emergencyBtn) emergencyBtn.style.display = 'inline-flex';
-    
-    frame.style.setProperty('display', 'block', 'important');
-    frame.style.setProperty('visibility', 'hidden', 'important');
-    frame.style.opacity = '0';
-    frame.style.transition = 'opacity 0.25s ease';
-    frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock');
-	
-    // 2. Set Status to Loading (Yellow)
-    const statusDot = document.getElementById('game-status-dot');
-    if (statusContainer && statusDot) {
-        statusContainer.style.display = 'flex';
-        statusDot.style.background = '#FFEB3B';
-        statusDot.style.boxShadow = '0 0 8px #FFEB3B';
-        statusText.textContent = 'Loading...';
+
+    // Handle Game Stash loading with Preload support
+    if (game && game.id === "ugs-stash" && isPreloadEnabled && stashFrame) {
+        if (frame) frame.style.setProperty('display', 'none', 'important');
+        stashFrame.style.setProperty('display', 'block', 'important');
+        stashFrame.style.setProperty('visibility', 'visible', 'important');
+        stashFrame.style.opacity = '1';
+
+        if (!isStashPreloaded || !stashFrame.src || stashFrame.src.endsWith('about:blank')) {
+            updateGameStatusUI('loading');
+            stashFrame.src = 'clSINGLEFILE.html';
+            stashFrame.onload = () => {
+                isStashPreloaded = true;
+                updateGameStatusUI('loaded');
+            };
+        } else {
+            updateGameStatusUI('loaded');
+        }
+        return;
     }
 
-    // 3. Listen for Iframe to finish loading (Set Status to Green)
-    frame.onload = () => {
-        if (statusContainer && statusDot) {
-            statusDot.style.background = '#4CAF50';
-            statusDot.style.boxShadow = '0 0 8px #4CAF50';
-            statusText.textContent = 'Loaded';
-        }
-        frame.style.setProperty('visibility', 'visible', 'important');
-        frame.style.opacity = '1';
-    };
+    // Standard Game Loading
+    if (stashFrame) stashFrame.style.setProperty('display', 'none', 'important');
+    if (frame) {
+        frame.style.setProperty('display', 'block', 'important');
+        frame.style.setProperty('visibility', 'hidden', 'important');
+        frame.style.opacity = '0';
+        frame.style.transition = 'opacity 0.25s ease';
+        frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock');
 
-    // 4. Inject Game Content
-    if (game.type === 'file') {
-        const base64Data = game.content.split(',')[1];
-        let htmlContent;
-        try { htmlContent = atob(base64Data); } catch(e) { nexusAlert("File corrupted."); return; }
-        
-        const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
-        const finalHTML = persistenceScript + htmlContent;
+        updateGameStatusUI('loading');
 
-        try {
-            frame.srcdoc = finalHTML;
-        } catch (err1) {
+        frame.onload = () => {
+            updateGameStatusUI('loaded');
+            frame.style.setProperty('visibility', 'visible', 'important');
+            frame.style.opacity = '1';
+        };
+
+        if (game.type === 'file') {
+            const base64Data = game.content.split(',')[1];
+            let htmlContent;
+            try { htmlContent = atob(base64Data); } catch(e) { nexusAlert("File corrupted."); return; }
+            
+            const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
+            const finalHTML = persistenceScript + htmlContent;
+
             try {
-                const blob = new Blob([finalHTML], {type: 'text/html'});
-                frame.removeAttribute('srcdoc');
-                frame.src = URL.createObjectURL(blob);
-            } catch (err2) {
-                frame.removeAttribute('srcdoc');
-                frame.src = game.content; 
+                frame.srcdoc = finalHTML;
+            } catch (err1) {
+                try {
+                    const blob = new Blob([finalHTML], {type: 'text/html'});
+                    frame.removeAttribute('srcdoc');
+                    frame.src = URL.createObjectURL(blob);
+                } catch (err2) {
+                    frame.removeAttribute('srcdoc');
+                    frame.src = game.content; 
+                }
             }
+        } else {
+            frame.removeAttribute('srcdoc');
+            if (game.url.endsWith('.pdf')) frame.removeAttribute('sandbox');
+            frame.src = game.url;
         }
-    } else {
-        frame.removeAttribute('srcdoc');
-        if (game.url.endsWith('.pdf')) frame.removeAttribute('sandbox');
-        frame.src = game.url;
+    }
+
+    if (isPreloadEnabled) {
+        ensureStashPreloaded();
     }
 }
 

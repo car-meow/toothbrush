@@ -134,6 +134,17 @@
             </div>
 
             <div class="setting-row">
+                <div class="setting-label-group">
+                    <span class="setting-label">Preload Game Stash</span>
+                    <span class="setting-hint">Keep Game Stash loaded in the background so closing games opens it instantly.</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-preload-stash">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
                 <span class="setting-label">Sounds</span>
                 <label class="toggle-switch">
                     <input type="checkbox" id="toggle-mute">
@@ -321,6 +332,15 @@
                 } else {
                     document.documentElement.classList.remove('performance-mode');
                 }
+            });
+        }
+
+        // Preload Game Stash
+        const togglePreloadStash = document.getElementById('toggle-preload-stash');
+        if (togglePreloadStash) {
+            togglePreloadStash.checked = localStorage.getItem('tb_preload_stash') === 'true';
+            togglePreloadStash.addEventListener('change', (e) => {
+                localStorage.setItem('tb_preload_stash', e.target.checked ? 'true' : 'false');
             });
         }
 
