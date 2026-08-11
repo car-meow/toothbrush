@@ -416,13 +416,14 @@ body {
         <div class="logo-wrapper" style="pointer-events: auto !important;">
             <img src="Assets/nexusLogo.png" id="nexus-logo" class="home-title-img" alt="Nexus" style="cursor: pointer; pointer-events: auto !important;">
             <div class="nexus-version-container" style="pointer-events: auto !important;">
-                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: #ffffff !important; opacity: 1 !important;">v3.5.17</span>
+                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: #ffffff !important; opacity: 1 !important;">v3.5.20</span>
                 <div class="nexus-update-card" style="pointer-events: auto !important;">
-                    <div class="nexus-update-title">3.5 is here!</div>
+                    <div class="nexus-update-title">Welcome back to NEXUS!</div>
                     <div class="nexus-update-body">
-                        In this major update, I added tons of backend optimization for some insanely slow Chromebooks and some QoL changes. Also added an interactive tutorial, tweaked Settings menus, and little UI updates to make it feel fresh.
+                        School is back in session, and so is Nexus! MASSIVE New game additions, performance updates, and a whole lot more. Read all about it by clicking the blue button below.
                     </div>
                     <div class="nexus-update-footer">
+                        <button id="nexus-read-more-btn" class="nexus-read-more-btn">Read More</button>
                         <a href="https://docs.google.com/forms/d/e/1FAIpQLSdcKa51l2lPC8BYXKA164MJe2ilxPSmkIT_C87REfbhtdri3g/viewform?usp=dialog" target="_blank" class="nexus-request-btn" style="pointer-events: auto !important;">Request Stuff</a>
                     </div>
                 </div>
@@ -499,6 +500,32 @@ body {
 </div>
 
 
+
+<!-- ========== EXPANDED PATCH NOTES MODAL ========== -->
+<div id="nexus-patchnotes-overlay" class="nexus-patchnotes-overlay" style="display: none;">
+    <div class="nexus-patchnotes-modal">
+        <div class="nexus-patchnotes-header">
+            <div class="nexus-patchnotes-title">Patch Notes</div>
+        </div>
+        <div class="nexus-patchnotes-body" id="nexus-patchnotes-expanded-text">It's been one long summer, and we're all enthusiastic to get back to school. (not) And I've been hard at work at the latest revisions, updates, improvements, tweaks, and refinements of Nexus so your experience can be the best while my sleep schedule can be the worst! Regardless, here are a few updates.
+
+I added some new games...
+Balatro (finally!)
+Battle Beavers
+OG Slope (just called Slope in the Game Stash)
+
+Performance was a huge issue in 2.9, and with the 3.0 update bringing some new visuals it didn't get much better. So I've completely overhauled the backend to ensure that your Chromebooks with specs from 1989 can at least run the site! But for those STONE AGE computers (they barely qualify to be called that) I've added a Performance mode, which removes some extra flare and pizzazz to favor usability and performance. General performance improvements include: Less stuttering, higher frame rate animations, file sizes made way smaller, crazy fast loading times (especially on Media, which went from 15s to 2-3s!) and a little more under the hood.
+
+Games Tab and the UI especially got a little love too, improving the Loading Status Bar with a cleaner animated version that doesn't look super old, and the option to preload the Game Stash, which is under Settings.
+
+For tech nerds, I extracted this one big irritating file I had (that did everything) into site-core.js and some smaller files, which means that the code is less optimized. More of a me thing. :D
+
+And that's all for version 3.5.20! Have fun y'all, and make sure to request stuff if you want. PEACE!</div>
+        <div class="nexus-patchnotes-footer">
+            <button id="nexus-close-patchnotes-btn" class="nexus-close-patchnotes-btn">Cool! Close</button>
+        </div>
+    </div>
+</div>
 
 <!-- ========== DEBUG MENU ========== -->
 <div id="debug-menu" style="display:none; position:fixed; top:20px; left:20px; z-index:19000; background:rgba(0,0,0,0.9); border:2px solid lime; padding:15px; border-radius:10px; font-family:monospace; color:lime;">

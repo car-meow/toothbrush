@@ -322,7 +322,33 @@ body:not(.media-bg) .rename-done-btn:hover {
 
 .nexus-update-footer {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.nexus-read-more-btn {
+    background: #2196F3;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 6px 14px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.4);
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    pointer-events: auto !important;
+}
+
+.nexus-read-more-btn:hover {
+    background: #42A5F5;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(66, 165, 245, 0.6);
 }
 
 .nexus-request-btn {
@@ -337,9 +363,96 @@ body:not(.media-bg) .rename-done-btn:hover {
     display: inline-flex;
     align-items: center;
     box-shadow: 0 2px 8px rgba(229, 57, 53, 0.4);
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
 }
 
 .nexus-request-btn:hover {
+    background: #f44336;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.6);
+}
+
+/* Expanded Patch Notes Modal */
+.nexus-patchnotes-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.86);
+    z-index: 50000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.nexus-patchnotes-modal {
+    background: rgba(18, 18, 28, 0.96);
+    border: 2px solid #B388FF;
+    border-radius: 20px;
+    padding: 28px;
+    width: fit-content;
+    min-width: 320px;
+    max-width: 800px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 50px rgba(179, 136, 255, 0.25);
+    color: #ffffff;
+    font-family: 'Space Grotesk', sans-serif;
+}
+
+.nexus-patchnotes-header {
+    margin-bottom: 14px;
+}
+
+.nexus-patchnotes-title {
+    color: #B388FF;
+    font-size: 24px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.nexus-patchnotes-body {
+    font-size: 16px;
+    color: #e0e0e0;
+    line-height: 1.6;
+    font-weight: 500;
+    margin-bottom: 20px;
+    overflow-y: auto;
+    max-height: 60vh;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.nexus-patchnotes-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.nexus-close-patchnotes-btn {
+    background: #e53935;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 6px 14px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(229, 57, 53, 0.4);
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.nexus-close-patchnotes-btn:hover {
     background: #f44336;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(244, 67, 54, 0.6);

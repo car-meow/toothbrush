@@ -166,6 +166,52 @@
             updateCard.addEventListener('mouseleave', hideCard);
         }
 
+        // Expanded Patch Notes Modal Handlers
+        const readMoreBtn = document.getElementById('nexus-read-more-btn');
+        const closePatchnotesBtn = document.getElementById('nexus-close-patchnotes-btn');
+        const patchnotesOverlay = document.getElementById('nexus-patchnotes-overlay');
+
+        if (readMoreBtn && patchnotesOverlay) {
+            readMoreBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (updateCard) {
+                    updateCard.style.opacity = '0';
+                    updateCard.style.visibility = 'hidden';
+                    updateCard.style.pointerEvents = 'none';
+                }
+                patchnotesOverlay.style.display = 'flex';
+            };
+        }
+
+        function closePatchnotesModal() {
+            if (patchnotesOverlay) {
+                patchnotesOverlay.style.display = 'none';
+            }
+        }
+
+        if (closePatchnotesBtn) {
+            closePatchnotesBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                closePatchnotesModal();
+            };
+        }
+
+        if (patchnotesOverlay) {
+            patchnotesOverlay.onclick = (e) => {
+                if (e.target === patchnotesOverlay) {
+                    closePatchnotesModal();
+                }
+            };
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && patchnotesOverlay && patchnotesOverlay.style.display === 'flex') {
+                closePatchnotesModal();
+            }
+        });
+
         // Launch in-app tutorial engine
         if (window.TutorialEngine && typeof window.TutorialEngine.initHome === 'function') {
             window.TutorialEngine.initHome();
