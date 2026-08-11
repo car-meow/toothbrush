@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, minimum-scale=1, maximum-scale=1">
+  <title>Balatro</title>
+
+  <!-- Base URL pointing to the static assets host -->
+  <base href="https://cdn.jsdelivr.net/gh/55gms/55gms@master/static/misc/balatro/">
+  <link rel="stylesheet" type="text/css" href="theme/love.css">
+  <script src="consolewrapper.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #0e0e10;
+    }
+    #loadingCanvas, #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      border: 0;
+    }
+    #canvas {
+      visibility: hidden;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="loadingCanvas" oncontextmenu="event.preventDefault()"></canvas>
+  <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+
+  <script type='text/javascript'>
+    if (window.parent !== window.self) {
+      try { window.parent.postMessage("bonk", "*"); } catch(e) {}
+    }
+
+    var canvas = document.getElementById("loadingCanvas");
+    canvas.width = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+    canvas.height = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+
+    var loadingContext = canvas.getContext('2d');
+
+    function drawLoadingText(text) {
+      var canvas = loadingContext.canvas;
+      loadingContext.fillStyle = "rgb(18, 22, 34)";
+      loadingContext.fillRect(0, 0, canvas.scrollWidth, canvas.scrollHeight);
+
+      loadingContext.font = '24px sans-serif';
+      loadingContext.textAlign = 'center';
+      loadingContext.fillStyle = "rgb(230, 235, 245)";
+      loadingContext.fillText(text, canvas.scrollWidth / 2, canvas.scrollHeight / 2);
+    }
+
+    window.addEventListener("keydown", function (e) {
+      if ([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
+        e.preventDefault();
+      }
+    }, false);
+
+    var Module = {
+      arguments: ["./game.love"],
+      INITIAL_MEMORY: 256000000,
+      printErr: console.error.bind(console),
+      canvas: (function () {
+        var canvas = document.getElementById('canvas');
+        canvas.addEventListener("webglcontextlost", function (e) {
+          alert('WebGL context lost. You will need to reload the page.');
+          e.preventDefault();
+        }, false);
+        return canvas;
+      })(),
+      setStatus: function (text) {
+        if (text) {
+          drawLoadingText(text);
+        } else if (Module.remainingDependencies === 0) {
+          document.getElementById('loadingCanvas').style.display = 'none';
+          document.getElementById('canvas').style.visibility = 'visible';
+        }
+      },
+      totalDependencies: 0,
+      remainingDependencies: 0,
+      monitorRunDependencies: function (left) {
+        this.remainingDependencies = left;
+        this.totalDependencies = Math.max(this.totalDependencies, left);
+        Module.setStatus(left ? 'Preparing Balatro... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+      }
+    };
+    Module.setStatus('Downloading...');
+    window.onerror = function (event) {
+      Module.setStatus('Exception thrown, see JavaScript console');
+    };
+
+    var applicationLoad = function (e) {
+      Love(Module);
+    }
+  </script>
+  <script type="text/javascript" src="game.js?v=d7e34743-2fea-4de6-8a0e-1103b5fcf07f"></script>
+  <script async type="text/javascript" src="love.js" onload="applicationLoad(this)"></script>
+</body>
+</html>
