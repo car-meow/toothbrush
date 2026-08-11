@@ -25,9 +25,14 @@
       width: 100vw;
       height: 100vh;
       border: 0;
+      will-change: transform;
+      transform: translateZ(0);
+      backface-visibility: hidden;
     }
     #canvas {
       visibility: hidden;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
     }
   </style>
 </head>
@@ -44,7 +49,7 @@
     canvas.width = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
     canvas.height = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
 
-    var loadingContext = canvas.getContext('2d');
+    var loadingContext = canvas.getContext('2d', { alpha: false });
 
     function drawLoadingText(text) {
       var canvas = loadingContext.canvas;
@@ -57,16 +62,26 @@
       loadingContext.fillText(text, canvas.scrollWidth / 2, canvas.scrollHeight / 2);
     }
 
+    // Prevent default scroll behavior for arrow keys & spacebar without legacy keyCode overhead
     window.addEventListener("keydown", function (e) {
-      if ([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
+      if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].indexOf(e.code) > -1 ||
+          [32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
         e.preventDefault();
       }
-    }, false);
+    }, { passive: false });
 
+    // Emscripten WASM runtime performance configuration
     var Module = {
       arguments: ["./game.love"],
-      INITIAL_MEMORY: 256000000,
-      printErr: console.error.bind(console),
+      // Pre-allocate 512MB WASM memory heap to eliminate dynamic heap reallocation & GC lag spikes during gameplay
+      INITIAL_MEMORY: 536870912,
+      // Suppress verbose Emscripten console outputs to prevent main-thread DOM log locks
+      print: function() {},
+      printErr: function(msg) {
+        if (msg && msg.indexOf && msg.indexOf("WebGL") !== -1) {
+          console.warn("[Balatro WASM]", msg);
+        }
+      },
       canvas: (function () {
         var canvas = document.getElementById('canvas');
         canvas.addEventListener("webglcontextlost", function (e) {
@@ -91,6 +106,7 @@
         Module.setStatus(left ? 'Preparing Balatro... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
       }
     };
+
     Module.setStatus('Downloading...');
     window.onerror = function (event) {
       Module.setStatus('Exception thrown, see JavaScript console');

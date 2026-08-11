@@ -1603,8 +1603,8 @@ body.tutorial-active #nexus-logo {
     position: fixed;
     bottom: 0;
     left: 0;
-    width: 150px;
-    height: 150px;
+    width: 160px;
+    height: 160px;
     z-index: 11999;
     pointer-events: auto;
 }
@@ -1623,14 +1623,14 @@ body.tutorial-active #nexus-logo {
     cursor: pointer;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease, color 0.3s ease, border-color 0.3s ease, background-color 0.3s ease, transform 0.2s ease;
+    transition: opacity 0.25s ease, visibility 0.25s ease, color 0.3s ease, border-color 0.3s ease, background-color 0.3s ease, transform 0.2s ease;
     
     /* Default Red state (Inactive) */
     color: #ef5350 !important;
     border: 2.5px solid #ef5350 !important;
     background-color: rgba(239, 83, 80, 0.2) !important;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    pointer-events: auto;
+    pointer-events: auto !important;
 }
 
 #cookie-btn:hover {
@@ -1655,8 +1655,57 @@ body.tutorial-active #nexus-logo {
 }
 
 #cookie-btn-trigger:hover ~ #cookie-btn,
-#cookie-btn:hover {
-    opacity: 1;
-    visibility: visible;
+#cookie-btn-trigger:hover #cookie-btn,
+#cookie-btn:hover,
+#cookie-btn.visible {
+    opacity: 1 !important;
+    visibility: visible !important;
 }
+
+/* =========================================
+   PERFORMANCE MODE OPTIMIZATIONS
+========================================= */
+html.performance-mode *,
+html.performance-mode *::before,
+html.performance-mode *::after {
+    animation: none !important;
+    transition: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+}
+
+html.performance-mode body.home-screen {
+    background-image: url('Assets/performanceBG.jpg') !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed !important;
+    background-color: #050505 !important;
+}
+
+html.performance-mode .home-bg-video {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+html.performance-mode .chat-bg {
+    animation: none !important;
+    background-position: 0 0 !important;
+}
+
+html.performance-mode .material-nav-btn {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(40, 30, 60, 0.95) !important;
+}
+
+html.performance-mode .nexus-update-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: #12121c !important;
+}
+
 

@@ -64,8 +64,7 @@
         .custom-select:disabled { opacity: 0.65; cursor: not-allowed; }
     </style>
     <link rel="prefetch" href="index.html">
-    <link rel="prefetch" href="cookie-engine.js">
-    <link rel="prefetch" href="cookie-core.js">
+    <link rel="prefetch" href="site-core.js">
 </head>
 <body class="chat-bg">
     <div id="page-fade-overlay"></div>
@@ -119,6 +118,17 @@
                 </div>
                 <label class="toggle-switch">
                     <input type="checkbox" id="toggle-debug-fullscreen">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label-group">
+                    <span class="setting-label">Performance Mode</span>
+                    <span class="setting-hint">Disables animations and background video, favors raw speed over visual polish.</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-performance-mode">
                     <span class="slider"></span>
                 </label>
             </div>
@@ -296,6 +306,21 @@
             toggleDebugFS.checked = localStorage.getItem('tb_debug_fullscreen') === 'true';
             toggleDebugFS.addEventListener('change', (e) => {
                 localStorage.setItem('tb_debug_fullscreen', e.target.checked ? 'true' : 'false');
+            });
+        }
+
+        // Performance Mode
+        const togglePerf = document.getElementById('toggle-performance-mode');
+        if (togglePerf) {
+            togglePerf.checked = localStorage.getItem('tb_performance_mode') === 'true';
+            togglePerf.addEventListener('change', (e) => {
+                const enabled = e.target.checked;
+                localStorage.setItem('tb_performance_mode', enabled ? 'true' : 'false');
+                if (enabled) {
+                    document.documentElement.classList.add('performance-mode');
+                } else {
+                    document.documentElement.classList.remove('performance-mode');
+                }
             });
         }
 

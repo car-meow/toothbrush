@@ -871,8 +871,6 @@
         }
 
         async function openPlayer(item, type) {
-            localStorage.setItem('tb_bgm_stopped_by_media', Date.now().toString());
-            if (window.BGMManager) window.BGMManager.updateState();
             const id = item.id;
             const title = item.title || item.name;
             const savedProgress = getSavedMediaProgress(type, id);
@@ -894,7 +892,7 @@
             }
 
             const win = window.open('about:blank', '_blank');
-            if (!win) return alert('Pop-up blocked!');
+            if (!win) return nexusAlert('Pop-up blocked!');
 
             // Set dark background immediately to prevent white flash
             try {
@@ -1091,19 +1089,11 @@
 
   window.addEventListener('pagehide', function() {
     saveProgress();
-    localStorage.removeItem('tb_bgm_stopped_by_media');
   });
   window.addEventListener('beforeunload', function() {
     saveProgress();
-    localStorage.removeItem('tb_bgm_stopped_by_media');
   });
   setInterval(saveProgress, 10000);
-
-  // BGM stopped heartbeat
-  setInterval(function() {
-    localStorage.setItem('tb_bgm_stopped_by_media', Date.now().toString());
-  }, 2000);
-  localStorage.setItem('tb_bgm_stopped_by_media', Date.now().toString());
 
   const PROVIDERS = [
     { id: 'cinemaos', name: 'CinemaOS', quality: 98, captions: 92, reliability: 98, popupRisk: 10,

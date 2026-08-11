@@ -337,13 +337,36 @@ body {
     animation: homeEnter 0.5s ease-out both;
 }
 
-</style>
+    <script>
+        (function() {
+            const localStorage = window.nexusStorage || window.localStorage;
+            if (localStorage.getItem('tb_performance_mode') === 'true') {
+                document.documentElement.classList.add('performance-mode');
+            }
+        })();
+    </script>
 </head>
 <body class="home-screen">
 
 <video class="home-bg-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
     <source src="Assets/loopBG.mp4" type="video/mp4">
 </video>
+<script>
+    (function() {
+        const localStorage = window.nexusStorage || window.localStorage;
+        if (localStorage.getItem('tb_performance_mode') === 'true') {
+            const video = document.querySelector('.home-bg-video');
+            if (video) {
+                try {
+                    video.pause();
+                    video.removeAttribute('src');
+                    video.load();
+                } catch(e) {}
+                if (video.parentNode) video.parentNode.removeChild(video);
+            }
+        }
+    })();
+</script>
 
 <!-- Page exit fade overlay -->
 <div id="page-fade-overlay"></div>
@@ -392,7 +415,7 @@ body {
         <div class="logo-wrapper" style="pointer-events: auto !important;">
             <img src="Assets/nexusLogo.png" id="nexus-logo" class="home-title-img" alt="Nexus" style="cursor: pointer; pointer-events: auto !important;">
             <div class="nexus-version-container" style="pointer-events: auto !important;">
-                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: #ffffff !important; opacity: 1 !important;">v3.5.07</span>
+                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: #ffffff !important; opacity: 1 !important;">v3.5.17</span>
                 <div class="nexus-update-card" style="pointer-events: auto !important;">
                     <div class="nexus-update-title">3.5 is here!</div>
                     <div class="nexus-update-body">
@@ -485,35 +508,131 @@ body {
 </div>
 
 <!-- ========== JAVASCRIPT ========== -->
+<script src="site-core.js?v=1"></script>
 <script src="tutorial-engine.js?v=1"></script>
-<script src="cookie-core.js?v=48"></script>
-<script src="cookie-engine.js?v=52"></script>
 <script>
     (function() {
-        const verContainer = document.querySelector('.nexus-version-container');
-        const updateCard = document.querySelector('.nexus-update-card');
-        if (verContainer && updateCard) {
-            let hideTimer = null;
-            function showCard() {
-                clearTimeout(hideTimer);
-                updateCard.style.opacity = '1';
-                updateCard.style.visibility = 'visible';
-                updateCard.style.transform = 'translateY(-50%) translateX(0)';
-                updateCard.style.pointerEvents = 'auto';
-            }
-            function hideCard() {
-                hideTimer = setTimeout(() => {
-                    updateCard.style.opacity = '0';
-                    updateCard.style.visibility = 'hidden';
-                    updateCard.style.transform = 'translateY(-50%) translateX(6px)';
-                    updateCard.style.pointerEvents = 'none';
-                }, 200);
-            }
-            verContainer.addEventListener('mouseenter', showCard);
-            verContainer.addEventListener('mouseleave', hideCard);
-            updateCard.addEventListener('mouseenter', showCard);
-            updateCard.addEventListener('mouseleave', hideCard);
+        const localStorage = window.nexusStorage || window.localStorage;
+        let scriptsLoaded = false;
+        let isFetching = false;
+
+        function isCookieDisabled() {
+            return localStorage.getItem('tb_cookie_disabled') !== 'false';
         }
+
+        function syncBtnState() {
+            const btn = document.getElementById('cookie-btn');
+            if (!btn) return;
+            if (isCookieDisabled()) {
+                btn.classList.remove('active');
+            } else {
+                btn.classList.add('active');
+            }
+        }
+
+        function initHoverTracker() {
+            const btn = document.getElementById('cookie-btn');
+            if (!btn) return;
+
+            function checkCursorPos(e) {
+                const inCorner = e.clientX <= 160 && (window.innerHeight - e.clientY) <= 160;
+                if (inCorner) {
+                    btn.classList.add('visible');
+                    btn.style.opacity = '1';
+                    btn.style.visibility = 'visible';
+                } else if (!btn.matches(':hover')) {
+                    btn.classList.remove('visible');
+                    btn.style.opacity = '';
+                    btn.style.visibility = '';
+                }
+            }
+
+            window.addEventListener('mousemove', checkCursorPos, { passive: true });
+
+            const trigger = document.getElementById('cookie-btn-trigger');
+            if (trigger) {
+                trigger.addEventListener('mouseenter', () => {
+                    btn.classList.add('visible');
+                    btn.style.opacity = '1';
+                    btn.style.visibility = 'visible';
+                });
+                trigger.addEventListener('mouseleave', (e) => {
+                    if (!btn.contains(e.relatedTarget)) {
+                        btn.classList.remove('visible');
+                        btn.style.opacity = '';
+                        btn.style.visibility = '';
+                    }
+                });
+            }
+        }
+
+        function appendScript(url) {
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = url;
+                s.onload = resolve;
+                s.onerror = reject;
+                document.body.appendChild(s);
+            });
+        }
+
+        async function enableGame() {
+            if (isFetching) return;
+            if (!scriptsLoaded) {
+                isFetching = true;
+                try {
+                    await appendScript('cookie-core.js?v=48');
+                    await appendScript('cookie-engine.js?v=52');
+                    scriptsLoaded = true;
+                } catch(err) {
+                    console.error("Failed loading cookie engine:", err);
+                    isFetching = false;
+                    return;
+                }
+                isFetching = false;
+            }
+
+            if (window.startCookieGame) {
+                window.startCookieGame();
+            }
+        }
+
+        function disableGame() {
+            if (window.stopCookieGame) {
+                window.stopCookieGame();
+            }
+        }
+
+        function toggleState() {
+            const currentlyDisabled = isCookieDisabled();
+            if (currentlyDisabled) {
+                localStorage.setItem('tb_cookie_disabled', 'false');
+                syncBtnState();
+                enableGame();
+            } else {
+                localStorage.setItem('tb_cookie_disabled', 'true');
+                syncBtnState();
+                disableGame();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initHoverTracker();
+            syncBtnState();
+
+            const btn = document.getElementById('cookie-btn');
+            if (btn) {
+                btn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleState();
+                };
+            }
+
+            if (!isCookieDisabled()) {
+                enableGame();
+            }
+        });
     })();
 </script>
 </body>

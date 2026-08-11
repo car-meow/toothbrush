@@ -10,11 +10,11 @@
             const localStorage = window.nexusStorage;
             const theme = localStorage.getItem('tb_theme') || 'dark';
             if (theme === 'light') document.documentElement.classList.add('light-mode');
+            if (localStorage.getItem('tb_performance_mode') === 'true') document.documentElement.classList.add('performance-mode');
         })();
     </script>
     <link rel="prefetch" href="index.html">
-    <link rel="prefetch" href="cookie-engine.js">
-    <link rel="prefetch" href="cookie-core.js">
+    <link rel="prefetch" href="site-core.js">
 </head>
 <body>
     <div id="page-fade-overlay"></div>

@@ -169,7 +169,7 @@
         const timeoutEnd = localStorage.getItem('tb_chat_timeout');
         if (timeoutEnd && Date.now() < parseInt(timeoutEnd)) {
             const timeLeft = Math.ceil((parseInt(timeoutEnd) - Date.now()) / 1000);
-            alert(`You are currently in a timeout from being kicked. Please wait ${timeLeft} seconds.`);
+            await nexusAlert(`You are currently in a timeout from being kicked. Please wait ${timeLeft} seconds.`);
             navigateWithFade('index.html'); return;
         } else if (timeoutEnd) { localStorage.removeItem('tb_chat_timeout'); }
 
@@ -533,7 +533,7 @@
                     if (isDisconnecting) return;
                     isDisconnecting = true;
                     localStorage.setItem('tb_chat_timeout', Date.now() + 60000);
-                    alert('You have been kicked! You are timed out for 1 minute.');
+                    await nexusAlert('You have been kicked! You are timed out for 1 minute.');
                     navigateWithFade('index.html');
                 }
             }
@@ -674,12 +674,13 @@
         // ═══════════════════════════════════════════════════
         //  11. DISBAND / KICK / RE-ROLL
         // ═══════════════════════════════════════════════════
-        document.getElementById('disband-btn').onclick = () => {
-            if (confirm('Disband Room?')) {
+        document.getElementById('disband-btn').onclick = async () => {
+            const ok = await nexusConfirm('Disband Room?');
+            if (ok) {
                 if (isDisconnecting) return;
                 isDisconnecting = true;
                 publish({ type: 'disband' });
-                alert('Room Disbanded.');
+                await nexusAlert('Room Disbanded.');
                 setTimeout(() => location.reload(), 500);
             }
         };
@@ -697,14 +698,14 @@
 
         // Re-Roll: pick a new unused name from the pool
         let rerollCooldown = false;
-        document.getElementById('reroll-btn').onclick = () => {
-            if (rerollCooldown) return alert('You must wait 3 minutes between name changes.');
+        document.getElementById('reroll-btn').onclick = async () => {
+            if (rerollCooldown) return nexusAlert('You must wait 3 minutes between name changes.');
             if (!myName) return;
 
             // Figure out which names are in use
             const inUse = new Set(globalUserList.map(u => u.name));
             const available = USERNAME_POOL.filter(n => !inUse.has(n));
-            if (available.length === 0) return alert('No usernames available right now.');
+            if (available.length === 0) return nexusAlert('No usernames available right now.');
 
             const oldName  = myName;
             const newName  = available[Math.floor(Math.random() * available.length)];

@@ -232,9 +232,10 @@ function animateCookies(now) {
             rot = progress * 360 * 2;
         }
 
+        const isPerfMode = localStorage.getItem('tb_performance_mode') === 'true';
         c.el.style.left = x + 'px';
         c.el.style.top = y + 'px';
-        c.el.style.transform = 'rotate(' + rot + 'deg)';
+        if (!isPerfMode) c.el.style.transform = 'rotate(' + rot + 'deg)';
     }
     activeCookies = activeCookies.filter(c => c.alive);
     cookieAnimFrameId = requestAnimationFrame(animateCookies);
@@ -282,10 +283,13 @@ function handleCookieClick(data, cx, cy) {
         queueDiscovery(cookie, rarity.color);
     }
 
-    showPop(cx, cy);
-    showFloatingBucks(cx, cy - 20, '+₡' + value);
-    showFloatingRarity(cx, cy + 20, rarity.name, rarity.color);
-    if (rarity.vignette) flashVignette(rarity.vignette);
+    const isPerf = localStorage.getItem('tb_performance_mode') === 'true';
+    if (!isPerf) {
+        showPop(cx, cy);
+        showFloatingBucks(cx, cy - 20, '+₡' + value);
+        showFloatingRarity(cx, cy + 20, rarity.name, rarity.color);
+        if (rarity.vignette) flashVignette(rarity.vignette);
+    }
     if (rarity.id === 'divine') triggerDivineEvent();
 
     updateHUD();
@@ -619,64 +623,90 @@ function toggleMenus() {
     }
 }
 
-// --- Toggle Cookie Game ---
+let autoTickInterval = null;
+let effectsInterval = null;
+let saveInterval = null;
+let hudInterval = null;
+
+function stopCookieGame() {
+    if (spawnTimer) { clearInterval(spawnTimer); spawnTimer = null; }
+    if (autoTickInterval) { clearInterval(autoTickInterval); autoTickInterval = null; }
+    if (effectsInterval) { clearInterval(effectsInterval); effectsInterval = null; }
+    if (saveInterval) { clearInterval(saveInterval); saveInterval = null; }
+    if (hudInterval) { clearInterval(hudInterval); hudInterval = null; }
+    if (cookieAnimFrameId) { cancelAnimationFrame(cookieAnimFrameId); cookieAnimFrameId = null; }
+
+    activeCookies.forEach(c => { if (c.el && c.el.parentNode) c.el.parentNode.removeChild(c.el); });
+    activeCookies = [];
+
+    cacheDom();
+    if (DOM.cookieLayer) { DOM.cookieLayer.innerHTML = ''; DOM.cookieLayer.style.display = 'none'; }
+    if (DOM.floatLayer) { DOM.floatLayer.innerHTML = ''; DOM.floatLayer.style.display = 'none'; }
+    const hudTopLeft = document.getElementById('hud-top-left');
+    if (hudTopLeft) hudTopLeft.style.display = 'none';
+
+    let styleNode = document.getElementById('tb-cookie-disabled-styles');
+    if (!styleNode) {
+        styleNode = document.createElement('style');
+        styleNode.id = 'tb-cookie-disabled-styles';
+        styleNode.innerHTML = '#hud-top-left, .hud-bottom-right, #cookie-layer, #float-layer, #effects-container, #discovery-popup { display: none !important; }';
+        document.head.appendChild(styleNode);
+    }
+
+    const btn = document.getElementById('cookie-btn');
+    if (btn) btn.classList.remove('active');
+    if (menusHidden) toggleMenus();
+}
+
+function startCookieGame() {
+    cacheDom();
+    const styleNode = document.getElementById('tb-cookie-disabled-styles');
+    if (styleNode) styleNode.remove();
+
+    if (DOM.cookieLayer) DOM.cookieLayer.style.display = 'block';
+    if (DOM.floatLayer) DOM.floatLayer.style.display = 'block';
+    const hudTopLeft = document.getElementById('hud-top-left');
+    if (hudTopLeft) hudTopLeft.style.display = 'flex';
+
+    const btn = document.getElementById('cookie-btn');
+    if (btn) btn.classList.add('active');
+
+    loadGame();
+
+    const offline = calcOfflineEarnings();
+    if (offline > 0) {
+        G.bucks += offline;
+        G.totalEarned += offline;
+    }
+
+    updateHUD();
+    startSpawning();
+    ensureCookieLoop();
+
+    if (!autoTickInterval) autoTickInterval = setInterval(autoTick, 100);
+    if (!effectsInterval) effectsInterval = setInterval(updateEffects, 1000);
+    if (!saveInterval) saveInterval = setInterval(saveGame, 15000);
+    if (!hudInterval) hudInterval = setInterval(() => { updateHUD(); if (DOM.shopModal && DOM.shopModal.classList.contains('open')) renderShop(); }, 1000);
+
+    if (!menusHidden) toggleMenus();
+}
+
 function toggleCookieGame() {
     const localStorage = window.nexusStorage;
     const disabled = localStorage.getItem('tb_cookie_disabled') !== 'false';
     const newDisabled = !disabled;
     localStorage.setItem('tb_cookie_disabled', newDisabled);
 
-    const btn = document.getElementById('cookie-btn');
-    if (btn) {
-        if (newDisabled) {
-            btn.classList.remove('active');
-        } else {
-            btn.classList.add('active');
-        }
-    }
-
-    const styleNode = document.getElementById('tb-cookie-disabled-styles');
     if (newDisabled) {
-        // Stop gameplay
-        if (spawnTimer) clearInterval(spawnTimer);
-        activeCookies.forEach(c => { if (c.el && c.el.parentNode) c.el.parentNode.removeChild(c.el); });
-        activeCookies = [];
-        if (DOM.cookieLayer) DOM.cookieLayer.style.display = 'none';
-        if (DOM.floatLayer) DOM.floatLayer.style.display = 'none';
-        const hudTopLeft = document.getElementById('hud-top-left');
-        if (hudTopLeft) hudTopLeft.style.display = 'none';
-
-        // Recreate style node if it doesn't exist
-        if (!styleNode) {
-            const style = document.createElement('style');
-            style.id = 'tb-cookie-disabled-styles';
-            style.innerHTML = '#hud-top-left, .hud-bottom-right, #cookie-layer, #float-layer, #effects-container, #discovery-popup { display: none !important; }';
-            document.head.appendChild(style);
-        }
-
-        // Show menu
-        if (menusHidden) {
-            toggleMenus();
-        }
+        stopCookieGame();
     } else {
-        // Remove style node
-        if (styleNode) styleNode.remove();
-
-        // Start gameplay
-        if (DOM.cookieLayer) DOM.cookieLayer.style.display = 'block';
-        if (DOM.floatLayer) DOM.floatLayer.style.display = 'block';
-        const hudTopLeft = document.getElementById('hud-top-left');
-        if (hudTopLeft) hudTopLeft.style.display = 'flex';
-
-        startSpawning();
-        ensureCookieLoop();
-
-        // Hide menu
-        if (!menusHidden) {
-            toggleMenus();
-        }
+        startCookieGame();
     }
 }
+
+window.startCookieGame = startCookieGame;
+window.stopCookieGame = stopCookieGame;
+window.toggleCookieGame = toggleCookieGame;
 
 function closeAllModals() {
     DOM.shopModal.classList.remove('open');
@@ -745,59 +775,25 @@ window.addEventListener('DOMContentLoaded', () => {
     ensureCookieLoop();
 
 
-    // Smooth fade-out before navigation
-    function navigateWithFade(url) {
-        const overlay = document.getElementById('page-fade-overlay');
-        if (overlay) {
-            overlay.classList.remove('fade-out');
-            setTimeout(() => { location.href = url; }, 370);
-        } else {
-            location.href = url;
-        }
-    }
-
-    document.getElementById('nexus-logo').onclick = (e) => { e.preventDefault(); cycleSplash(); };
-    document.getElementById('btn-nav-games').onclick = () => { navigateWithFade('carmeow.html'); };
-    document.getElementById('btn-nav-ai').onclick = () => { navigateWithFade('ai.html'); };
-    document.getElementById('btn-nav-chat').onclick = () => { navigateWithFade('chat.html'); };
-    document.getElementById('btn-nav-media').onclick = () => { navigateWithFade('media.html'); };
-    document.getElementById('btn-nav-settings').onclick = () => { navigateWithFade('settings.html'); };
-    document.getElementById('proxy-btn').onclick = () => {
-        const win = window.open('about:blank', '_blank');
-        if (win) {
-            win.document.title = "GUST Browser";
-            win.document.body.style.margin = '0';
-            win.document.body.style.padding = '0';
-            win.document.body.style.overflow = 'hidden';
-            const iframe = win.document.createElement('iframe');
-            iframe.style.position = 'fixed';
-            iframe.style.top = '0';
-            iframe.style.left = '0';
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = 'none';
-            iframe.src = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1) + 'gust.html';
-            win.document.body.appendChild(iframe);
-        } else {
-            nexusAlert('Pop-up blocked! Please allow pop-ups to open the proxy.');
-        }
-    };
-
-
     if (DOM.hideMenuBtn) DOM.hideMenuBtn.onclick = (e) => { e.preventDefault(); toggleMenus(); };
 
-    document.getElementById('btn-shop').onclick = (e) => { e.preventDefault(); renderShop(); DOM.shopModal.classList.add('open'); };
-    document.getElementById('shop-close').onclick = (e) => { e.preventDefault(); DOM.shopModal.classList.remove('open'); };
-    DOM.shopModal.onclick = (e) => { if (e.target === DOM.shopModal) DOM.shopModal.classList.remove('open'); };
+    const btnShop = document.getElementById('btn-shop');
+    if (btnShop) btnShop.onclick = (e) => { e.preventDefault(); renderShop(); if (DOM.shopModal) DOM.shopModal.classList.add('open'); };
+    const shopClose = document.getElementById('shop-close');
+    if (shopClose) shopClose.onclick = (e) => { e.preventDefault(); if (DOM.shopModal) DOM.shopModal.classList.remove('open'); };
+    if (DOM.shopModal) DOM.shopModal.onclick = (e) => { if (e.target === DOM.shopModal) DOM.shopModal.classList.remove('open'); };
 
-    document.getElementById('btn-stats').onclick = (e) => { e.preventDefault(); renderStats(); DOM.statsModal.classList.add('open'); };
-    document.getElementById('stats-close').onclick = (e) => { e.preventDefault(); DOM.statsModal.classList.remove('open'); };
-    DOM.statsModal.onclick = (e) => { if (e.target === DOM.statsModal) DOM.statsModal.classList.remove('open'); };
+    const btnStats = document.getElementById('btn-stats');
+    if (btnStats) btnStats.onclick = (e) => { e.preventDefault(); renderStats(); if (DOM.statsModal) DOM.statsModal.classList.add('open'); };
+    const statsClose = document.getElementById('stats-close');
+    if (statsClose) statsClose.onclick = (e) => { e.preventDefault(); if (DOM.statsModal) DOM.statsModal.classList.remove('open'); };
+    if (DOM.statsModal) DOM.statsModal.onclick = (e) => { if (e.target === DOM.statsModal) DOM.statsModal.classList.remove('open'); };
 
-    setInterval(autoTick, 100);
-    setInterval(updateEffects, 1000);
-    setInterval(saveGame, 15000);
-    setInterval(() => { updateHUD(); if (DOM.shopModal.classList.contains('open')) renderShop(); }, 1000);
+    if (localStorage.getItem('tb_cookie_disabled') === 'false') {
+        startCookieGame();
+    } else {
+        stopCookieGame();
+    }
 
     // Keybinds & Debug
     document.addEventListener('keydown', async (e) => {
