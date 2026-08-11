@@ -72,10 +72,10 @@
             <!-- Tab switcher -->
             <div id="custom-tab-row" style="display: flex; border-radius: 10px; overflow: hidden; margin-bottom: 20px; gap: 6px;">
                 <button id="tab-file-btn" onclick="switchCustomTab('file')" style="flex:1; padding: 9px 0; background: #2196F3; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                    <img src="Assets/uploadFile.svg" alt="" style="width:16px;height:16px;filter:brightness(0) invert(1);pointer-events:none;"> File
+                    <img src="Assets/uploadFile.svg" alt="" style="width:16px;height:16px;filter:invert(68%) sepia(33%) saturate(748%) hue-rotate(81deg) brightness(98%) contrast(91%);pointer-events:none;"> File
                 </button>
                 <button id="tab-url-btn" onclick="switchCustomTab('url')" style="flex:1; padding: 9px 0; background: transparent; color: #2196F3; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                    <img id="tab-url-icon" src="Assets/addLink.svg" alt="" style="width:16px;height:16px;filter:invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(119%) contrast(119%);pointer-events:none;"> URL
+                    <img id="tab-url-icon" src="Assets/addLink.svg" alt="" style="width:16px;height:16px;filter:brightness(0) invert(1);pointer-events:none;"> URL
                 </button>
             </div>
 
@@ -141,8 +141,8 @@
                 fileBtn.style.color = '#fff';
                 urlBtn.style.background = 'transparent';
                 urlBtn.style.color = '#2196F3';
-                if (fileIcon) fileIcon.style.filter = 'brightness(0) invert(1)';
-                if (urlIcon)  urlIcon.style.filter  = 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(119%) contrast(119%)';
+                if (fileIcon) fileIcon.style.filter = 'invert(68%) sepia(33%) saturate(748%) hue-rotate(81deg) brightness(98%) contrast(91%)';
+                if (urlIcon)  urlIcon.style.filter  = 'brightness(0) invert(1)';
             } else {
                 filePanel.style.display = 'none';
                 urlPanel.style.display  = 'block';
@@ -150,8 +150,8 @@
                 urlBtn.style.color = '#fff';
                 fileBtn.style.background = 'transparent';
                 fileBtn.style.color = '#2196F3';
-                if (urlIcon)  urlIcon.style.filter  = 'brightness(0) invert(1)';
-                if (fileIcon) fileIcon.style.filter = 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(119%) contrast(119%)';
+                if (urlIcon)  urlIcon.style.filter  = 'invert(68%) sepia(33%) saturate(748%) hue-rotate(81deg) brightness(98%) contrast(91%)';
+                if (fileIcon) fileIcon.style.filter = 'brightness(0) invert(1)';
                 setTimeout(() => document.getElementById('new-game-url').focus(), 0);
             }
         }
