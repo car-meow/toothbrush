@@ -6,15 +6,20 @@
     <link rel="stylesheet" href="style.css?v=48">
     <script>
         (function() {
-            const theme = localStorage.getItem('tb_theme') || 'dark';
-            if (theme === 'light') document.documentElement.classList.add('light-mode');
+            try {
+                const storage = window.nexusStorage || window.localStorage;
+                const theme = storage.getItem('tb_theme') || 'dark';
+                if (theme === 'light') document.documentElement.classList.add('light-mode');
+                if (storage.getItem('tb_performance_mode') === 'true') {
+                    document.documentElement.classList.add('performance-mode');
+                }
+            } catch(e) {}
         })();
     </script>
 </head>
 <body>
     <header>
         <h1 onclick="location.href='index.html'">Nexus Stash</h1>
-        <div class="controls">
             <button onclick="location.href='index.html'" class="save-btn" style="background-color: #555;">Back</button>
         </div>
     </header>

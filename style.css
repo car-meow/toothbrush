@@ -1837,7 +1837,11 @@ html.performance-mode .home-bg-video {
     visibility: hidden !important;
 }
 
-html.performance-mode .chat-bg {
+html.performance-mode .chat-bg,
+html.performance-mode .empty-state-bg,
+html.performance-mode body.media-bg,
+html.performance-mode body.chat-bg,
+html.performance-mode body {
     animation: none !important;
     background-position: 0 0 !important;
 }
@@ -1853,5 +1857,23 @@ html.performance-mode .nexus-update-card {
     -webkit-backdrop-filter: none !important;
     background: #12121c !important;
 }
+
+html.performance-mode .word-fade {
+    display: inline !important;
+    opacity: 1 !important;
+    animation: none !important;
+}
+
+html.performance-mode #temp-thinking img {
+    display: none !important;
+}
+
+html.performance-mode #temp-thinking::before {
+    content: "Thinking...";
+    color: #ffffff;
+    font-style: italic;
+    font-size: 14px;
+}
+
 
 

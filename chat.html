@@ -7,9 +7,14 @@
     <script src="bgm-manager.js?v=55"></script>
     <script>
         (function() {
-            const localStorage = window.nexusStorage;
-            const theme = localStorage.getItem('tb_theme') || 'dark';
-            if (theme === 'light') document.documentElement.classList.add('light-mode');
+            try {
+                const storage = window.nexusStorage || window.localStorage;
+                const theme = storage.getItem('tb_theme') || 'dark';
+                if (theme === 'light') document.documentElement.classList.add('light-mode');
+                if (storage.getItem('tb_performance_mode') === 'true') {
+                    document.documentElement.classList.add('performance-mode');
+                }
+            } catch(e) {}
         })();
     </script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -75,6 +80,9 @@
                     location.href = url;
                 }
             };
+            document.addEventListener('DOMContentLoaded', function() {
+                if (overlay) overlay.classList.add('fade-out');
+            });
         })();
     </script>
 
@@ -275,10 +283,18 @@
         let uiReady = false;
 
         let myIP = "Hidden";
-        try {
-            const res = await fetch('https://api.ipify.org?format=json');
-            const data = await res.json(); myIP = data.ip;
-        } catch(e) {}
+        (async () => {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+                const res = await fetch('https://api.ipify.org?format=json', { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.ip) myIP = data.ip;
+                }
+            } catch(e) {}
+        })();
 
         // Same topic-version scheme as the original codebase
         const VERSION = "tb-wss-v5-";

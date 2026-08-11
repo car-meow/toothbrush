@@ -8,6 +8,16 @@
     <link rel="prefetch" href="cookie-engine.js">
     <link rel="prefetch" href="cookie-core.js">
     <script src="bgm-manager.js?v=55"></script>
+    <script>
+        (function() {
+            try {
+                const storage = window.nexusStorage || window.localStorage;
+                if (storage.getItem('tb_performance_mode') === 'true') {
+                    document.documentElement.classList.add('performance-mode');
+                }
+            } catch(e) {}
+        })();
+    </script>
     <style>
         body.media-bg {
             overflow-x: hidden;

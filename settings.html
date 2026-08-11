@@ -5,6 +5,18 @@
     <title>Settings - Nexus</title>
     <link rel="stylesheet" href="style.css?v=54">
     <script src="bgm-manager.js?v=55"></script>
+    <script>
+        (function() {
+            try {
+                const storage = window.nexusStorage || window.localStorage;
+                const theme = storage.getItem('tb_theme') || 'dark';
+                if (theme === 'light') document.documentElement.classList.add('light-mode');
+                if (storage.getItem('tb_performance_mode') === 'true') {
+                    document.documentElement.classList.add('performance-mode');
+                }
+            } catch(e) {}
+        })();
+    </script>
     <style>
         body {
             margin: 0; overflow: hidden; width: 100vw; height: 100vh;
@@ -323,10 +335,11 @@
         // Performance Mode
         const togglePerf = document.getElementById('toggle-performance-mode');
         if (togglePerf) {
-            togglePerf.checked = localStorage.getItem('tb_performance_mode') === 'true';
+            const storage = window.nexusStorage || window.localStorage;
+            togglePerf.checked = storage.getItem('tb_performance_mode') === 'true';
             togglePerf.addEventListener('change', (e) => {
                 const enabled = e.target.checked;
-                localStorage.setItem('tb_performance_mode', enabled ? 'true' : 'false');
+                storage.setItem('tb_performance_mode', enabled ? 'true' : 'false');
                 if (enabled) {
                     document.documentElement.classList.add('performance-mode');
                 } else {

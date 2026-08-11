@@ -7,9 +7,14 @@
     <script src="bgm-manager.js?v=55"></script>
     <script>
         (function() {
-            const localStorage = window.nexusStorage;
-            const theme = localStorage.getItem('tb_theme') || 'dark';
-            if (theme === 'light') document.documentElement.classList.add('light-mode');
+            try {
+                const storage = window.nexusStorage || window.localStorage;
+                const theme = storage.getItem('tb_theme') || 'dark';
+                if (theme === 'light') document.documentElement.classList.add('light-mode');
+                if (storage.getItem('tb_performance_mode') === 'true') {
+                    document.documentElement.classList.add('performance-mode');
+                }
+            } catch(e) {}
         })();
     </script>
     
