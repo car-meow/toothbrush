@@ -70,9 +70,13 @@
             <h2 style="color: #2196F3; margin-top: 0; margin-bottom: 16px; font-size: 24px;">Add Custom App</h2>
 
             <!-- Tab switcher -->
-            <div id="custom-tab-row" style="display: flex; border-radius: 10px; overflow: hidden; border: 1.5px solid #2196F3; margin-bottom: 20px;">
-                <button id="tab-file-btn" onclick="switchCustomTab('file')" style="flex:1; padding: 9px 0; background: #2196F3; color: #fff; border: none; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.18s;">📁 File</button>
-                <button id="tab-url-btn" onclick="switchCustomTab('url')" style="flex:1; padding: 9px 0; background: transparent; color: #2196F3; border: none; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.18s;">🔗 URL</button>
+            <div id="custom-tab-row" style="display: flex; border-radius: 10px; overflow: hidden; margin-bottom: 20px; gap: 6px;">
+                <button id="tab-file-btn" onclick="switchCustomTab('file')" style="flex:1; padding: 9px 0; background: #2196F3; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <img src="Assets/uploadFile.svg" alt="" style="width:16px;height:16px;filter:brightness(0) invert(1);pointer-events:none;"> File
+                </button>
+                <button id="tab-url-btn" onclick="switchCustomTab('url')" style="flex:1; padding: 9px 0; background: transparent; color: #2196F3; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <img id="tab-url-icon" src="Assets/addLink.svg" alt="" style="width:16px;height:16px;filter:invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(119%) contrast(119%);pointer-events:none;"> URL
+                </button>
             </div>
 
             <input type="text" id="new-game-title" placeholder="App Title" style="width: 100%; padding: 12px; margin-bottom: 18px; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color); font-size: 16px;">
@@ -127,6 +131,8 @@
             const urlPanel  = document.getElementById('custom-url-panel');
             const fileBtn   = document.getElementById('tab-file-btn');
             const urlBtn    = document.getElementById('tab-url-btn');
+            const fileIcon  = fileBtn.querySelector('img');
+            const urlIcon   = document.getElementById('tab-url-icon');
 
             if (mode === 'file') {
                 filePanel.style.display = 'block';
@@ -135,6 +141,8 @@
                 fileBtn.style.color = '#fff';
                 urlBtn.style.background = 'transparent';
                 urlBtn.style.color = '#2196F3';
+                if (fileIcon) fileIcon.style.filter = 'brightness(0) invert(1)';
+                if (urlIcon)  urlIcon.style.filter  = 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(119%) contrast(119%)';
             } else {
                 filePanel.style.display = 'none';
                 urlPanel.style.display  = 'block';
@@ -142,12 +150,14 @@
                 urlBtn.style.color = '#fff';
                 fileBtn.style.background = 'transparent';
                 fileBtn.style.color = '#2196F3';
+                if (urlIcon)  urlIcon.style.filter  = 'brightness(0) invert(1)';
+                if (fileIcon) fileIcon.style.filter = 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(119%) contrast(119%)';
                 setTimeout(() => document.getElementById('new-game-url').focus(), 0);
             }
         }
 
-        // Okay button — confirm the URL
-        document.getElementById('url-okay-btn').addEventListener('click', () => {
+        // Confirm the URL (shared by button click and auto-paste)
+        function confirmUrl() {
             const raw = document.getElementById('new-game-url').value.trim();
             if (!raw) return;
             let url = raw;
@@ -156,6 +166,14 @@
             const badge = document.getElementById('url-preview-badge');
             badge.textContent = '✔ ' + url;
             badge.style.display = 'block';
+        }
+
+        document.getElementById('url-okay-btn').addEventListener('click', confirmUrl);
+
+        // Auto-confirm when a URL is pasted in
+        document.getElementById('new-game-url').addEventListener('paste', () => {
+            // Use setTimeout so the pasted value is in the input before we read it
+            setTimeout(confirmUrl, 0);
         });
 
         document.getElementById('custom-app-btn').addEventListener('click', () => {

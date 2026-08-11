@@ -1883,5 +1883,27 @@ html.performance-mode #temp-thinking::before {
     font-size: 14px;
 }
 
+/* Custom overlay performance mode */
+html.performance-mode #custom-app-overlay {
+    background: rgba(0,0,0,0.96) !important;
+}
+
+html.performance-mode #custom-app-overlay > div {
+    box-shadow: none !important;
+    border-color: #2196F3 !important;
+}
+
+html.performance-mode #tab-file-btn,
+html.performance-mode #tab-url-btn {
+    transition: none !important;
+}
+
+html.performance-mode #url-preview-badge {
+    background: #0d1f33 !important;
+    box-shadow: none !important;
+}
+
+
+
 
 

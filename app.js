@@ -595,11 +595,29 @@ if (addGameBtn) {
 }
 
 async function deleteGame(id, index) {
-    const ok = await nexusConfirm("Delete? You can always re-bookmark app, and progress will not be removed.");
-    if (!ok) return;
+    // Instantly remove — no confirmation dialog
+    const game = games[index];
+
+    // Free memory: if this game was loaded, clear the frame and drop the reference
+    if (currentGame && currentGame.id === id) {
+        const frame = document.getElementById('game-frame');
+        if (frame) {
+            // Revoke any blob URL we may have set as the src
+            try {
+                if (frame.src && frame.src.startsWith('blob:')) URL.revokeObjectURL(frame.src);
+            } catch(e) {}
+            frame.removeAttribute('src');
+            frame.removeAttribute('srcdoc');
+        }
+        currentGame = null;
+    }
+
+    // Drop the base64 content from memory if it's a file game
+    if (game && game.content) game.content = null;
+
     const tx = db.transaction("customGames", "readwrite");
-    await tx.objectStore("customGames").delete(id);
-    games.splice(index, 1); 
+    tx.objectStore("customGames").delete(id);
+    games.splice(index, 1);
     saveGameOrder();
     renderGameList();
     // Auto-navigate back to Game Stash after deletion
