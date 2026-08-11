@@ -66,10 +66,31 @@
     </main>
     <!-- Custom App Overlay -->
     <div id="custom-app-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.88); z-index: 30000; align-items: center; justify-content: center;">
-        <div style="background: var(--modal-bg); padding: 28px; border-radius: 24px; width: 440px; max-width: 90vw; border: 2px solid #2196F3; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9);">
-            <h2 style="color: #2196F3; margin-top: 0; margin-bottom: 12px; font-size: 24px;">Add Local App</h2>
+        <div style="background: var(--modal-bg); padding: 28px; border-radius: 24px; width: 460px; max-width: 90vw; border: 2px solid #2196F3; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9);">
+            <h2 style="color: #2196F3; margin-top: 0; margin-bottom: 16px; font-size: 24px;">Add Custom App</h2>
+
+            <!-- Tab switcher -->
+            <div id="custom-tab-row" style="display: flex; border-radius: 10px; overflow: hidden; border: 1.5px solid #2196F3; margin-bottom: 20px;">
+                <button id="tab-file-btn" onclick="switchCustomTab('file')" style="flex:1; padding: 9px 0; background: #2196F3; color: #fff; border: none; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.18s;">📁 File</button>
+                <button id="tab-url-btn" onclick="switchCustomTab('url')" style="flex:1; padding: 9px 0; background: transparent; color: #2196F3; border: none; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.18s;">🔗 URL</button>
+            </div>
+
             <input type="text" id="new-game-title" placeholder="App Title" style="width: 100%; padding: 12px; margin-bottom: 18px; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color); font-size: 16px;">
-            <input type="file" id="new-game-file" accept=".html" style="width: 100%; margin-bottom: 18px; color: var(--text-color); background: var(--input-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+
+            <!-- File panel -->
+            <div id="custom-file-panel">
+                <input type="file" id="new-game-file" accept=".html" style="width: 100%; margin-bottom: 18px; color: var(--text-color); background: var(--input-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); box-sizing: border-box;">
+            </div>
+
+            <!-- URL panel -->
+            <div id="custom-url-panel" style="display:none; margin-bottom: 18px;">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="url" id="new-game-url" placeholder="https://example.com" style="flex:1; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color); font-size: 15px; box-sizing: border-box;">
+                    <button id="url-okay-btn" style="padding: 12px 18px; background: #2196F3; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: filter 0.15s;" onmouseenter="this.style.filter='brightness(1.2)'" onmouseleave="this.style.filter=''">Okay</button>
+                </div>
+                <div id="url-preview-badge" style="display:none; margin-top: 10px; padding: 8px 14px; background: rgba(33,150,243,0.12); border: 1px solid #2196F3; border-radius: 8px; font-size: 13px; color: #64b5f6; word-break: break-all; text-align: left;"></div>
+            </div>
+
             <button id="add-game-btn" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 999px; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; transition: filter 0.2s;">Add App</button>
         </div>
     </div>
@@ -91,21 +112,101 @@
         });
     </script>
     <script>
+        // ---- Custom tab logic ----
+        let _customMode = 'file'; // 'file' or 'url'
+        let _confirmedUrl = null;
+
+        function switchCustomTab(mode) {
+            _customMode = mode;
+            _confirmedUrl = null;
+            document.getElementById('url-preview-badge').style.display = 'none';
+            document.getElementById('url-preview-badge').textContent = '';
+            document.getElementById('new-game-url').value = '';
+
+            const filePanel = document.getElementById('custom-file-panel');
+            const urlPanel  = document.getElementById('custom-url-panel');
+            const fileBtn   = document.getElementById('tab-file-btn');
+            const urlBtn    = document.getElementById('tab-url-btn');
+
+            if (mode === 'file') {
+                filePanel.style.display = 'block';
+                urlPanel.style.display  = 'none';
+                fileBtn.style.background = '#2196F3';
+                fileBtn.style.color = '#fff';
+                urlBtn.style.background = 'transparent';
+                urlBtn.style.color = '#2196F3';
+            } else {
+                filePanel.style.display = 'none';
+                urlPanel.style.display  = 'block';
+                urlBtn.style.background = '#2196F3';
+                urlBtn.style.color = '#fff';
+                fileBtn.style.background = 'transparent';
+                fileBtn.style.color = '#2196F3';
+                setTimeout(() => document.getElementById('new-game-url').focus(), 0);
+            }
+        }
+
+        // Okay button — confirm the URL
+        document.getElementById('url-okay-btn').addEventListener('click', () => {
+            const raw = document.getElementById('new-game-url').value.trim();
+            if (!raw) return;
+            let url = raw;
+            if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+            _confirmedUrl = url;
+            const badge = document.getElementById('url-preview-badge');
+            badge.textContent = '✔ ' + url;
+            badge.style.display = 'block';
+        });
+
         document.getElementById('custom-app-btn').addEventListener('click', () => {
+            // reset to file tab every open
+            _customMode = 'file';
+            _confirmedUrl = null;
+            switchCustomTab('file');
+            document.getElementById('new-game-title').value = '';
+            document.getElementById('new-game-file').value = '';
+            document.getElementById('url-preview-badge').style.display = 'none';
             document.getElementById('custom-app-overlay').style.display = 'flex';
             if (window.setGamePopupState) window.setGamePopupState('custom-app-overlay', true);
         });
 
         document.getElementById('add-game-btn').addEventListener('click', () => {
-            setTimeout(() => {
-                if (document.getElementById('new-game-title').value && document.getElementById('new-game-file').files.length > 0) {
-                    document.getElementById('custom-app-overlay').style.display = 'none';
-                    document.getElementById('new-game-title').value = '';
-                    document.getElementById('new-game-file').value = '';
-                    if (window.setGamePopupState) window.setGamePopupState('custom-app-overlay', false);
+            const title = document.getElementById('new-game-title').value.trim();
+
+            if (_customMode === 'url') {
+                if (!title || !_confirmedUrl) {
+                    if (!title) document.getElementById('new-game-title').focus();
+                    else { nexusAlert && nexusAlert('Click "Okay" to confirm the URL first.'); }
+                    return;
                 }
-            }, 50);
+                // Add URL game
+                const newG = { id: 'custom_' + Date.now(), title, type: 'url', url: _confirmedUrl };
+                const tx = db.transaction('customGames', 'readwrite');
+                tx.objectStore('customGames').put(newG);
+                tx.oncomplete = () => {
+                    games.push(newG);
+                    saveGameOrder();
+                    renderGameList();
+                };
+                closeCustomOverlay();
+            } else {
+                // File mode — original logic via app.js handler fires separately
+                setTimeout(() => {
+                    const file = document.getElementById('new-game-file').files[0];
+                    if (title && file) closeCustomOverlay();
+                }, 50);
+            }
         });
+
+        function closeCustomOverlay() {
+            document.getElementById('custom-app-overlay').style.display = 'none';
+            document.getElementById('new-game-title').value = '';
+            document.getElementById('new-game-file').value = '';
+            document.getElementById('new-game-url').value = '';
+            document.getElementById('url-preview-badge').style.display = 'none';
+            _confirmedUrl = null;
+            if (window.setGamePopupState) window.setGamePopupState('custom-app-overlay', false);
+        }
 
         document.addEventListener('keydown', (e) => {
             const customOverlay = document.getElementById('custom-app-overlay');
@@ -113,8 +214,7 @@
 
             if (e.key === 'Escape') {
                 if (customOverlay.style.display === 'flex') {
-                    customOverlay.style.display = 'none';
-                    if (window.setGamePopupState) window.setGamePopupState('custom-app-overlay', false);
+                    closeCustomOverlay();
                 }
                 if (renameOverlay && renameOverlay.style.display === 'flex') {
                     document.getElementById('rename-done-btn').dispatchEvent(new Event('rename-cancel'));
@@ -122,6 +222,13 @@
             }
 
             if (e.key === 'Enter' && customOverlay.style.display === 'flex') {
+                const focused = document.activeElement;
+                // If focus is in the URL input, treat Enter as "Okay"
+                if (focused && focused.id === 'new-game-url') {
+                    e.preventDefault();
+                    document.getElementById('url-okay-btn').click();
+                    return;
+                }
                 e.preventDefault();
                 document.getElementById('add-game-btn').click();
             }

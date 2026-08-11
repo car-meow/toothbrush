@@ -578,6 +578,8 @@ if (emgBtn) {
 const addGameBtn = document.getElementById('add-game-btn');
 if (addGameBtn) {
     addGameBtn.onclick = () => {
+        // If in URL mode, the carmeow.html handler manages everything — skip here.
+        if (typeof _customMode !== 'undefined' && _customMode === 'url') return;
         const title = document.getElementById('new-game-title').value;
         const file = document.getElementById('new-game-file').files[0];
         if (!title || !file) return nexusAlert("Missing data");

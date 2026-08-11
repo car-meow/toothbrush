@@ -699,6 +699,14 @@ main {
     transition: all 0.1s;
 }
 
+/* Don't shift the li when clicking a rename/delete action button — prevents the button
+   from sliding out from under the cursor between mousedown and mouseup (the double-click bug) */
+#game-list li:has(.app-action-btn:active):active {
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+}
+
 body.app-is-dragging .save-btn:hover,
 body.app-is-dragging .nav-btn:hover,
 body.app-is-dragging #game-list li:not(.dragging),
