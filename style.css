@@ -122,7 +122,7 @@ h1 {
     contain: layout paint;
 }
 
-body:not(.media-bg) button,
+body:not(.media-bg) button:not(.color-swatch-btn),
 body:not(.media-bg) .save-btn,
 body:not(.media-bg) .nav-btn,
 body:not(.media-bg) .hud-btn,
@@ -138,7 +138,7 @@ body:not(.media-bg) .rename-done-btn {
     border-radius: 999px !important;
 }
 
-body:not(.media-bg) button:hover,
+body:not(.media-bg) button:not(.color-swatch-btn):hover,
 body:not(.media-bg) .save-btn:hover,
 body:not(.media-bg) .nav-btn:hover,
 body:not(.media-bg) .hud-btn:hover,
@@ -705,6 +705,106 @@ main {
     transform: none !important;
     filter: none !important;
     transition: none !important;
+}
+
+/* =========================================
+   SIDEBAR COLOR SWATCH PANEL
+========================================= */
+#game-list li {
+    flex-wrap: wrap;
+}
+
+.color-swatch-panel {
+    display: flex;
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    /* Hidden by default via max-height + opacity */
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 1px solid rgba(255,255,255,0.12);
+    border-top-width: 0;
+    pointer-events: none;
+    transition:
+        max-height 0.24s cubic-bezier(0.2,0,0,1),
+        opacity 0.18s ease,
+        margin-top 0.24s cubic-bezier(0.2,0,0,1),
+        padding-top 0.24s cubic-bezier(0.2,0,0,1),
+        border-top-width 0.24s;
+}
+
+#game-list li.color-editing .color-swatch-panel {
+    max-height: 50px;
+    opacity: 1;
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top-width: 1px;
+    pointer-events: auto;
+}
+
+/* Circular color swatch button */
+.color-swatch-btn {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    min-height: 20px !important;
+    border-radius: 50% !important;
+    border: none !important;
+    padding: 0 !important;
+    cursor: pointer;
+    transition: transform 0.15s cubic-bezier(0.2,0,0,1), box-shadow 0.15s !important;
+    flex-shrink: 0;
+    position: relative;
+    outline: none;
+    /* Override the global button rule that makes everything white-bordered pills */
+    background: transparent;
+}
+
+.color-swatch-btn:hover {
+    transform: scale(1.22) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
+}
+
+.color-swatch-btn:active {
+    transform: scale(0.9) !important;
+    transition-duration: 0.05s !important;
+}
+
+/* Reset button: black base + red diagonal slash drawn via CSS */
+.color-swatch-reset {
+    background: #111 !important;
+    box-shadow: 0 0 0 2.5px #333 !important;
+    overflow: hidden;
+}
+
+/* Red line through the reset button */
+.color-swatch-reset::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 130%;
+    height: 2.5px;
+    background: #e53935;
+    border-radius: 2px;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    pointer-events: none;
+}
+
+/* Subtle glow on the li when color editing is open */
+#game-list li.color-editing {
+    box-shadow: -5px 5px 12px rgba(0,0,0,0.4);
+}
+
+/* Keep action buttons visible while editing colors */
+#game-list li.color-editing .app-action-btn {
+    opacity: 1;
 }
 
 body.app-is-dragging .save-btn:hover,

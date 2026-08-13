@@ -94,15 +94,97 @@ function saveGameOrder() {
     localStorage.setItem('sidebar-game-order', JSON.stringify(orderIds));
 }
 
+/* =========================================
+   SIDEBAR COLOR SCHEMES
+   Each entry: { fill, border, text }
+   fill = background, border = slightly darker, text = contrast label color
+========================================= */
+const SIDEBAR_COLOR_SCHEMES = [
+    { id: 'blue',   fill: 'hsl(213,70%,28%)',  border: 'hsl(213,70%,18%)',  text: '#e8f0ff' },
+    { id: 'green',  fill: 'hsl(140,55%,22%)',  border: 'hsl(140,55%,13%)',  text: '#d4f5e0' },
+    { id: 'red',    fill: 'hsl(0,62%,30%)',    border: 'hsl(0,62%,19%)',    text: '#ffdada' },
+    { id: 'orange', fill: 'hsl(28,72%,30%)',   border: 'hsl(28,72%,19%)',   text: '#ffe5c2' },
+    { id: 'yellow', fill: 'hsl(48,72%,26%)',   border: 'hsl(48,72%,15%)',   text: '#fff8c0' },
+    { id: 'purple', fill: 'hsl(275,55%,28%)',  border: 'hsl(275,55%,17%)',  text: '#f0daff' },
+    { id: 'pink',   fill: 'hsl(335,60%,28%)',  border: 'hsl(335,60%,17%)',  text: '#ffdaea' },
+    { id: 'teal',   fill: 'hsl(180,55%,22%)',  border: 'hsl(180,55%,13%)',  text: '#d0f5f5' },
+    { id: 'indigo', fill: 'hsl(240,55%,30%)',  border: 'hsl(240,55%,19%)',  text: '#dce0ff' },
+];
+
+// Swatch fill colors (the circle itself) — vivid so they're recognizable
+const SWATCH_COLORS = [
+    'hsl(213,80%,50%)',
+    'hsl(140,65%,38%)',
+    'hsl(0,72%,50%)',
+    'hsl(28,88%,50%)',
+    'hsl(48,88%,50%)',
+    'hsl(275,70%,55%)',
+    'hsl(335,75%,55%)',
+    'hsl(180,70%,38%)',
+    'hsl(240,70%,58%)',
+];
+
+function applyGameColorToLi(li, game) {
+    if (!game || !game.sidebarColor) {
+        // Remove any custom color
+        li.style.removeProperty('background-color');
+        li.style.removeProperty('border-color');
+        li.style.removeProperty('color');
+        return;
+    }
+    const scheme = SIDEBAR_COLOR_SCHEMES.find(s => s.id === game.sidebarColor);
+    if (!scheme) return;
+    li.style.setProperty('background-color', scheme.fill, 'important');
+    li.style.setProperty('border-color', scheme.border, 'important');
+    li.style.setProperty('color', scheme.text, 'important');
+}
+
+let colorEditingGameId = null;
+
+function openColorEdit(gameId, li) {
+    // Close any previously open color panel
+    closeColorEdit();
+    colorEditingGameId = gameId;
+    li.classList.add('color-editing');
+}
+
+function closeColorEdit() {
+    if (!colorEditingGameId) return;
+    const prevLi = document.querySelector('#game-list li.color-editing');
+    if (prevLi) prevLi.classList.remove('color-editing');
+    colorEditingGameId = null;
+}
+
+async function setGameColor(gameId, colorId) {
+    const game = games.find(g => g.id === gameId);
+    if (!game) return;
+    if (colorId === null) {
+        delete game.sidebarColor;
+    } else {
+        game.sidebarColor = colorId;
+    }
+    const tx = db.transaction("customGames", "readwrite");
+    tx.objectStore("customGames").put(game);
+    // Update the li immediately without re-rendering (avoid losing color-editing state)
+    const li = document.querySelector(`#game-list li[data-game-id="${gameId}"]`);
+    if (li) applyGameColorToLi(li, game);
+}
+
 function renderGameList() {
     const list = document.getElementById('game-list');
     if (!list) return;
     list.innerHTML = '';
     games.forEach((game, i) => {
         const li = document.createElement('li');
+        li.dataset.gameId = game.id;
         
         if (game.id === "ugs-stash") li.classList.add('ugs-item');
         if (game.isNew) li.classList.add('new-game');
+
+        // Apply saved color scheme
+        if (game.id !== "ugs-stash" && game.sidebarColor) {
+            applyGameColorToLi(li, game);
+        }
         
         const t = document.createElement('span');
         t.className = "game-title";
@@ -122,10 +204,15 @@ function renderGameList() {
 
         if (isUserManagedGame(game)) {
             const rename = document.createElement('span');
-            rename.innerHTML = '<img src="Assets/Rename.svg" alt="Rename" style="width:18px;height:18px;filter:brightness(0) invert(1);vertical-align:middle;">';
+            rename.innerHTML = '<img src="Assets/Rename.svg" alt="Edit" style="width:18px;height:18px;filter:brightness(0) invert(1);vertical-align:middle;">';
             rename.className = "app-action-btn rename-btn";
-            rename.title = "Rename app";
-            rename.onclick = (e) => { e.stopPropagation(); openRenamePrompt(game); };
+            rename.title = "Edit app";
+            rename.onclick = (e) => {
+                e.stopPropagation();
+                // Always open color panel (it closes when rename modal closes)
+                openColorEdit(game.id, li);
+                openRenamePrompt(game);
+            };
             li.appendChild(rename);
 
             const del = document.createElement('span');
@@ -133,6 +220,40 @@ function renderGameList() {
             del.onclick = (e) => { e.stopPropagation(); deleteGame(game.id, i); };
             del.style.marginRight = "22px"; // keep close to the drag handle
             li.appendChild(del);
+
+            // --- Color swatch panel (shown when .color-editing) ---
+            const swatchPanel = document.createElement('div');
+            swatchPanel.className = 'color-swatch-panel';
+            swatchPanel.onclick = (e) => e.stopPropagation(); // prevent li click
+
+            // Reset button (black circle with red line through it)
+            const resetBtn = document.createElement('button');
+            resetBtn.className = 'color-swatch-btn color-swatch-reset';
+            resetBtn.title = 'Default color';
+            resetBtn.onclick = (e) => {
+                e.stopPropagation();
+                setGameColor(game.id, null);
+            };
+            swatchPanel.appendChild(resetBtn);
+
+            // 9 color swatches
+            SIDEBAR_COLOR_SCHEMES.forEach((scheme, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'color-swatch-btn';
+                btn.title = scheme.id.charAt(0).toUpperCase() + scheme.id.slice(1);
+                btn.style.background = SWATCH_COLORS[idx];
+                btn.style.boxShadow = `0 0 0 2.5px ${scheme.border}`;
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    setGameColor(game.id, scheme.id);
+                    // Visual feedback: briefly pulse
+                    btn.style.transform = 'scale(1.3)';
+                    setTimeout(() => { btn.style.transform = ''; }, 180);
+                };
+                swatchPanel.appendChild(btn);
+            });
+
+            li.appendChild(swatchPanel);
         }
 
         // Add drag handle for all items EXCEPT Master Stash (ugs-stash)
@@ -649,6 +770,8 @@ function closeRenamePrompt() {
     if (input) input.value = '';
     renameTargetId = null;
     if (window.setGamePopupState) window.setGamePopupState('rename-overlay', false);
+    // Also close the color edit panel
+    closeColorEdit();
 }
 
 async function renameGame() {
