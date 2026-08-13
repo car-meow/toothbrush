@@ -126,10 +126,10 @@ const SWATCH_COLORS = [
 
 function applyGameColorToLi(li, game) {
     if (!game || !game.sidebarColor) {
-        // Remove any custom color
         li.style.removeProperty('background-color');
         li.style.removeProperty('border-color');
         li.style.removeProperty('color');
+        li.style.removeProperty('--li-bg');
         return;
     }
     const scheme = SIDEBAR_COLOR_SCHEMES.find(s => s.id === game.sidebarColor);
@@ -137,6 +137,7 @@ function applyGameColorToLi(li, game) {
     li.style.setProperty('background-color', scheme.fill, 'important');
     li.style.setProperty('border-color', scheme.border, 'important');
     li.style.setProperty('color', scheme.text, 'important');
+    li.style.setProperty('--li-bg', scheme.fill);
 }
 
 async function setGameColor(gameId, colorId) {
@@ -176,7 +177,7 @@ function renderGameList() {
         t.className = "game-title";
         if (game.id === "ugs-stash") t.classList.add("game-title-single-line");
         t.textContent = game.id === "ugs-stash" ? getSidebarTitle(game) : addSoftBreaks(getSidebarTitle(game), 12);
-        
+
         li.onclick = () => {
             if (game.isNew) {
                 game.isNew = false;
@@ -185,8 +186,22 @@ function renderGameList() {
                 li.classList.remove('new-game');
             }
             loadGame(game);
+            // Hold expanded state for 500ms after click, then slide back
+            if (game.id !== 'ugs-stash' && !document.documentElement.classList.contains('performance-mode')) {
+                li.classList.add('post-click');
+                setTimeout(() => li.classList.remove('post-click'), 500);
+            }
         };
-        li.appendChild(t);
+
+        if (game.id !== 'ugs-stash') {
+            // Wrap in a clipping container that slides open on hover
+            const wrapper = document.createElement('div');
+            wrapper.className = 'game-title-wrapper';
+            wrapper.appendChild(t);
+            li.appendChild(wrapper);
+        } else {
+            li.appendChild(t);
+        }
 
         if (isUserManagedGame(game)) {
             const rename = document.createElement('span');

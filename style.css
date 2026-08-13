@@ -680,6 +680,7 @@ main {
     transition: all 0.2s;
     border: 2.5px solid #1c1430;
     position: relative;
+    --li-bg: var(--zigzag-line);  /* gradient color matches button bg */
 }
 
 #game-list li:hover {
@@ -832,23 +833,90 @@ body.app-is-dragging #game-list li:not(.dragging):not(.ugs-item):hover {
     color: var(--panel-bg) !important;
 }
 
-.game-title {
+/* =========================================
+   GAME TITLE — SINGLE LINE WITH FADE & EXPAND
+   --li-bg is the button's own background color,
+   used so the gradient blends perfectly.
+========================================= */
+
+/* Set per-state gradient colors as overrides */
+#game-list li.new-game  { --li-bg: #2f972c; }
+.ugs-item               { --li-bg: #ffffff; }
+
+/* Clipping wrapper — single line by default */
+.game-title-wrapper {
     flex: 1;
     min-width: 0;
-    max-width: calc(100% - 76px);
+    position: relative;
+    overflow: hidden;
+    max-height: 1.4em;      /* exactly one line */
+    padding-right: 6px;
+}
+
+/* Fade gradient — covers the last ~3 chars before clip */
+.game-title-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 72px;
+    height: 100%;
+    background: linear-gradient(to right, transparent, var(--li-bg));
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Smooth expand on hover */
+html:not(.performance-mode) .game-title-wrapper {
+    transition: max-height 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+html:not(.performance-mode) .game-title-wrapper::after {
+    transition: opacity 0.2s ease;
+}
+
+/* Expanded state: hover or 500ms post-click hold */
+#game-list li:not(.ugs-item):hover .game-title-wrapper,
+#game-list li.post-click .game-title-wrapper {
+    max-height: 160px;  /* generous upper bound */
+}
+
+/* Hide the fade overlay while expanded */
+#game-list li:not(.ugs-item):hover .game-title-wrapper::after,
+#game-list li.post-click .game-title-wrapper::after {
+    opacity: 0;
+}
+
+/* Allow text to wrap when expanded */
+#game-list li:not(.ugs-item):hover .game-title,
+#game-list li.post-click .game-title {
+    white-space: pre-wrap;
     overflow-wrap: anywhere;
     word-break: break-word;
-    white-space: pre-wrap;
-    line-height: 1.15;
-    padding-right: 8px;
+}
+
+/* Also update gradient color when li is hovered
+   (background shifts to --panel-bg-alt on hover; gradient
+    fades to 0 anyway, but this keeps it consistent) */
+#game-list li:not(.ugs-item):hover {
+    --li-bg: var(--panel-bg-alt);
+}
+
+.game-title {
+    display: block;
+    white-space: nowrap;
+    line-height: 1.4;
     pointer-events: none;
 }
 
 .game-title-single-line {
+    /* ugs-stash: single line with ellipsis, no wrapper needed */
+    flex: 1;
+    min-width: 0;
     max-width: none;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    pointer-events: none;
 }
 
 #game-list li.new-game {
