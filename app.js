@@ -176,7 +176,7 @@ function renderGameList() {
         const t = document.createElement('span');
         t.className = "game-title";
         if (game.id === "ugs-stash") t.classList.add("game-title-single-line");
-        t.textContent = game.id === "ugs-stash" ? getSidebarTitle(game) : addSoftBreaks(getSidebarTitle(game), 12);
+        t.textContent = game.id === "ugs-stash" ? getSidebarTitle(game) : addSoftBreaks(getSidebarTitle(game), 13);
 
         li.onclick = () => {
             if (game.isNew) {
