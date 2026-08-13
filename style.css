@@ -853,7 +853,7 @@ body.app-is-dragging #game-list li:not(.dragging):not(.ugs-item):hover {
     padding-right: 6px;
 }
 
-/* Fade gradient — covers the last ~3 chars before clip */
+/* Fade gradient — hidden by default, shown only when title genuinely overflows */
 .game-title-wrapper::after {
     content: '';
     position: absolute;
@@ -864,6 +864,11 @@ body.app-is-dragging #game-list li:not(.dragging):not(.ugs-item):hover {
     background: linear-gradient(to right, transparent, var(--li-bg));
     pointer-events: none;
     z-index: 1;
+    opacity: 0;  /* invisible unless .title-overflows is set by JS */
+}
+
+.game-title-wrapper.title-overflows::after {
+    opacity: 1;
 }
 
 /* Smooth expand on hover */
@@ -994,6 +999,35 @@ li:hover .app-action-btn {
 
 .rename-btn:hover {
     border-color: #81C784;
+}
+
+.trash-btn {
+    position: relative;   /* anchor ::before ring */
+    overflow: visible;    /* let ring extend beyond border */
+}
+
+/* Circular progress ring — conic-gradient masked into a hollow ring */
+.trash-btn::before {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    background: conic-gradient(
+        from -90deg,
+        #e53935 var(--hold-progress, 0deg),
+        rgba(239, 83, 80, 0.15) var(--hold-progress, 0deg)
+    );
+    /* Mask the center out to make it look like a ring */
+    -webkit-mask: radial-gradient(farthest-side, transparent 55%, black 57%);
+    mask:          radial-gradient(farthest-side, transparent 55%, black 57%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 3;
+}
+
+.trash-btn.holding::before {
+    opacity: 1;
 }
 
 .trash-btn:hover {

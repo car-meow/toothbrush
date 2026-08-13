@@ -212,9 +212,52 @@ function renderGameList() {
             li.appendChild(rename);
 
             const del = document.createElement('span');
-            del.innerHTML = '<img src="Assets/Delete.svg" alt="Delete" style="width:18px;height:18px;filter:brightness(0) invert(1);vertical-align:middle;">'; del.className = "app-action-btn trash-btn";
-            del.onclick = (e) => { e.stopPropagation(); deleteGame(game.id, i); };
-            del.style.marginRight = "22px"; // keep close to the drag handle
+            del.innerHTML = '<img src="Assets/Delete.svg" alt="Delete" style="width:18px;height:18px;filter:brightness(0) invert(1);vertical-align:middle;">';
+            del.className = "app-action-btn trash-btn";
+            del.style.marginRight = "22px";
+
+            // Hold-to-delete: requires 3s continuous press
+            {
+                const HOLD_MS = 3000;
+                let holdRAF = null;
+                let holdStart = null;
+
+                function startHold(e) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    if (holdRAF) return;
+                    holdStart = performance.now();
+                    del.classList.add('holding');
+
+                    function tick(now) {
+                        const progress = Math.min((now - holdStart) / HOLD_MS, 1);
+                        del.style.setProperty('--hold-progress', `${progress * 360}deg`);
+                        if (progress >= 1) {
+                            endHold();
+                            deleteGame(game.id, i);
+                        } else {
+                            holdRAF = requestAnimationFrame(tick);
+                        }
+                    }
+                    holdRAF = requestAnimationFrame(tick);
+                }
+
+                function endHold() {
+                    if (holdRAF) { cancelAnimationFrame(holdRAF); holdRAF = null; }
+                    holdStart = null;
+                    del.classList.remove('holding');
+                    del.style.removeProperty('--hold-progress');
+                }
+
+                del.addEventListener('mousedown',   startHold);
+                del.addEventListener('mouseup',     (e) => { e.stopPropagation(); endHold(); });
+                del.addEventListener('mouseleave',  endHold);
+                del.addEventListener('contextmenu', (e) => { e.preventDefault(); endHold(); });
+                del.addEventListener('touchstart',  startHold, { passive: false });
+                del.addEventListener('touchend',    (e) => { e.stopPropagation(); endHold(); });
+                del.addEventListener('touchcancel', endHold);
+            }
+
             li.appendChild(del);
         }
 
@@ -249,6 +292,22 @@ function renderGameList() {
     });
 
     notifyStashBookmarkAvailability();
+    checkTitleOverflows();
+}
+
+// Show the fade-out gradient only for titles that genuinely overflow one line
+function checkTitleOverflows() {
+    const list = document.getElementById('game-list');
+    if (!list) return;
+    // rAF ensures layout is complete before measuring
+    requestAnimationFrame(() => {
+        list.querySelectorAll('.game-title-wrapper').forEach(wrapper => {
+            const title = wrapper.querySelector('.game-title');
+            if (!title) return;
+            // scrollWidth = full natural width of text; clientWidth = visible clip area
+            wrapper.classList.toggle('title-overflows', title.scrollWidth > wrapper.clientWidth);
+        });
+    });
 }
 
 function isUserManagedGame(game) {
