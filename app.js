@@ -139,22 +139,6 @@ function applyGameColorToLi(li, game) {
     li.style.setProperty('color', scheme.text, 'important');
 }
 
-let colorEditingGameId = null;
-
-function openColorEdit(gameId, li) {
-    // Close any previously open color panel
-    closeColorEdit();
-    colorEditingGameId = gameId;
-    li.classList.add('color-editing');
-}
-
-function closeColorEdit() {
-    if (!colorEditingGameId) return;
-    const prevLi = document.querySelector('#game-list li.color-editing');
-    if (prevLi) prevLi.classList.remove('color-editing');
-    colorEditingGameId = null;
-}
-
 async function setGameColor(gameId, colorId) {
     const game = games.find(g => g.id === gameId);
     if (!game) return;
@@ -165,9 +149,11 @@ async function setGameColor(gameId, colorId) {
     }
     const tx = db.transaction("customGames", "readwrite");
     tx.objectStore("customGames").put(game);
-    // Update the li immediately without re-rendering (avoid losing color-editing state)
+    // Update the sidebar li immediately (no full re-render needed)
     const li = document.querySelector(`#game-list li[data-game-id="${gameId}"]`);
     if (li) applyGameColorToLi(li, game);
+    // Refresh the active-color highlight in the open swatch row
+    refreshSwatchActiveState(colorId);
 }
 
 function renderGameList() {
@@ -207,12 +193,7 @@ function renderGameList() {
             rename.innerHTML = '<img src="Assets/Rename.svg" alt="Edit" style="width:18px;height:18px;filter:brightness(0) invert(1);vertical-align:middle;">';
             rename.className = "app-action-btn rename-btn";
             rename.title = "Edit app";
-            rename.onclick = (e) => {
-                e.stopPropagation();
-                // Always open color panel (it closes when rename modal closes)
-                openColorEdit(game.id, li);
-                openRenamePrompt(game);
-            };
+            rename.onclick = (e) => { e.stopPropagation(); openRenamePrompt(game); };
             li.appendChild(rename);
 
             const del = document.createElement('span');
@@ -220,40 +201,6 @@ function renderGameList() {
             del.onclick = (e) => { e.stopPropagation(); deleteGame(game.id, i); };
             del.style.marginRight = "22px"; // keep close to the drag handle
             li.appendChild(del);
-
-            // --- Color swatch panel (shown when .color-editing) ---
-            const swatchPanel = document.createElement('div');
-            swatchPanel.className = 'color-swatch-panel';
-            swatchPanel.onclick = (e) => e.stopPropagation(); // prevent li click
-
-            // Reset button (black circle with red line through it)
-            const resetBtn = document.createElement('button');
-            resetBtn.className = 'color-swatch-btn color-swatch-reset';
-            resetBtn.title = 'Default color';
-            resetBtn.onclick = (e) => {
-                e.stopPropagation();
-                setGameColor(game.id, null);
-            };
-            swatchPanel.appendChild(resetBtn);
-
-            // 9 color swatches
-            SIDEBAR_COLOR_SCHEMES.forEach((scheme, idx) => {
-                const btn = document.createElement('button');
-                btn.className = 'color-swatch-btn';
-                btn.title = scheme.id.charAt(0).toUpperCase() + scheme.id.slice(1);
-                btn.style.background = SWATCH_COLORS[idx];
-                btn.style.boxShadow = `0 0 0 2.5px ${scheme.border}`;
-                btn.onclick = (e) => {
-                    e.stopPropagation();
-                    setGameColor(game.id, scheme.id);
-                    // Visual feedback: briefly pulse
-                    btn.style.transform = 'scale(1.3)';
-                    setTimeout(() => { btn.style.transform = ''; }, 180);
-                };
-                swatchPanel.appendChild(btn);
-            });
-
-            li.appendChild(swatchPanel);
         }
 
         // Add drag handle for all items EXCEPT Master Stash (ugs-stash)
@@ -748,6 +695,45 @@ async function deleteGame(id, index) {
 
 let renameTargetId = null;
 
+function buildRenameSwatches(game) {
+    const container = document.getElementById('rename-color-swatches');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // Reset button — black circle with a red slash
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'color-swatch-btn color-swatch-reset';
+    resetBtn.title = 'Default color';
+    if (!game.sidebarColor) resetBtn.classList.add('color-swatch-active');
+    resetBtn.onclick = () => setGameColor(game.id, null);
+    container.appendChild(resetBtn);
+
+    // 9 color swatches
+    SIDEBAR_COLOR_SCHEMES.forEach((scheme, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'color-swatch-btn';
+        btn.dataset.colorId = scheme.id;
+        btn.title = scheme.id.charAt(0).toUpperCase() + scheme.id.slice(1);
+        btn.style.background = SWATCH_COLORS[idx];
+        btn.style.setProperty('--swatch-border', scheme.border);
+        if (game.sidebarColor === scheme.id) btn.classList.add('color-swatch-active');
+        btn.onclick = () => setGameColor(game.id, scheme.id);
+        container.appendChild(btn);
+    });
+}
+
+function refreshSwatchActiveState(activeColorId) {
+    const container = document.getElementById('rename-color-swatches');
+    if (!container) return;
+    container.querySelectorAll('.color-swatch-btn').forEach(btn => {
+        const isReset = btn.classList.contains('color-swatch-reset');
+        btn.classList.toggle('color-swatch-active',
+            isReset ? (activeColorId === null || activeColorId === undefined)
+                     : btn.dataset.colorId === activeColorId
+        );
+    });
+}
+
 function openRenamePrompt(game) {
     const overlay = document.getElementById('rename-overlay');
     const input = document.getElementById('rename-app-title');
@@ -755,6 +741,7 @@ function openRenamePrompt(game) {
 
     renameTargetId = game.id;
     input.value = game.title;
+    buildRenameSwatches(game);
     overlay.style.display = 'flex';
     if (window.setGamePopupState) window.setGamePopupState('rename-overlay', true);
     setTimeout(() => {
@@ -770,8 +757,6 @@ function closeRenamePrompt() {
     if (input) input.value = '';
     renameTargetId = null;
     if (window.setGamePopupState) window.setGamePopupState('rename-overlay', false);
-    // Also close the color edit panel
-    closeColorEdit();
 }
 
 async function renameGame() {

@@ -708,79 +708,64 @@ main {
 }
 
 /* =========================================
-   SIDEBAR COLOR SWATCH PANEL
+   RENAME MODAL — COLOR SWATCH ROW
 ========================================= */
-#game-list li {
-    flex-wrap: wrap;
-}
-
-.color-swatch-panel {
+.rename-color-swatches {
     display: flex;
-    width: 100%;
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    /* Hidden by default via max-height + opacity */
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-    margin-top: 0;
-    padding-top: 0;
-    border-top: 1px solid rgba(255,255,255,0.12);
-    border-top-width: 0;
-    pointer-events: none;
-    transition:
-        max-height 0.24s cubic-bezier(0.2,0,0,1),
-        opacity 0.18s ease,
-        margin-top 0.24s cubic-bezier(0.2,0,0,1),
-        padding-top 0.24s cubic-bezier(0.2,0,0,1),
-        border-top-width 0.24s;
-}
-
-#game-list li.color-editing .color-swatch-panel {
-    max-height: 50px;
-    opacity: 1;
-    margin-top: 8px;
-    padding-top: 7px;
-    border-top-width: 1px;
-    pointer-events: auto;
+    gap: 8px;
+    margin: 14px 0 18px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 12px;
 }
 
 /* Circular color swatch button */
 .color-swatch-btn {
-    width: 20px !important;
-    height: 20px !important;
-    min-width: 20px !important;
-    min-height: 20px !important;
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+    min-height: 22px !important;
     border-radius: 50% !important;
     border: none !important;
     padding: 0 !important;
     cursor: pointer;
-    transition: transform 0.15s cubic-bezier(0.2,0,0,1), box-shadow 0.15s !important;
+    transition: transform 0.14s cubic-bezier(0.2,0,0,1), box-shadow 0.14s !important;
     flex-shrink: 0;
     position: relative;
     outline: none;
-    /* Override the global button rule that makes everything white-bordered pills */
     background: transparent;
 }
 
 .color-swatch-btn:hover {
-    transform: scale(1.22) !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
+    transform: scale(1.25) !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.6) !important;
 }
 
 .color-swatch-btn:active {
-    transform: scale(0.9) !important;
+    transform: scale(0.88) !important;
     transition-duration: 0.05s !important;
+}
+
+/* Active (selected) swatch — white ring */
+.color-swatch-btn.color-swatch-active {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(255,255,255,0.25) !important;
+    transform: scale(1.1) !important;
 }
 
 /* Reset button: black base + red diagonal slash drawn via CSS */
 .color-swatch-reset {
     background: #111 !important;
-    box-shadow: 0 0 0 2.5px #333 !important;
+    box-shadow: 0 0 0 2px #444 !important;
     overflow: hidden;
+}
+
+.color-swatch-reset.color-swatch-active {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(255,255,255,0.25) !important;
 }
 
 /* Red line through the reset button */
@@ -797,15 +782,6 @@ main {
     pointer-events: none;
 }
 
-/* Subtle glow on the li when color editing is open */
-#game-list li.color-editing {
-    box-shadow: -5px 5px 12px rgba(0,0,0,0.4);
-}
-
-/* Keep action buttons visible while editing colors */
-#game-list li.color-editing .app-action-btn {
-    opacity: 1;
-}
 
 body.app-is-dragging .save-btn:hover,
 body.app-is-dragging .nav-btn:hover,
