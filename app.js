@@ -676,6 +676,9 @@ function launchGameFullscreen(game) {
     let gameSrcDoc = null;
     if (game.type === 'file') {
         const rawHtml = atob(game.content.split(',')[1]);
+        const unityCompatibility = /(?:createUnityInstance|UnityLoader|unity-container|unity-canvas)/i.test(rawHtml)
+            ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
+            : '';
         const snapshotJson = JSON.stringify(loadedGameSnapshots.get(game) || {}).replace(/</g, '\\u003c');
         const popupBridge = `<script>(function(){let syncing=false;function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}var opener=(window.parent&&window.parent.opener)||window.opener;if(opener)opener.postMessage({type:'nexus-game-save',gameId:${JSON.stringify(game.id)},localStorage:s},'*');}catch(e){}}function syncAndSend(){if(syncing)return;syncing=true;try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){syncing=false;send();});return;}}catch(e){}syncing=false;send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});setInterval(syncAndSend,30000);})();<\/script>`;
         const popupRestore = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
@@ -703,7 +706,7 @@ function launchGameFullscreen(game) {
         // Use stable srcdoc loading for local games. Blob URLs get a new pathname on
         // every launch, which makes path-based game storage (including Balatro's IDBFS)
         // appear to be a different save location each time.
-        gameSrcDoc = injectGameBootstrap(rawHtml, popupRestore + popupBridge + autoFocusScript);
+        gameSrcDoc = injectGameBootstrap(rawHtml, unityCompatibility + popupRestore + popupBridge + autoFocusScript);
     } else {
         gameSrc = game.url;
     }
@@ -957,10 +960,13 @@ function loadGame(game, forceInternal = false) {
             
             const snapshot = loadedGameSnapshots.get(game) || {};
             const snapshotJson = JSON.stringify(snapshot).replace(/</g, '\\u003c');
+            const unityCompatibility = isUnityRuntime
+                ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
+                : '';
             const restoreScript = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
             const autosaveBridge = `<script>(function(){let syncing=false;function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}parent.postMessage({type:'nexus-game-save',localStorage:s},'*');}catch(e){}}function syncAndSend(){if(syncing)return;syncing=true;try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){syncing=false;send();});return;}}catch(e){}syncing=false;send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});})();<\/script>`;
             const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
-            const finalHTML = injectGameBootstrap(htmlContent, restoreScript + persistenceScript + autosaveBridge);
+            const finalHTML = injectGameBootstrap(htmlContent, unityCompatibility + restoreScript + persistenceScript + autosaveBridge);
 
             try {
                 frame.srcdoc = finalHTML;
