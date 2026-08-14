@@ -291,8 +291,8 @@ function decodeBackupValue(value) {
 
 function startGameAutosave() {
     if (gameAutosaveTimer) clearInterval(gameAutosaveTimer);
-    // Two minutes for every local HTML game, including Balatro.
-    gameAutosaveTimer = setInterval(requestCurrentGameAutosave, 120000);
+    // Save every 30 seconds for every local HTML game, including Balatro.
+    gameAutosaveTimer = setInterval(requestCurrentGameAutosave, 30000);
 }
 
 window.addEventListener('message', event => {
@@ -677,7 +677,7 @@ function launchGameFullscreen(game) {
     if (game.type === 'file') {
         const rawHtml = atob(game.content.split(',')[1]);
         const snapshotJson = JSON.stringify(loadedGameSnapshots.get(game) || {}).replace(/</g, '\\u003c');
-        const popupBridge = `<script>(function(){function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}var opener=(window.parent&&window.parent.opener)||window.opener;if(opener)opener.postMessage({type:'nexus-game-save',gameId:${JSON.stringify(game.id)},localStorage:s},'*');}catch(e){}}function syncAndSend(){try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){send();});return;}}catch(e){}send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});setInterval(syncAndSend,120000);setTimeout(syncAndSend,0);})();<\/script>`;
+        const popupBridge = `<script>(function(){let syncing=false;function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}var opener=(window.parent&&window.parent.opener)||window.opener;if(opener)opener.postMessage({type:'nexus-game-save',gameId:${JSON.stringify(game.id)},localStorage:s},'*');}catch(e){}}function syncAndSend(){if(syncing)return;syncing=true;try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){syncing=false;send();});return;}}catch(e){}syncing=false;send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});setInterval(syncAndSend,30000);})();<\/script>`;
         const popupRestore = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
         const autoFocusScript = `<script>
         (function(){
@@ -958,7 +958,7 @@ function loadGame(game, forceInternal = false) {
             const snapshot = loadedGameSnapshots.get(game) || {};
             const snapshotJson = JSON.stringify(snapshot).replace(/</g, '\\u003c');
             const restoreScript = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
-            const autosaveBridge = `<script>(function(){function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}parent.postMessage({type:'nexus-game-save',localStorage:s},'*');}catch(e){}}function syncAndSend(){try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){send();});return;}}catch(e){}send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});setTimeout(syncAndSend,0);})();<\/script>`;
+            const autosaveBridge = `<script>(function(){let syncing=false;function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}parent.postMessage({type:'nexus-game-save',localStorage:s},'*');}catch(e){}}function syncAndSend(){if(syncing)return;syncing=true;try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){syncing=false;send();});return;}}catch(e){}syncing=false;send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});})();<\/script>`;
             const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
             const finalHTML = injectGameBootstrap(htmlContent, restoreScript + persistenceScript + autosaveBridge);
 
