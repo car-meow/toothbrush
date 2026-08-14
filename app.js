@@ -3,6 +3,8 @@ let db, games =[], currentGame = null;
 const popupMuteSources = new Set();
 const loadingGames = new Map();
 let defaultGamesPromise = null;
+let dbReadyPromise = null;
+let gameLoadToken = 0;
 
 
 window.showAddingState = function(sourceKey, title) {
@@ -17,20 +19,32 @@ window.hideAddingState = function(sourceKey) {
 
 
 async function initDB() {
-    return new Promise(r => {
+    if (db) return db;
+    if (dbReadyPromise) return dbReadyPromise;
+    dbReadyPromise = new Promise((resolve, reject) => {
         const req = indexedDB.open(dbName, 1);
         req.onupgradeneeded = e => e.target.result.createObjectStore("customGames", { keyPath: "id" });
-        req.onsuccess = e => { db = e.target.result; r(); };
+        req.onsuccess = e => { db = e.target.result; db.onversionchange = () => db.close(); resolve(db); };
+        req.onerror = () => reject(req.error);
     });
+    return dbReadyPromise;
 }
 
 async function loadGames() {
     const localStorage = window.nexusStorage;
     await initDB();
     const tx = db.transaction("customGames", "readonly");
-    const custom = await new Promise(r => {
-        const req = tx.objectStore("customGames").getAll();
-        req.onsuccess = () => r(req.result);
+    const custom = await new Promise((resolve, reject) => {
+        const metadata = [];
+        const req = tx.objectStore("customGames").openCursor();
+        req.onsuccess = e => {
+            const cursor = e.target.result;
+            if (!cursor) return resolve(metadata);
+            const { content, ...gameMetadata } = cursor.value;
+            metadata.push(gameMetadata);
+            cursor.continue();
+        };
+        req.onerror = () => reject(req.error);
     });
     try {
         // Default games do not change while the page is open. Reusing this request avoids
@@ -148,6 +162,23 @@ function applyGameColorToLi(li, game) {
     li.style.setProperty('--li-bg', scheme.fill);
 }
 
+async function saveGameRecord(game) {
+    await initDB();
+    const tx = db.transaction("customGames", "readwrite");
+    const store = tx.objectStore("customGames");
+    const existing = await new Promise(resolve => {
+        const req = store.get(game.id);
+        req.onsuccess = () => resolve(req.result || {});
+        req.onerror = () => resolve({});
+    });
+    store.put({ ...existing, ...game });
+    return new Promise((resolve, reject) => {
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+}
+
 async function setGameColor(gameId, colorId) {
     const game = games.find(g => g.id === gameId);
     if (!game) return;
@@ -156,8 +187,7 @@ async function setGameColor(gameId, colorId) {
     } else {
         game.sidebarColor = colorId;
     }
-    const tx = db.transaction("customGames", "readwrite");
-    tx.objectStore("customGames").put(game);
+    saveGameRecord(game).catch(() => {});
     // Update the sidebar li immediately (no full re-render needed)
     const li = document.querySelector(`#game-list li[data-game-id="${gameId}"]`);
     if (li) applyGameColorToLi(li, game);
@@ -189,8 +219,7 @@ function renderGameList() {
         li.onclick = () => {
             if (game.isNew) {
                 game.isNew = false;
-                const tx = db.transaction("customGames", "readwrite");
-                tx.objectStore("customGames").put(game);
+                saveGameRecord(game).catch(() => {});
                 li.classList.remove('new-game');
             }
             loadGame(game);
@@ -642,6 +671,18 @@ function ensureStashPreloaded() {
 }
 
 function loadGame(game, forceInternal = false) {
+    const requestedLoadToken = ++gameLoadToken;
+    if (game && game.type === 'file' && !game.content) {
+        initDB().then(() => new Promise(resolve => {
+            const req = db.transaction("customGames", "readonly").objectStore("customGames").get(game.id);
+            req.onsuccess = () => { game.content = req.result && req.result.content; resolve(); };
+            req.onerror = () => resolve();
+        })).then(() => {
+            if (game.content && requestedLoadToken === gameLoadToken) loadGame(game, forceInternal);
+            else nexusAlert("File unavailable.");
+        });
+        return;
+    }
     const localStorage = window.nexusStorage;
     const isDebugFS = localStorage.getItem('tb_debug_fullscreen') === 'true';
     const isPreloadEnabled = localStorage.getItem('tb_preload_stash') === 'true';
@@ -695,6 +736,11 @@ function loadGame(game, forceInternal = false) {
     // Standard Game Loading
     if (stashFrame) stashFrame.style.setProperty('display', 'none', 'important');
     if (frame) {
+        try {
+            if (frame.src && frame.src.startsWith('blob:')) URL.revokeObjectURL(frame.src);
+        } catch (e) {}
+        frame.removeAttribute('src');
+        frame.removeAttribute('srcdoc');
         frame.style.setProperty('display', 'block', 'important');
         frame.style.setProperty('visibility', 'hidden', 'important');
         frame.style.opacity = '0';
@@ -886,12 +932,7 @@ async function renameGame() {
 
     game.title = title;
     game.userRenamed = true;
-    const tx = db.transaction("customGames", "readwrite");
-    tx.objectStore("customGames").put(game);
-    await new Promise(resolve => {
-        tx.oncomplete = resolve;
-        tx.onerror = resolve;
-    });
+    await saveGameRecord(game);
 
     closeRenamePrompt();
     renderGameList();
