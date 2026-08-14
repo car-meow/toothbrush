@@ -728,6 +728,24 @@ function launchGameFullscreen(game) {
         win.document.head.appendChild(link);
     }
 
+    // Unity WebGL builds (including War the Knights and Survival Race v2) use
+    // workers, compressed asset loaders, and IndexedDB. Loading the prepared
+    // document directly in the about:blank popup avoids sandbox restrictions
+    // that can leave their own Unity progress screen running forever.
+    if (gameSrcDoc !== null) {
+        try {
+            win.document.open();
+            win.document.write(gameSrcDoc);
+            win.document.close();
+            setTimeout(() => { try { win.focus(); } catch (e) {} }, 100);
+        } catch (error) {
+            console.error('Failed to launch local game:', error);
+            try { win.close(); } catch (e) {}
+            nexusAlert('This game could not be opened.');
+        }
+        return;
+    }
+
     const ifr = win.document.createElement('iframe');
     Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
     ifr.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock');
@@ -929,6 +947,13 @@ function loadGame(game, forceInternal = false) {
             const base64Data = game.content.split(',')[1];
             let htmlContent;
             try { htmlContent = atob(base64Data); } catch(e) { nexusAlert("File corrupted."); return; }
+
+            // Unity WebGL needs a real worker/storage-capable document when
+            // Debug Fullscreen is enabled too. The normal launcher uses the
+            // unrestricted about:blank popup above; this covers the embedded
+            // debug path without relaxing other game documents.
+            const isUnityRuntime = /(?:createUnityInstance|UnityLoader|unity-container|unity-canvas)/i.test(htmlContent);
+            if (isUnityRuntime) frame.removeAttribute('sandbox');
             
             const snapshot = loadedGameSnapshots.get(game) || {};
             const snapshotJson = JSON.stringify(snapshot).replace(/</g, '\\u003c');
