@@ -703,7 +703,7 @@ function launchGameFullscreen(game) {
         // Use stable srcdoc loading for local games. Blob URLs get a new pathname on
         // every launch, which makes path-based game storage (including Balatro's IDBFS)
         // appear to be a different save location each time.
-        gameSrcDoc = popupRestore + popupBridge + autoFocusScript + rawHtml;
+        gameSrcDoc = injectGameBootstrap(rawHtml, popupRestore + popupBridge + autoFocusScript);
     } else {
         gameSrc = game.url;
     }
@@ -761,6 +761,24 @@ function launchGameFullscreen(game) {
     setTimeout(doFocusAndClick, 100);
     setTimeout(doFocusAndClick, 500); // 0.5s after launch
     setTimeout(doFocusAndClick, 1000);
+}
+
+// Keep the game's original doctype/html/head structure intact.  Putting helper
+// scripts before <!doctype html> can make some WASM and module-based games fail
+// during startup even though the original file is valid on its own.
+function injectGameBootstrap(html, bootstrap) {
+    if (!html || !bootstrap) return html;
+    const headMatch = html.match(/<head(?:\s[^>]*)?>/i);
+    if (headMatch && headMatch.index !== undefined) {
+        const insertAt = headMatch.index + headMatch[0].length;
+        return html.slice(0, insertAt) + bootstrap + html.slice(insertAt);
+    }
+    const bodyMatch = html.match(/<body(?:\s[^>]*)?>/i);
+    if (bodyMatch && bodyMatch.index !== undefined) {
+        const insertAt = bodyMatch.index + bodyMatch[0].length;
+        return html.slice(0, insertAt) + bootstrap + html.slice(insertAt);
+    }
+    return bootstrap + html;
 }
 
 let gameStatusFadeTimer = null;
@@ -917,7 +935,7 @@ function loadGame(game, forceInternal = false) {
             const restoreScript = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
             const autosaveBridge = `<script>(function(){function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}parent.postMessage({type:'nexus-game-save',localStorage:s},'*');}catch(e){}}function syncAndSend(){try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){send();});return;}}catch(e){}send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});setTimeout(syncAndSend,0);})();<\/script>`;
             const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
-            const finalHTML = restoreScript + persistenceScript + autosaveBridge + htmlContent;
+            const finalHTML = injectGameBootstrap(htmlContent, restoreScript + persistenceScript + autosaveBridge);
 
             try {
                 frame.srcdoc = finalHTML;
