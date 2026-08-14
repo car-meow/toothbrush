@@ -677,7 +677,7 @@ main {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: all 0.2s;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
     border: 2.5px solid #1c1430;
     position: relative;
     --li-bg: var(--zigzag-line);  /* gradient color matches button bg */
@@ -1032,6 +1032,24 @@ li:hover .app-action-btn {
 
 .trash-btn:hover {
     border-color: #ef5350;
+}
+
+/* Matches the Stash feedback label, but warns in red at the released pointer position. */
+.floating-sidebar-warning {
+    position: fixed;
+    pointer-events: none;
+    color: #ef5350;
+    font-weight: bold;
+    font-size: 20px;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    z-index: 10000;
+    animation: float-up-fade 1s ease-out forwards;
+    will-change: transform, opacity;
+}
+
+@keyframes float-up-fade {
+    from { transform: translateY(0); opacity: 1; }
+    to { transform: translateY(-50px); opacity: 0; }
 }
 
 .game-bookmark-btn.bookmarked {
@@ -2080,7 +2098,6 @@ html.performance-mode #url-preview-badge {
     background: #0d1f33 !important;
     box-shadow: none !important;
 }
-
 
 
 

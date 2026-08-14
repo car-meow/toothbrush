@@ -347,6 +347,8 @@
         const searchInput = document.getElementById('searchInput');
         let searchLayoutIsUpdating = false;
         let searchQueueTimer = null;
+        let bookmarkRefreshTimer = null;
+        let bookmarkRefreshInFlight = false;
         const searchResultsContainer = document.createElement('div');
         searchResultsContainer.id = 'search-results-container';
         searchResultsContainer.className = 'search-results-container';
@@ -551,19 +553,30 @@
         }
 
         async function refreshBookmarkAvailability() {
-            const customGames = await getCustomGamesFromDb();
-            bookmarkedSourceKeys.clear();
+            if (bookmarkRefreshInFlight) return;
+            bookmarkRefreshInFlight = true;
+            try {
+                const customGames = await getCustomGamesFromDb();
+                bookmarkedSourceKeys.clear();
 
-            customGames.forEach(game => {
-                if (game && game.sourceKey) bookmarkedSourceKeys.add(game.sourceKey);
-            });
+                customGames.forEach(game => {
+                    if (game && game.sourceKey) bookmarkedSourceKeys.add(game.sourceKey);
+                });
 
-            document.querySelectorAll('.game-bookmark-btn').forEach(btn => {
-                const isBookmarked = bookmarkedSourceKeys.has(btn.dataset.sourceKey);
-                btn.disabled = isBookmarked;
-                btn.classList.toggle('bookmarked', isBookmarked);
-                btn.title = isBookmarked ? 'Already in sidebar' : 'Add to sidebar';
-            });
+                document.querySelectorAll('.game-bookmark-btn').forEach(btn => {
+                    const isBookmarked = bookmarkedSourceKeys.has(btn.dataset.sourceKey);
+                    btn.disabled = isBookmarked;
+                    btn.classList.toggle('bookmarked', isBookmarked);
+                    btn.title = isBookmarked ? 'Already in sidebar' : 'Add to sidebar';
+                });
+            } finally {
+                bookmarkRefreshInFlight = false;
+            }
+        }
+
+        function queueBookmarkAvailabilityRefresh() {
+            clearTimeout(bookmarkRefreshTimer);
+            bookmarkRefreshTimer = setTimeout(refreshBookmarkAvailability, 80);
         }
 
         async function addBookmarkToSidebar(originalValue, e) {
@@ -651,7 +664,9 @@
             }
         }
 
-        window.refreshBookmarkAvailability = refreshBookmarkAvailability;
+        // Parent-side sidebar renders may request this frequently. Coalesce those requests
+        // into one IndexedDB read instead of starting a read for every DOM mutation.
+        window.refreshBookmarkAvailability = queueBookmarkAvailabilityRefresh;
 
         searchInput.addEventListener('input', queueStashSearch);
         searchInput.addEventListener('change', queueStashSearch);
@@ -674,7 +689,7 @@
             });
 
             ensureExtraStashButtons(false);
-            refreshBookmarkAvailability();
+            queueBookmarkAvailabilityRefresh();
             if (searchInput.value.trim() && !searchLayoutIsUpdating) queueStashSearch();
         });
 

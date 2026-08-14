@@ -2,6 +2,7 @@ const dbName = "GameStorageDB";
 let db, games =[], currentGame = null;
 const popupMuteSources = new Set();
 const loadingGames = new Map();
+let defaultGamesPromise = null;
 
 
 window.showAddingState = function(sourceKey, title) {
@@ -32,8 +33,15 @@ async function loadGames() {
         req.onsuccess = () => r(req.result);
     });
     try {
-        const res = await fetch('games.json?t=' + Date.now());
-        const defaults = await res.json();
+        // Default games do not change while the page is open. Reusing this request avoids
+        // a network round-trip and JSON parsing every time a Stash item is added.
+        if (!defaultGamesPromise) {
+            defaultGamesPromise = fetch('games.json').then(res => {
+                if (!res.ok) throw new Error(`Unable to load games (${res.status})`);
+                return res.json();
+            });
+        }
+        const defaults = await defaultGamesPromise;
         games = [...defaults, ...custom];
     } catch { games = [...custom]; }
 
@@ -208,7 +216,12 @@ function renderGameList() {
             rename.innerHTML = '<img src="Assets/Rename.svg" alt="Edit" style="width:18px;height:18px;filter:brightness(0) invert(1);vertical-align:middle;">';
             rename.className = "app-action-btn rename-btn";
             rename.title = "Edit app";
-            rename.onclick = (e) => { e.stopPropagation(); openRenamePrompt(game); };
+            rename.addEventListener('pointerdown', (e) => e.stopPropagation());
+            rename.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openRenamePrompt(game);
+            });
             li.appendChild(rename);
 
             const del = document.createElement('span');
@@ -216,16 +229,18 @@ function renderGameList() {
             del.className = "app-action-btn trash-btn";
             del.style.marginRight = "22px";
 
-            // Hold-to-delete: requires 3s continuous press
+            // A short press gives guidance; a continuous 1.5s press deletes.
             {
-                const HOLD_MS = 3000;
+                const HOLD_MS = 1500;
                 let holdRAF = null;
                 let holdStart = null;
+                let didDelete = false;
 
                 function startHold(e) {
                     e.stopPropagation();
                     e.preventDefault();
                     if (holdRAF) return;
+                    didDelete = false;
                     holdStart = performance.now();
                     del.classList.add('holding');
 
@@ -234,6 +249,7 @@ function renderGameList() {
                         del.style.setProperty('--hold-progress', `${progress * 360}deg`);
                         if (progress >= 1) {
                             endHold();
+                            didDelete = true;
                             deleteGame(game.id, i);
                         } else {
                             holdRAF = requestAnimationFrame(tick);
@@ -249,13 +265,18 @@ function renderGameList() {
                     del.style.removeProperty('--hold-progress');
                 }
 
-                del.addEventListener('mousedown',   startHold);
-                del.addEventListener('mouseup',     (e) => { e.stopPropagation(); endHold(); });
-                del.addEventListener('mouseleave',  endHold);
-                del.addEventListener('contextmenu', (e) => { e.preventDefault(); endHold(); });
-                del.addEventListener('touchstart',  startHold, { passive: false });
-                del.addEventListener('touchend',    (e) => { e.stopPropagation(); endHold(); });
-                del.addEventListener('touchcancel', endHold);
+                del.addEventListener('pointerdown', startHold);
+                del.addEventListener('pointerup', (e) => {
+                    e.stopPropagation();
+                    const wasHolding = Boolean(holdRAF);
+                    endHold();
+                    if (wasHolding && !didDelete) showSidebarPointerMessage('Hold to delete!', e.clientX, e.clientY);
+                });
+                del.addEventListener('pointerleave', endHold);
+                del.addEventListener('pointercancel', endHold);
+                del.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); endHold(); });
+                // Prevent the sidebar item's click handler from opening the game after any delete-button press.
+                del.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
             }
 
             li.appendChild(del);
@@ -310,6 +331,16 @@ function checkTitleOverflows() {
     });
 }
 
+function showSidebarPointerMessage(text, clientX, clientY) {
+    const message = document.createElement('div');
+    message.className = 'floating-sidebar-warning';
+    message.textContent = text;
+    message.style.left = `${clientX}px`;
+    message.style.top = `${clientY}px`;
+    document.body.appendChild(message);
+    message.addEventListener('animationend', () => message.remove(), { once: true });
+}
+
 function isUserManagedGame(game) {
     const id = game && game.id ? game.id.toString() : "";
     return id.startsWith("custom_") || id.startsWith("bookmark_");
@@ -327,15 +358,19 @@ function addSoftBreaks(value, every = 12) {
 }
 
 function notifyStashBookmarkAvailability() {
-    const frame = document.getElementById('game-frame');
-    if (!frame || !frame.contentWindow) return;
-    try {
-        if (typeof frame.contentWindow.refreshBookmarkAvailability === "function") {
-            frame.contentWindow.refreshBookmarkAvailability();
+    // The Stash can live in either frame (and can be preloaded while another game is open).
+    // Refresh both so a deletion is recognized immediately without navigating away and back.
+    ['game-frame', 'stash-frame'].forEach(frameId => {
+        const frame = document.getElementById(frameId);
+        if (!frame || !frame.contentWindow) return;
+        try {
+            if (typeof frame.contentWindow.refreshBookmarkAvailability === "function") {
+                frame.contentWindow.refreshBookmarkAvailability();
+            }
+        } catch (err) {
+            // Cross-origin app; nothing to sync.
         }
-    } catch (err) {
-        // Cross-origin app; nothing to sync.
-    }
+    });
 }
 
 /* =========================================
@@ -738,7 +773,9 @@ if (addGameBtn) {
 
 async function deleteGame(id, index) {
     // Instantly remove — no confirmation dialog
-    const game = games[index];
+    const currentIndex = games.findIndex(game => game.id === id);
+    if (currentIndex === -1) return;
+    const game = games[currentIndex];
 
     // Free memory: if this game was loaded, clear the frame and drop the reference
     if (currentGame && currentGame.id === id) {
@@ -759,9 +796,15 @@ async function deleteGame(id, index) {
 
     const tx = db.transaction("customGames", "readwrite");
     tx.objectStore("customGames").delete(id);
-    games.splice(index, 1);
+    await new Promise((resolve, reject) => {
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+    games.splice(currentIndex, 1);
     saveGameOrder();
     renderGameList();
+    notifyStashBookmarkAvailability();
     // Auto-navigate back to Game Stash after deletion
     const stash = games.find(g => g.id === "ugs-stash");
     if (stash) loadGame(stash);
