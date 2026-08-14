@@ -189,6 +189,27 @@ async function saveGameRecord(game) {
     });
 }
 
+// Called by Game Stash after it has fetched a game. Keeping the write in the
+// parent page avoids competing IndexedDB versions between the iframe and app.
+window.addStashGameToSidebar = async function(game) {
+    if (!game || !game.id) throw new Error('Invalid game record');
+
+    await saveGameRecord(game);
+
+    // Keep the sidebar lightweight: retrieve a game's HTML only when it is opened.
+    const sidebarGame = { ...game };
+    delete sidebarGame.content;
+
+    const existingIndex = games.findIndex(item => item.id === sidebarGame.id);
+    if (existingIndex !== -1) games.splice(existingIndex, 1);
+
+    const stashIndex = games.findIndex(item => item.id === 'ugs-stash');
+    games.splice(stashIndex === -1 ? 0 : stashIndex + 1, 0, sidebarGame);
+    saveGameOrder();
+    renderGameList();
+    notifyStashBookmarkAvailability();
+};
+
 async function getGameSnapshot(gameId) {
     await initDB();
     return new Promise(resolve => {

@@ -550,9 +550,14 @@
 
         async function getCustomGamesFromDb() {
             return new Promise(resolve => {
-                const request = indexedDB.open("GameStorageDB", 1);
+                // Do not request an older database version than the parent app.
+                // A versionless open always uses the current schema.
+                const request = indexedDB.open("GameStorageDB");
                 request.onupgradeneeded = (event) => {
-                    event.target.result.createObjectStore("customGames", { keyPath: "id" });
+                    const database = event.target.result;
+                    if (!database.objectStoreNames.contains("customGames")) {
+                        database.createObjectStore("customGames", { keyPath: "id" });
+                    }
                 };
                 request.onsuccess = (event) => {
                     const db = event.target.result;
@@ -637,7 +642,7 @@
 
                 const blob = new Blob([text], { type: 'text/html' });
                 const reader = new FileReader();
-                reader.onload = function (e) {
+                reader.onload = async function (e) {
                     const dataUrl = e.target.result;
                     const newG = {
                         id: buildBookmarkIdFromSourceKey(sourceKey),
@@ -650,28 +655,27 @@
                         isNew: true
                     };
 
-                    const req = indexedDB.open("GameStorageDB", 1);
-                    req.onupgradeneeded = ev => {
-                        ev.target.result.createObjectStore("customGames", { keyPath: "id" });
-                    };
-                    req.onsuccess = ev => {
-                        const db = ev.target.result;
-                        const tx = db.transaction("customGames", "readwrite");
-                        tx.objectStore("customGames").put(newG);
-                        tx.oncomplete = async () => {
-                            db.close();
-                            await refreshBookmarkAvailability();
-
-                            if (window.parent && window.parent !== window && typeof window.parent.loadGames === 'function') {
-                                window.parent.loadGames();
-                            }
-
-                            // Remove sidebar loading state
-                            if (window.parent && typeof window.parent.hideAddingState === 'function') {
-                                window.parent.hideAddingState(sourceKey);
-                            }
-                        };
-                    };
+                    try {
+                        if (!window.parent || window.parent === window || typeof window.parent.addStashGameToSidebar !== 'function') {
+                            throw new Error('Game Stash must be opened inside Nexus Files');
+                        }
+                        await window.parent.addStashGameToSidebar(newG);
+                        await refreshBookmarkAvailability();
+                    } catch (error) {
+                        console.error('Failed to save bookmarked game:', error);
+                        nexusAlert('Could not add this game. Please try again.');
+                    } finally {
+                        // Always clear the temporary sidebar item, including on errors.
+                        if (window.parent && typeof window.parent.hideAddingState === 'function') {
+                            window.parent.hideAddingState(sourceKey);
+                        }
+                    }
+                };
+                reader.onerror = () => {
+                    if (window.parent && typeof window.parent.hideAddingState === 'function') {
+                        window.parent.hideAddingState(sourceKey);
+                    }
+                    nexusAlert('Could not prepare this game for the sidebar.');
                 };
                 reader.readAsDataURL(blob);
             } catch (err) {
