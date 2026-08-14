@@ -11,7 +11,10 @@
         })();
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap');
+        @font-face { font-family: 'Space Grotesk'; src: url('Assets/SpaceGrotesk-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+        @font-face { font-family: 'Space Grotesk'; src: url('Assets/SpaceGrotesk-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+        @font-face { font-family: 'Space Grotesk'; src: url('Assets/SpaceGrotesk-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+        @font-face { font-family: 'Space Grotesk'; src: url('Assets/SpaceGrotesk-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
 
         :root {
             --bg-color: #130d22;
@@ -238,6 +241,18 @@
 
         body.stash-searching .search-results-container {
             display: flex;
+        }
+
+        /* Search mode is a flat result list: no section intrinsic height or margins
+           should remain behind hidden buttons. */
+        body.stash-searching .search-results-container.has-matches {
+            display: none;
+        }
+        body.stash-searching .letter-section.search-visible {
+            min-height: 0;
+            margin-bottom: 12px;
+            padding-top: 0;
+            padding-bottom: 0;
         }
 
         body.stash-searching .letter-header,
@@ -486,16 +501,18 @@
             rememberSectionOrder();
             resetSearchStyles();
 
+            const sections = getLetterSections();
             const query = searchInput.value.trim().toLowerCase();
             if (!query) {
                 document.body.classList.remove('stash-searching');
                 noResultsMessage.style.display = 'none';
+                searchResultsContainer.classList.remove('has-matches');
+                sections.forEach(section => section.classList.remove('search-visible'));
                 searchLayoutIsUpdating = false;
                 return;
             }
 
             let matchCount = 0;
-            const sections = getLetterSections();
 
             sections.forEach(section => {
                 let sectionHasMatch = false;
@@ -515,10 +532,12 @@
                 }
 
                 section.style.display = sectionHasMatch ? '' : 'none';
+                section.classList.toggle('search-visible', sectionHasMatch);
             });
 
             document.body.classList.add('stash-searching');
             noResultsMessage.style.display = matchCount ? 'none' : 'block';
+            searchResultsContainer.classList.toggle('has-matches', matchCount > 0);
             searchResultsContainer.appendChild(noResultsMessage);
             window.scrollTo({ top: 0, behavior: 'auto' });
             searchLayoutIsUpdating = false;

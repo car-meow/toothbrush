@@ -5,6 +5,8 @@ const loadingGames = new Map();
 let defaultGamesPromise = null;
 let dbReadyPromise = null;
 let gameLoadToken = 0;
+let gameAutosaveTimer = null;
+const loadedGameSnapshots = new WeakMap();
 
 
 window.showAddingState = function(sourceKey, title) {
@@ -22,8 +24,16 @@ async function initDB() {
     if (db) return db;
     if (dbReadyPromise) return dbReadyPromise;
     dbReadyPromise = new Promise((resolve, reject) => {
-        const req = indexedDB.open(dbName, 1);
-        req.onupgradeneeded = e => e.target.result.createObjectStore("customGames", { keyPath: "id" });
+        const req = indexedDB.open(dbName, 2);
+        req.onupgradeneeded = e => {
+            const database = e.target.result;
+            if (!database.objectStoreNames.contains('customGames')) {
+                database.createObjectStore('customGames', { keyPath: 'id' });
+            }
+            if (!database.objectStoreNames.contains('gameSnapshots')) {
+                database.createObjectStore('gameSnapshots', { keyPath: 'gameId' });
+            }
+        };
         req.onsuccess = e => { db = e.target.result; db.onversionchange = () => db.close(); resolve(db); };
         req.onerror = () => reject(req.error);
     });
@@ -178,6 +188,107 @@ async function saveGameRecord(game) {
         tx.onabort = () => reject(tx.error);
     });
 }
+
+async function getGameSnapshot(gameId) {
+    await initDB();
+    return new Promise(resolve => {
+        const tx = db.transaction('gameSnapshots', 'readonly');
+        const req = tx.objectStore('gameSnapshots').get(gameId);
+        req.onsuccess = () => resolve(req.result ? req.result.localStorage : null);
+        req.onerror = () => resolve(null);
+    });
+}
+
+async function saveGameSnapshot(gameId, localStorageData) {
+    if (!gameId || !localStorageData) return;
+    await initDB();
+    const tx = db.transaction('gameSnapshots', 'readwrite');
+    tx.objectStore('gameSnapshots').put({ gameId, localStorage: localStorageData, savedAt: Date.now() });
+    return new Promise((resolve, reject) => {
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+}
+
+function requestCurrentGameAutosave() {
+    const game = currentGame;
+    const frame = document.getElementById('game-frame');
+    if (!game || game.type !== 'file' || !frame || !frame.contentWindow) return;
+    try { frame.contentWindow.postMessage({ type: 'nexus-request-game-save' }, '*'); } catch (e) {}
+}
+
+function bytesToBase64(bytes) {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+}
+
+function base64ToBytes(value) {
+    const binary = atob(value);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+}
+
+function encodeBackupValue(value) {
+    if (value instanceof ArrayBuffer) {
+        return { __nexusBinary: 'ArrayBuffer', data: bytesToBase64(new Uint8Array(value)) };
+    }
+    if (ArrayBuffer.isView(value)) {
+        return { __nexusBinary: value.constructor.name, data: bytesToBase64(new Uint8Array(value.buffer, value.byteOffset, value.byteLength)) };
+    }
+    if (Array.isArray(value)) return value.map(encodeBackupValue);
+    if (value && typeof value === 'object') {
+        const copy = {};
+        Object.keys(value).forEach(key => { copy[key] = encodeBackupValue(value[key]); });
+        return copy;
+    }
+    return value;
+}
+
+function decodeBackupValue(value) {
+    if (value && value.__nexusBinary) {
+        const bytes = base64ToBytes(value.data || '');
+        if (value.__nexusBinary === 'ArrayBuffer') return bytes.buffer;
+        const constructors = { Uint8Array, Uint8ClampedArray, Uint16Array, Uint32Array, Int8Array, Int16Array, Int32Array, Float32Array, Float64Array, BigInt64Array, BigUint64Array };
+        const Ctor = constructors[value.__nexusBinary] || Uint8Array;
+        const elementSize = Ctor.BYTES_PER_ELEMENT || 1;
+        return new Ctor(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / elementSize));
+    }
+    if (Array.isArray(value)) return value.map(decodeBackupValue);
+    if (value && typeof value === 'object') {
+        const copy = {};
+        Object.keys(value).forEach(key => { copy[key] = decodeBackupValue(value[key]); });
+        return copy;
+    }
+    return value;
+}
+
+function startGameAutosave() {
+    if (gameAutosaveTimer) clearInterval(gameAutosaveTimer);
+    // Two minutes for every local HTML game, including Balatro.
+    gameAutosaveTimer = setInterval(requestCurrentGameAutosave, 120000);
+}
+
+window.addEventListener('message', event => {
+    const message = event.data;
+    const frame = document.getElementById('game-frame');
+    if (!message || message.type !== 'nexus-game-save') return;
+    const isEmbeddedGame = frame && event.source === frame.contentWindow;
+    if (!isEmbeddedGame && !message.gameId) return;
+    const gameId = message.gameId || (currentGame && currentGame.type === 'file' ? currentGame.id : null);
+    if (gameId) saveGameSnapshot(gameId, message.localStorage || {}).catch(() => {});
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) requestCurrentGameAutosave();
+}, { passive: true });
+
+startGameAutosave();
 
 async function setGameColor(gameId, colorId) {
     const game = games.find(g => g.id === gameId);
@@ -533,8 +644,12 @@ function launchGameFullscreen(game) {
     try { win.focus(); } catch(e) {}
 
     let gameSrc;
+    let gameSrcDoc = null;
     if (game.type === 'file') {
         const rawHtml = atob(game.content.split(',')[1]);
+        const snapshotJson = JSON.stringify(loadedGameSnapshots.get(game) || {}).replace(/</g, '\\u003c');
+        const popupBridge = `<script>(function(){function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}var opener=(window.parent&&window.parent.opener)||window.opener;if(opener)opener.postMessage({type:'nexus-game-save',gameId:${JSON.stringify(game.id)},localStorage:s},'*');}catch(e){}}function syncAndSend(){try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){send();});return;}}catch(e){}send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});setInterval(syncAndSend,120000);setTimeout(syncAndSend,0);})();<\/script>`;
+        const popupRestore = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
         const autoFocusScript = `<script>
         (function(){
             function triggerClickFocus() {
@@ -556,7 +671,10 @@ function launchGameFullscreen(game) {
             }
         })();
         <\/script>`;
-        gameSrc = URL.createObjectURL(new Blob([autoFocusScript + rawHtml], { type: 'text/html' }));
+        // Use stable srcdoc loading for local games. Blob URLs get a new pathname on
+        // every launch, which makes path-based game storage (including Balatro's IDBFS)
+        // appear to be a different save location each time.
+        gameSrcDoc = popupRestore + popupBridge + autoFocusScript + rawHtml;
     } else {
         gameSrc = game.url;
     }
@@ -585,7 +703,8 @@ function launchGameFullscreen(game) {
     Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
     ifr.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock');
     ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen');
-    ifr.src = gameSrc;
+    if (gameSrcDoc !== null) ifr.srcdoc = gameSrcDoc;
+    else ifr.src = gameSrc;
     win.document.body.style.margin = '0';
     win.document.body.style.padding = '0';
     win.document.body.style.overflow = 'hidden';
@@ -672,14 +791,18 @@ function ensureStashPreloaded() {
 
 function loadGame(game, forceInternal = false) {
     const requestedLoadToken = ++gameLoadToken;
-    if (game && game.type === 'file' && !game.content) {
-        initDB().then(() => new Promise(resolve => {
-            const req = db.transaction("customGames", "readonly").objectStore("customGames").get(game.id);
-            req.onsuccess = () => { game.content = req.result && req.result.content; resolve(); };
-            req.onerror = () => resolve();
-        })).then(() => {
+    if (game && game.type === 'file' && (!game.content || !loadedGameSnapshots.has(game))) {
+        Promise.all([
+            game.content ? Promise.resolve() : initDB().then(() => new Promise(resolve => {
+                const req = db.transaction("customGames", "readonly").objectStore("customGames").get(game.id);
+                req.onsuccess = () => { game.content = req.result && req.result.content; resolve(); };
+                req.onerror = () => resolve();
+            })),
+            getGameSnapshot(game.id)
+        ]).then(([, snapshot]) => {
+            loadedGameSnapshots.set(game, snapshot || {});
             if (game.content && requestedLoadToken === gameLoadToken) loadGame(game, forceInternal);
-            else nexusAlert("File unavailable.");
+            else if (!game.content) nexusAlert("File unavailable.");
         });
         return;
     }
@@ -760,8 +883,12 @@ function loadGame(game, forceInternal = false) {
             let htmlContent;
             try { htmlContent = atob(base64Data); } catch(e) { nexusAlert("File corrupted."); return; }
             
+            const snapshot = loadedGameSnapshots.get(game) || {};
+            const snapshotJson = JSON.stringify(snapshot).replace(/</g, '\\u003c');
+            const restoreScript = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
+            const autosaveBridge = `<script>(function(){function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}parent.postMessage({type:'nexus-game-save',localStorage:s},'*');}catch(e){}}function syncAndSend(){try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){send();});return;}}catch(e){}send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});setTimeout(syncAndSend,0);})();<\/script>`;
             const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
-            const finalHTML = persistenceScript + htmlContent;
+            const finalHTML = restoreScript + persistenceScript + autosaveBridge + htmlContent;
 
             try {
                 frame.srcdoc = finalHTML;
@@ -1065,6 +1192,12 @@ if (exportBtn) {
                 req.onsuccess = () => r(req.result);
                 req.onerror = () => r([]);
             });
+            const snapshotTx = db.transaction('gameSnapshots', 'readonly');
+            const gameSnapshots = await new Promise(r => {
+                const req = snapshotTx.objectStore('gameSnapshots').getAll();
+                req.onsuccess = () => r(req.result || []);
+                req.onerror = () => r([]);
+            });
 
             // Gather all saves from localStorage
             const allSaves = {};
@@ -1088,7 +1221,7 @@ if (exportBtn) {
                     });
                     if (!gameDB) continue;
 
-                    const dbContent = {};
+                    const dbContent = { __version: gameDB.version };
                     for (let storeName of gameDB.objectStoreNames) {
                         const storeTx = gameDB.transaction(storeName, 'readonly');
                         const store = storeTx.objectStore(storeName);
@@ -1096,6 +1229,10 @@ if (exportBtn) {
                         // Extract schema metadata
                         const keyPath = store.keyPath;
                         const autoIncrement = store.autoIncrement;
+                        const indexes = Array.from(store.indexNames).map(indexName => {
+                            const index = store.index(indexName);
+                            return { name: index.name, keyPath: index.keyPath, unique: index.unique, multiEntry: index.multiEntry };
+                        });
 
                         // Use a cursor to preserve both key and value
                         const records = [];
@@ -1104,7 +1241,7 @@ if (exportBtn) {
                             reqCursor.onsuccess = e => {
                                 const cursor = e.target.result;
                                 if (cursor) {
-                                    records.push({ key: cursor.key, value: cursor.value });
+                                    records.push({ key: cursor.key, value: encodeBackupValue(cursor.value) });
                                     cursor.continue();
                                 } else {
                                     res();
@@ -1116,6 +1253,7 @@ if (exportBtn) {
                         dbContent[storeName] = {
                             keyPath: keyPath,
                             autoIncrement: autoIncrement,
+                            indexes,
                             records: records
                         };
                     }
@@ -1124,7 +1262,19 @@ if (exportBtn) {
                 }
             }
 
-            const backupData = { saves: allSaves, indexedData: idbData, games: customGames };
+            const sidebarOrder = localStorage.getItem('sidebar-game-order');
+            const colors = {};
+            customGames.forEach(game => {
+                if (game && game.sidebarColor) colors[game.id] = game.sidebarColor;
+            });
+            const backupData = {
+                version: 2,
+                saves: allSaves,
+                indexedData: idbData,
+                games: customGames,
+                gameLibrary: { games: customGames, sidebarOrder, colors },
+                gameSnapshots
+            };
             const jsonStr = JSON.stringify(backupData);
 
             if (fileHandle) {
@@ -1175,6 +1325,22 @@ if (proxyBtn) {
 
 const importBtn = document.getElementById('import-btn');
 if (importBtn) {
+    async function releaseGameFramesForRestore() {
+        currentGame = null;
+        gameLoadToken++;
+        [document.getElementById('game-frame'), document.getElementById('stash-frame')].forEach(frame => {
+            if (!frame) return;
+            try {
+                if (frame.src && frame.src.startsWith('blob:')) URL.revokeObjectURL(frame.src);
+            } catch (e) {}
+            frame.removeAttribute('srcdoc');
+            frame.src = 'about:blank';
+        });
+        isStashPreloaded = false;
+        // Give embedded games a chance to close their IndexedDB connections.
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
     importBtn.onchange = (e) => {
         const localStorage = window.nexusStorage;
         const file = e.target.files[0];
@@ -1191,15 +1357,36 @@ if (importBtn) {
             }
 
             try {
+                await releaseGameFramesForRestore();
                 // Restore localStorage
                 if (data.saves) {
                     Object.keys(data.saves).forEach(k => localStorage.setItem(k, data.saves[k]));
                 }
 
-                // Restore custom games list
-                if (data.games) {
+                // Restore the complete custom library, including file payloads and colors.
+                const library = data.gameLibrary || {};
+                const restoredGames = Array.isArray(library.games) ? library.games : (Array.isArray(data.games) ? data.games : []);
+                if (restoredGames.length || data.gameLibrary || data.games) {
                     const tx = db.transaction('customGames', 'readwrite');
-                    data.games.forEach(g => tx.objectStore('customGames').put(g));
+                    const store = tx.objectStore('customGames');
+                    store.clear();
+                    restoredGames.forEach(g => {
+                        const color = library.colors && library.colors[g.id];
+                        store.put(color && !g.sidebarColor ? { ...g, sidebarColor: color } : g);
+                    });
+                    await new Promise(resolve => {
+                        tx.oncomplete = resolve;
+                        tx.onerror = resolve;
+                    });
+                }
+                if (typeof library.sidebarOrder === 'string') {
+                    localStorage.setItem('sidebar-game-order', library.sidebarOrder);
+                }
+                if (Array.isArray(data.gameSnapshots)) {
+                    const tx = db.transaction('gameSnapshots', 'readwrite');
+                    const store = tx.objectStore('gameSnapshots');
+                    store.clear();
+                    data.gameSnapshots.forEach(snapshot => store.put(snapshot));
                     await new Promise(resolve => {
                         tx.oncomplete = resolve;
                         tx.onerror = resolve;
@@ -1209,6 +1396,8 @@ if (importBtn) {
                 // Restore IndexedDB databases
                 if (data.indexedData) {
                     for (let dbName in data.indexedData) {
+                        const backupDb = data.indexedData[dbName];
+                        const restoreVersion = Number(backupDb && backupDb.__version) || 1;
                         // Delete the database first to wipe any existing schemas/records cleanly
                         await new Promise((resolve) => {
                             const reqDel = indexedDB.deleteDatabase(dbName);
@@ -1221,11 +1410,12 @@ if (importBtn) {
                         });
 
                         // Recreate the database with correct schemas in onupgradeneeded
-                        const dbRequest = indexedDB.open(dbName, 1);
+                        const dbRequest = indexedDB.open(dbName, restoreVersion);
                         dbRequest.onupgradeneeded = (event) => {
                             const targetDB = event.target.result;
-                            for (let storeName in data.indexedData[dbName]) {
-                                const storeInfo = data.indexedData[dbName][storeName];
+                            for (let storeName in backupDb) {
+                                if (storeName === '__version') continue;
+                                const storeInfo = backupDb[storeName];
                                 const options = {};
                                 
                                 if (storeInfo && !Array.isArray(storeInfo)) {
@@ -1236,7 +1426,17 @@ if (importBtn) {
                                         options.autoIncrement = storeInfo.autoIncrement;
                                     }
                                 }
-                                targetDB.createObjectStore(storeName, options);
+                                const restoredStore = targetDB.createObjectStore(storeName, options);
+                                if (storeInfo && !Array.isArray(storeInfo) && Array.isArray(storeInfo.indexes)) {
+                                    storeInfo.indexes.forEach(index => {
+                                        try {
+                                            restoredStore.createIndex(index.name, index.keyPath, {
+                                                unique: !!index.unique,
+                                                multiEntry: !!index.multiEntry
+                                            });
+                                        } catch (err) {}
+                                    });
+                                }
                             }
                         };
 
@@ -1247,8 +1447,9 @@ if (importBtn) {
                         if (!openedDB) continue;
 
                         // Insert records
-                        for (let storeName in data.indexedData[dbName]) {
-                            const storeInfo = data.indexedData[dbName][storeName];
+                        for (let storeName in backupDb) {
+                            if (storeName === '__version') continue;
+                            const storeInfo = backupDb[storeName];
                             let records = [];
                             
                             // Backwards compatibility for old format backups
@@ -1271,6 +1472,7 @@ if (importBtn) {
                                     key = item.key;
                                     value = item.value;
                                 }
+                                value = decodeBackupValue(value);
 
                                 try {
                                     if (objectStore.keyPath !== null && objectStore.keyPath !== undefined) {

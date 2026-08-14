@@ -73,8 +73,9 @@
     // Emscripten WASM runtime performance configuration
     var Module = {
       arguments: ["./game.love"],
-      // Pre-allocate 512MB WASM memory heap to eliminate dynamic heap reallocation & GC lag spikes during gameplay
-      INITIAL_MEMORY: 536870912,
+      // Start at 128MB and allow the runtime's 2GB maximum to grow on demand.
+      // Pre-allocating 512MB made every Balatro tab consume a large heap immediately.
+      INITIAL_MEMORY: 134217728,
       // Suppress verbose Emscripten console outputs to prevent main-thread DOM log locks
       print: function() {},
       printErr: function(msg) {
