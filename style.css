@@ -280,7 +280,7 @@ body:not(.media-bg) .rename-done-btn:hover {
     position: absolute;
     top: 50%;
     left: calc(100% + 12px);
-    width: 280px;
+    width: 310px;
     background: rgba(18, 18, 28, 0.96);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
@@ -327,7 +327,7 @@ body:not(.media-bg) .rename-done-btn:hover {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 8px;
+    gap: 14px;
 }
 
 .nexus-read-more-btn {
@@ -2101,6 +2101,5 @@ html.performance-mode #url-preview-badge {
     background: #0d1f33 !important;
     box-shadow: none !important;
 }
-
 
 
