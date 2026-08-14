@@ -459,7 +459,9 @@ function renderGameList() {
         list.appendChild(li);
     });
 
-    // Render loading states
+    // Render loading states directly beneath Game Stash, matching where a
+    // successfully added game will appear.
+    const loadingItems = [];
     loadingGames.forEach((title, sourceKey) => {
         const li = document.createElement('li');
         li.style.cursor = 'default';
@@ -470,8 +472,14 @@ function renderGameList() {
         loader.innerHTML = `Adding <div class="spinner"></div>`;
         
         li.appendChild(loader);
-        list.appendChild(li);
+        loadingItems.push(li);
     });
+
+    if (loadingItems.length) {
+        const stashItem = list.querySelector('li[data-game-id="ugs-stash"]');
+        const insertionPoint = stashItem ? stashItem.nextSibling : list.firstChild;
+        loadingItems.forEach(li => list.insertBefore(li, insertionPoint));
+    }
 
     notifyStashBookmarkAvailability();
     checkTitleOverflows();
