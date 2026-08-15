@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexus-cache-v1';
+const CACHE_NAME = 'nexus-cache-v2';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -16,6 +16,7 @@ const ASSETS_TO_CACHE = [
     './game-title-utils.js',
     './tutorial-engine.js',
     './games.json',
+    './survival-race.html',
     // Assets SVGs
     './Assets/AI.svg',
     './Assets/Active%20Timer.svg',

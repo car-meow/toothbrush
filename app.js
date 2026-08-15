@@ -7,6 +7,8 @@ let dbReadyPromise = null;
 let gameLoadToken = 0;
 let gameAutosaveTimer = null;
 const loadedGameSnapshots = new WeakMap();
+const snapshotHashes = new Map();
+const popupGameWindows = new Map();
 
 
 window.showAddingState = function(sourceKey, title) {
@@ -24,7 +26,7 @@ async function initDB() {
     if (db) return db;
     if (dbReadyPromise) return dbReadyPromise;
     dbReadyPromise = new Promise((resolve, reject) => {
-        const req = indexedDB.open(dbName, 2);
+        const req = indexedDB.open(dbName, 3);
         req.onupgradeneeded = e => {
             const database = e.target.result;
             if (!database.objectStoreNames.contains('customGames')) {
@@ -223,8 +225,20 @@ async function getGameSnapshot(gameId) {
 async function saveGameSnapshot(gameId, localStorageData) {
     if (!gameId || !localStorageData) return;
     await initDB();
+    const hash = JSON.stringify(localStorageData);
+    if (snapshotHashes.get(gameId) === hash) return;
     const tx = db.transaction('gameSnapshots', 'readwrite');
-    tx.objectStore('gameSnapshots').put({ gameId, localStorage: localStorageData, savedAt: Date.now() });
+    const store = tx.objectStore('gameSnapshots');
+    const existing = await new Promise(resolve => {
+        const req = store.get(gameId);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+    });
+    const savedAt = Date.now();
+    const history = Array.isArray(existing && existing.history) ? existing.history.slice(-4) : [];
+    if (existing && existing.localStorage) history.push({ localStorage: existing.localStorage, savedAt: existing.savedAt || savedAt });
+    store.put({ gameId, localStorage: localStorageData, savedAt, history });
+    snapshotHashes.set(gameId, hash);
     return new Promise((resolve, reject) => {
         tx.oncomplete = resolve;
         tx.onerror = () => reject(tx.error);
@@ -300,7 +314,9 @@ window.addEventListener('message', event => {
     const frame = document.getElementById('game-frame');
     if (!message || message.type !== 'nexus-game-save') return;
     const isEmbeddedGame = frame && event.source === frame.contentWindow;
-    if (!isEmbeddedGame && !message.gameId) return;
+    const isKnownPopup = message.gameId && popupGameWindows.get(message.gameId) === event.source;
+    if (!isEmbeddedGame && !isKnownPopup) return;
+    if (event.origin !== window.location.origin) return;
     const gameId = message.gameId || (currentGame && currentGame.type === 'file' ? currentGame.id : null);
     if (gameId) saveGameSnapshot(gameId, message.localStorage || {}).catch(() => {});
 });
@@ -308,6 +324,9 @@ window.addEventListener('message', event => {
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) requestCurrentGameAutosave();
 }, { passive: true });
+
+window.addEventListener('pagehide', requestCurrentGameAutosave, { passive: true });
+window.addEventListener('beforeunload', requestCurrentGameAutosave, { passive: true });
 
 startGameAutosave();
 
@@ -331,6 +350,7 @@ function renderGameList() {
     const list = document.getElementById('game-list');
     if (!list) return;
     list.innerHTML = '';
+    const fragment = document.createDocumentFragment();
     games.forEach((game, i) => {
         const li = document.createElement('li');
         li.dataset.gameId = game.id;
@@ -456,7 +476,7 @@ function renderGameList() {
             li.appendChild(dragZone);
         }
 
-        list.appendChild(li);
+        fragment.appendChild(li);
     });
 
     // Render loading states directly beneath Game Stash, matching where a
@@ -476,10 +496,21 @@ function renderGameList() {
     });
 
     if (loadingItems.length) {
-        const stashItem = list.querySelector('li[data-game-id="ugs-stash"]');
-        const insertionPoint = stashItem ? stashItem.nextSibling : list.firstChild;
-        loadingItems.forEach(li => list.insertBefore(li, insertionPoint));
+        const stashItem = fragment.querySelector ? fragment.querySelector('li[data-game-id="ugs-stash"]') : null;
+        const orderedItems = stashItem ? [stashItem, ...loadingItems] : loadingItems;
+        if (stashItem) {
+            const allItems = Array.from(fragment.childNodes);
+            fragment.textContent = '';
+            allItems.forEach(item => {
+                fragment.appendChild(item);
+                if (item === stashItem) loadingItems.forEach(loading => fragment.appendChild(loading));
+            });
+        } else {
+            loadingItems.forEach(li => fragment.insertBefore(li, fragment.firstChild));
+        }
     }
+
+    list.appendChild(fragment);
 
     notifyStashBookmarkAvailability();
     checkTitleOverflows();
@@ -680,7 +711,7 @@ function launchGameFullscreen(game) {
             ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
             : '';
         const snapshotJson = JSON.stringify(loadedGameSnapshots.get(game) || {}).replace(/</g, '\\u003c');
-        const popupBridge = `<script>(function(){let syncing=false;function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}var opener=(window.parent&&window.parent.opener)||window.opener;if(opener)opener.postMessage({type:'nexus-game-save',gameId:${JSON.stringify(game.id)},localStorage:s},'*');}catch(e){}}function syncAndSend(){if(syncing)return;syncing=true;try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){syncing=false;send();});return;}}catch(e){}syncing=false;send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});setInterval(syncAndSend,30000);})();<\/script>`;
+        const popupBridge = `<script>(function(){let syncing=false;function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}var opener=(window.parent&&window.parent.opener)||window.opener;if(opener)opener.postMessage({type:'nexus-game-save',gameId:${JSON.stringify(game.id)},localStorage:s},'*');}catch(e){}}function syncAndSend(){if(syncing)return;syncing=true;try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){syncing=false;send();});return;}}catch(e){}syncing=false;send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});window.addEventListener('pagehide',syncAndSend,{passive:true});window.addEventListener('beforeunload',syncAndSend,{passive:true});setInterval(syncAndSend,30000);})();<\/script>`;
         const popupRestore = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
         const autoFocusScript = `<script>
         (function(){
@@ -706,7 +737,7 @@ function launchGameFullscreen(game) {
         // Use stable srcdoc loading for local games. Blob URLs get a new pathname on
         // every launch, which makes path-based game storage (including Balatro's IDBFS)
         // appear to be a different save location each time.
-        gameSrcDoc = injectGameBootstrap(rawHtml, unityCompatibility + popupRestore + popupBridge + autoFocusScript);
+        gameSrcDoc = injectGameBootstrap(rawHtml, unityCompatibility + getUniversalGameBootstrap() + popupRestore + popupBridge + autoFocusScript);
     } else {
         gameSrc = game.url;
     }
@@ -800,6 +831,20 @@ function injectGameBootstrap(html, bootstrap) {
         return html.slice(0, insertAt) + bootstrap + html.slice(insertAt);
     }
     return bootstrap + html;
+}
+
+// Ad SDKs do not load reliably in the embedded/offline game surface.  These
+// adapters preserve the callback contract the games expect: a reward request
+// completes immediately, and the game awards its normal in-game prize.
+function getUniversalGameBootstrap() {
+    return `<script>(function(){
+var n=function(){},r=function(c){try{c&&c.onRewarded&&c.onRewarded();}catch(e){}try{c&&c.onReward&&c.onReward();}catch(e){}try{c&&c.onClose&&c.onClose();}catch(e){}return Promise.resolve(true)};
+if(!window.PokiSDK)window.PokiSDK={init:function(){return Promise.resolve()},setDebug:n,gameLoadingStart:n,gameLoadingProgress:n,gameLoadingFinished:n,commercialBreak:function(){return Promise.resolve()},rewardedBreak:function(){return r()},shareableURL:function(){return Promise.resolve(location.href)}};
+if(!window.YaGames)window.YaGames={init:function(){return Promise.resolve({adv:{showRewardedVideo:r,showFullscreenAdv:r}})}};
+if(!window.CrazyGames)window.CrazyGames={SDK:{init:function(){return Promise.resolve()},ad:{requestAd:function(k,c){return r(c)}},gameplay:{startGame:n,stopGame:n}}};
+if(!window.GameMonetizeSDK)window.GameMonetizeSDK={showRewardedAd:function(){return r()},showAd:function(){return r()}};
+setInterval(function(){if(!window.PokiSDK)window.PokiSDK={init:function(){return Promise.resolve()},rewardedBreak:function(){return r()},commercialBreak:function(){return Promise.resolve()}};if(!window.GameMonetizeSDK)window.GameMonetizeSDK={showRewardedAd:function(){return r()},showAd:function(){return r()}};},1000);
+})();<\/script>`;
 }
 
 let gameStatusFadeTimer = null;
@@ -964,9 +1009,9 @@ function loadGame(game, forceInternal = false) {
                 ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
                 : '';
             const restoreScript = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
-            const autosaveBridge = `<script>(function(){let syncing=false;function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}parent.postMessage({type:'nexus-game-save',localStorage:s},'*');}catch(e){}}function syncAndSend(){if(syncing)return;syncing=true;try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){syncing=false;send();});return;}}catch(e){}syncing=false;send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});})();<\/script>`;
+            const autosaveBridge = `<script>(function(){let syncing=false;function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}parent.postMessage({type:'nexus-game-save',localStorage:s},'*');}catch(e){}}function syncAndSend(){if(syncing)return;syncing=true;try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){syncing=false;send();});return;}}catch(e){}syncing=false;send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});window.addEventListener('pagehide',syncAndSend,{passive:true});window.addEventListener('beforeunload',syncAndSend,{passive:true});})();<\/script>`;
             const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
-            const finalHTML = injectGameBootstrap(htmlContent, unityCompatibility + restoreScript + persistenceScript + autosaveBridge);
+            const finalHTML = injectGameBootstrap(htmlContent, unityCompatibility + getUniversalGameBootstrap() + restoreScript + persistenceScript + autosaveBridge);
 
             try {
                 frame.srcdoc = finalHTML;

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Survival Race</title>
+  <style>
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #231f20; }
+    #game { width: 100%; height: 100%; display: block; outline: none; }
+    #loading { position: fixed; inset: 0; display: grid; place-content: center; gap: 12px; color: #fff; font: 600 16px system-ui, sans-serif; text-align: center; }
+    #progress { width: min(300px, 70vw); height: 8px; overflow: hidden; border-radius: 999px; background: #ffffff33; }
+    #progress > i { display: block; height: 100%; width: 0; background: #51d2ff; transition: width .15s ease; }
+  </style>
+  <script>
+    /*
+     * The site build uses Poki's bridge for rewarded ads.  Network ad SDKs are
+     * unavailable inside Nexus, so this local bridge resolves every reward as
+     * watched immediately and still sends the game's normal success callback.
+     */
+    (() => {
+      const resolveReward = callbacks => {
+        try { callbacks && callbacks.onRewarded && callbacks.onRewarded(); } catch (_) {}
+        try { callbacks && callbacks.onReward && callbacks.onReward(); } catch (_) {}
+        try { callbacks && callbacks.onClose && callbacks.onClose(); } catch (_) {}
+        return Promise.resolve(true);
+      };
+      const noop = () => {};
+      window.PokiSDK = {
+        init: () => Promise.resolve(), setDebug: noop, gameLoadingStart: noop,
+        gameLoadingProgress: noop, gameLoadingFinished: noop,
+        commercialBreak: () => Promise.resolve(), rewardedBreak: () => resolveReward(),
+        shareableURL: () => Promise.resolve(location.href)
+      };
+      window.CrazyGames = { SDK: { init: () => Promise.resolve(), ad: { requestAd: (_kind, callbacks) => resolveReward(callbacks) }, gameplay: { startGame: noop, stopGame: noop } } };
+      window.GameMonetizeSDK = { showRewardedAd: () => resolveReward(), showAd: () => resolveReward() };
+      window.YaGames = { init: () => Promise.resolve({ adv: { showRewardedVideo: callbacks => resolveReward(callbacks), showFullscreenAdv: callbacks => resolveReward(callbacks) } }) };
+      window.initPokiBridge = bridge => {
+        const deliver = value => {
+          try { window.unityGame && window.unityGame.SendMessage(bridge, 'rewardedBreakCompleted', String(value)); } catch (_) {}
+          return value;
+        };
+        window.commercialBreak = () => Promise.resolve().then(() => {
+          try { window.unityGame && window.unityGame.SendMessage(bridge, 'commercialBreakCompleted'); } catch (_) {}
+        });
+        window.rewardedBreak = () => Promise.resolve(true).then(deliver);
+        window.shareableURL = () => Promise.resolve(location.href).then(url => {
+          try { window.unityGame && window.unityGame.SendMessage(bridge, 'shareableURLResolved', url); } catch (_) {}
+          return url;
+        });
+        try { window.unityGame && window.unityGame.SendMessage(bridge, 'ready'); } catch (_) {}
+      };
+      // Unity's bootstrap may rebuild the page shell; keep the adapters
+      // available for late platform callbacks as well.
+      setInterval(() => {
+        if (!window.PokiSDK) window.PokiSDK = { init: () => Promise.resolve(), rewardedBreak: () => resolveReward(), commercialBreak: () => Promise.resolve() };
+        if (!window.GameMonetizeSDK) window.GameMonetizeSDK = { showRewardedAd: () => resolveReward(), showAd: () => resolveReward() };
+      }, 1000);
+    })();
+  </script>
+</head>
+<body>
+  <canvas id="game" tabindex="-1"></canvas>
+  <div id="loading"><span id="status">Loading Survival Race…</span><div id="progress"><i></i></div></div>
+  <script src="game-assets/survival-race/Build/9853637125e801e9aae48e78dbbdcfca.loader.js"></script>
+  <script>
+    (() => {
+      const buildRoot = 'game-assets/survival-race/Build/';
+      const config = {
+        dataUrl: buildRoot + '0efc5f5920e387ddd900893f445adc64.data.unityweb',
+        frameworkUrl: buildRoot + '9beb3b25a77830e1a837a1192eaf008f.framework.js.unityweb',
+        codeUrl: buildRoot + '2af43bcf95e2c5402294f39cb5883fcb.wasm.unityweb',
+        streamingAssetsUrl: 'game-assets/survival-race/StreamingAssets',
+        companyName: 'Brain massage', productName: 'Survival Race', productVersion: '0.0.187',
+        cacheControl: () => 'must-revalidate'
+      };
+      const progress = document.querySelector('#progress > i');
+      const status = document.querySelector('#status');
+      createUnityInstance(document.querySelector('#game'), config, value => {
+        progress.style.width = `${Math.round(value * 100)}%`;
+        status.textContent = `Loading Survival Race… ${Math.round(value * 100)}%`;
+      }).then(instance => {
+        window.unityGame = instance;
+        document.querySelector('#loading').remove();
+      }).catch(error => { status.textContent = 'Unable to load Survival Race. Check your connection and reload.'; console.error(error); });
+    })();
+  </script>
+</body>
+</html>
