@@ -356,7 +356,7 @@
             { sourceFile: 'balatro.html', displayName: 'Balatro', letter: 'B' },
             { sourceFile: 'battlebeavers.html', displayName: 'battle beavers', letter: 'B' },
             { sourceFile: 'slope.html', displayName: 'Slope OG', letter: 'S' },
-            { sourceFile: 'survival-race.html', displayName: 'Survival Race', letter: 'S' }
+            { sourceFile: 'survival-race-local', externalUrl: 'survivalrace/index.html', displayName: 'Survival Race', letter: 'S' }
         ];
 
         const sectionsContainer = document.getElementById('sections-container');
@@ -395,6 +395,14 @@
             btn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                if (btn.dataset.externalUrl) {
+                    if (window.parent && window.parent !== window && typeof window.parent.loadGame === 'function') {
+                        window.parent.loadGame({ id: 'external_' + encodeURIComponent(btn.dataset.externalUrl), title: displayName, type: 'url', url: btn.dataset.externalUrl });
+                    } else {
+                        window.location.href = btn.dataset.externalUrl;
+                    }
+                    return;
+                }
                 addBookmarkToSidebar(btn.dataset.originalValue, e);
             };
             btn.addEventListener('click', () => {
@@ -476,6 +484,7 @@
                 btn.value = extraApp.displayName;
                 btn.dataset.originalValue = extraApp.sourceFile;
                 btn.dataset.extraSource = extraApp.sourceFile;
+                if (extraApp.externalUrl) btn.dataset.externalUrl = extraApp.externalUrl;
                 btn.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();

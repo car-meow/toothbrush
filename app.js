@@ -705,13 +705,7 @@ function launchGameFullscreen(game) {
 
     let gameSrc;
     let gameSrcDoc = null;
-    // Survival Race's Stash wrapper references split local assets. Keep it as
-    // a real same-origin URL so those relative paths resolve correctly in the
-    // popup; rewriting the wrapper into srcdoc would make them resolve against
-    // about:blank.
-    const isSurvivalRaceWrapper = game.sourceFile === 'survival-race.html'
-        || (game.type === 'file' && typeof game.content === 'string' && game.content.includes('game-assets/survival-race'));
-    if (game.type === 'file' && !isSurvivalRaceWrapper) {
+    if (game.type === 'file') {
         const rawHtml = atob(game.content.split(',')[1]);
         const unityCompatibility = /(?:createUnityInstance|UnityLoader|unity-container|unity-canvas)/i.test(rawHtml)
             ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
@@ -743,9 +737,7 @@ function launchGameFullscreen(game) {
         // Use stable srcdoc loading for local games. Blob URLs get a new pathname on
         // every launch, which makes path-based game storage (including Balatro's IDBFS)
         // appear to be a different save location each time.
-        gameSrcDoc = injectGameBootstrap(rawHtml, unityCompatibility + getUniversalGameBootstrap() + popupRestore + popupBridge + autoFocusScript);
-    } else if (isSurvivalRaceWrapper) {
-        gameSrc = 'survival-race.html';
+        gameSrcDoc = injectGameBootstrap(rawHtml, unityCompatibility + popupRestore + popupBridge + autoFocusScript);
     } else {
         gameSrc = game.url;
     }
@@ -844,17 +836,6 @@ function injectGameBootstrap(html, bootstrap) {
 // Ad SDKs do not load reliably in the embedded/offline game surface.  These
 // adapters preserve the callback contract the games expect: a reward request
 // completes immediately, and the game awards its normal in-game prize.
-function getUniversalGameBootstrap() {
-    return `<script>(function(){
-var n=function(){},r=function(c){try{c&&c.onRewarded&&c.onRewarded();}catch(e){}try{c&&c.onReward&&c.onReward();}catch(e){}try{c&&c.onClose&&c.onClose();}catch(e){}return Promise.resolve(true)};
-if(!window.PokiSDK)window.PokiSDK={init:function(){return Promise.resolve()},setDebug:n,gameLoadingStart:n,gameLoadingProgress:n,gameLoadingFinished:n,commercialBreak:function(){return Promise.resolve()},rewardedBreak:function(){return r()},shareableURL:function(){return Promise.resolve(location.href)}};
-if(!window.YaGames)window.YaGames={init:function(){return Promise.resolve({adv:{showRewardedVideo:r,showFullscreenAdv:r}})}};
-if(!window.CrazyGames)window.CrazyGames={SDK:{init:function(){return Promise.resolve()},ad:{requestAd:function(k,c){return r(c)}},gameplay:{startGame:n,stopGame:n}}};
-if(!window.GameMonetizeSDK)window.GameMonetizeSDK={showRewardedAd:function(){return r()},showAd:function(){return r()}};
-setInterval(function(){if(!window.PokiSDK)window.PokiSDK={init:function(){return Promise.resolve()},rewardedBreak:function(){return r()},commercialBreak:function(){return Promise.resolve()}};if(!window.GameMonetizeSDK)window.GameMonetizeSDK={showRewardedAd:function(){return r()},showAd:function(){return r()}};},1000);
-})();<\/script>`;
-}
-
 let gameStatusFadeTimer = null;
 let isStashPreloaded = false;
 
@@ -999,12 +980,7 @@ function loadGame(game, forceInternal = false) {
             frame.style.opacity = '1';
         };
 
-        const isSurvivalRaceWrapper = game.sourceFile === 'survival-race.html'
-            || (game.type === 'file' && typeof game.content === 'string' && game.content.includes('game-assets/survival-race'));
-        if (game.type === 'file' && isSurvivalRaceWrapper) {
-            frame.removeAttribute('srcdoc');
-            frame.src = 'survival-race.html';
-        } else if (game.type === 'file') {
+        if (game.type === 'file') {
             const base64Data = game.content.split(',')[1];
             let htmlContent;
             try { htmlContent = atob(base64Data); } catch(e) { nexusAlert("File corrupted."); return; }
@@ -1024,7 +1000,7 @@ function loadGame(game, forceInternal = false) {
             const restoreScript = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
             const autosaveBridge = `<script>(function(){let syncing=false;function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}parent.postMessage({type:'nexus-game-save',localStorage:s},'*');}catch(e){}}function syncAndSend(){if(syncing)return;syncing=true;try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){syncing=false;send();});return;}}catch(e){}syncing=false;send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});window.addEventListener('pagehide',syncAndSend,{passive:true});window.addEventListener('beforeunload',syncAndSend,{passive:true});})();<\/script>`;
             const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
-            const finalHTML = injectGameBootstrap(htmlContent, unityCompatibility + getUniversalGameBootstrap() + restoreScript + persistenceScript + autosaveBridge);
+            const finalHTML = injectGameBootstrap(htmlContent, unityCompatibility + restoreScript + persistenceScript + autosaveBridge);
 
             try {
                 frame.srcdoc = finalHTML;

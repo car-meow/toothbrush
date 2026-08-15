@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexus-cache-v2';
+const CACHE_NAME = 'nexus-cache-v1';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -16,7 +16,8 @@ const ASSETS_TO_CACHE = [
     './game-title-utils.js',
     './tutorial-engine.js',
     './games.json',
-    './survival-race.html',
+    './survivalrace/Build/2af43bcf95e2c5402294f39cb5883fcb.wasm.unityweb.part1',
+    './survivalrace/Build/2af43bcf95e2c5402294f39cb5883fcb.wasm.unityweb.part2',
     // Assets SVGs
     './Assets/AI.svg',
     './Assets/Active%20Timer.svg',
@@ -139,6 +140,23 @@ self.addEventListener('fetch', event => {
 
     const url = new URL(event.request.url);
     if (!url.protocol.startsWith('http')) return;
+
+    // The original Unity loader still requests the original WASM filename.
+    // Reassemble the two storage parts transparently so the game and its
+    // loader remain byte-for-byte unchanged.
+    if (url.pathname.endsWith('/survivalrace/Build/2af43bcf95e2c5402294f39cb5883fcb.wasm.unityweb')) {
+        event.respondWith(Promise.all([
+            fetch(new URL('./survivalrace/Build/2af43bcf95e2c5402294f39cb5883fcb.wasm.unityweb.part1', self.location)),
+            fetch(new URL('./survivalrace/Build/2af43bcf95e2c5402294f39cb5883fcb.wasm.unityweb.part2', self.location))
+        ]).then(async ([first, second]) => {
+            if (!first.ok || !second.ok) throw new Error('Survival Race WASM part unavailable');
+            return new Response(new Blob([await first.arrayBuffer(), await second.arrayBuffer()], { type: 'application/wasm' }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/wasm' }
+            });
+        }));
+        return;
+    }
 
     event.respondWith(
         fetch(event.request)
