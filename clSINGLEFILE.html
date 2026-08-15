@@ -696,24 +696,31 @@
 
         // ---- Wrap every game button that gets loaded by the external script ----
         // We use a MutationObserver to catch buttons as they are injected by games.js
+        let buttonWrapFrame = 0;
         const observer = new MutationObserver(() => {
-            // Find all input[type="button"] that are NOT yet wrapped
-            document.querySelectorAll('#sections-container input[type="button"]').forEach(btn => {
-                prepareGameButton(btn);
-                if (btn.parentElement && btn.parentElement.classList.contains('game-btn-wrapper')) return; // already wrapped
+            // games.js can add many buttons in one burst. Batch the full-list
+            // scan so we do one layout pass per frame instead of one per node.
+            if (buttonWrapFrame) return;
+            buttonWrapFrame = requestAnimationFrame(() => {
+                buttonWrapFrame = 0;
+                // Find all input[type="button"] that are NOT yet wrapped
+                document.querySelectorAll('#sections-container input[type="button"]').forEach(btn => {
+                    prepareGameButton(btn);
+                    if (btn.parentElement && btn.parentElement.classList.contains('game-btn-wrapper')) return; // already wrapped
 
-                const wrapper = document.createElement('div');
-                wrapper.className = 'game-btn-wrapper';
-                wrapper.dataset.stashIndex = String(stashButtonIndex++);
-                wrapper.__stashHomeParent = btn.parentNode;
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'game-btn-wrapper';
+                    wrapper.dataset.stashIndex = String(stashButtonIndex++);
+                    wrapper.__stashHomeParent = btn.parentNode;
 
-                btn.parentNode.insertBefore(wrapper, btn);
-                wrapper.appendChild(btn);
+                    btn.parentNode.insertBefore(wrapper, btn);
+                    wrapper.appendChild(btn);
+                });
+
+                ensureExtraStashButtons(false);
+                queueBookmarkAvailabilityRefresh();
+                if (searchInput.value.trim() && !searchLayoutIsUpdating) queueStashSearch();
             });
-
-            ensureExtraStashButtons(false);
-            queueBookmarkAvailabilityRefresh();
-            if (searchInput.value.trim() && !searchLayoutIsUpdating) queueStashSearch();
         });
 
         observer.observe(sectionsContainer, { childList: true, subtree: true });
