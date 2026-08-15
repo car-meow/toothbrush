@@ -355,7 +355,8 @@
         const EXTRA_STASH_APPS = [
             { sourceFile: 'balatro.html', displayName: 'Balatro', letter: 'B' },
             { sourceFile: 'battlebeavers.html', displayName: 'battle beavers', letter: 'B' },
-            { sourceFile: 'slope.html', displayName: 'Slope OG', letter: 'S' }
+            { sourceFile: 'slope.html', displayName: 'Slope OG', letter: 'S' },
+            { sourceFile: 'survival-race.html', displayName: 'Survival Race', letter: 'S' }
         ];
 
         const sectionsContainer = document.getElementById('sections-container');
@@ -414,6 +415,16 @@
             return getLetterSections().find(section => {
                 const header = section.querySelector('.letter-header');
                 return header && header.textContent.trim().toUpperCase() === upper;
+            });
+        }
+
+        function removeLegacySurvivalRaceV2() {
+            document.querySelectorAll('#sections-container input[type="button"]').forEach(btn => {
+                const source = String(btn.dataset.originalValue || btn.value || '').toLowerCase().replace(/[\s_-]+/g, '');
+                if (source === 'survivalracev2') {
+                    const wrapper = btn.closest('.game-btn-wrapper');
+                    (wrapper || btn).remove();
+                }
             });
         }
 
@@ -718,13 +729,14 @@
                 });
 
                 ensureExtraStashButtons(false);
+                removeLegacySurvivalRaceV2();
                 queueBookmarkAvailabilityRefresh();
                 if (searchInput.value.trim() && !searchLayoutIsUpdating) queueStashSearch();
             });
         });
 
         observer.observe(sectionsContainer, { childList: true, subtree: true });
-        setTimeout(() => ensureExtraStashButtons(true), 1200);
+        setTimeout(() => { ensureExtraStashButtons(true); removeLegacySurvivalRaceV2(); }, 1200);
         refreshBookmarkAvailability();
     </script>
     <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/games.js"></script>
