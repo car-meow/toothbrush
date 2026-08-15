@@ -430,11 +430,11 @@ body {
         <div class="logo-wrapper" style="pointer-events: auto !important;">
             <img src="Assets/nexusLogo.png" id="nexus-logo" class="home-title-img" alt="Nexus" style="cursor: pointer; pointer-events: auto !important;">
             <div class="nexus-version-container" style="pointer-events: auto !important;">
-                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: #ffffff !important; opacity: 1 !important;">v3.5.23 beta</span>
+                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: #ffffff !important; opacity: 1 !important;">v3.7.28 beta</span>
                 <div class="nexus-update-card" style="pointer-events: auto !important;">
                     <div class="nexus-update-title">Welcome back to NEXUS!</div>
                     <div class="nexus-update-body">
-                        School is back in session, and so is Nexus! MASSIVE New game additions, performance updates, and a whole lot more. Read all about it by clicking the "Read More" button below.
+                        School is back in session, and so is Nexus! MASSIVE new game additions, INSANE new performance updates, a DIABOLICAL amount of bugfixes, and a WHOLE lot more. Read all about it by clicking the aptly named button below.
                     </div>
                     <div class="nexus-update-footer">
                         <button id="nexus-read-more-btn" class="nexus-read-more-btn">Read More</button>
@@ -521,24 +521,36 @@ body {
         <div class="nexus-patchnotes-header">
             <div class="nexus-patchnotes-title">Patch Notes</div>
         </div>
-        <div class="nexus-patchnotes-body" id="nexus-patchnotes-expanded-text">It's been one long summer, and we're all enthusiastic to get back to school. (not) And I've been hard at work at the latest revisions, updates, improvements, tweaks, and refinements of Nexus so your experience can be the best while my sleep schedule can be the worst! Regardless, here are a few updates.
+        <div class="nexus-patchnotes-body" id="nexus-patchnotes-expanded-text">It's been one long summer, and we're all enthusiastic to get back to school. (not) And I've been hard at work at the latest revisions, updates, improvements, tweaks, and refinements of Nexus so your experience can be the best...
+		while my sleep schedule can be the worst! 🥲 Regardless, here are a few updates.
 
-I added some new games...
-Balatro (finally!)
-Battle Beavers
-OG Slope (just called Slope in the Game Stash)
+I added a brand-new & updated version of Nautilus Labs' beloved Gust proxy, which I just find insane. It's super quick, and it's mind boggling to think that it fits in ONE single file!
 
-And a new feature JUST added in 3.5.23: Adding URLs! We have tons of games, but unfortunately our provider (Ultimate Games Stash) has some games that don't work in the file that I'm using, so if you have other websites out there that you love, you can just... add them here! Easy and useful. :3
+Performance was a huge issue in 2.9, and with the 3.0 update bringing some new visuals it... was rough. 😔 So I've COMPLETELY overhauled the backend to ensure that your Chromebooks with specs from 1989 can at least run the site! 
+I've added an optional Performance mode, which removes some extra pizzazz to favor usability and performance. General performance improvements include: Less stuttering, higher frame rate animations, file sizes made way smaller, crazy fast loading times, and heavily decreased RAM usage.
 
-I added a fresh new updated version of Nautilus Labs' beloved Gust proxy, which I just find insane. It's super quick, and it's mind boggling to think that it fits in ONE single file! Enjoy browsing with that.
+Games Tab and the UI especially got some love too, improving the Loading Status Bar with a cleaner animated version that doesn't look super old, and the option to preload the Game Stash, which is under Settings. I do recommend turning that on!
 
-Performance was a huge issue in 2.9, and with the 3.0 update bringing some new visuals it didn't get much better. So I've completely overhauled the backend to ensure that your Chromebooks with specs from 1989 can at least run the site! But for those STONE AGE computers (they barely qualify to be called that) I've added a Performance mode, which removes some extra flare and pizzazz to favor usability and performance. General performance improvements include: Less stuttering, higher frame rate animations, file sizes made way smaller, crazy fast loading times (especially on Media, which went from 15s to 2-3s!) and a little more under the hood.
+I fixed tons of bugs, and when I say TONS, I mean it. Here's some of them, categorized from HUGE to SMALL but still impactful!
 
-Games Tab and the UI especially got a little love too, improving the Loading Status Bar with a cleaner animated version that doesn't look super old, and the option to preload the Game Stash, which is under Settings.
+MAJOR:
+White-screen bug and loading bug is FINALLY fixed after over 4 months! Now all the games in the Stash should work perfectly, especially Unity games.
+Some games (ahem, Unity) didn't save properly, like Balatro or War the Knights. I've revamped the saving system from the ground up to get them to work properly, and added a backup autosave feature that updates every 30 seconds.
+I expanded the backup and restore system to save entire libraries of games, not just saves, including color, save data, and order of all the games. 
+Added general loading and response improvements by reducing redundant prefetching and background work. Also greatly increased performance gain when Performance Mode is turned on.
 
-For tech nerds, I extracted this one big irritating file I had (that did everything) into site-core.js and some smaller files, which means that the code is finally more optimized. More of a me thing. :D
+MEDIUM:
+Fixed some games getting stuck on "Adding..." in the sidebar, and moved the newly added games to the top.
+Fixed outdated IndexedDB version issues, which caused a rare bug that made adding games fail.
+Fixed deleted games not being re-addeable in the Stash until you refreshed it.
 
-Aaaaand that's all, folks. Remember, this is still a beta version-- bugs do exist, and I'll try my best to get all of them-- but I'm a solo dev. To help me out, click the red button that says "Requests/Concerns" and fill that out. Thanks and PEACE!</div>
+Kinda SMALL:
+Fixed crazy high RAM usage for Balatro specifically, its file had some errored loops going on so I fixed that.
+Search layouts in the Game Stash were fixed, removing those annoying gaps in Search.
+Fonts should now read properly on Chromebook, bundling the .ttf files locally instead of relying on Google Fonts.
+General polish update as per usual.
+
+Aaaaand that's all, folks. Remember, this is still a beta version-- bugs do exist, and I'll try my best to get all of them-- but I'm a solo dev. If you have any "Requests/Concerns" click that button and fill that out. TYSM and PEACE!</div>
         <div class="nexus-patchnotes-footer">
             <button id="nexus-close-patchnotes-btn" class="nexus-close-patchnotes-btn">Cool! Close</button>
         </div>
