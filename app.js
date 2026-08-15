@@ -705,7 +705,13 @@ function launchGameFullscreen(game) {
 
     let gameSrc;
     let gameSrcDoc = null;
-    if (game.type === 'file') {
+    // Survival Race's Stash wrapper references split local assets. Keep it as
+    // a real same-origin URL so those relative paths resolve correctly in the
+    // popup; rewriting the wrapper into srcdoc would make them resolve against
+    // about:blank.
+    const isSurvivalRaceWrapper = game.sourceFile === 'survival-race.html'
+        || (game.type === 'file' && typeof game.content === 'string' && game.content.includes('game-assets/survival-race'));
+    if (game.type === 'file' && !isSurvivalRaceWrapper) {
         const rawHtml = atob(game.content.split(',')[1]);
         const unityCompatibility = /(?:createUnityInstance|UnityLoader|unity-container|unity-canvas)/i.test(rawHtml)
             ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
@@ -738,6 +744,8 @@ function launchGameFullscreen(game) {
         // every launch, which makes path-based game storage (including Balatro's IDBFS)
         // appear to be a different save location each time.
         gameSrcDoc = injectGameBootstrap(rawHtml, unityCompatibility + getUniversalGameBootstrap() + popupRestore + popupBridge + autoFocusScript);
+    } else if (isSurvivalRaceWrapper) {
+        gameSrc = 'survival-race.html';
     } else {
         gameSrc = game.url;
     }
@@ -991,7 +999,12 @@ function loadGame(game, forceInternal = false) {
             frame.style.opacity = '1';
         };
 
-        if (game.type === 'file') {
+        const isSurvivalRaceWrapper = game.sourceFile === 'survival-race.html'
+            || (game.type === 'file' && typeof game.content === 'string' && game.content.includes('game-assets/survival-race'));
+        if (game.type === 'file' && isSurvivalRaceWrapper) {
+            frame.removeAttribute('srcdoc');
+            frame.src = 'survival-race.html';
+        } else if (game.type === 'file') {
             const base64Data = game.content.split(',')[1];
             let htmlContent;
             try { htmlContent = atob(base64Data); } catch(e) { nexusAlert("File corrupted."); return; }
