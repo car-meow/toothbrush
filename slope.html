@@ -21,6 +21,51 @@
   <link rel="icon" href="slope4.jpeg" />
   <script src="Build/UnityLoader.js"></script>
   <script src="https://55gms.app/assets/js/script.js?v=14"></script>
+  <style>
+    #nexus-loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 999999;
+      background-color: #050505;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      pointer-events: auto;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+    .nexus-loader-bar-container {
+      width: clamp(220px, 30vw, 360px);
+      height: 10px;
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: clamp(28px, 6vh, 48px);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+    .nexus-loader-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: #ffffff;
+      border-radius: 8px;
+      transition: width 0.2s ease-out;
+    }
+    @keyframes nexus-bar-flash {
+      0%, 100% { background-color: #666666; }
+      50% { background-color: #ffffff; }
+    }
+    .nexus-bar-flashing {
+      animation: nexus-bar-flash 0.8s ease-in-out infinite !important;
+    }
+  </style>
 
   <script>
     window.rWS = WebSocket;
@@ -60,14 +105,76 @@
           : args[1];
       origOpen.apply(this, args);
     };
+
+    var nexusProgress = 0;
+    var isNexusDone = false;
+    var nexusBar = null;
+    var nexusOverlay = null;
+    var nexusFlashTimer = null;
+
+    function initNexusLoading() {
+      nexusBar = document.getElementById('nexus-loader-bar');
+      nexusOverlay = document.getElementById('nexus-loading-screen');
+      if (nexusOverlay) {
+        var bgUrl = 'Assets/loading_screen.png';
+        try {
+          var base = window.location.href.split('?')[0].split('#')[0];
+          bgUrl = base.substring(0, base.lastIndexOf('/') + 1) + 'Assets/loading_screen.png';
+        } catch(e) {}
+        nexusOverlay.style.backgroundImage = "url('" + bgUrl + "')";
+      }
+      nexusFlashTimer = setTimeout(function() {
+        if (!isNexusDone && nexusBar) {
+          nexusBar.classList.add('nexus-bar-flashing');
+        }
+      }, 3000);
+    }
+
+    function updateNexusProgress(pct) {
+      if (isNexusDone || !nexusBar) return;
+      nexusProgress = Math.max(nexusProgress, Math.min(100, Math.round(pct)));
+      nexusBar.style.width = nexusProgress + '%';
+    }
+
+    function completeNexusLoading() {
+      if (isNexusDone) return;
+      isNexusDone = true;
+      if (nexusFlashTimer) clearTimeout(nexusFlashTimer);
+      if (nexusBar) nexusBar.style.width = '100%';
+
+      if (nexusOverlay) {
+        nexusOverlay.style.opacity = '0';
+        nexusOverlay.style.pointerEvents = 'none';
+        setTimeout(function() {
+          if (nexusOverlay && nexusOverlay.parentNode) {
+            nexusOverlay.parentNode.removeChild(nexusOverlay);
+          }
+          nexusOverlay = null;
+          nexusBar = null;
+        }, 500);
+      }
+    }
+
+    function customUnityProgress(gameInstance, progress) {
+      if (typeof progress === 'number') {
+        updateNexusProgress(progress * 100);
+        if (progress >= 1) completeNexusLoading();
+      } else if (progress === 'complete') {
+        completeNexusLoading();
+      }
+      if (typeof UnityProgress === 'function' && UnityProgress !== customUnityProgress) {
+        try { UnityProgress(gameInstance, progress); } catch(e) {}
+      }
+    }
+
     var gameInstance = UnityLoader.instantiate(
       "gameContainer",
       "Build/slope_27Sept.json",
       {
-        onProgress: UnityProgress,
+        onProgress: customUnityProgress,
         Module: {
           onRuntimeInitialized: function () {
-            UnityProgress(gameInstance, "complete");
+            completeNexusLoading();
           },
         },
       }
@@ -87,6 +194,12 @@
 </head>
 
 <body>
+  <div id="nexus-loading-screen">
+    <div class="nexus-loader-bar-container">
+      <div id="nexus-loader-bar" class="nexus-loader-bar-fill"></div>
+    </div>
+  </div>
+  <script>initNexusLoading();</script>
   <div class="webgl-content">
     <div id="gameContainer" style="width: 100vw; height: 100vh"></div>
   </div>

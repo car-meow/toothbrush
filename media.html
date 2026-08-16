@@ -35,6 +35,8 @@
         }
 
         .media-sticky-stack header { position: relative; margin: 0; border-bottom: none; }
+        .media-header-warning { position: absolute; left: 50%; transform: translateX(-50%); color: #ff3b30; font-size: 14px; font-weight: 800; white-space: nowrap; text-align: center; pointer-events: none; }
+        @media (max-width: 720px) { .media-header-warning { position: static; transform: none; width: 100%; padding: 0 12px 8px; box-sizing: border-box; white-space: normal; } }
 
         .media-search-row {
             padding: 10px 20px 14px;
@@ -140,6 +142,7 @@
     <div class="media-sticky-stack">
         <header>
             <h1 onclick="navigateWithFade('index.html')">Nexus Movies & TV</h1>
+            <div class="media-header-warning">Content May not Load - Fix in Progress!</div>
             <div class="controls">
                 <button onclick="navigateWithFade('index.html')" class="material-nav-btn" style="--expanded-width: 104px;">
                     <img src="Assets/media-back-arrow.svg" alt=""><span>Home</span>

@@ -156,6 +156,14 @@
             </div>
 
             <div class="setting-row">
+                <div class="setting-label-group">
+                    <span class="setting-label">Browser Compatibility</span>
+                    <span class="setting-hint" id="compatibility-summary">Check WebGL, WASM, storage, and popup support.</span>
+                </div>
+                <button id="run-compatibility-check" class="action-btn" style="background:#2196F3;">Check</button>
+            </div>
+
+            <div class="setting-row">
                 <span class="setting-label">Sounds</span>
                 <label class="toggle-switch">
                     <input type="checkbox" id="toggle-mute">
@@ -353,6 +361,21 @@
             togglePreloadStash.checked = localStorage.getItem('tb_preload_stash') === 'true';
             togglePreloadStash.addEventListener('change', (e) => {
                 localStorage.setItem('tb_preload_stash', e.target.checked ? 'true' : 'false');
+            });
+        }
+
+        const compatibilitySummary = document.getElementById('compatibility-summary');
+        const compatibilityButton = document.getElementById('run-compatibility-check');
+        if (compatibilityButton && compatibilitySummary) {
+            compatibilityButton.addEventListener('click', async () => {
+                const canvas = document.createElement('canvas');
+                const webgl = !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+                const wasm = typeof WebAssembly !== 'undefined';
+                const indexed = !!window.indexedDB;
+                const storage = !!(window.localStorage && navigator.storage);
+                const popup = !!window.open;
+                const results = [webgl && 'WebGL', wasm && 'WASM', indexed && 'IndexedDB', storage && 'Storage', popup && 'Popups'].filter(Boolean);
+                compatibilitySummary.textContent = `${results.join(', ')} supported${results.length < 5 ? ' — some features may be limited' : ''}.`;
             });
         }
 

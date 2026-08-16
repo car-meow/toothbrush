@@ -716,6 +716,97 @@ function onDragEnd(e) {
     renderGameList();
 }
 
+function createNexusLoadingOverlay(parentDoc = document, customBgUrl = 'Assets/loading_screen.png') {
+    try {
+        const existing = parentDoc.getElementById('nexus-loading-screen');
+        if (existing) existing.remove();
+
+        const overlay = parentDoc.createElement('div');
+        overlay.id = 'nexus-loading-screen';
+        overlay.innerHTML = `
+            <style>
+                #nexus-loading-screen {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    z-index: 999999;
+                    background-color: #050505;
+                    background-image: url('${customBgUrl}');
+                    background-size: cover;
+                    background-position: center;
+                    background-repeat: no-repeat;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: flex-end;
+                    align-items: center;
+                    pointer-events: auto;
+                    opacity: 1;
+                    transition: opacity 0.5s ease;
+                }
+                .nexus-loader-bar-container {
+                    width: clamp(220px, 30vw, 360px);
+                    height: 10px;
+                    background: rgba(255, 255, 255, 0.15);
+                    border: 1px solid rgba(255, 255, 255, 0.25);
+                    border-radius: 8px;
+                    overflow: hidden;
+                    margin-bottom: clamp(28px, 6vh, 48px);
+                    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+                }
+                .nexus-loader-bar-fill {
+                    height: 100%;
+                    width: 0%;
+                    background: #ffffff;
+                    border-radius: 8px;
+                    transition: width 0.2s ease-out;
+                }
+                @keyframes nexus-bar-flash {
+                    0%, 100% { background-color: #666666; }
+                    50% { background-color: #ffffff; }
+                }
+                .nexus-bar-flashing {
+                    animation: nexus-bar-flash 0.8s ease-in-out infinite !important;
+                }
+            </style>
+            <div class="nexus-loader-bar-container">
+                <div id="nexus-loader-bar" class="nexus-loader-bar-fill"></div>
+            </div>
+        `;
+
+        (parentDoc.body || parentDoc.documentElement).appendChild(overlay);
+        const bar = overlay.querySelector('#nexus-loader-bar');
+        let progress = 0;
+        let isDone = false;
+
+        const flashTimer = setTimeout(() => {
+            if (!isDone && bar) bar.classList.add('nexus-bar-flashing');
+        }, 3000);
+
+        return {
+            setProgress(pct) {
+                if (isDone || !bar) return;
+                progress = Math.max(progress, Math.min(100, Math.round(pct)));
+                bar.style.width = progress + '%';
+            },
+            complete() {
+                if (isDone) return;
+                isDone = true;
+                clearTimeout(flashTimer);
+                if (bar) bar.style.width = '100%';
+                overlay.style.opacity = '0';
+                overlay.style.pointerEvents = 'none';
+                setTimeout(() => {
+                    try { overlay.remove(); } catch(e) {}
+                }, 500);
+            }
+        };
+    } catch(e) {
+        return { setProgress: () => {}, complete: () => {} };
+    }
+}
+
 function launchGameFullscreen(game) {
     if (!game || game.id === "ugs-stash") return;
     const win = window.open('about:blank', '_blank');
@@ -805,6 +896,9 @@ function launchGameFullscreen(game) {
         return;
     }
 
+    const popupLoader = createNexusLoadingOverlay(win.document);
+    popupLoader.setProgress(20);
+
     const ifr = win.document.createElement('iframe');
     Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
     ifr.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock');
@@ -815,6 +909,11 @@ function launchGameFullscreen(game) {
     win.document.body.style.padding = '0';
     win.document.body.style.overflow = 'hidden';
     win.document.body.appendChild(ifr);
+
+    ifr.onload = () => {
+        popupLoader.setProgress(100);
+        popupLoader.complete();
+    };
 
     // Auto-focus and simulate mouse click 0.5 seconds after launch
     function doFocusAndClick() {
@@ -844,18 +943,26 @@ function launchGameFullscreen(game) {
 // scripts before <!doctype html> can make some WASM and module-based games fail
 // during startup even though the original file is valid on its own.
 function injectGameBootstrap(html, bootstrap) {
-    if (!html || !bootstrap) return html;
+    if (!html) return html;
+    let finalBootstrap = bootstrap || '';
+
+    // Inject cohesive loading screen if not already present in the custom game HTML
+    if (!html.includes('nexus-loading-screen')) {
+        const loadingBootstrap = `<div id="nexus-loading-screen"><div class="nexus-loader-bar-container"><div id="nexus-loader-bar" class="nexus-loader-bar-fill"></div></div></div><style>#nexus-loading-screen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:999999;background-color:#050505;background-image:url('Assets/loading_screen.png');background-size:cover;background-position:center;background-repeat:no-repeat;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;pointer-events:auto;opacity:1;transition:opacity 0.5s ease;}.nexus-loader-bar-container{width:clamp(220px,30vw,360px);height:10px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:8px;overflow:hidden;margin-bottom:clamp(28px,6vh,48px);box-shadow:0 2px 10px rgba(0,0,0,0.5);}.nexus-loader-bar-fill{height:100%;width:0%;background:#ffffff;border-radius:8px;transition:width 0.2s ease-out;}@keyframes nexus-bar-flash{0%,100%{background-color:#666666;}50%{background-color:#ffffff;}}.nexus-bar-flashing{animation:nexus-bar-flash 0.8s ease-in-out infinite !important;}</style><script>(function(){var b=document.getElementById('nexus-loader-bar');var o=document.getElementById('nexus-loading-screen');var d=false;var t=setTimeout(function(){if(!d&&b)b.classList.add('nexus-bar-flashing');},3000);function done(){if(d)return;d=true;clearTimeout(t);if(b)b.style.width='100%';if(o){o.style.opacity='0';o.style.pointerEvents='none';setTimeout(function(){if(o&&o.parentNode)o.parentNode.removeChild(o);},500);}}if(b)b.style.width='40%';if(document.readyState==='complete'){setTimeout(done,300);}else{window.addEventListener('load',function(){setTimeout(done,300);});}})();<\/script>`;
+        finalBootstrap = loadingBootstrap + finalBootstrap;
+    }
+
     const headMatch = html.match(/<head(?:\s[^>]*)?>/i);
     if (headMatch && headMatch.index !== undefined) {
         const insertAt = headMatch.index + headMatch[0].length;
-        return html.slice(0, insertAt) + bootstrap + html.slice(insertAt);
+        return html.slice(0, insertAt) + finalBootstrap + html.slice(insertAt);
     }
     const bodyMatch = html.match(/<body(?:\s[^>]*)?>/i);
     if (bodyMatch && bodyMatch.index !== undefined) {
         const insertAt = bodyMatch.index + bodyMatch[0].length;
-        return html.slice(0, insertAt) + bootstrap + html.slice(insertAt);
+        return html.slice(0, insertAt) + finalBootstrap + html.slice(insertAt);
     }
-    return bootstrap + html;
+    return finalBootstrap + html;
 }
 
 // Ad SDKs do not load reliably in the embedded/offline game surface.  These
@@ -999,8 +1106,12 @@ function loadGame(game, forceInternal = false) {
         frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock');
 
         updateGameStatusUI('loading');
+        const overlayLoader = createNexusLoadingOverlay(document);
+        overlayLoader.setProgress(25);
 
         frame.onload = () => {
+            overlayLoader.setProgress(100);
+            overlayLoader.complete();
             updateGameStatusUI('loaded');
             frame.style.setProperty('visibility', 'visible', 'important');
             frame.style.opacity = '1';

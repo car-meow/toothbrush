@@ -34,10 +34,57 @@
       image-rendering: -webkit-optimize-contrast;
       image-rendering: crisp-edges;
     }
+    #nexus-loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 999999;
+      background-color: #050505;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      pointer-events: auto;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+    .nexus-loader-bar-container {
+      width: clamp(220px, 30vw, 360px);
+      height: 10px;
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: clamp(28px, 6vh, 48px);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+    .nexus-loader-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: #ffffff;
+      border-radius: 8px;
+      transition: width 0.2s ease-out;
+    }
+    @keyframes nexus-bar-flash {
+      0%, 100% { background-color: #666666; }
+      50% { background-color: #ffffff; }
+    }
+    .nexus-bar-flashing {
+      animation: nexus-bar-flash 0.8s ease-in-out infinite !important;
+    }
   </style>
 </head>
 <body>
-  <canvas id="loadingCanvas" oncontextmenu="event.preventDefault()"></canvas>
+  <div id="nexus-loading-screen">
+    <div class="nexus-loader-bar-container">
+      <div id="nexus-loader-bar" class="nexus-loader-bar-fill"></div>
+    </div>
+  </div>
   <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
 
   <script type='text/javascript'>
@@ -45,21 +92,54 @@
       try { window.parent.postMessage("bonk", "*"); } catch(e) {}
     }
 
-    var canvas = document.getElementById("loadingCanvas");
-    canvas.width = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-    canvas.height = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+    // Initialize loading screen background safely resolving relative to page origin
+    (function() {
+      var overlay = document.getElementById('nexus-loading-screen');
+      if (overlay) {
+        var bgUrl = 'Assets/loading_screen.png';
+        try {
+          var base = window.location.href.split('?')[0].split('#')[0];
+          bgUrl = base.substring(0, base.lastIndexOf('/') + 1) + 'Assets/loading_screen.png';
+        } catch(e) {}
+        overlay.style.backgroundImage = "url('" + bgUrl + "')";
+      }
+    })();
 
-    var loadingContext = canvas.getContext('2d', { alpha: false });
+    var nexusProgress = 0;
+    var isNexusDone = false;
+    var nexusBar = document.getElementById('nexus-loader-bar');
+    var nexusOverlay = document.getElementById('nexus-loading-screen');
+    var nexusFlashTimer = setTimeout(function() {
+      if (!isNexusDone && nexusBar) {
+        nexusBar.classList.add('nexus-bar-flashing');
+      }
+    }, 3000);
 
-    function drawLoadingText(text) {
-      var canvas = loadingContext.canvas;
-      loadingContext.fillStyle = "rgb(18, 22, 34)";
-      loadingContext.fillRect(0, 0, canvas.scrollWidth, canvas.scrollHeight);
+    function updateNexusProgress(pct) {
+      if (isNexusDone || !nexusBar) return;
+      nexusProgress = Math.max(nexusProgress, Math.min(100, Math.round(pct)));
+      nexusBar.style.width = nexusProgress + '%';
+    }
 
-      loadingContext.font = '24px sans-serif';
-      loadingContext.textAlign = 'center';
-      loadingContext.fillStyle = "rgb(230, 235, 245)";
-      loadingContext.fillText(text, canvas.scrollWidth / 2, canvas.scrollHeight / 2);
+    function completeNexusLoading() {
+      if (isNexusDone) return;
+      isNexusDone = true;
+      clearTimeout(nexusFlashTimer);
+      if (nexusBar) nexusBar.style.width = '100%';
+      var canvas = document.getElementById('canvas');
+      if (canvas) canvas.style.visibility = 'visible';
+
+      if (nexusOverlay) {
+        nexusOverlay.style.opacity = '0';
+        nexusOverlay.style.pointerEvents = 'none';
+        setTimeout(function() {
+          if (nexusOverlay && nexusOverlay.parentNode) {
+            nexusOverlay.parentNode.removeChild(nexusOverlay);
+          }
+          nexusOverlay = null;
+          nexusBar = null;
+        }, 500);
+      }
     }
 
     // Prevent default scroll behavior for arrow keys & spacebar without legacy keyCode overhead
@@ -73,10 +153,7 @@
     // Emscripten WASM runtime performance configuration
     var Module = {
       arguments: ["./game.love"],
-      // Start at 128MB and allow the runtime's 2GB maximum to grow on demand.
-      // Pre-allocating 512MB made every Balatro tab consume a large heap immediately.
       INITIAL_MEMORY: 134217728,
-      // Suppress verbose Emscripten console outputs to prevent main-thread DOM log locks
       print: function() {},
       printErr: function(msg) {
         if (msg && msg.indexOf && msg.indexOf("WebGL") !== -1) {
@@ -92,11 +169,8 @@
         return canvas;
       })(),
       setStatus: function (text) {
-        if (text) {
-          drawLoadingText(text);
-        } else if (Module.remainingDependencies === 0) {
-          document.getElementById('loadingCanvas').style.display = 'none';
-          document.getElementById('canvas').style.visibility = 'visible';
+        if (!text || Module.remainingDependencies === 0) {
+          completeNexusLoading();
         }
       },
       totalDependencies: 0,
@@ -104,17 +178,25 @@
       monitorRunDependencies: function (left) {
         this.remainingDependencies = left;
         this.totalDependencies = Math.max(this.totalDependencies, left);
-        Module.setStatus(left ? 'Preparing Balatro... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+        if (this.totalDependencies > 0) {
+          var ratio = (this.totalDependencies - left) / this.totalDependencies;
+          updateNexusProgress(ratio * 95);
+        }
+        if (left === 0) {
+          completeNexusLoading();
+        }
       }
     };
 
-    Module.setStatus('Downloading...');
+    updateNexusProgress(15);
     window.onerror = function (event) {
-      Module.setStatus('Exception thrown, see JavaScript console');
+      completeNexusLoading();
     };
 
     var applicationLoad = function (e) {
+      updateNexusProgress(90);
       Love(Module);
+      setTimeout(completeNexusLoading, 400);
     }
   </script>
   <script type="text/javascript" src="game.js?v=d7e34743-2fea-4de6-8a0e-1103b5fcf07f"></script>

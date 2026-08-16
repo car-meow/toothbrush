@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexus-cache-v1';
+const CACHE_NAME = 'nexus-cache-v2';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -7,7 +7,7 @@ const ASSETS_TO_CACHE = [
     './chat.html',
     './media.html',
     './settings.html',
-    './gust.html',
+    './clSINGLEFILE.html',
     './style.css',
     './app.js',
     './cookie-engine.js',
@@ -16,6 +16,10 @@ const ASSETS_TO_CACHE = [
     './game-title-utils.js',
     './tutorial-engine.js',
     './games.json',
+    './Assets/SpaceGrotesk-Regular.ttf',
+    './Assets/SpaceGrotesk-Medium.ttf',
+    './Assets/SpaceGrotesk-SemiBold.ttf',
+    './Assets/SpaceGrotesk-Bold.ttf',
     './survivalrace/Build/2af43bcf95e2c5402294f39cb5883fcb.wasm.unityweb.part1',
     './survivalrace/Build/2af43bcf95e2c5402294f39cb5883fcb.wasm.unityweb.part2',
     // Assets SVGs
