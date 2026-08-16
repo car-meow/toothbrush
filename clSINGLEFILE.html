@@ -356,7 +356,7 @@
             { sourceFile: 'balatro.html', displayName: 'Balatro', letter: 'B' },
             { sourceFile: 'battlebeavers.html', displayName: 'battle beavers', letter: 'B' },
             { sourceFile: 'slope.html', displayName: 'Slope OG', letter: 'S' },
-            { sourceFile: 'survival-race', externalUrl: 'survivalrace/index.html', displayName: 'Survival Race', letter: 'S' }
+            { sourceFile: 'survivalrace/index.html', externalUrl: 'survivalrace/index.html', displayName: 'Survival Race', letter: 'S' }
         ];
 
         const sectionsContainer = document.getElementById('sections-container');
@@ -395,14 +395,6 @@
             btn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (btn.dataset.externalUrl) {
-                    if (window.parent && window.parent !== window && typeof window.parent.loadGame === 'function') {
-                        window.parent.loadGame({ id: 'external_' + encodeURIComponent(btn.dataset.externalUrl), title: displayName, type: 'url', url: btn.dataset.externalUrl });
-                    } else {
-                        window.location.href = btn.dataset.externalUrl;
-                    }
-                    return;
-                }
                 addBookmarkToSidebar(btn.dataset.originalValue, e);
             };
             btn.addEventListener('click', () => {
@@ -428,7 +420,10 @@
 
         function removeLegacySurvivalRaceV2() {
             document.querySelectorAll('#sections-container input[type="button"]').forEach(btn => {
-                const source = String(btn.dataset.originalValue || btn.value || '').toLowerCase().replace(/[\s_-]+/g, '');
+                const source = String(btn.dataset.originalValue || btn.value || '')
+                    .toLowerCase()
+                    .replace(/\.(?:html?|url)$/i, '')
+                    .replace(/[\s_-]+/g, '');
                 if (source === 'survivalracev2') {
                     const wrapper = btn.closest('.game-btn-wrapper');
                     (wrapper || btn).remove();
@@ -604,12 +599,18 @@
                 bookmarkedSourceKeys.clear();
 
                 customGames.forEach(game => {
-                    if (game && game.sourceKey) bookmarkedSourceKeys.add(game.sourceKey);
+                    if (!game) return;
+                    if (game.sourceKey) bookmarkedSourceKeys.add(String(game.sourceKey).toLowerCase());
+                    // Support older records that only stored sourceFile, and
+                    // normalize differences in casing/extension consistently.
+                    if (game.sourceFile) bookmarkedSourceKeys.add(buildBookmarkSourceKey(game.sourceFile));
                 });
 
-                document.querySelectorAll('.game-bookmark-btn').forEach(btn => {
-                    const isBookmarked = bookmarkedSourceKeys.has(btn.dataset.sourceKey);
-                    btn.disabled = isBookmarked;
+                document.querySelectorAll('#sections-container input[type="button"]').forEach(btn => {
+                    const isBookmarked = bookmarkedSourceKeys.has(String(btn.dataset.sourceKey || '').toLowerCase());
+                    // Keep it clickable so addBookmarkToSidebar can show the
+                    // existing "Already Added!" feedback every time.
+                    btn.disabled = false;
                     btn.classList.toggle('bookmarked', isBookmarked);
                     btn.title = isBookmarked ? 'Already in sidebar' : 'Add to sidebar';
                 });
@@ -650,7 +651,39 @@
             if (isAlreadyAdded) return;
 
             const encoded = encodeURIComponent(sourceFile);
-            const isExtraStashApp = EXTRA_STASH_APPS.some(app => app.sourceFile === sourceFile);
+            const extraStashApp = EXTRA_STASH_APPS.find(app => app.sourceFile === sourceFile);
+
+            // Folder-based games need their real URL so their scripts, WASM, and
+            // other relative assets continue to resolve after being added.
+            if (extraStashApp && extraStashApp.externalUrl) {
+                const newG = {
+                    id: buildBookmarkIdFromSourceKey(sourceKey),
+                    sourceKey,
+                    sourceFile,
+                    title: extraStashApp.displayName,
+                    userRenamed: false,
+                    type: 'url',
+                    url: extraStashApp.externalUrl,
+                    isNew: true
+                };
+                try {
+                    if (!window.parent || window.parent === window || typeof window.parent.addStashGameToSidebar !== 'function') {
+                        throw new Error('Game Stash must be opened inside Nexus Files');
+                    }
+                    await window.parent.addStashGameToSidebar(newG);
+                    await refreshBookmarkAvailability();
+                } catch (error) {
+                    console.error('Failed to save bookmarked game:', error);
+                    nexusAlert('Could not add this game. Please try again.');
+                } finally {
+                    if (window.parent && typeof window.parent.hideAddingState === 'function') {
+                        window.parent.hideAddingState(sourceKey);
+                    }
+                }
+                return;
+            }
+
+            const isExtraStashApp = Boolean(extraStashApp);
             const gameUrl = isExtraStashApp
                 ? `${sourceFile}?t=${Date.now()}`
                 : `https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/${encoded}?t=${Date.now()}`;

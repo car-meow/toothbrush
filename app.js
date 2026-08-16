@@ -58,6 +58,25 @@ async function loadGames() {
         };
         req.onerror = () => reject(req.error);
     });
+    const isLegacySurvivalRaceV2 = game => {
+        const values = [game && game.id, game && game.sourceKey, game && game.sourceFile, game && game.title, game && game.url];
+        return values.some(value => String(value || '').toLowerCase()
+            .replace(/\.(?:html?|url)$/i, '')
+            .replace(/[\s_-]+/g, '')
+            .includes('survivalracev2'));
+    };
+    const legacyIds = custom.filter(isLegacySurvivalRaceV2).map(game => game.id);
+    if (legacyIds.length) {
+        const cleanupTx = db.transaction(['customGames', 'gameSnapshots'], 'readwrite');
+        const cleanupStore = cleanupTx.objectStore('customGames');
+        const snapshotStore = cleanupTx.objectStore('gameSnapshots');
+        legacyIds.forEach(id => {
+            cleanupStore.delete(id);
+            snapshotStore.delete(id);
+        });
+        await new Promise(resolve => { cleanupTx.oncomplete = cleanupTx.onerror = cleanupTx.onabort = resolve; });
+    }
+    const activeCustom = custom.filter(game => !isLegacySurvivalRaceV2(game));
     try {
         // Default games do not change while the page is open. Reusing this request avoids
         // a network round-trip and JSON parsing every time a Stash item is added.
@@ -68,8 +87,8 @@ async function loadGames() {
             });
         }
         const defaults = await defaultGamesPromise;
-        games = [...defaults, ...custom];
-    } catch { games = [...custom]; }
+        games = [...defaults, ...activeCustom];
+    } catch { games = [...activeCustom]; }
 
     // Apply saved order
     const savedOrder = localStorage.getItem('sidebar-game-order');
@@ -106,6 +125,12 @@ function openDefaultGame() {
     if (currentGame || !document.getElementById('game-frame')) return;
     const preferredGame = games.find(g => g.id === "ugs-stash") || games[0];
     if (preferredGame) loadGame(preferredGame);
+}
+
+function releaseInactiveGameContent(activeGame) {
+    games.forEach(game => {
+        if (game !== activeGame && game.type === 'file' && game.content) game.content = null;
+    });
 }
 
 function pinMasterStash() {
@@ -227,16 +252,16 @@ async function saveGameSnapshot(gameId, localStorageData) {
     await initDB();
     const hash = JSON.stringify(localStorageData);
     if (snapshotHashes.get(gameId) === hash) return;
-    const tx = db.transaction('gameSnapshots', 'readwrite');
-    const store = tx.objectStore('gameSnapshots');
     const existing = await new Promise(resolve => {
-        const req = store.get(gameId);
+        const req = db.transaction('gameSnapshots', 'readonly').objectStore('gameSnapshots').get(gameId);
         req.onsuccess = () => resolve(req.result || null);
         req.onerror = () => resolve(null);
     });
     const savedAt = Date.now();
     const history = Array.isArray(existing && existing.history) ? existing.history.slice(-4) : [];
     if (existing && existing.localStorage) history.push({ localStorage: existing.localStorage, savedAt: existing.savedAt || savedAt });
+    const tx = db.transaction('gameSnapshots', 'readwrite');
+    const store = tx.objectStore('gameSnapshots');
     store.put({ gameId, localStorage: localStorageData, savedAt, history });
     snapshotHashes.set(gameId, hash);
     return new Promise((resolve, reject) => {
@@ -497,7 +522,6 @@ function renderGameList() {
 
     if (loadingItems.length) {
         const stashItem = fragment.querySelector ? fragment.querySelector('li[data-game-id="ugs-stash"]') : null;
-        const orderedItems = stashItem ? [stashItem, ...loadingItems] : loadingItems;
         if (stashItem) {
             const allItems = Array.from(fragment.childNodes);
             fragment.textContent = '';
@@ -699,6 +723,7 @@ function launchGameFullscreen(game) {
         nexusAlert("Pop-up blocked! Please allow pop-ups to open games.");
         return;
     }
+    if (game && game.id) popupGameWindows.set(game.id, win);
     
     // Focus tab instantly on launch
     try { win.focus(); } catch(e) {}
@@ -762,7 +787,7 @@ function launchGameFullscreen(game) {
         win.document.head.appendChild(link);
     }
 
-    // Unity WebGL builds (including War the Knights and Survival Race v2) use
+    // Unity WebGL builds (including Survival Race) use
     // workers, compressed asset loaders, and IndexedDB. Loading the prepared
     // document directly in the about:blank popup avoids sandbox restrictions
     // that can leave their own Unity progress screen running forever.
@@ -920,6 +945,7 @@ function loadGame(game, forceInternal = false) {
         return;
     }
 
+    releaseInactiveGameContent(game);
     currentGame = game;
     const cloakBtn = document.getElementById('cloak-btn');
     if (cloakBtn) {
@@ -1265,8 +1291,78 @@ if (cloakBtn) {
 }
 
 const exportBtn = document.getElementById('export-btn');
+const healthBtn = document.getElementById('game-health-btn');
+if (healthBtn) {
+    healthBtn.onclick = async () => {
+        const game = currentGame && currentGame.id !== 'ugs-stash' ? currentGame : games.find(item => item.id !== 'ugs-stash');
+        if (!game) return nexusAlert('No custom game is available to check.');
+        let record = game;
+        if (!record.content && game.type === 'file') {
+            await initDB();
+            record = await new Promise(resolve => {
+                const req = db.transaction('customGames', 'readonly').objectStore('customGames').get(game.id);
+                req.onsuccess = () => resolve(req.result || game);
+                req.onerror = () => resolve(game);
+            });
+        }
+        const html = record.content ? atob(record.content.split(',')[1] || '') : '';
+        const checks = [
+            ['File data', !!html.length],
+            ['HTML structure', /<html|<body/i.test(html)],
+            ['External assets', /https?:\/\//i.test(html)],
+            ['WebGL/WASM runtime', /unity|wasm|webgl/i.test(html)],
+            ['Saved snapshot', !!(await getGameSnapshot(game.id))]
+        ];
+        const report = checks.map(([label, ok]) => `${ok ? '✓' : '⚠'} ${label}`).join('\n');
+        nexusAlert(`${game.title || game.id}\n\n${report}`);
+    };
+
+}
+function openBackupSelection(gameList, title, hint) {
+    const overlay = document.getElementById('backup-select-overlay');
+    const list = document.getElementById('backup-game-list');
+    if (!overlay || !list) return Promise.resolve(null);
+    document.getElementById('backup-select-title').textContent = title;
+    document.getElementById('backup-select-hint').textContent = hint;
+    list.innerHTML = '';
+    gameList.forEach(game => {
+        const label = document.createElement('label');
+        label.style.cssText = 'display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--border-color);border-radius:8px;';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox'; checkbox.value = game.id; checkbox.checked = true;
+        const text = document.createElement('span');
+        text.textContent = game.title || game.id;
+        label.append(checkbox, text);
+        list.appendChild(label);
+    });
+    const settings = document.getElementById('backup-include-settings');
+    settings.checked = false;
+    overlay.style.display = 'flex';
+    if (window.setGamePopupState) window.setGamePopupState('backup-select-overlay', true);
+    return new Promise(resolve => {
+        const finish = value => {
+            overlay.style.display = 'none';
+            if (window.setGamePopupState) window.setGamePopupState('backup-select-overlay', false);
+            resolve(value);
+        };
+        document.getElementById('backup-select-all').onclick = () => list.querySelectorAll('input').forEach(input => input.checked = true);
+        document.getElementById('backup-select-none').onclick = () => list.querySelectorAll('input').forEach(input => input.checked = false);
+        document.getElementById('backup-select-cancel').onclick = () => finish(null);
+        document.getElementById('backup-select-confirm').onclick = () => finish({
+            ids: new Set(Array.from(list.querySelectorAll('input:checked')).map(input => input.value)),
+            includeSettings: settings.checked
+        });
+    });
+}
+
 if (exportBtn) {
     exportBtn.onclick = async () => {
+        const selection = await openBackupSelection(
+            games.filter(game => game.id !== 'ugs-stash' && isUserManagedGame(game)),
+            'Select Games to Back Up',
+            'Only selected games and their saves will be included.'
+        );
+        if (!selection) return;
         const originalText = exportBtn.textContent;
         exportBtn.disabled = true;
         exportBtn.textContent = "Saving...";
@@ -1313,9 +1409,11 @@ if (exportBtn) {
 
             // Gather all saves from localStorage
             const allSaves = {};
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                allSaves[key] = localStorage.getItem(key);
+            if (selection.includeSettings) {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    allSaves[key] = localStorage.getItem(key);
+                }
             }
 
             // Gather IndexedDB databases
@@ -1375,17 +1473,26 @@ if (exportBtn) {
             }
 
             const sidebarOrder = localStorage.getItem('sidebar-game-order');
+            const selectedGames = customGames.filter(game => selection.ids.has(game.id));
+            const selectedIds = new Set(selectedGames.map(game => game.id));
+            const selectedSnapshots = gameSnapshots.filter(snapshot => selectedIds.has(snapshot.gameId));
+            const selectedTokens = selectedGames.flatMap(game => [String(game.id), String(game.title || '')].map(value => value.toLowerCase().replace(/[^a-z0-9]/g, '')));
+            const selectedIndexedData = Object.fromEntries(Object.entries(idbData).filter(([name]) => {
+                const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                return selectedTokens.some(token => token.length > 3 && normalized.includes(token));
+            }));
             const colors = {};
-            customGames.forEach(game => {
+            selectedGames.forEach(game => {
                 if (game && game.sidebarColor) colors[game.id] = game.sidebarColor;
             });
             const backupData = {
-                version: 2,
+                version: 3,
+                scope: { type: 'selective', gameIds: Array.from(selectedIds), includeGlobalSettings: selection.includeSettings },
                 saves: allSaves,
-                indexedData: idbData,
-                games: customGames,
-                gameLibrary: { games: customGames, sidebarOrder, colors },
-                gameSnapshots
+                indexedData: selectedIndexedData,
+                games: selectedGames,
+                gameLibrary: { games: selectedGames, sidebarOrder, colors },
+                gameSnapshots: selectedSnapshots
             };
             const jsonStr = JSON.stringify(backupData);
 
@@ -1469,19 +1576,29 @@ if (importBtn) {
             }
 
             try {
+                const backupLibrary = data.gameLibrary || {};
+                const backupGames = Array.isArray(backupLibrary.games) ? backupLibrary.games : (Array.isArray(data.games) ? data.games : []);
+                const restoreSelection = await openBackupSelection(
+                    backupGames,
+                    'Select Games to Restore',
+                    'Unselected games already on this device will remain unchanged.'
+                );
+                if (!restoreSelection) return;
+                const selectedRestoreIds = restoreSelection.ids;
                 await releaseGameFramesForRestore();
                 // Restore localStorage
-                if (data.saves) {
+                if (restoreSelection.includeSettings && data.saves) {
                     Object.keys(data.saves).forEach(k => localStorage.setItem(k, data.saves[k]));
                 }
 
                 // Restore the complete custom library, including file payloads and colors.
                 const library = data.gameLibrary || {};
-                const restoredGames = Array.isArray(library.games) ? library.games : (Array.isArray(data.games) ? data.games : []);
+                const restoredGames = (Array.isArray(library.games) ? library.games : (Array.isArray(data.games) ? data.games : []))
+                    .filter(game => selectedRestoreIds.has(game.id));
                 if (restoredGames.length || data.gameLibrary || data.games) {
                     const tx = db.transaction('customGames', 'readwrite');
                     const store = tx.objectStore('customGames');
-                    store.clear();
+                    selectedRestoreIds.forEach(id => store.delete(id));
                     restoredGames.forEach(g => {
                         const color = library.colors && library.colors[g.id];
                         store.put(color && !g.sidebarColor ? { ...g, sidebarColor: color } : g);
@@ -1492,13 +1609,21 @@ if (importBtn) {
                     });
                 }
                 if (typeof library.sidebarOrder === 'string') {
-                    localStorage.setItem('sidebar-game-order', library.sidebarOrder);
+                    let incomingOrder = [];
+                    let currentOrder = [];
+                    try { incomingOrder = JSON.parse(library.sidebarOrder); } catch (e) {}
+                    try { currentOrder = JSON.parse(localStorage.getItem('sidebar-game-order') || '[]'); } catch (e) {}
+                    const mergedOrder = currentOrder.filter(id => !selectedRestoreIds.has(id));
+                    const stashIndex = mergedOrder.indexOf('ugs-stash');
+                    const insertAt = stashIndex >= 0 ? stashIndex + 1 : 0;
+                    mergedOrder.splice(insertAt, 0, ...incomingOrder.filter(id => selectedRestoreIds.has(id)));
+                    localStorage.setItem('sidebar-game-order', JSON.stringify(mergedOrder));
                 }
                 if (Array.isArray(data.gameSnapshots)) {
                     const tx = db.transaction('gameSnapshots', 'readwrite');
                     const store = tx.objectStore('gameSnapshots');
-                    store.clear();
-                    data.gameSnapshots.forEach(snapshot => store.put(snapshot));
+                    selectedRestoreIds.forEach(id => store.delete(id));
+                    data.gameSnapshots.filter(snapshot => selectedRestoreIds.has(snapshot.gameId)).forEach(snapshot => store.put(snapshot));
                     await new Promise(resolve => {
                         tx.oncomplete = resolve;
                         tx.onerror = resolve;
