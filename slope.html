@@ -42,20 +42,20 @@
       transition: opacity 0.5s ease;
     }
     .nexus-loader-bar-container {
-      width: clamp(220px, 30vw, 360px);
-      height: 10px;
+      width: clamp(260px, 36vw, 440px);
+      height: 16px;
       background: rgba(255, 255, 255, 0.15);
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      border-radius: 8px;
+      border: 1.5px solid rgba(255, 255, 255, 0.3);
+      border-radius: 10px;
       overflow: hidden;
-      margin-bottom: clamp(28px, 6vh, 48px);
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+      margin-bottom: clamp(60px, 12vh, 100px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
     }
     .nexus-loader-bar-fill {
       height: 100%;
       width: 0%;
       background: #ffffff;
-      border-radius: 8px;
+      border-radius: 10px;
       transition: width 0.2s ease-out;
     }
     @keyframes nexus-bar-flash {
@@ -155,12 +155,23 @@
       }
     }
 
+    // Universal Instant Ad Reward Bypass Engine
+    window.PokiSDK = window.PokiSDK || {
+      init: function() { return Promise.resolve(); },
+      commercialBreak: function() { return Promise.resolve(); },
+      rewardedBreak: function(fn) { if (typeof fn === 'function') try { fn(true); } catch(e) {} return Promise.resolve(true); }
+    };
+    window.rewardedBreak = function() { return Promise.resolve(true); };
+    window.commercialBreak = function() { return Promise.resolve(); };
+
     function customUnityProgress(gameInstance, progress) {
       if (typeof progress === 'number') {
-        updateNexusProgress(progress * 100);
-        if (progress >= 1) completeNexusLoading();
+        updateNexusProgress(Math.min(92, progress * 92));
+        if (progress >= 1) {
+          updateNexusProgress(95);
+        }
       } else if (progress === 'complete') {
-        completeNexusLoading();
+        updateNexusProgress(98);
       }
       if (typeof UnityProgress === 'function' && UnityProgress !== customUnityProgress) {
         try { UnityProgress(gameInstance, progress); } catch(e) {}
@@ -174,11 +185,25 @@
         onProgress: customUnityProgress,
         Module: {
           onRuntimeInitialized: function () {
-            completeNexusLoading();
+            updateNexusProgress(100);
+            requestAnimationFrame(function() {
+              setTimeout(completeNexusLoading, 150);
+            });
           },
+          postRun: [
+            function() {
+              updateNexusProgress(100);
+              setTimeout(completeNexusLoading, 150);
+            }
+          ]
         },
       }
     );
+
+    // Fail-safe timeout in case Unity initialization callback is skipped
+    setTimeout(function() {
+      if (!isNexusDone) completeNexusLoading();
+    }, 12000);
   </script>
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-98DP5VKS42"></script>
   <script>
