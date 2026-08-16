@@ -92,6 +92,15 @@
       try { window.parent.postMessage("bonk", "*"); } catch(e) {}
     }
 
+    // Universal Instant Ad Reward Bypass Engine
+    window.PokiSDK = window.PokiSDK || {
+      init: function() { return Promise.resolve(); },
+      commercialBreak: function() { return Promise.resolve(); },
+      rewardedBreak: function(fn) { if (typeof fn === 'function') try { fn(true); } catch(e) {} return Promise.resolve(true); }
+    };
+    window.rewardedBreak = function() { return Promise.resolve(true); };
+    window.commercialBreak = function() { return Promise.resolve(); };
+
     // Initialize loading screen background safely resolving relative to page origin
     (function() {
       var overlay = document.getElementById('nexus-loading-screen');
@@ -151,6 +160,7 @@
     }, { passive: false });
 
     // Emscripten WASM runtime performance configuration
+    var hasDependenciesStarted = false;
     var Module = {
       arguments: ["./game.love"],
       INITIAL_MEMORY: 134217728,
@@ -169,35 +179,55 @@
         return canvas;
       })(),
       setStatus: function (text) {
-        if (!text || Module.remainingDependencies === 0) {
-          completeNexusLoading();
+        if (text) {
+          var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+          if (m) {
+            updateNexusProgress((parseFloat(m[2]) / parseFloat(m[4])) * 90);
+          }
         }
       },
       totalDependencies: 0,
       remainingDependencies: 0,
       monitorRunDependencies: function (left) {
         this.remainingDependencies = left;
+        if (left > 0) hasDependenciesStarted = true;
         this.totalDependencies = Math.max(this.totalDependencies, left);
         if (this.totalDependencies > 0) {
           var ratio = (this.totalDependencies - left) / this.totalDependencies;
-          updateNexusProgress(ratio * 95);
+          updateNexusProgress(ratio * 90);
         }
-        if (left === 0) {
-          completeNexusLoading();
+        if (left === 0 && hasDependenciesStarted) {
+          updateNexusProgress(95);
         }
-      }
+      },
+      postRun: [
+        function() {
+          updateNexusProgress(100);
+          // Wait a frame for the WebGL canvas to render the title/menu screen
+          requestAnimationFrame(function() {
+            setTimeout(completeNexusLoading, 100);
+          });
+        }
+      ]
     };
 
     updateNexusProgress(15);
     window.onerror = function (event) {
-      completeNexusLoading();
+      setTimeout(completeNexusLoading, 1000);
     };
 
     var applicationLoad = function (e) {
-      updateNexusProgress(90);
-      Love(Module);
-      setTimeout(completeNexusLoading, 400);
-    }
+      updateNexusProgress(92);
+      try {
+        Love(Module);
+      } catch(err) {
+        console.error("Love error:", err);
+      }
+      // Safety fail-safe in case postRun is delayed
+      setTimeout(function() {
+        if (!isNexusDone) completeNexusLoading();
+      }, 10000);
+    };
   </script>
   <script type="text/javascript" src="game.js?v=d7e34743-2fea-4de6-8a0e-1103b5fcf07f"></script>
   <script async type="text/javascript" src="love.js" onload="applicationLoad(this)"></script>

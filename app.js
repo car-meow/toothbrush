@@ -896,9 +896,6 @@ function launchGameFullscreen(game) {
         return;
     }
 
-    const popupLoader = createNexusLoadingOverlay(win.document);
-    popupLoader.setProgress(20);
-
     const ifr = win.document.createElement('iframe');
     Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
     ifr.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock');
@@ -909,11 +906,6 @@ function launchGameFullscreen(game) {
     win.document.body.style.padding = '0';
     win.document.body.style.overflow = 'hidden';
     win.document.body.appendChild(ifr);
-
-    ifr.onload = () => {
-        popupLoader.setProgress(100);
-        popupLoader.complete();
-    };
 
     // Auto-focus and simulate mouse click 0.5 seconds after launch
     function doFocusAndClick() {
@@ -946,10 +938,85 @@ function injectGameBootstrap(html, bootstrap) {
     if (!html) return html;
     let finalBootstrap = bootstrap || '';
 
+    // Universal Instant Ad Reward Bypass Engine
+    const adBypassBootstrap = `<script>
+(function() {
+    window.PokiSDK = window.PokiSDK || {};
+    window.PokiSDK.init = function() { return Promise.resolve(); };
+    window.PokiSDK.initWithVideoHB = function() { return Promise.resolve(); };
+    window.PokiSDK.commercialBreak = function() { return Promise.resolve(); };
+    window.PokiSDK.rewardedBreak = function(fn) {
+        if (typeof fn === 'function') { try { fn(true); } catch(e) {} }
+        return Promise.resolve(true);
+    };
+    window.PokiSDK.displayAd = function() { return Promise.resolve(); };
+    window.PokiSDK.destroyAd = function() {};
+    window.PokiSDK.gameLoadingStart = function() {};
+    window.PokiSDK.gameLoadingFinished = function() {};
+    window.PokiSDK.gameLoadingProgress = function() {};
+    window.PokiSDK.gameplayStart = function() {};
+    window.PokiSDK.gameplayStop = function() {};
+    window.PokiSDK.happyTime = function() {};
+    window.PokiSDK.setDebug = function() {};
+
+    var crazyAdMock = {
+        requestAd: function(type, callbacks) {
+            if (callbacks) {
+                if (callbacks.adStarted) try { callbacks.adStarted(); } catch(e) {}
+                if (callbacks.adFinished) try { callbacks.adFinished(); } catch(e) {}
+                if (callbacks.reward) try { callbacks.reward(); } catch(e) {}
+                if (callbacks.adCompleted) try { callbacks.adCompleted(); } catch(e) {}
+            }
+            return Promise.resolve(true);
+        },
+        hasAdblock: function() { return Promise.resolve(false); },
+        checkAdblock: function() { return Promise.resolve(false); }
+    };
+    window.CrazyGames = window.CrazyGames || {};
+    window.CrazyGames.SDK = window.CrazyGames.SDK || {
+        ad: crazyAdMock,
+        banner: { requestBanner: function() { return Promise.resolve(); }, clearAll: function() {} },
+        game: { gameplayStart: function() {}, gameplayStop: function() {}, happytime: function() {}, inviteLink: function() { return ""; } }
+    };
+    window.crazygames = window.CrazyGames;
+
+    window.aiptag = window.aiptag || {};
+    window.aiptag.cmd = window.aiptag.cmd || {};
+    window.aiptag.cmd.player = window.aiptag.cmd.player || [];
+    window.aiptag.cmd.display = window.aiptag.cmd.display || [];
+    window.aiptag.cmd.player.push = function(cfg) {
+        if (cfg && typeof cfg === 'object') {
+            if (typeof cfg.callback === 'function') { setTimeout(function() { try { cfg.callback(true); } catch(e) {} }, 10); return 1; }
+            if (typeof cfg.onComplete === 'function') { setTimeout(function() { try { cfg.onComplete(true); } catch(e) {} }, 10); return 1; }
+        }
+        return 1;
+    };
+
+    window.GamePix = window.GamePix || {};
+    window.GamePix.rewardAd = function() { return Promise.resolve({ success: true }); };
+    window.GamePix.interstitialAd = function() { return Promise.resolve({ success: true }); };
+
+    window.rewardedBreak = function() {
+        if (window.unityGame && window.pokiBridge) {
+            try { window.unityGame.SendMessage(window.pokiBridge, "rewardedBreakCompleted", "true"); } catch(e) {}
+        }
+        return Promise.resolve(true);
+    };
+    window.commercialBreak = function() {
+        if (window.unityGame && window.pokiBridge) {
+            try { window.unityGame.SendMessage(window.pokiBridge, "commercialBreakCompleted"); } catch(e) {}
+        }
+        return Promise.resolve();
+    };
+})();
+<\/script>`;
+
     // Inject cohesive loading screen if not already present in the custom game HTML
     if (!html.includes('nexus-loading-screen')) {
-        const loadingBootstrap = `<div id="nexus-loading-screen"><div class="nexus-loader-bar-container"><div id="nexus-loader-bar" class="nexus-loader-bar-fill"></div></div></div><style>#nexus-loading-screen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:999999;background-color:#050505;background-image:url('Assets/loading_screen.png');background-size:cover;background-position:center;background-repeat:no-repeat;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;pointer-events:auto;opacity:1;transition:opacity 0.5s ease;}.nexus-loader-bar-container{width:clamp(220px,30vw,360px);height:10px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:8px;overflow:hidden;margin-bottom:clamp(28px,6vh,48px);box-shadow:0 2px 10px rgba(0,0,0,0.5);}.nexus-loader-bar-fill{height:100%;width:0%;background:#ffffff;border-radius:8px;transition:width 0.2s ease-out;}@keyframes nexus-bar-flash{0%,100%{background-color:#666666;}50%{background-color:#ffffff;}}.nexus-bar-flashing{animation:nexus-bar-flash 0.8s ease-in-out infinite !important;}</style><script>(function(){var b=document.getElementById('nexus-loader-bar');var o=document.getElementById('nexus-loading-screen');var d=false;var t=setTimeout(function(){if(!d&&b)b.classList.add('nexus-bar-flashing');},3000);function done(){if(d)return;d=true;clearTimeout(t);if(b)b.style.width='100%';if(o){o.style.opacity='0';o.style.pointerEvents='none';setTimeout(function(){if(o&&o.parentNode)o.parentNode.removeChild(o);},500);}}if(b)b.style.width='40%';if(document.readyState==='complete'){setTimeout(done,300);}else{window.addEventListener('load',function(){setTimeout(done,300);});}})();<\/script>`;
-        finalBootstrap = loadingBootstrap + finalBootstrap;
+        const loadingBootstrap = `<div id="nexus-loading-screen"><div class="nexus-loader-bar-container"><div id="nexus-loader-bar" class="nexus-loader-bar-fill"></div></div></div><style>#nexus-loading-screen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:999999;background-color:#050505;background-image:url('Assets/loading_screen.png');background-size:cover;background-position:center;background-repeat:no-repeat;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;pointer-events:auto;opacity:1;transition:opacity 0.5s ease;}.nexus-loader-bar-container{width:clamp(220px,30vw,360px);height:10px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:8px;overflow:hidden;margin-bottom:clamp(28px,6vh,48px);box-shadow:0 2px 10px rgba(0,0,0,0.5);}.nexus-loader-bar-fill{height:100%;width:0%;background:#ffffff;border-radius:8px;transition:width 0.2s ease-out;}@keyframes nexus-bar-flash{0%,100%{background-color:#666666;}50%{background-color:#ffffff;}}.nexus-bar-flashing{animation:nexus-bar-flash 0.8s ease-in-out infinite !important;}</style><script>(function(){var b=document.getElementById('nexus-loader-bar');var o=document.getElementById('nexus-loading-screen');var d=false;var t=setTimeout(function(){if(!d&&b)b.classList.add('nexus-bar-flashing');},3000);function done(){if(d)return;d=true;clearTimeout(t);if(b)b.style.width='100%';if(o){o.style.opacity='0';o.style.pointerEvents='none';setTimeout(function(){if(o&&o.parentNode)o.parentNode.removeChild(o);},500);}}if(b)b.style.width='30%';document.addEventListener('DOMContentLoaded',function(){if(b&&!d)b.style.width='60%';});window.addEventListener('load',function(){if(b&&!d)b.style.width='90%';requestAnimationFrame(function(){setTimeout(done,250);});});setTimeout(function(){if(!d)done();},12000);})();<\/script>`;
+        finalBootstrap = adBypassBootstrap + loadingBootstrap + finalBootstrap;
+    } else {
+        finalBootstrap = adBypassBootstrap + finalBootstrap;
     }
 
     const headMatch = html.match(/<head(?:\s[^>]*)?>/i);
@@ -1106,12 +1173,8 @@ function loadGame(game, forceInternal = false) {
         frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock');
 
         updateGameStatusUI('loading');
-        const overlayLoader = createNexusLoadingOverlay(document);
-        overlayLoader.setProgress(25);
 
         frame.onload = () => {
-            overlayLoader.setProgress(100);
-            overlayLoader.complete();
             updateGameStatusUI('loaded');
             frame.style.setProperty('visibility', 'visible', 'important');
             frame.style.opacity = '1';
