@@ -200,6 +200,7 @@ function applyGameColorToLi(li, game) {
 }
 
 async function saveGameRecord(game) {
+    if (!game || !game.id) return;
     await initDB();
     const tx = db.transaction("customGames", "readwrite");
     const store = tx.objectStore("customGames");
@@ -208,7 +209,20 @@ async function saveGameRecord(game) {
         req.onsuccess = () => resolve(req.result || {});
         req.onerror = () => resolve({});
     });
-    store.put({ ...existing, ...game });
+
+    const recordToSave = { ...existing };
+    for (const [key, value] of Object.entries(game)) {
+        if (key === 'content' && (value === null || value === undefined)) {
+            continue;
+        }
+        recordToSave[key] = value;
+    }
+
+    if (!recordToSave.content && existing && existing.content) {
+        recordToSave.content = existing.content;
+    }
+
+    store.put(recordToSave);
     return new Promise((resolve, reject) => {
         tx.oncomplete = resolve;
         tx.onerror = () => reject(tx.error);
@@ -1375,6 +1389,7 @@ async function renameGame() {
 
     closeRenamePrompt();
     renderGameList();
+    notifyStashBookmarkAvailability();
 }
 
 const renameDoneBtn = document.getElementById('rename-done-btn');
