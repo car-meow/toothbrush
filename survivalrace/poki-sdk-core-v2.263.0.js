@@ -4811,29 +4811,10 @@
 							})*/
 						}))
 					}, this.rewardedBreak = function(e) {
-						console.log(123);
-						return new Promise((function(i) {
-							var r = n.ads.position.rewarded;
-							a.clearAnnotations(), a.setDataAnnotations({
-								opportunityId: Qe(),
-								position: r
-							});//,
-							// this.callHandler("onFinish", {
-							// 	type: n.ads.completed,
-							// 	rewardAllowed: !0
-							// })
-							// n.ads.completed; 
-							// i(1);
-							at.track(n.tracking.screen.rewardedBreak), t.SDK.requestAd({
-								position: r,
-								onFinish: function(e) {
-									console.log(e);
-									e.length > 0 ? i(!e[0].rewardAllowed) : i(!1)
-								},
-								onStart: e
-							})
-							
-						}))
+						if (typeof e === 'function') {
+							try { e(true); } catch(err) {}
+						}
+						return Promise.resolve(true);
 					}, this.happyTime = function(e) {
 						void 0 === e && (e = 1), ((e = Number(e)) < 0 || e > 1) && (e = Math.max(0, Math.min(1, e)), t.warning("happyTime", "Intensity should be a value between 0 and 1, adjusted to " + e)), at.track(n.tracking.screen.happyTime, {
 							intensity: e

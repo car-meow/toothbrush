@@ -6,7 +6,62 @@
 	<meta charset="utf-8">
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 	<title>Survival Race </title>
+	<style>
+		#nexus-loading-screen {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100vw;
+			height: 100vh;
+			z-index: 999999;
+			background-color: #050505;
+			background-size: cover;
+			background-position: center;
+			background-repeat: no-repeat;
+			display: flex;
+			flex-direction: column;
+			justify-content: flex-end;
+			align-items: center;
+			pointer-events: auto;
+			opacity: 1;
+			transition: opacity 0.5s ease;
+		}
+		.nexus-loader-bar-container {
+			width: clamp(220px, 30vw, 360px);
+			height: 10px;
+			background: rgba(255, 255, 255, 0.15);
+			border: 1px solid rgba(255, 255, 255, 0.25);
+			border-radius: 8px;
+			overflow: hidden;
+			margin-bottom: clamp(28px, 6vh, 48px);
+			box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+		}
+		.nexus-loader-bar-fill {
+			height: 100%;
+			width: 0%;
+			background: #ffffff;
+			border-radius: 8px;
+			transition: width 0.2s ease-out;
+		}
+		@keyframes nexus-bar-flash {
+			0%, 100% { background-color: #666666; }
+			50% { background-color: #ffffff; }
+		}
+		.nexus-bar-flashing {
+			animation: nexus-bar-flash 0.8s ease-in-out infinite !important;
+		}
+		#loader, #spinner { display: none !important; }
+	</style>
 	<script>
+		// Universal Instant Ad Reward Bypass Engine
+		window.PokiSDK = window.PokiSDK || {
+			init: function() { return Promise.resolve(); },
+			commercialBreak: function() { return Promise.resolve(); },
+			rewardedBreak: function(fn) { if (typeof fn === 'function') try { fn(true); } catch(e) {} return Promise.resolve(true); }
+		};
+		window.rewardedBreak = function() { return Promise.resolve(true); };
+		window.commercialBreak = function() { return Promise.resolve(); };
+
 		// Unity's first IDBFS probe can emit this known non-fatal timestamp
 		// warning before the save store is initialized. Keep real errors intact.
 		(function () {
@@ -19,6 +74,60 @@
 				return nativeAlert.apply(this, arguments);
 			};
 		})();
+
+		var nexusProgress = 0;
+		var isNexusDone = false;
+		var nexusBar = null;
+		var nexusOverlay = null;
+		var nexusFlashTimer = null;
+
+		function initNexusLoading() {
+			nexusBar = document.getElementById('nexus-loader-bar');
+			nexusOverlay = document.getElementById('nexus-loading-screen');
+			if (nexusOverlay) {
+				var bgUrl = 'loading_screen.png';
+				try {
+					var base = window.location.href.split('?')[0].split('#')[0];
+					bgUrl = base.substring(0, base.lastIndexOf('/') + 1) + 'loading_screen.png';
+				} catch(e) {}
+				nexusOverlay.style.backgroundImage = "url('" + bgUrl + "')";
+			}
+			nexusFlashTimer = setTimeout(function() {
+				if (!isNexusDone && nexusBar) {
+					nexusBar.classList.add('nexus-bar-flashing');
+				}
+			}, 3000);
+		}
+
+		window.updateNexusProgress = function(pct) {
+			if (isNexusDone || !nexusBar) return;
+			nexusProgress = Math.max(nexusProgress, Math.min(100, Math.round(pct)));
+			nexusBar.style.width = nexusProgress + '%';
+		};
+
+		window.completeNexusLoading = function() {
+			if (isNexusDone) return;
+			isNexusDone = true;
+			if (nexusFlashTimer) clearTimeout(nexusFlashTimer);
+			if (nexusBar) nexusBar.style.width = '100%';
+
+			if (nexusOverlay) {
+				nexusOverlay.style.opacity = '0';
+				nexusOverlay.style.pointerEvents = 'none';
+				setTimeout(function() {
+					if (nexusOverlay && nexusOverlay.parentNode) {
+						nexusOverlay.parentNode.removeChild(nexusOverlay);
+					}
+					nexusOverlay = null;
+					nexusBar = null;
+				}, 500);
+			}
+		};
+
+		// Fail-safe in case Unity init hook is delayed
+		setTimeout(function() {
+			if (!isNexusDone) window.completeNexusLoading();
+		}, 12000);
 	</script>
 	<script>
 	window.config = {
@@ -44,11 +153,14 @@
 		"metadata": {"poki_template_version":1,"background_color":"#231F20","code_filename":"2af43bcf95e2c5402294f39cb5883fcb.wasm.unityweb","company_name":"Brain massage","data_filename":"0efc5f5920e387ddd900893f445adc64.data.unityweb","decompression_fallback":"Brotli","development_player":"false","framework_filename":"9beb3b25a77830e1a837a1192eaf008f.framework.js.unityweb","height":"600","loader_filename":"9853637125e801e9aae48e78dbbdcfca.loader.js","product_name":"Survival Race","product_version":"0.0.187","splash_screen_style":"Dark","unity_version":"2022.3.24f1","use_data_caching":"true","use_threads":"false","use_wasm":"true","use_webgl_1_0":"false","use_webgl_2_0":"true","width":"960"}
 	};
 	</script>
-<!-- will be copied to the resulting head //-->
 </head>
 <body>
+	<div id="nexus-loading-screen">
+		<div class="nexus-loader-bar-container">
+			<div id="nexus-loader-bar" class="nexus-loader-bar-fill"></div>
+		</div>
+	</div>
+	<script>initNexusLoading();</script>
 	<script src="master-loader.js"></script>
-<!-- will be copied to the resulting body //-->
-<!-- will also be copied to the resulting body //-->
 </body>
 </html>

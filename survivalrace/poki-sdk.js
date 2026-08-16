@@ -13,7 +13,7 @@
 					}))
 				}, this.rewardedBreak = function() {
 					return new Promise((function(e) {
-						e(!1)
+						e(!0)
 					}))
 				}, this.noArguments = function(n) {
 					return function() {
