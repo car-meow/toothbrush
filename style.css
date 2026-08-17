@@ -494,8 +494,6 @@ body:not(.media-bg) .rename-done-btn:hover {
 
 .home-btn {
     font-size: 22px;
-    padding: 15px 40px;
-    border-radius: 12px;
 }
 
 .home-title-img {
@@ -509,15 +507,15 @@ body:not(.media-bg) .rename-done-btn:hover {
 }
 
 .material-nav-btn {
-    /* Collapsed: perfect circle. padding-left=14px keeps icon centered (52px btn, 24px icon → 14px margin each side) */
+    /* Collapsed: perfect circle. Mathematical centering in both axes */
     width: 52px;
     height: 52px;
     min-width: 52px;
-    padding: 0 14px;
-    border-radius: 26px;
+    padding: 0 !important;
+    border-radius: 9999px;
     display: inline-flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: center;
     gap: 0;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.08);
@@ -531,10 +529,11 @@ body:not(.media-bg) .rename-done-btn:hover {
     z-index: 10002 !important;
     contain: layout paint;
     will-change: transform, width;
-    /* Unhover: text fades first (0s), then width shrinks (0.15s delay) */
+    /* Unhover: text fades and collapses first, width shrinks back to circle */
     transition:
         width 0.3s cubic-bezier(0.2, 0, 0, 1) 0.15s,
         gap 0.3s cubic-bezier(0.2, 0, 0, 1) 0.15s,
+        padding 0.3s cubic-bezier(0.2, 0, 0, 1) 0.15s,
         background 0.2s ease,
         transform 0.2s cubic-bezier(0.2, 0, 0, 1),
         box-shadow 0.2s ease;
@@ -542,9 +541,11 @@ body:not(.media-bg) .rename-done-btn:hover {
 
 .material-nav-btn:hover,
 .material-nav-btn:focus-visible {
-    /* Expanded: grow to fit icon + gap + text + equal right padding */
+    /* Expanded: grow to fit icon + gap + text */
     width: var(--expanded-width);
+    padding: 0 16px !important;
     gap: 10px;
+    justify-content: center;
     background: rgba(255, 255, 255, 0.16);
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
@@ -552,6 +553,7 @@ body:not(.media-bg) .rename-done-btn:hover {
     transition:
         width 0.3s cubic-bezier(0.2, 0, 0, 1) 0s,
         gap 0.3s cubic-bezier(0.2, 0, 0, 1) 0s,
+        padding 0.3s cubic-bezier(0.2, 0, 0, 1) 0s,
         background 0.2s ease,
         transform 0.2s cubic-bezier(0.2, 0, 0, 1),
         box-shadow 0.2s ease;
@@ -564,48 +566,60 @@ body:not(.media-bg) .rename-done-btn:hover {
     object-fit: contain;
     filter: brightness(0) invert(1);
     flex-shrink: 0;
+    display: block;
+    margin: 0;
+    pointer-events: none;
 }
 
 .material-nav-btn span {
     display: inline-block;
     opacity: 0;
     white-space: nowrap;
-    overflow: visible;
+    overflow: hidden;
     color: #ffffff;
     font-size: 16px;
     font-weight: 700;
     line-height: 1;
+    width: 0;
     max-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
     pointer-events: none;
     /* Unhover: fade out instantly */
     transition:
         opacity 0.15s ease 0s,
-        max-width 0.3s cubic-bezier(0.2, 0, 0, 1) 0.15s;
+        max-width 0.3s cubic-bezier(0.2, 0, 0, 1) 0.15s,
+        width 0.3s cubic-bezier(0.2, 0, 0, 1) 0.15s;
 }
 
 .material-nav-btn:hover span,
 .material-nav-btn:focus-visible span {
     opacity: 1;
+    width: auto;
     max-width: 300px;
     /* Hover: width opens first, then text fades in */
     transition:
         opacity 0.15s ease 0.2s,
-        max-width 0.3s cubic-bezier(0.2, 0, 0, 1) 0s;
+        max-width 0.3s cubic-bezier(0.2, 0, 0, 1) 0s,
+        width 0.3s cubic-bezier(0.2, 0, 0, 1) 0s;
 }
 
 /* Home screen — bigger buttons */
 .home-screen .material-nav-btn {
-    /* 64px btn, 30px icon → (64-30)/2 = 17px padding on each side */
     width: 64px;
     height: 64px;
     min-width: 64px;
-    padding: 0 17px;
-    border-radius: 32px;
+    padding: 0 !important;
+    border-radius: 9999px;
 }
 
 .home-screen .material-nav-btn:hover,
 .home-screen .material-nav-btn:focus-visible {
     width: var(--expanded-width);
+    padding: 0 20px !important;
+    gap: 12px;
+    justify-content: center;
 }
 
 .home-screen .material-nav-btn img {
@@ -623,7 +637,7 @@ body:not(.media-bg) .rename-done-btn:hover {
 .btn-restore {
     width: 60px;
     min-width: 60px;
-    padding: 0;
+    padding: 0 !important;
     justify-content: center;
 }
 
@@ -641,6 +655,8 @@ body:not(.media-bg) button.btn-restore {
 .btn-restore:hover,
 .btn-restore:focus-visible {
     width: var(--expanded-width);
+    padding: 0 16px !important;
+    gap: 10px;
     justify-content: center;
 }
 
