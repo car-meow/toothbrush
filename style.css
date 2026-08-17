@@ -529,11 +529,11 @@ body:not(.media-bg) .rename-done-btn:hover {
     z-index: 10002 !important;
     contain: layout paint;
     will-change: transform, width;
-    /* Unhover: text fades and collapses first, width shrinks back to circle */
+    /* Unhover: text collapses and fades first, then width smoothly slides back */
     transition:
-        width 0.3s cubic-bezier(0.2, 0, 0, 1) 0.15s,
-        gap 0.3s cubic-bezier(0.2, 0, 0, 1) 0.15s,
-        padding 0.3s cubic-bezier(0.2, 0, 0, 1) 0.15s,
+        width 0.35s cubic-bezier(0.2, 0, 0, 1) 0.12s,
+        gap 0.35s cubic-bezier(0.2, 0, 0, 1) 0.12s,
+        padding 0.35s cubic-bezier(0.2, 0, 0, 1) 0.12s,
         background 0.2s ease,
         transform 0.2s cubic-bezier(0.2, 0, 0, 1),
         box-shadow 0.2s ease;
@@ -541,20 +541,19 @@ body:not(.media-bg) .rename-done-btn:hover {
 
 .material-nav-btn:hover,
 .material-nav-btn:focus-visible {
-    /* Expanded: grow to fit icon + gap + text */
-    width: max(var(--expanded-width, 0px), max-content);
-    min-width: var(--expanded-width);
+    /* Expanded: smoothly slides to expanded width */
+    width: var(--expanded-width);
     padding: 0 16px !important;
     gap: 10px;
     justify-content: center;
     background: rgba(255, 255, 255, 0.16);
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-    /* Hover: width expands immediately, text fades in after width opens */
+    /* Hover: width expands immediately with ultra-smooth easing */
     transition:
-        width 0.3s cubic-bezier(0.2, 0, 0, 1) 0s,
-        gap 0.3s cubic-bezier(0.2, 0, 0, 1) 0s,
-        padding 0.3s cubic-bezier(0.2, 0, 0, 1) 0s,
+        width 0.35s cubic-bezier(0.2, 0, 0, 1) 0s,
+        gap 0.35s cubic-bezier(0.2, 0, 0, 1) 0s,
+        padding 0.35s cubic-bezier(0.2, 0, 0, 1) 0s,
         background 0.2s ease,
         transform 0.2s cubic-bezier(0.2, 0, 0, 1),
         box-shadow 0.2s ease;
@@ -581,31 +580,22 @@ body:not(.media-bg) .rename-done-btn:hover {
     font-size: 16px;
     font-weight: 700;
     line-height: 1;
-    width: 0;
     max-width: 0;
-    margin: 0;
-    padding: 0;
-    border: 0;
     pointer-events: none;
-    /* Unhover: fade out instantly */
+    /* Unhover: fade out quickly while button shrinks */
     transition:
-        opacity 0.15s ease 0s,
-        max-width 0.3s cubic-bezier(0.2, 0, 0, 1) 0.15s,
-        width 0.3s cubic-bezier(0.2, 0, 0, 1) 0.15s;
+        opacity 0.12s ease 0s,
+        max-width 0.35s cubic-bezier(0.2, 0, 0, 1) 0.12s;
 }
 
 .material-nav-btn:hover span,
 .material-nav-btn:focus-visible span {
     opacity: 1;
-    width: auto;
     max-width: 300px;
-    overflow: visible;
-    flex-shrink: 0;
-    /* Hover: width opens first, then text fades in */
+    /* Hover: width opens smoothly, text fades in gracefully */
     transition:
-        opacity 0.15s ease 0.2s,
-        max-width 0.3s cubic-bezier(0.2, 0, 0, 1) 0s,
-        width 0.3s cubic-bezier(0.2, 0, 0, 1) 0s;
+        opacity 0.2s ease 0.15s,
+        max-width 0.35s cubic-bezier(0.2, 0, 0, 1) 0s;
 }
 
 /* Home screen — bigger buttons */
@@ -619,8 +609,7 @@ body:not(.media-bg) .rename-done-btn:hover {
 
 .home-screen .material-nav-btn:hover,
 .home-screen .material-nav-btn:focus-visible {
-    width: max(var(--expanded-width, 0px), max-content);
-    min-width: var(--expanded-width);
+    width: var(--expanded-width);
     padding: 0 20px !important;
     gap: 12px;
     justify-content: center;
