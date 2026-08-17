@@ -542,7 +542,8 @@ body:not(.media-bg) .rename-done-btn:hover {
 .material-nav-btn:hover,
 .material-nav-btn:focus-visible {
     /* Expanded: grow to fit icon + gap + text */
-    width: var(--expanded-width);
+    width: max(var(--expanded-width, 0px), max-content);
+    min-width: var(--expanded-width);
     padding: 0 16px !important;
     gap: 10px;
     justify-content: center;
@@ -598,6 +599,8 @@ body:not(.media-bg) .rename-done-btn:hover {
     opacity: 1;
     width: auto;
     max-width: 300px;
+    overflow: visible;
+    flex-shrink: 0;
     /* Hover: width opens first, then text fades in */
     transition:
         opacity 0.15s ease 0.2s,
@@ -616,7 +619,8 @@ body:not(.media-bg) .rename-done-btn:hover {
 
 .home-screen .material-nav-btn:hover,
 .home-screen .material-nav-btn:focus-visible {
-    width: var(--expanded-width);
+    width: max(var(--expanded-width, 0px), max-content);
+    min-width: var(--expanded-width);
     padding: 0 20px !important;
     gap: 12px;
     justify-content: center;

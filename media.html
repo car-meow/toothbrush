@@ -144,7 +144,7 @@
             <h1 onclick="navigateWithFade('index.html')">Nexus Movies & TV</h1>
             <div class="media-header-warning">Content May not Load - Fix in Progress!</div>
             <div class="controls">
-                <button onclick="navigateWithFade('index.html')" class="material-nav-btn" style="--expanded-width: 104px;">
+                <button onclick="navigateWithFade('index.html')" class="material-nav-btn" style="--expanded-width: 125px;">
                     <img src="Assets/media-back-arrow.svg" alt=""><span>Home</span>
                 </button>
             </div>
@@ -157,7 +157,7 @@
     </div>
 
     <div class="media-container">
-        <button id="back-btn" class="back-btn material-nav-btn" style="--expanded-width: 180px; display: none;">
+        <button id="back-btn" class="back-btn material-nav-btn" style="--expanded-width: 195px; display: none;">
             <img src="Assets/media-back-arrow.svg" alt=""><span>Back to browse</span>
         </button>
 
@@ -335,13 +335,13 @@
             
             const title = item.title || item.name || 'Untitled';
             const date = item.release_date || item.first_air_date || '';
-            const year = (date && date.split('-')[0]) || '—';
+            const year = (date && date.split('-')[0]) || 'â€”';
             const posterSources = getPosterSources(item, title);
             
             const isFav = getFavorites().some(f => String(f.id) === String(item.id));
 
             card.innerHTML = `
-                <div class="fav-btn ${isFav ? 'active' : ''}" title="Toggle Favorite">★</div>
+                <div class="fav-btn ${isFav ? 'active' : ''}" title="Toggle Favorite">â˜…</div>
                 <img src="${posterSources[0]}" class="poster-img${posterSources[0].startsWith('data:') ? ' is-fallback' : ''}" alt="${escapeHtml(title)}" loading="lazy" decoding="async">
                 <div class="media-overlay">
                     <div class="media-date">${year}</div>
@@ -381,7 +381,7 @@
             { id: 'row-action', title: 'Action', endpoint: 'discover/movie?with_genres=28&sort_by=popularity.desc', preview: 6 },
             { id: 'row-comedy', title: 'Comedy', endpoint: 'discover/movie?with_genres=35&sort_by=popularity.desc', preview: 6 },
             { id: 'row-animation', title: 'Animation', endpoint: 'discover/movie?with_genres=16&sort_by=popularity.desc', preview: 6 },
-            { id: 'row-scifi', title: 'Sci‑Fi', endpoint: 'discover/movie?with_genres=878&sort_by=popularity.desc', preview: 6 },
+            { id: 'row-scifi', title: 'Sciâ€‘Fi', endpoint: 'discover/movie?with_genres=878&sort_by=popularity.desc', preview: 6 },
             { id: 'row-horror', title: 'Horror', endpoint: 'discover/movie?with_genres=27&sort_by=popularity.desc', preview: 6 },
             { id: 'row-doc', title: 'Documentaries', endpoint: 'discover/movie?with_genres=99&sort_by=popularity.desc', preview: 6 },
             { id: 'row-romance', title: 'Romance', endpoint: 'discover/movie?with_genres=10749&sort_by=popularity.desc', preview: 6 },
@@ -493,7 +493,7 @@
             if (searchHint) searchHint.style.display = 'none';
 
             document.getElementById('grid-view-title').textContent = title || 'Browse';
-            document.getElementById('grid-meta').textContent = 'Loading…';
+            document.getElementById('grid-meta').textContent = 'Loadingâ€¦';
 
             gridView.innerHTML = '<div class="loading-wrap"><div class="loading-spinner"></div></div>';
 
@@ -523,7 +523,7 @@
                     if (c) gridView.appendChild(c);
                 });
 
-                document.getElementById('grid-meta').textContent = playable.length + ' titles · multi-page where available';
+                document.getElementById('grid-meta').textContent = playable.length + ' titles Â· multi-page where available';
                 if (!playable.length) {
                     gridView.innerHTML = '<div class="loading-wrap" style="color:#aaa;font-weight:bold;">No results.</div>';
                     document.getElementById('grid-meta').textContent = '';
@@ -580,9 +580,9 @@
 
         document.getElementById('back-btn').onclick = resetView;
 
-        // ═══════════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  INTELLIGENT SEARCH ENGINE
-        // ═══════════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         const MOVIE_GENRES = {
             'action': 28, 'adventure': 12, 'animation': 16, 'animated': 16,
             'comedy': 35, 'crime': 80, 'documentary': 99, 'drama': 18,
@@ -986,7 +986,7 @@
 <div id="peek-zone">
   <div class="peek-stack">
     <button type="button" class="peek-ico-btn" id="btn-back" title="Close Player"><img src="${backIconUrl}" alt=""></button>
-    <button type="button" class="peek-ico-btn" id="peek-open" title="Show Sidebar">☰</button>
+    <button type="button" class="peek-ico-btn" id="peek-open" title="Show Sidebar">â˜°</button>
   </div>
 </div>
 
