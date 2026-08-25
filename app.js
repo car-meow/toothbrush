@@ -1033,142 +1033,162 @@ function getUniversalAutosaveBridge(gameId) {
 <\/script>`;
 }
 
-async function launchGameFullscreen(game) {
+function launchGameFullscreen(game) {
     if (!game || game.id === "ugs-stash") return;
 
-    if (game.type === 'file') {
-        if (!game.content) {
-            await initDB();
-            const stored = await new Promise(resolve => {
-                const req = db.transaction("customGames", "readonly").objectStore("customGames").get(game.id);
-                req.onsuccess = () => resolve(req.result && req.result.content);
-                req.onerror = () => resolve(null);
-            });
-            if (stored) game.content = stored;
-        }
-        const latestSnapshot = await getGameSnapshot(game.id);
-        loadedGameSnapshots.set(game, latestSnapshot || {});
-    }
-
+    // Open about:blank synchronously on the user click gesture to avoid browser popup blocking
     const win = window.open('about:blank', '_blank');
     if (!win) {
         nexusAlert("Pop-up blocked! Please allow pop-ups to open games.");
         return;
     }
     if (game && game.id) popupGameWindows.set(game.id, win);
-    
-    // Focus tab instantly on launch
     try { win.focus(); } catch(e) {}
 
-    let gameSrc;
-    let gameSrcDoc = null;
-    if (game.type === 'file') {
-        const rawHtml = atob(game.content.split(',')[1]);
-        const unityCompatibility = /(?:createUnityInstance|UnityLoader|unity-container|unity-canvas)/i.test(rawHtml)
-            ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
-            : '';
-        const snapshot = loadedGameSnapshots.get(game) || {};
-        const snapshotJson = JSON.stringify(snapshot).replace(/</g, '\\u003c');
-        const popupBridge = getUniversalAutosaveBridge(game.id);
-        const popupRestore = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
-        const autoFocusScript = `<script>
-        (function(){
-            function triggerClickFocus() {
-                try {
-                    window.focus();
-                    const target = document.body || document.documentElement;
-                    if (target) {
-                        target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-                        target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-                        target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-                    }
-                } catch(e){}
-            }
-            if (document.readyState === 'complete') {
-                setTimeout(triggerClickFocus, 500);
-            } else {
-                window.addEventListener('load', function() { setTimeout(triggerClickFocus, 500); });
-                setTimeout(triggerClickFocus, 500);
-            }
-        })();
-        <\/script>`;
-        // Use stable srcdoc loading for local games.
-        gameSrcDoc = injectGameBootstrap(rawHtml, unityCompatibility + popupRestore + popupBridge + autoFocusScript);
-    } else {
-        gameSrc = game.url;
-    }
-
-    const localStorage = window.nexusStorage;
-    const preset = localStorage.getItem('tb_cloak_preset');
-    if (preset === 'drive') {
-        win.document.title = "My Drive - Google Drive";
-        const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'Assets/drive_cloak.png';
-        win.document.head.appendChild(link);
-    } else if (preset === 'wikipedia') {
-        win.document.title = "Wikipedia, the free encyclopedia";
-        const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'https://en.wikipedia.org/favicon.ico';
-        win.document.head.appendChild(link);
-    } else if (preset === 'canvas') {
-        win.document.title = "Dashboard";
-        const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'Assets/canvas_cloak.png';
-        win.document.head.appendChild(link);
-    } else {
-        win.document.title = game.title || "Game";
-        const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'data:,';
-        win.document.head.appendChild(link);
-    }
-
-    if (gameSrcDoc !== null) {
-        try {
-            win.document.open();
-            win.document.write(gameSrcDoc);
-            win.document.close();
-            setTimeout(() => { try { win.focus(); } catch (e) {} }, 100);
-        } catch (error) {
-            console.error('Failed to launch local game:', error);
-            try { win.close(); } catch (e) {}
-            nexusAlert('This game could not be opened.');
+    // Apply Cloaking Preset
+    try {
+        const localStorage = window.nexusStorage;
+        const preset = localStorage.getItem('tb_cloak_preset');
+        if (preset === 'drive') {
+            win.document.title = "My Drive - Google Drive";
+            const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'Assets/drive_cloak.png';
+            win.document.head.appendChild(link);
+        } else if (preset === 'wikipedia') {
+            win.document.title = "Wikipedia, the free encyclopedia";
+            const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'https://en.wikipedia.org/favicon.ico';
+            win.document.head.appendChild(link);
+        } else if (preset === 'canvas') {
+            win.document.title = "Dashboard";
+            const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'Assets/canvas_cloak.png';
+            win.document.head.appendChild(link);
+        } else {
+            win.document.title = game.title || "Game";
+            const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'data:,';
+            win.document.head.appendChild(link);
         }
-        return;
-    }
+    } catch(e) {}
 
-    const ifr = win.document.createElement('iframe');
-    Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
-    ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
-    if (gameSrcDoc !== null) ifr.srcdoc = gameSrcDoc;
-    else ifr.src = gameSrc;
-    win.document.body.style.margin = '0';
-    win.document.body.style.padding = '0';
-    win.document.body.style.overflow = 'hidden';
-    win.document.body.appendChild(ifr);
-
-    function doFocusAndClick() {
+    // Asynchronously load content/snapshots and initialize game document inside about:blank
+    (async () => {
         try {
-            win.focus();
-            ifr.focus();
-            if (ifr.contentWindow) {
-                ifr.contentWindow.focus();
-                try {
-                    const doc = ifr.contentDocument || ifr.contentWindow.document;
-                    if (doc && doc.body) {
-                        doc.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: ifr.contentWindow }));
-                        doc.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: ifr.contentWindow }));
-                        doc.body.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: ifr.contentWindow }));
+            if (game.type === 'file') {
+                if (!game.content) {
+                    await initDB();
+                    const stored = await new Promise(resolve => {
+                        const req = db.transaction("customGames", "readonly").objectStore("customGames").get(game.id);
+                        req.onsuccess = () => resolve(req.result && req.result.content);
+                        req.onerror = () => resolve(null);
+                    });
+                    if (stored) game.content = stored;
+                    else {
+                        try { win.close(); } catch(e) {}
+                        nexusAlert("Game data unavailable.");
+                        return;
                     }
-                } catch(e) {}
-            }
-        } catch(e) {}
-    }
+                }
+                const latestSnapshot = await getGameSnapshot(game.id);
+                loadedGameSnapshots.set(game, latestSnapshot || {});
 
-    setTimeout(doFocusAndClick, 100);
-    setTimeout(doFocusAndClick, 500);
-    setTimeout(doFocusAndClick, 1000);
+                const rawHtml = atob(game.content.split(',')[1]);
+                const isUnityRuntime = /(?:createUnityInstance|UnityLoader|unity-container|unity-canvas)/i.test(rawHtml);
+                const unityCompatibility = isUnityRuntime
+                    ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
+                    : '';
+                const snapshot = loadedGameSnapshots.get(game) || {};
+                const snapshotJson = JSON.stringify(snapshot).replace(/</g, '\\u003c');
+                const popupBridge = getUniversalAutosaveBridge(game.id);
+                const popupRestore = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
+                const autoFocusScript = `<script>
+                (function(){
+                    function triggerClickFocus() {
+                        try {
+                            window.focus();
+                            const target = document.body || document.documentElement;
+                            if (target) {
+                                target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                                target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                                target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                            }
+                        } catch(e){}
+                    }
+                    if (document.readyState === 'complete') {
+                        setTimeout(triggerClickFocus, 300);
+                    } else {
+                        window.addEventListener('load', function() { setTimeout(triggerClickFocus, 300); });
+                        setTimeout(triggerClickFocus, 300);
+                    }
+                })();
+                <\/script>`;
+
+                const gameSrcDoc = injectGameBootstrap(rawHtml, unityCompatibility + popupRestore + popupBridge + autoFocusScript);
+                win.document.open();
+                win.document.write(gameSrcDoc);
+                win.document.close();
+                setTimeout(() => { try { win.focus(); } catch (e) {} }, 100);
+            } else {
+                const ifr = win.document.createElement('iframe');
+                Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
+                ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
+                ifr.src = game.url;
+                win.document.body.style.margin = '0';
+                win.document.body.style.padding = '0';
+                win.document.body.style.overflow = 'hidden';
+                win.document.body.appendChild(ifr);
+
+                function doFocusAndClick() {
+                    try {
+                        win.focus();
+                        ifr.focus();
+                        if (ifr.contentWindow) {
+                            ifr.contentWindow.focus();
+                            try {
+                                const doc = ifr.contentDocument || ifr.contentWindow.document;
+                                if (doc && doc.body) {
+                                    doc.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: ifr.contentWindow }));
+                                    doc.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: ifr.contentWindow }));
+                                    doc.body.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: ifr.contentWindow }));
+                                }
+                            } catch(e) {}
+                        }
+                    } catch(e) {}
+                }
+                setTimeout(doFocusAndClick, 100);
+                setTimeout(doFocusAndClick, 500);
+                setTimeout(doFocusAndClick, 1000);
+            }
+        } catch(err) {
+            console.error("Error launching game in fullscreen window:", err);
+        }
+    })();
 }
 
-// Universal Game Bootstrap Injection with High-Accuracy Visual Render Detection
+function getAppBaseUrl() {
+    try {
+        const origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
+        let path = window.location.pathname || '';
+        path = path.substring(0, path.lastIndexOf('/') + 1);
+        return origin + path;
+    } catch(e) {
+        return './';
+    }
+}
+
+function getLoadingScreenBgUrl() {
+    try {
+        const base = getAppBaseUrl();
+        return base.endsWith('/') ? base + 'Assets/loading_screen.png' : base + '/Assets/loading_screen.png';
+    } catch(e) {
+        return 'Assets/loading_screen.png';
+    }
+}
+
+// Universal Game Bootstrap Injection with Accurate Loading Detection & Non-Invasive Overlay
 function injectGameBootstrap(html, bootstrap) {
     if (!html) return html;
     let finalBootstrap = bootstrap || '';
+    const bgUrl = getLoadingScreenBgUrl();
+    const baseUrl = getAppBaseUrl();
+    const baseTag = !/<base(?:\s[^>]*)?>/i.test(html) ? `<base href="${baseUrl}">` : '';
 
     // Universal Instant Ad Reward Bypass Engine
     const adBypassBootstrap = `<script>
@@ -1243,163 +1263,240 @@ function injectGameBootstrap(html, bootstrap) {
 })();
 <\/script>`;
 
-    // Inject accurate visual loading screen if not present
+    // Inject loading screen styles & safe overlay creator if not already present in the custom game HTML
+    let loadingScripts = '';
     if (!html.includes('nexus-loading-screen')) {
-        const loadingBootstrap = `<div id="nexus-loading-screen"><div class="nexus-loader-bar-container"><div id="nexus-loader-bar" class="nexus-loader-bar-fill"></div></div></div><style>#nexus-loading-screen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:999999;background-color:#050505;background-image:url('Assets/loading_screen.png');background-size:cover;background-position:center;background-repeat:no-repeat;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;pointer-events:auto;opacity:1;transition:opacity 0.4s ease;}.nexus-loader-bar-container{width:clamp(260px,36vw,440px);height:16px;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.3);border-radius:10px;overflow:hidden;margin-bottom:clamp(60px,12vh,100px);box-shadow:0 4px 16px rgba(0,0,0,0.6);}.nexus-loader-bar-fill{height:100%;width:0%;background-color:#ffffff;border-radius:10px;transition:width 0.2s ease-out;}@keyframes nexus-stripes-backward{0%{background-position:56px 0;}100%{background-position:0 0;}}.nexus-bar-busy{background-image:repeating-linear-gradient(-45deg,#ffffff 0px,#ffffff 14px,#a8a8a8 14px,#a8a8a8 28px) !important;background-size:39.6px 100% !important;animation:nexus-stripes-backward 0.75s linear infinite !important;}</style><script>
+        loadingScripts = `<style>
+#nexus-loading-screen {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 2147483647 !important;
+    background-color: #08080c !important;
+    background: radial-gradient(circle at 50% 40%, #1a1a24 0%, #08080c 70%, #000000 100%) !important;
+    background-image: url('${bgUrl}') !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    transition: opacity 0.4s ease !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+}
+.nexus-loader-bar-container {
+    width: clamp(260px, 36vw, 440px) !important;
+    height: 16px !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    margin-bottom: clamp(60px, 12vh, 100px) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
+    box-sizing: border-box !important;
+}
+.nexus-loader-bar-fill {
+    height: 100% !important;
+    width: 0% !important;
+    background-color: #ffffff !important;
+    border-radius: 10px !important;
+    transition: width 0.25s cubic-bezier(0.25, 1, 0.5, 1) !important;
+    box-sizing: border-box !important;
+}
+@keyframes nexus-stripes-backward {
+    0% { background-position: 56px 0; }
+    100% { background-position: 0 0; }
+}
+.nexus-bar-busy {
+    background-image: repeating-linear-gradient(
+        -45deg,
+        #ffffff 0px,
+        #ffffff 14px,
+        #b8b8b8 14px,
+        #b8b8b8 28px
+    ) !important;
+    background-size: 39.6px 100% !important;
+    animation: nexus-stripes-backward 0.75s linear infinite !important;
+}
+</style>
+<script>
 (function() {
-    var b = document.getElementById('nexus-loader-bar');
-    var o = document.getElementById('nexus-loading-screen');
-    var done = false;
-    var progress = 0;
-    var drawOps = 0;
-    var consecutiveActiveFrames = 0;
-    var engineReady = false;
+    var isDone = false;
+    var progress = 20;
+    var bar = null;
+    var overlay = null;
+    var busyTimer = null;
     var creepTimer = null;
+    var creepStartTimer = null;
+    var stepTimer1 = null;
+    var stepTimer2 = null;
+    var maxWaitTimer = null;
 
-    try {
-        if (o) {
-            var base = window.location.href.split('?')[0].split('#')[0];
-            var resolvedBg = base.substring(0, base.lastIndexOf('/') + 1) + 'Assets/loading_screen.png';
-            o.style.backgroundImage = "url('" + resolvedBg + "')";
+    function createOverlay() {
+        if (overlay || document.getElementById('nexus-loading-screen')) {
+            overlay = document.getElementById('nexus-loading-screen');
+            if (overlay && !bar) bar = overlay.querySelector('#nexus-loader-bar');
+            return;
         }
-    } catch(e) {}
+        overlay = document.createElement('div');
+        overlay.id = 'nexus-loading-screen';
+        overlay.innerHTML = '<div class="nexus-loader-bar-container"><div id="nexus-loader-bar" class="nexus-loader-bar-fill"></div></div>';
+        (document.body || document.documentElement).appendChild(overlay);
+        bar = overlay.querySelector('#nexus-loader-bar');
 
-    function updatePct(pct) {
-        if (done || !b) return;
-        progress = Math.max(progress, Math.min(99, pct));
-        b.style.width = progress + '%';
+        // Initial bar position
+        updateProgress(20);
+
+        // Smooth initial progress glide
+        stepTimer1 = setTimeout(function() { updateProgress(45); }, 180);
+        stepTimer2 = setTimeout(function() { updateProgress(65); }, 420);
+
+        // Within 0.7 seconds: backward moving stripes appear
+        busyTimer = setTimeout(function() {
+            if (!isDone && bar) bar.classList.add('nexus-bar-busy');
+        }, 700);
+
+        // Within 2.0 seconds: slow forward crawl ensues towards 99%
+        creepStartTimer = setTimeout(function() {
+            if (isDone) return;
+            creepTimer = setInterval(function() {
+                if (isDone) {
+                    clearInterval(creepTimer);
+                    return;
+                }
+                if (progress < 99) {
+                    var remaining = 99 - progress;
+                    var step = Math.max(0.12, remaining * 0.045);
+                    progress = Math.min(99, progress + step);
+                    if (bar) bar.style.setProperty('width', progress + '%', 'important');
+                }
+            }, 80);
+        }, 2000);
     }
 
-    var busyTimer = setTimeout(function() {
-        if (!done && b) b.classList.add('nexus-bar-busy');
-    }, 2000);
-
-    var creepStartTimer = setTimeout(function() {
-        if (done) return;
-        creepTimer = setInterval(function() {
-            if (done) {
-                clearInterval(creepTimer);
-                return;
-            }
-            if (progress < 99) {
-                var remaining = 99 - progress;
-                var step = Math.max(0.08, remaining * 0.04);
-                progress = Math.min(99, progress + step);
-                if (b) b.style.width = progress + '%';
-            }
-        }, 120);
-    }, 4000);
+    function updateProgress(pct) {
+        if (isDone) return;
+        progress = Math.max(progress, Math.min(99, pct));
+        if (bar) bar.style.setProperty('width', progress + '%', 'important');
+    }
 
     function completeLoading() {
-        if (done) return;
-        done = true;
-        clearTimeout(busyTimer);
-        clearTimeout(creepStartTimer);
+        if (isDone) return;
+        isDone = true;
+        if (stepTimer1) clearTimeout(stepTimer1);
+        if (stepTimer2) clearTimeout(stepTimer2);
+        if (busyTimer) clearTimeout(busyTimer);
+        if (creepStartTimer) clearTimeout(creepStartTimer);
         if (creepTimer) clearInterval(creepTimer);
-        if (b) b.style.width = '100%';
+        if (maxWaitTimer) clearTimeout(maxWaitTimer);
 
-        requestAnimationFrame(function() {
-            requestAnimationFrame(function() {
-                if (o) {
-                    o.style.opacity = '0';
-                    o.style.pointerEvents = 'none';
-                    setTimeout(function() {
-                        try { if (o && o.parentNode) o.parentNode.removeChild(o); } catch(e) {}
-                    }, 400);
-                }
-            });
-        });
+        // Quickly glide to 100% full
+        if (bar) {
+            bar.style.setProperty('transition', 'width 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)', 'important');
+            bar.style.setProperty('width', '100%', 'important');
+        }
+
+        // As the bar reaches full, smoothly execute the fade-out
+        setTimeout(function() {
+            if (overlay) {
+                overlay.style.setProperty('transition', 'opacity 0.4s ease', 'important');
+                overlay.style.setProperty('opacity', '0', 'important');
+                overlay.style.setProperty('pointer-events', 'none', 'important');
+                setTimeout(function() {
+                    try {
+                        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                    } catch(e) {}
+                    overlay = null;
+                    bar = null;
+                }, 450);
+            }
+        }, 120);
     }
 
-    window.updateNexusProgress = updatePct;
+    window.updateNexusProgress = updateProgress;
     window.completeNexusLoading = completeLoading;
 
-    updatePct(20);
-    document.addEventListener('DOMContentLoaded', function() { updatePct(50); });
-    window.addEventListener('load', function() { updatePct(75); });
+    // Attach overlay immediately
+    if (document.body) createOverlay();
+    else document.addEventListener('DOMContentLoaded', createOverlay);
 
-    // Hook WebGL/Canvas context draw operations
-    try {
-        var origGetContext = HTMLCanvasElement.prototype.getContext;
-        HTMLCanvasElement.prototype.getContext = function(type) {
-            var ctx = origGetContext.apply(this, arguments);
-            if (!ctx) return ctx;
-            if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
-                var oDA = ctx.drawArrays;
-                if (oDA) ctx.drawArrays = function(m, f, count) { if (count > 0) drawOps++; return oDA.apply(this, arguments); };
-                var oDE = ctx.drawElements;
-                if (oDE) ctx.drawElements = function(m, count) { if (count > 0) drawOps++; return oDE.apply(this, arguments); };
-            } else if (type === '2d') {
-                var oDI = ctx.drawImage;
-                if (oDI) ctx.drawImage = function() { drawOps++; return oDI.apply(this, arguments); };
-                var oFR = ctx.fillRect;
-                if (oFR) ctx.fillRect = function() { drawOps++; return oFR.apply(this, arguments); };
-            }
-            return ctx;
-        };
-    } catch(e) {}
-
-    var lastDraws = 0;
-    function checkRender() {
-        if (done) return;
-        var canvases = document.querySelectorAll('canvas');
-        var visibleCanvas = false;
-        for (var i = 0; i < canvases.length; i++) {
-            var c = canvases[i];
-            var style = window.getComputedStyle ? window.getComputedStyle(c) : null;
-            if (style && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && c.width > 32 && c.height > 32) {
-                visibleCanvas = true;
-                break;
-            }
-        }
-
-        if (drawOps > lastDraws && visibleCanvas) {
-            consecutiveActiveFrames++;
-            updatePct(75 + Math.min(22, consecutiveActiveFrames * 5));
-        }
-        lastDraws = drawOps;
-
-        if (consecutiveActiveFrames >= 4 || (engineReady && consecutiveActiveFrames >= 1)) {
-            completeLoading();
-            return;
-        }
-
-        if (document.readyState === 'complete' && canvases.length === 0 && document.body && document.body.children.length > 1) {
-            completeLoading();
-            return;
-        }
-
-        requestAnimationFrame(checkRender);
+    function onInteractive() {
+        createOverlay();
+        updateProgress(65);
     }
-    requestAnimationFrame(checkRender);
+
+    function onDocumentComplete() {
+        createOverlay();
+        updateProgress(85);
+
+        var frameCount = 0;
+        function checkGameRender() {
+            if (isDone) return;
+            frameCount++;
+            updateProgress(85 + Math.min(10, frameCount * 2));
+
+            // Wait 5 animation frames after completion so game graphics render to screen before fade
+            if (frameCount >= 5) {
+                completeLoading();
+                return;
+            }
+            requestAnimationFrame(checkGameRender);
+        }
+        requestAnimationFrame(checkGameRender);
+    }
+
+    // Handle all document states (including about:blank document.write)
+    if (document.readyState === 'complete') {
+        onDocumentComplete();
+    } else if (document.readyState === 'interactive') {
+        onInteractive();
+        document.addEventListener('readystatechange', function() {
+            if (document.readyState === 'complete') onDocumentComplete();
+        });
+        window.addEventListener('load', onDocumentComplete);
+    } else {
+        document.addEventListener('DOMContentLoaded', onInteractive);
+        document.addEventListener('readystatechange', function() {
+            if (document.readyState === 'interactive') onInteractive();
+            else if (document.readyState === 'complete') onDocumentComplete();
+        });
+        window.addEventListener('load', onDocumentComplete);
+    }
+
+    // Max wait timer failsafe
+    maxWaitTimer = setTimeout(function() {
+        if (!isDone) completeLoading();
+    }, 8000);
 
     window.addEventListener('message', function(e) {
         if (e.data === 'bonk' || (e.data && e.data.type === 'nexus-game-ready')) {
-            engineReady = true;
+            completeLoading();
         }
     });
 
-    var pokiCheck = setInterval(function() {
+    try {
         if (window.PokiSDK) {
-            var origF = window.PokiSDK.gameLoadingFinished;
+            var origDone = window.PokiSDK.gameLoadingFinished;
             window.PokiSDK.gameLoadingFinished = function() {
-                engineReady = true;
-                if (typeof origF === 'function') origF.apply(this, arguments);
+                completeLoading();
+                if (typeof origDone === 'function') origDone.apply(this, arguments);
             };
-            clearInterval(pokiCheck);
         }
-    }, 200);
-
-    setTimeout(function() {
-        if (!done) completeLoading();
-    }, 18000);
+    } catch(e) {}
 })();
 <\/script>`;
-        finalBootstrap = adBypassBootstrap + loadingBootstrap + finalBootstrap;
-    } else {
-        finalBootstrap = adBypassBootstrap + finalBootstrap;
     }
 
+    finalBootstrap = baseTag + adBypassBootstrap + loadingScripts + finalBootstrap;
+
+    // Inject scripts safely into <head> or at start of document
     const headMatch = html.match(/<head(?:\s[^>]*)?>/i);
     if (headMatch && headMatch.index !== undefined) {
         const insertAt = headMatch.index + headMatch[0].length;
@@ -1469,8 +1566,20 @@ function ensureStashPreloaded() {
 }
 
 async function loadGame(game, forceInternal = false) {
-    const requestedLoadToken = ++gameLoadToken;
     if (!game) return;
+
+    const localStorage = window.nexusStorage;
+    const isDebugFS = localStorage.getItem('tb_debug_fullscreen') === 'true';
+    const isPreloadEnabled = localStorage.getItem('tb_preload_stash') === 'true';
+
+    // If Debug Fullscreen is OFF (default) and launching a non-stash game from sidebar,
+    // open the fullscreen window immediately on the synchronous user click event!
+    if (!isDebugFS && !forceInternal && game && game.id !== "ugs-stash") {
+        launchGameFullscreen(game);
+        return;
+    }
+
+    const requestedLoadToken = ++gameLoadToken;
 
     if (game.type === 'file') {
         if (!game.content) {
@@ -1489,18 +1598,6 @@ async function loadGame(game, forceInternal = false) {
         loadedGameSnapshots.set(game, latestSnapshot || {});
 
         if (requestedLoadToken !== gameLoadToken) return;
-    }
-
-    const localStorage = window.nexusStorage;
-    const isDebugFS = localStorage.getItem('tb_debug_fullscreen') === 'true';
-    const isPreloadEnabled = localStorage.getItem('tb_preload_stash') === 'true';
-
-    // If Debug Fullscreen is OFF (default) and launching a non-stash game from sidebar
-    if (!isDebugFS && !forceInternal && game && game.id !== "ugs-stash") {
-        launchGameFullscreen(game);
-        const stash = games.find(g => g.id === "ugs-stash");
-        if (stash) loadGame(stash, true);
-        return;
     }
 
     releaseInactiveGameContent(game);
@@ -1581,14 +1678,13 @@ async function loadGame(game, forceInternal = false) {
             const finalHTML = injectGameBootstrap(htmlContent, unityCompatibility + restoreScript + persistenceScript + autosaveBridge);
 
             try {
-                frame.srcdoc = finalHTML;
+                const blob = new Blob([finalHTML], { type: 'text/html' });
+                frame.removeAttribute('srcdoc');
+                frame.src = URL.createObjectURL(blob);
             } catch (err1) {
                 try {
-                    const blob = new Blob([finalHTML], {type: 'text/html'});
-                    frame.removeAttribute('srcdoc');
-                    frame.src = URL.createObjectURL(blob);
+                    frame.srcdoc = finalHTML;
                 } catch (err2) {
-                    frame.removeAttribute('srcdoc');
                     frame.src = game.content; 
                 }
             }

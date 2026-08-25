@@ -30,7 +30,6 @@
       backface-visibility: hidden;
     }
     #canvas {
-      visibility: hidden;
       image-rendering: -webkit-optimize-contrast;
       image-rendering: crisp-edges;
     }
@@ -42,6 +41,7 @@
       height: 100vh;
       z-index: 999999;
       background-color: #050505;
+      background: radial-gradient(circle at 50% 40%, #1a1a24 0%, #08080c 70%, #000000 100%);
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
@@ -135,7 +135,7 @@
       if (!isNexusDone && nexusBar) {
         nexusBar.classList.add('nexus-bar-busy');
       }
-    }, 2000);
+    }, 700);
 
     var creepStartTimer = setTimeout(function() {
       if (isNexusDone) return;
@@ -146,12 +146,12 @@
         }
         if (nexusProgress < 99) {
           var remaining = 99 - nexusProgress;
-          var step = Math.max(0.08, remaining * 0.04);
+          var step = Math.max(0.1, remaining * 0.04);
           nexusProgress = Math.min(99, nexusProgress + step);
           if (nexusBar) nexusBar.style.width = nexusProgress + '%';
         }
-      }, 120);
-    }, 4000);
+      }, 100);
+    }, 2000);
 
     function updateNexusProgress(pct) {
       if (isNexusDone || !nexusBar) return;
@@ -165,25 +165,27 @@
       clearTimeout(busyTimer);
       clearTimeout(creepStartTimer);
       if (creepTimer) clearInterval(creepTimer);
-      if (nexusBar) nexusBar.style.width = '100%';
+      if (nexusBar) {
+        nexusBar.style.transition = 'width 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        nexusBar.style.width = '100%';
+      }
       var canvas = document.getElementById('canvas');
       if (canvas) canvas.style.visibility = 'visible';
 
-      requestAnimationFrame(function() {
-        requestAnimationFrame(function() {
-          if (nexusOverlay) {
-            nexusOverlay.style.opacity = '0';
-            nexusOverlay.style.pointerEvents = 'none';
-            setTimeout(function() {
-              if (nexusOverlay && nexusOverlay.parentNode) {
-                nexusOverlay.parentNode.removeChild(nexusOverlay);
-              }
-              nexusOverlay = null;
-              nexusBar = null;
-            }, 400);
-          }
-        });
-      });
+      setTimeout(function() {
+        if (nexusOverlay) {
+          nexusOverlay.style.transition = 'opacity 0.4s ease';
+          nexusOverlay.style.opacity = '0';
+          nexusOverlay.style.pointerEvents = 'none';
+          setTimeout(function() {
+            if (nexusOverlay && nexusOverlay.parentNode) {
+              nexusOverlay.parentNode.removeChild(nexusOverlay);
+            }
+            nexusOverlay = null;
+            nexusBar = null;
+          }, 450);
+        }
+      }, 120);
     }
 
     // Active canvas WebGL frame detector
@@ -274,6 +276,9 @@
         function() {
           isPostRunDone = true;
           updateNexusProgress(96);
+          setTimeout(function() {
+            if (!isNexusDone) completeNexusLoading();
+          }, 1500);
           // Periodic FS sync for Balatro save files
           setInterval(function() {
             try {
@@ -281,7 +286,7 @@
                 FS.syncfs(false, function() {});
               }
             } catch(e) {}
-          }, 4000);
+          }, 3000);
         }
       ]
     };
