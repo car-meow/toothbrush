@@ -202,29 +202,27 @@ function applyGameColorToLi(li, game) {
 async function saveGameRecord(game) {
     if (!game || !game.id) return;
     await initDB();
-    const tx = db.transaction("customGames", "readwrite");
-    const store = tx.objectStore("customGames");
-    const existing = await new Promise(resolve => {
-        const req = store.get(game.id);
-        req.onsuccess = () => resolve(req.result || {});
-        req.onerror = () => resolve({});
-    });
-
-    const recordToSave = { ...existing };
-    for (const [key, value] of Object.entries(game)) {
-        if (key === 'content' && (value === null || value === undefined)) {
-            continue;
-        }
-        recordToSave[key] = value;
-    }
-
-    if (!recordToSave.content && existing && existing.content) {
-        recordToSave.content = existing.content;
-    }
-
-    store.put(recordToSave);
     return new Promise((resolve, reject) => {
-        tx.oncomplete = resolve;
+        const tx = db.transaction("customGames", "readwrite");
+        const store = tx.objectStore("customGames");
+        const getReq = store.get(game.id);
+        getReq.onsuccess = () => {
+            const existing = getReq.result || {};
+            const recordToSave = { ...existing };
+            for (const [key, value] of Object.entries(game)) {
+                if (key === 'content' && (value === null || value === undefined)) {
+                    continue;
+                }
+                recordToSave[key] = value;
+            }
+            if (!recordToSave.content && existing && existing.content) {
+                recordToSave.content = existing.content;
+            }
+            const putReq = store.put(recordToSave);
+            putReq.onerror = () => reject(putReq.error);
+        };
+        getReq.onerror = () => reject(getReq.error);
+        tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error);
     });
@@ -1568,6 +1566,13 @@ function ensureStashPreloaded() {
 
 async function loadGame(game, forceInternal = false) {
     if (!game) return;
+
+    if (game.isNew) {
+        game.isNew = false;
+        saveGameRecord(game).catch(() => {});
+        const li = document.querySelector(`li[data-game-id="${game.id}"]`);
+        if (li) li.classList.remove('new-game');
+    }
 
     const localStorage = window.nexusStorage;
     const isDebugFS = localStorage.getItem('tb_debug_fullscreen') === 'true';
