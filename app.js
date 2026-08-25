@@ -650,7 +650,7 @@ function addSoftBreaks(value, every = 12) {
 
 function notifyStashBookmarkAvailability() {
     // The Stash can live in either frame (and can be preloaded while another game is open).
-    // Refresh both so a deletion is recognized immediately without navigating away and back.
+    // Refresh both so a deletion or addition is recognized immediately without navigating away and back.
     ['game-frame', 'stash-frame'].forEach(frameId => {
         const frame = document.getElementById(frameId);
         if (!frame || !frame.contentWindow) return;
@@ -658,6 +658,7 @@ function notifyStashBookmarkAvailability() {
             if (typeof frame.contentWindow.refreshBookmarkAvailability === "function") {
                 frame.contentWindow.refreshBookmarkAvailability();
             }
+            frame.contentWindow.postMessage({ type: 'nexus-refresh-bookmarks' }, '*');
         } catch (err) {
             // Cross-origin app; nothing to sync.
         }

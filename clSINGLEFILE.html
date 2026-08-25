@@ -598,18 +598,47 @@
                 const customGames = await getCustomGamesFromDb();
                 bookmarkedSourceKeys.clear();
 
+                // 1. Read from IndexedDB
                 customGames.forEach(game => {
                     if (!game) return;
                     if (game.sourceKey) bookmarkedSourceKeys.add(String(game.sourceKey).toLowerCase());
-                    // Support older records that only stored sourceFile, and
-                    // normalize differences in casing/extension consistently.
-                    if (game.sourceFile) bookmarkedSourceKeys.add(buildBookmarkSourceKey(game.sourceFile));
+                    if (game.sourceFile) bookmarkedSourceKeys.add(buildBookmarkSourceKey(game.sourceFile).toLowerCase());
+                    if (game.id) {
+                        bookmarkedSourceKeys.add(String(game.id).toLowerCase());
+                        if (game.id.startsWith('bookmark_')) {
+                            try {
+                                const decoded = decodeURIComponent(game.id.substring(9));
+                                bookmarkedSourceKeys.add(decoded.toLowerCase());
+                            } catch(e) {}
+                        }
+                    }
                 });
 
+                // 2. Also read directly from parent window games in memory (instant)
+                if (window.parent && Array.isArray(window.parent.games)) {
+                    window.parent.games.forEach(game => {
+                        if (!game) return;
+                        if (game.sourceKey) bookmarkedSourceKeys.add(String(game.sourceKey).toLowerCase());
+                        if (game.sourceFile) bookmarkedSourceKeys.add(buildBookmarkSourceKey(game.sourceFile).toLowerCase());
+                        if (game.id) {
+                            bookmarkedSourceKeys.add(String(game.id).toLowerCase());
+                            if (game.id.startsWith('bookmark_')) {
+                                try {
+                                    const decoded = decodeURIComponent(game.id.substring(9));
+                                    bookmarkedSourceKeys.add(decoded.toLowerCase());
+                                } catch(e) {}
+                            }
+                        }
+                    });
+                }
+
                 document.querySelectorAll('#sections-container input[type="button"]').forEach(btn => {
-                    const isBookmarked = bookmarkedSourceKeys.has(String(btn.dataset.sourceKey || '').toLowerCase());
-                    // Keep it clickable so addBookmarkToSidebar can show the
-                    // existing "Already Added!" feedback every time.
+                    const originalVal = btn.dataset.originalValue || btn.value;
+                    const sourceKey = buildBookmarkSourceKey(originalVal);
+                    btn.dataset.sourceKey = sourceKey;
+                    const isBookmarked = bookmarkedSourceKeys.has(sourceKey.toLowerCase()) ||
+                                         bookmarkedSourceKeys.has(String(originalVal).toLowerCase()) ||
+                                         bookmarkedSourceKeys.has(buildBookmarkIdFromSourceKey(sourceKey).toLowerCase());
                     btn.disabled = false;
                     btn.classList.toggle('bookmarked', isBookmarked);
                     btn.title = isBookmarked ? 'Already in sidebar' : 'Add to sidebar';
@@ -621,13 +650,29 @@
 
         function queueBookmarkAvailabilityRefresh() {
             clearTimeout(bookmarkRefreshTimer);
-            bookmarkRefreshTimer = setTimeout(refreshBookmarkAvailability, 80);
+            bookmarkRefreshTimer = setTimeout(refreshBookmarkAvailability, 50);
         }
 
         async function addBookmarkToSidebar(originalValue, e) {
             const sourceFile = normalizeBookmarkFileName(originalValue);
             const sourceKey = buildBookmarkSourceKey(sourceFile);
-            const isAlreadyAdded = bookmarkedSourceKeys.has(sourceKey);
+            const bookmarkId = buildBookmarkIdFromSourceKey(sourceKey);
+
+            // Comprehensive check across in-memory set and parent window games
+            let isAlreadyAdded = bookmarkedSourceKeys.has(sourceKey.toLowerCase()) ||
+                                 bookmarkedSourceKeys.has(sourceFile.toLowerCase()) ||
+                                 bookmarkedSourceKeys.has(bookmarkId.toLowerCase());
+
+            if (!isAlreadyAdded && window.parent && Array.isArray(window.parent.games)) {
+                isAlreadyAdded = window.parent.games.some(g =>
+                    g && (
+                        g.id === bookmarkId ||
+                        (g.sourceKey && g.sourceKey.toLowerCase() === sourceKey.toLowerCase()) ||
+                        (g.sourceFile && g.sourceFile.toLowerCase() === sourceFile.toLowerCase()) ||
+                        (g.id && g.id.toLowerCase() === bookmarkId.toLowerCase())
+                    )
+                );
+            }
             
             if (e) {
                 const floating = document.createElement('div');
@@ -649,6 +694,11 @@
             }
 
             if (isAlreadyAdded) return;
+
+            // Immediately mark locally so subsequent clicks recognize it instantly
+            bookmarkedSourceKeys.add(sourceKey.toLowerCase());
+            bookmarkedSourceKeys.add(sourceFile.toLowerCase());
+            bookmarkedSourceKeys.add(bookmarkId.toLowerCase());
 
             const encoded = encodeURIComponent(sourceFile);
             const extraStashApp = EXTRA_STASH_APPS.find(app => app.sourceFile === sourceFile);
@@ -743,6 +793,11 @@
         // Parent-side sidebar renders may request this frequently. Coalesce those requests
         // into one IndexedDB read instead of starting a read for every DOM mutation.
         window.refreshBookmarkAvailability = queueBookmarkAvailabilityRefresh;
+        window.addEventListener('message', (e) => {
+            if (e.data && e.data.type === 'nexus-refresh-bookmarks') {
+                refreshBookmarkAvailability();
+            }
+        });
 
         searchInput.addEventListener('input', queueStashSearch);
         searchInput.addEventListener('change', queueStashSearch);
