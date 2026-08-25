@@ -47,7 +47,7 @@
             align-items: center;
             pointer-events: auto;
             opacity: 1;
-            transition: opacity 0.5s ease;
+            transition: opacity 0.4s ease;
         }
         .nexus-loader-bar-container {
             width: clamp(260px, 36vw, 440px);
@@ -62,16 +62,24 @@
         .nexus-loader-bar-fill {
             height: 100%;
             width: 0%;
-            background: #ffffff;
+            background-color: #ffffff;
             border-radius: 10px;
             transition: width 0.2s ease-out;
         }
-        @keyframes nexus-bar-flash {
-            0%, 100% { background-color: #666666; }
-            50% { background-color: #ffffff; }
+        @keyframes nexus-stripes-backward {
+            0% { background-position: 56px 0; }
+            100% { background-position: 0 0; }
         }
-        .nexus-bar-flashing {
-            animation: nexus-bar-flash 0.8s ease-in-out infinite !important;
+        .nexus-bar-busy {
+            background-image: repeating-linear-gradient(
+                -45deg,
+                #ffffff 0px,
+                #ffffff 14px,
+                #a8a8a8 14px,
+                #a8a8a8 28px
+            ) !important;
+            background-size: 39.6px 100% !important;
+            animation: nexus-stripes-backward 0.75s linear infinite !important;
         }
     </style>
 </head>
@@ -98,38 +106,141 @@
         var isNexusDone = false;
         var nexusBar = document.getElementById('nexus-loader-bar');
         var nexusOverlay = document.getElementById('nexus-loading-screen');
-        var nexusFlashTimer = setTimeout(function() {
+        var drawCount = 0;
+        var activeFrames = 0;
+        var isPlayerLoaded = false;
+        var creepTimer = null;
+
+        // Intercept Canvas 2D/WebGL context creation and draw calls
+        try {
+            var origGetContext = HTMLCanvasElement.prototype.getContext;
+            HTMLCanvasElement.prototype.getContext = function(type) {
+                var ctx = origGetContext.apply(this, arguments);
+                if (!ctx) return ctx;
+                if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+                    var oDA = ctx.drawArrays;
+                    if (oDA) ctx.drawArrays = function(m, f, count) { if (count > 0) drawCount++; return oDA.apply(this, arguments); };
+                    var oDE = ctx.drawElements;
+                    if (oDE) ctx.drawElements = function(m, count) { if (count > 0) drawCount++; return oDE.apply(this, arguments); };
+                } else if (type === '2d') {
+                    var oDI = ctx.drawImage;
+                    if (oDI) ctx.drawImage = function() { drawCount++; return oDI.apply(this, arguments); };
+                    var oFR = ctx.fillRect;
+                    if (oFR) ctx.fillRect = function() { drawCount++; return oFR.apply(this, arguments); };
+                }
+                return ctx;
+            };
+        } catch(e) {}
+
+        var busyTimer = setTimeout(function() {
             if (!isNexusDone && nexusBar) {
-                nexusBar.classList.add('nexus-bar-flashing');
+                nexusBar.classList.add('nexus-bar-busy');
             }
-        }, 3000);
+        }, 2000);
+
+        var creepStartTimer = setTimeout(function() {
+            if (isNexusDone) return;
+            creepTimer = setInterval(function() {
+                if (isNexusDone) {
+                    clearInterval(creepTimer);
+                    return;
+                }
+                if (nexusProgress < 99) {
+                    var remaining = 99 - nexusProgress;
+                    var step = Math.max(0.08, remaining * 0.04);
+                    nexusProgress = Math.min(99, nexusProgress + step);
+                    if (nexusBar) nexusBar.style.width = nexusProgress + '%';
+                }
+            }, 120);
+        }, 4000);
 
         function updateNexusProgress(pct) {
             if (isNexusDone || !nexusBar) return;
-            nexusProgress = Math.max(nexusProgress, Math.min(100, Math.round(pct)));
+            nexusProgress = Math.max(nexusProgress, Math.min(99, pct));
             nexusBar.style.width = nexusProgress + '%';
         }
 
         function completeNexusLoading() {
             if (isNexusDone) return;
             isNexusDone = true;
-            if (nexusFlashTimer) clearTimeout(nexusFlashTimer);
+            if (busyTimer) clearTimeout(busyTimer);
+            if (creepStartTimer) clearTimeout(creepStartTimer);
+            if (creepTimer) clearInterval(creepTimer);
             if (nexusBar) nexusBar.style.width = '100%';
 
-            if (nexusOverlay) {
-                nexusOverlay.style.opacity = '0';
-                nexusOverlay.style.pointerEvents = 'none';
-                setTimeout(function() {
-                    if (nexusOverlay && nexusOverlay.parentNode) {
-                        nexusOverlay.parentNode.removeChild(nexusOverlay);
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    if (nexusOverlay) {
+                        nexusOverlay.style.opacity = '0';
+                        nexusOverlay.style.pointerEvents = 'none';
+                        setTimeout(function() {
+                            if (nexusOverlay && nexusOverlay.parentNode) {
+                                nexusOverlay.parentNode.removeChild(nexusOverlay);
+                            }
+                            nexusOverlay = null;
+                            nexusBar = null;
+                        }, 400);
                     }
-                    nexusOverlay = null;
-                    nexusBar = null;
-                }, 500);
-            }
+                });
+            });
         }
 
+        var lastDraws = 0;
+        function checkRuffleRender() {
+            if (isNexusDone) return;
+            var canvases = document.querySelectorAll('canvas');
+            var hasActiveCanvas = false;
+            for (var i = 0; i < canvases.length; i++) {
+                var c = canvases[i];
+                if (c.width > 32 && c.height > 32) {
+                    hasActiveCanvas = true;
+                    break;
+                }
+            }
+
+            if (drawCount > lastDraws && hasActiveCanvas) {
+                activeFrames++;
+                updateNexusProgress(88 + Math.min(10, activeFrames * 3));
+            }
+            lastDraws = drawCount;
+
+            if (isPlayerLoaded && activeFrames >= 3) {
+                completeNexusLoading();
+                return;
+            }
+            requestAnimationFrame(checkRuffleRender);
+        }
+        requestAnimationFrame(checkRuffleRender);
+
         updateNexusProgress(15);
+
+        // Universal Autosave Bridge for Battle Beavers
+        (function() {
+            function sendSave() {
+                try {
+                    var s = {};
+                    for (var i = 0; i < localStorage.length; i++) {
+                        var k = localStorage.key(i);
+                        if (k && k.indexOf('tb_') !== 0) s[k] = localStorage.getItem(k);
+                    }
+                    var msg = { type: 'nexus-game-save', gameId: 'battlebeavers', localStorage: s };
+                    if (window.parent && window.parent !== window) {
+                        try { window.parent.postMessage(msg, '*'); } catch(e) {}
+                    }
+                    var opener = (window.parent && window.parent.opener) || window.opener;
+                    if (opener) {
+                        try { opener.postMessage(msg, '*'); } catch(e) {}
+                    }
+                } catch(e) {}
+            }
+
+            window.addEventListener('message', function(e) {
+                if (e.data && e.data.type === 'nexus-request-game-save') sendSave();
+            });
+            window.addEventListener('pagehide', sendSave, { passive: true });
+            window.addEventListener('beforeunload', sendSave, { passive: true });
+            setInterval(sendSave, 4000);
+        })();
 
         window.RufflePlayer = window.RufflePlayer || {};
         window.addEventListener("load", () => {
@@ -155,18 +266,15 @@
                     quality: "high",
                     letterbox: "on"
                 }).then(() => {
-                    updateNexusProgress(100);
-                    requestAnimationFrame(() => {
-                        setTimeout(completeNexusLoading, 150);
-                    });
+                    isPlayerLoaded = true;
+                    updateNexusProgress(95);
                 }).catch(() => {
                     completeNexusLoading();
                 });
 
-                // Safety fail-safe in case of load promise issue
                 setTimeout(function() {
                     if (!isNexusDone) completeNexusLoading();
-                }, 12000);
+                }, 16000);
             }, 50);
         });
     </script>

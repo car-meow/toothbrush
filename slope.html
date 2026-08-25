@@ -39,7 +39,7 @@
       align-items: center;
       pointer-events: auto;
       opacity: 1;
-      transition: opacity 0.5s ease;
+      transition: opacity 0.4s ease;
     }
     .nexus-loader-bar-container {
       width: clamp(260px, 36vw, 440px);
@@ -54,16 +54,24 @@
     .nexus-loader-bar-fill {
       height: 100%;
       width: 0%;
-      background: #ffffff;
+      background-color: #ffffff;
       border-radius: 10px;
       transition: width 0.2s ease-out;
     }
-    @keyframes nexus-bar-flash {
-      0%, 100% { background-color: #666666; }
-      50% { background-color: #ffffff; }
+    @keyframes nexus-stripes-backward {
+      0% { background-position: 56px 0; }
+      100% { background-position: 0 0; }
     }
-    .nexus-bar-flashing {
-      animation: nexus-bar-flash 0.8s ease-in-out infinite !important;
+    .nexus-bar-busy {
+      background-image: repeating-linear-gradient(
+        -45deg,
+        #ffffff 0px,
+        #ffffff 14px,
+        #a8a8a8 14px,
+        #a8a8a8 28px
+      ) !important;
+      background-size: 39.6px 100% !important;
+      animation: nexus-stripes-backward 0.75s linear infinite !important;
     }
   </style>
 
@@ -110,7 +118,28 @@
     var isNexusDone = false;
     var nexusBar = null;
     var nexusOverlay = null;
-    var nexusFlashTimer = null;
+    var busyTimer = null;
+    var creepTimer = null;
+    var creepStartTimer = null;
+    var drawCount = 0;
+    var activeFrames = 0;
+    var isUnityRuntimeReady = false;
+
+    // Intercept WebGL context creation and draw operations
+    try {
+      var origGetContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function(type) {
+        var ctx = origGetContext.apply(this, arguments);
+        if (!ctx) return ctx;
+        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+          var oDA = ctx.drawArrays;
+          if (oDA) ctx.drawArrays = function(m, f, count) { if (count > 0) drawCount++; return oDA.apply(this, arguments); };
+          var oDE = ctx.drawElements;
+          if (oDE) ctx.drawElements = function(m, count) { if (count > 0) drawCount++; return oDE.apply(this, arguments); };
+        }
+        return ctx;
+      };
+    } catch(e) {}
 
     function initNexusLoading() {
       nexusBar = document.getElementById('nexus-loader-bar');
@@ -123,37 +152,77 @@
         } catch(e) {}
         nexusOverlay.style.backgroundImage = "url('" + bgUrl + "')";
       }
-      nexusFlashTimer = setTimeout(function() {
+      busyTimer = setTimeout(function() {
         if (!isNexusDone && nexusBar) {
-          nexusBar.classList.add('nexus-bar-flashing');
+          nexusBar.classList.add('nexus-bar-busy');
         }
-      }, 3000);
+      }, 2000);
+
+      creepStartTimer = setTimeout(function() {
+        if (isNexusDone) return;
+        creepTimer = setInterval(function() {
+          if (isNexusDone) {
+            clearInterval(creepTimer);
+            return;
+          }
+          if (nexusProgress < 99) {
+            var remaining = 99 - nexusProgress;
+            var step = Math.max(0.08, remaining * 0.04);
+            nexusProgress = Math.min(99, nexusProgress + step);
+            if (nexusBar) nexusBar.style.width = nexusProgress + '%';
+          }
+        }, 120);
+      }, 4000);
     }
 
     function updateNexusProgress(pct) {
       if (isNexusDone || !nexusBar) return;
-      nexusProgress = Math.max(nexusProgress, Math.min(100, Math.round(pct)));
+      nexusProgress = Math.max(nexusProgress, Math.min(99, pct));
       nexusBar.style.width = nexusProgress + '%';
     }
 
     function completeNexusLoading() {
       if (isNexusDone) return;
       isNexusDone = true;
-      if (nexusFlashTimer) clearTimeout(nexusFlashTimer);
+      if (busyTimer) clearTimeout(busyTimer);
+      if (creepStartTimer) clearTimeout(creepStartTimer);
+      if (creepTimer) clearInterval(creepTimer);
       if (nexusBar) nexusBar.style.width = '100%';
 
-      if (nexusOverlay) {
-        nexusOverlay.style.opacity = '0';
-        nexusOverlay.style.pointerEvents = 'none';
-        setTimeout(function() {
-          if (nexusOverlay && nexusOverlay.parentNode) {
-            nexusOverlay.parentNode.removeChild(nexusOverlay);
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          if (nexusOverlay) {
+            nexusOverlay.style.opacity = '0';
+            nexusOverlay.style.pointerEvents = 'none';
+            setTimeout(function() {
+              if (nexusOverlay && nexusOverlay.parentNode) {
+                nexusOverlay.parentNode.removeChild(nexusOverlay);
+              }
+              nexusOverlay = null;
+              nexusBar = null;
+            }, 400);
           }
-          nexusOverlay = null;
-          nexusBar = null;
-        }, 500);
-      }
+        });
+      });
     }
+
+    var lastDraws = 0;
+    function checkSlopeRender() {
+      if (isNexusDone) return;
+      var canvas = document.querySelector('#gameContainer canvas') || document.querySelector('canvas');
+      if (canvas && drawCount > lastDraws) {
+        activeFrames++;
+        updateNexusProgress(90 + Math.min(8, activeFrames * 2));
+      }
+      lastDraws = drawCount;
+
+      if (isUnityRuntimeReady && activeFrames >= 3) {
+        completeNexusLoading();
+        return;
+      }
+      requestAnimationFrame(checkSlopeRender);
+    }
+    requestAnimationFrame(checkSlopeRender);
 
     // Universal Instant Ad Reward Bypass Engine
     window.PokiSDK = window.PokiSDK || {
@@ -166,12 +235,12 @@
 
     function customUnityProgress(gameInstance, progress) {
       if (typeof progress === 'number') {
-        updateNexusProgress(Math.min(92, progress * 92));
+        updateNexusProgress(Math.min(88, progress * 88));
         if (progress >= 1) {
-          updateNexusProgress(95);
+          updateNexusProgress(92);
         }
       } else if (progress === 'complete') {
-        updateNexusProgress(98);
+        updateNexusProgress(95);
       }
       if (typeof UnityProgress === 'function' && UnityProgress !== customUnityProgress) {
         try { UnityProgress(gameInstance, progress); } catch(e) {}
@@ -185,25 +254,60 @@
         onProgress: customUnityProgress,
         Module: {
           onRuntimeInitialized: function () {
-            updateNexusProgress(100);
-            requestAnimationFrame(function() {
-              setTimeout(completeNexusLoading, 150);
-            });
+            isUnityRuntimeReady = true;
+            updateNexusProgress(95);
           },
           postRun: [
             function() {
-              updateNexusProgress(100);
-              setTimeout(completeNexusLoading, 150);
+              isUnityRuntimeReady = true;
+              updateNexusProgress(98);
             }
           ]
         },
       }
     );
 
-    // Fail-safe timeout in case Unity initialization callback is skipped
+    // Universal Autosave Bridge for Slope
+    (function() {
+      function sendSave() {
+        try {
+          var s = {};
+          for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (k && k.indexOf('tb_') !== 0) s[k] = localStorage.getItem(k);
+          }
+          var msg = { type: 'nexus-game-save', gameId: 'slope', localStorage: s };
+          if (window.parent && window.parent !== window) {
+            try { window.parent.postMessage(msg, '*'); } catch(e) {}
+          }
+          var opener = (window.parent && window.parent.opener) || window.opener;
+          if (opener) {
+            try { opener.postMessage(msg, '*'); } catch(e) {}
+          }
+        } catch(e) {}
+      }
+
+      function syncAndSend() {
+        try {
+          if (window.FS && typeof FS.syncfs === 'function') {
+            FS.syncfs(false, function() { sendSave(); });
+            return;
+          }
+        } catch(e) {}
+        sendSave();
+      }
+
+      window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'nexus-request-game-save') syncAndSend();
+      });
+      window.addEventListener('pagehide', syncAndSend, { passive: true });
+      window.addEventListener('beforeunload', syncAndSend, { passive: true });
+      setInterval(syncAndSend, 4000);
+    })();
+
     setTimeout(function() {
       if (!isNexusDone) completeNexusLoading();
-    }, 12000);
+    }, 18000);
   </script>
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-98DP5VKS42"></script>
   <script>

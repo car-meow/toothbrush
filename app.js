@@ -252,6 +252,7 @@ window.addStashGameToSidebar = async function(game) {
 };
 
 async function getGameSnapshot(gameId) {
+    if (!gameId) return null;
     await initDB();
     return new Promise(resolve => {
         const tx = db.transaction('gameSnapshots', 'readonly');
@@ -262,22 +263,56 @@ async function getGameSnapshot(gameId) {
 }
 
 async function saveGameSnapshot(gameId, localStorageData) {
-    if (!gameId || !localStorageData) return;
+    if (!gameId || !localStorageData || typeof localStorageData !== 'object') return;
     await initDB();
-    const hash = JSON.stringify(localStorageData);
-    if (snapshotHashes.get(gameId) === hash) return;
+
     const existing = await new Promise(resolve => {
-        const req = db.transaction('gameSnapshots', 'readonly').objectStore('gameSnapshots').get(gameId);
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror = () => resolve(null);
+        try {
+            const req = db.transaction('gameSnapshots', 'readonly').objectStore('gameSnapshots').get(gameId);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+        } catch (e) {
+            resolve(null);
+        }
     });
+
+    const incomingKeys = Object.keys(localStorageData);
+    const existingData = (existing && existing.localStorage && typeof existing.localStorage === 'object') ? existing.localStorage : {};
+    const existingKeys = Object.keys(existingData);
+
+    // Protection: If incoming snapshot is empty ({}) or only transient, but existing snapshot has valid progress,
+    // do NOT wipe out existing progress data.
+    let dataToSave = { ...localStorageData };
+    if (incomingKeys.length === 0 && existingKeys.length > 0) {
+        dataToSave = { ...existingData };
+    } else if (incomingKeys.length > 0 && existingKeys.length > 0) {
+        dataToSave = { ...existingData, ...localStorageData };
+    }
+
+    const hash = JSON.stringify(dataToSave);
+    if (snapshotHashes.get(gameId) === hash && existing) return;
+
     const savedAt = Date.now();
     const history = Array.isArray(existing && existing.history) ? existing.history.slice(-4) : [];
-    if (existing && existing.localStorage) history.push({ localStorage: existing.localStorage, savedAt: existing.savedAt || savedAt });
+    if (existing && existing.localStorage && Object.keys(existing.localStorage).length > 0) {
+        history.push({ localStorage: existing.localStorage, savedAt: existing.savedAt || savedAt });
+    }
+
     const tx = db.transaction('gameSnapshots', 'readwrite');
     const store = tx.objectStore('gameSnapshots');
-    store.put({ gameId, localStorage: localStorageData, savedAt, history });
+    store.put({ gameId, localStorage: dataToSave, savedAt, history });
     snapshotHashes.set(gameId, hash);
+
+    // Immediately synchronize in-memory caches across all references
+    games.forEach(g => {
+        if (g && g.id === gameId) {
+            loadedGameSnapshots.set(g, dataToSave);
+        }
+    });
+    if (currentGame && currentGame.id === gameId) {
+        loadedGameSnapshots.set(currentGame, dataToSave);
+    }
+
     return new Promise((resolve, reject) => {
         tx.oncomplete = resolve;
         tx.onerror = () => reject(tx.error);
@@ -286,10 +321,16 @@ async function saveGameSnapshot(gameId, localStorageData) {
 }
 
 function requestCurrentGameAutosave() {
-    const game = currentGame;
     const frame = document.getElementById('game-frame');
-    if (!game || game.type !== 'file' || !frame || !frame.contentWindow) return;
-    try { frame.contentWindow.postMessage({ type: 'nexus-request-game-save' }, '*'); } catch (e) {}
+    if (frame && frame.contentWindow) {
+        try { frame.contentWindow.postMessage({ type: 'nexus-request-game-save' }, '*'); } catch (e) {}
+    }
+    // Also message active popup windows
+    popupGameWindows.forEach((win) => {
+        if (win && !win.closed) {
+            try { win.postMessage({ type: 'nexus-request-game-save' }, '*'); } catch (e) {}
+        }
+    });
 }
 
 function bytesToBase64(bytes) {
@@ -344,20 +385,32 @@ function decodeBackupValue(value) {
 
 function startGameAutosave() {
     if (gameAutosaveTimer) clearInterval(gameAutosaveTimer);
-    // Save every 30 seconds for every local HTML game, including Balatro.
-    gameAutosaveTimer = setInterval(requestCurrentGameAutosave, 30000);
+    // Continuous periodic sync heartbeat
+    gameAutosaveTimer = setInterval(requestCurrentGameAutosave, 5000);
 }
 
 window.addEventListener('message', event => {
     const message = event.data;
-    const frame = document.getElementById('game-frame');
     if (!message || message.type !== 'nexus-game-save') return;
+
+    const frame = document.getElementById('game-frame');
     const isEmbeddedGame = frame && event.source === frame.contentWindow;
-    const isKnownPopup = message.gameId && popupGameWindows.get(message.gameId) === event.source;
-    if (!isEmbeddedGame && !isKnownPopup) return;
-    if (event.origin !== window.location.origin) return;
-    const gameId = message.gameId || (currentGame && currentGame.type === 'file' ? currentGame.id : null);
-    if (gameId) saveGameSnapshot(gameId, message.localStorage || {}).catch(() => {});
+    let isKnownPopup = false;
+    if (message.gameId && popupGameWindows.has(message.gameId)) {
+        const win = popupGameWindows.get(message.gameId);
+        if (win === event.source || (win && win.closed)) isKnownPopup = true;
+    }
+    for (const [, win] of popupGameWindows.entries()) {
+        if (win === event.source) { isKnownPopup = true; break; }
+    }
+
+    const originSafe = !event.origin || event.origin === 'null' || event.origin === window.location.origin || window.location.protocol === 'file:';
+    if (!originSafe && !isEmbeddedGame && !isKnownPopup) return;
+
+    const gameId = message.gameId || (currentGame && currentGame.id ? currentGame.id : null);
+    if (gameId && message.localStorage) {
+        saveGameSnapshot(gameId, message.localStorage).catch(() => {});
+    }
 });
 
 document.addEventListener('visibilitychange', () => {
@@ -757,7 +810,7 @@ function createNexusLoadingOverlay(parentDoc = document, customBgUrl = 'Assets/l
                     align-items: center;
                     pointer-events: auto;
                     opacity: 1;
-                    transition: opacity 0.5s ease;
+                    transition: opacity 0.4s ease;
                 }
                 .nexus-loader-bar-container {
                     width: clamp(260px, 36vw, 440px);
@@ -772,16 +825,24 @@ function createNexusLoadingOverlay(parentDoc = document, customBgUrl = 'Assets/l
                 .nexus-loader-bar-fill {
                     height: 100%;
                     width: 0%;
-                    background: #ffffff;
+                    background-color: #ffffff;
                     border-radius: 10px;
                     transition: width 0.2s ease-out;
                 }
-                @keyframes nexus-bar-flash {
-                    0%, 100% { background-color: #666666; }
-                    50% { background-color: #ffffff; }
+                @keyframes nexus-stripes-backward {
+                    0% { background-position: 56px 0; }
+                    100% { background-position: 0 0; }
                 }
-                .nexus-bar-flashing {
-                    animation: nexus-bar-flash 0.8s ease-in-out infinite !important;
+                .nexus-bar-busy {
+                    background-image: repeating-linear-gradient(
+                        -45deg,
+                        #ffffff 0px,
+                        #ffffff 14px,
+                        #a8a8a8 14px,
+                        #a8a8a8 28px
+                    ) !important;
+                    background-size: 39.6px 100% !important;
+                    animation: nexus-stripes-backward 0.75s linear infinite !important;
                 }
             </style>
             <div class="nexus-loader-bar-container">
@@ -793,27 +854,46 @@ function createNexusLoadingOverlay(parentDoc = document, customBgUrl = 'Assets/l
         const bar = overlay.querySelector('#nexus-loader-bar');
         let progress = 0;
         let isDone = false;
+        let creepTimer = null;
 
-        const flashTimer = setTimeout(() => {
-            if (!isDone && bar) bar.classList.add('nexus-bar-flashing');
-        }, 3000);
+        const busyTimer = setTimeout(() => {
+            if (!isDone && bar) bar.classList.add('nexus-bar-busy');
+        }, 2000);
+
+        const creepStartTimer = setTimeout(() => {
+            if (isDone) return;
+            creepTimer = setInterval(() => {
+                if (isDone) {
+                    clearInterval(creepTimer);
+                    return;
+                }
+                if (progress < 99) {
+                    const remaining = 99 - progress;
+                    const step = Math.max(0.08, remaining * 0.04);
+                    progress = Math.min(99, progress + step);
+                    if (bar) bar.style.width = progress + '%';
+                }
+            }, 120);
+        }, 4000);
 
         return {
             setProgress(pct) {
                 if (isDone || !bar) return;
-                progress = Math.max(progress, Math.min(100, Math.round(pct)));
+                progress = Math.max(progress, Math.min(99, pct));
                 bar.style.width = progress + '%';
             },
             complete() {
                 if (isDone) return;
                 isDone = true;
-                clearTimeout(flashTimer);
+                clearTimeout(busyTimer);
+                clearTimeout(creepStartTimer);
+                if (creepTimer) clearInterval(creepTimer);
                 if (bar) bar.style.width = '100%';
                 overlay.style.opacity = '0';
                 overlay.style.pointerEvents = 'none';
                 setTimeout(() => {
                     try { overlay.remove(); } catch(e) {}
-                }, 500);
+                }, 400);
             }
         };
     } catch(e) {
@@ -821,8 +901,155 @@ function createNexusLoadingOverlay(parentDoc = document, customBgUrl = 'Assets/l
     }
 }
 
-function launchGameFullscreen(game) {
+function getUniversalAutosaveBridge(gameId) {
+    return `<script>
+(function() {
+    var gameId = ${JSON.stringify(gameId)};
+    var syncing = false;
+    var syncTimer = null;
+    var lastSavedHash = '';
+
+    function getStorageSnapshot() {
+        var s = {};
+        try {
+            for (var i = 0; i < localStorage.length; i++) {
+                var k = localStorage.key(i);
+                if (k && k.indexOf('tb_') !== 0) {
+                    s[k] = localStorage.getItem(k);
+                }
+            }
+        } catch(e) {}
+        return s;
+    }
+
+    function sendSave(immediate) {
+        try {
+            var data = getStorageSnapshot();
+            var currentHash = JSON.stringify(data);
+            if (!immediate && currentHash === lastSavedHash) return;
+            lastSavedHash = currentHash;
+
+            var msg = { type: 'nexus-game-save', gameId: gameId, localStorage: data };
+            if (window.parent && window.parent !== window) {
+                try { window.parent.postMessage(msg, '*'); } catch(e) {}
+            }
+            var opener = (window.parent && window.parent.opener) || window.opener;
+            if (opener) {
+                try { opener.postMessage(msg, '*'); } catch(e) {}
+            }
+        } catch(e) {}
+    }
+
+    function syncAndSend(immediate) {
+        if (syncing) return;
+        syncing = true;
+        try {
+            var fs = window.FS || (window.Module && window.Module.FS);
+            if (fs && typeof fs.syncfs === 'function') {
+                fs.syncfs(false, function() {
+                    syncing = false;
+                    sendSave(immediate);
+                });
+                return;
+            }
+        } catch(e) {}
+        syncing = false;
+        sendSave(immediate);
+    }
+
+    function debounceSync(delay) {
+        if (syncTimer) clearTimeout(syncTimer);
+        syncTimer = setTimeout(function() {
+            syncTimer = null;
+            syncAndSend(false);
+        }, delay || 300);
+    }
+
+    // Active Storage Traps: catch localStorage modifications immediately
+    try {
+        var origSetItem = Storage.prototype.setItem;
+        Storage.prototype.setItem = function(k, v) {
+            var res = origSetItem.apply(this, arguments);
+            if (this === localStorage && k && k.indexOf('tb_') !== 0) {
+                debounceSync(300);
+            }
+            return res;
+        };
+        var origRemoveItem = Storage.prototype.removeItem;
+        Storage.prototype.removeItem = function(k) {
+            var res = origRemoveItem.apply(this, arguments);
+            if (this === localStorage && k && k.indexOf('tb_') !== 0) {
+                debounceSync(300);
+            }
+            return res;
+        };
+        var origClear = Storage.prototype.clear;
+        Storage.prototype.clear = function() {
+            var res = origClear.apply(this, arguments);
+            if (this === localStorage) {
+                debounceSync(300);
+            }
+            return res;
+        };
+    } catch(e) {}
+
+    // Emscripten / WASM Filesystem Sync Hook
+    function hookFS() {
+        try {
+            var fs = window.FS || (window.Module && window.Module.FS);
+            if (fs && typeof fs.syncfs === 'function' && !fs._nexusHooked) {
+                fs._nexusHooked = true;
+                var origSyncfs = fs.syncfs;
+                fs.syncfs = function(populate, callback) {
+                    return origSyncfs.call(this, populate, function(err) {
+                        if (typeof callback === 'function') callback(err);
+                        if (!populate) {
+                            debounceSync(200);
+                        }
+                    });
+                };
+            }
+        } catch(e) {}
+    }
+    hookFS();
+    setInterval(hookFS, 1000);
+
+    // Multi-Trigger Auto-Sync
+    window.addEventListener('storage', function() { debounceSync(200); }, { passive: true });
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'nexus-request-game-save') syncAndSend(true);
+    });
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) syncAndSend(true);
+    }, { passive: true });
+    window.addEventListener('blur', function() { syncAndSend(false); }, { passive: true });
+    window.addEventListener('pagehide', function() { syncAndSend(true); }, { passive: true });
+    window.addEventListener('beforeunload', function() { syncAndSend(true); }, { passive: true });
+
+    setInterval(function() { syncAndSend(false); }, 3000);
+    window.addEventListener('pointerup', function() { debounceSync(1500); }, { passive: true });
+    window.addEventListener('keyup', function() { debounceSync(1500); }, { passive: true });
+})();
+<\/script>`;
+}
+
+async function launchGameFullscreen(game) {
     if (!game || game.id === "ugs-stash") return;
+
+    if (game.type === 'file') {
+        if (!game.content) {
+            await initDB();
+            const stored = await new Promise(resolve => {
+                const req = db.transaction("customGames", "readonly").objectStore("customGames").get(game.id);
+                req.onsuccess = () => resolve(req.result && req.result.content);
+                req.onerror = () => resolve(null);
+            });
+            if (stored) game.content = stored;
+        }
+        const latestSnapshot = await getGameSnapshot(game.id);
+        loadedGameSnapshots.set(game, latestSnapshot || {});
+    }
+
     const win = window.open('about:blank', '_blank');
     if (!win) {
         nexusAlert("Pop-up blocked! Please allow pop-ups to open games.");
@@ -840,8 +1067,9 @@ function launchGameFullscreen(game) {
         const unityCompatibility = /(?:createUnityInstance|UnityLoader|unity-container|unity-canvas)/i.test(rawHtml)
             ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
             : '';
-        const snapshotJson = JSON.stringify(loadedGameSnapshots.get(game) || {}).replace(/</g, '\\u003c');
-        const popupBridge = `<script>(function(){let syncing=false;function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}var opener=(window.parent&&window.parent.opener)||window.opener;if(opener)opener.postMessage({type:'nexus-game-save',gameId:${JSON.stringify(game.id)},localStorage:s},'*');}catch(e){}}function syncAndSend(){if(syncing)return;syncing=true;try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){syncing=false;send();});return;}}catch(e){}syncing=false;send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});window.addEventListener('pagehide',syncAndSend,{passive:true});window.addEventListener('beforeunload',syncAndSend,{passive:true});setInterval(syncAndSend,30000);})();<\/script>`;
+        const snapshot = loadedGameSnapshots.get(game) || {};
+        const snapshotJson = JSON.stringify(snapshot).replace(/</g, '\\u003c');
+        const popupBridge = getUniversalAutosaveBridge(game.id);
         const popupRestore = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
         const autoFocusScript = `<script>
         (function(){
@@ -864,9 +1092,7 @@ function launchGameFullscreen(game) {
             }
         })();
         <\/script>`;
-        // Use stable srcdoc loading for local games. Blob URLs get a new pathname on
-        // every launch, which makes path-based game storage (including Balatro's IDBFS)
-        // appear to be a different save location each time.
+        // Use stable srcdoc loading for local games.
         gameSrcDoc = injectGameBootstrap(rawHtml, unityCompatibility + popupRestore + popupBridge + autoFocusScript);
     } else {
         gameSrc = game.url;
@@ -892,10 +1118,6 @@ function launchGameFullscreen(game) {
         win.document.head.appendChild(link);
     }
 
-    // Unity WebGL builds (including Survival Race) use
-    // workers, compressed asset loaders, and IndexedDB. Loading the prepared
-    // document directly in the about:blank popup avoids sandbox restrictions
-    // that can leave their own Unity progress screen running forever.
     if (gameSrcDoc !== null) {
         try {
             win.document.open();
@@ -912,8 +1134,7 @@ function launchGameFullscreen(game) {
 
     const ifr = win.document.createElement('iframe');
     Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
-    ifr.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock');
-    ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen');
+    ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
     if (gameSrcDoc !== null) ifr.srcdoc = gameSrcDoc;
     else ifr.src = gameSrc;
     win.document.body.style.margin = '0';
@@ -921,7 +1142,6 @@ function launchGameFullscreen(game) {
     win.document.body.style.overflow = 'hidden';
     win.document.body.appendChild(ifr);
 
-    // Auto-focus and simulate mouse click 0.5 seconds after launch
     function doFocusAndClick() {
         try {
             win.focus();
@@ -941,13 +1161,11 @@ function launchGameFullscreen(game) {
     }
 
     setTimeout(doFocusAndClick, 100);
-    setTimeout(doFocusAndClick, 500); // 0.5s after launch
+    setTimeout(doFocusAndClick, 500);
     setTimeout(doFocusAndClick, 1000);
 }
 
-// Keep the game's original doctype/html/head structure intact.  Putting helper
-// scripts before <!doctype html> can make some WASM and module-based games fail
-// during startup even though the original file is valid on its own.
+// Universal Game Bootstrap Injection with High-Accuracy Visual Render Detection
 function injectGameBootstrap(html, bootstrap) {
     if (!html) return html;
     let finalBootstrap = bootstrap || '';
@@ -1025,9 +1243,158 @@ function injectGameBootstrap(html, bootstrap) {
 })();
 <\/script>`;
 
-    // Inject cohesive loading screen if not already present in the custom game HTML
+    // Inject accurate visual loading screen if not present
     if (!html.includes('nexus-loading-screen')) {
-        const loadingBootstrap = `<div id="nexus-loading-screen"><div class="nexus-loader-bar-container"><div id="nexus-loader-bar" class="nexus-loader-bar-fill"></div></div></div><style>#nexus-loading-screen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:999999;background-color:#050505;background-image:url('Assets/loading_screen.png');background-size:cover;background-position:center;background-repeat:no-repeat;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;pointer-events:auto;opacity:1;transition:opacity 0.5s ease;}.nexus-loader-bar-container{width:clamp(260px,36vw,440px);height:16px;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.3);border-radius:10px;overflow:hidden;margin-bottom:clamp(60px,12vh,100px);box-shadow:0 4px 16px rgba(0,0,0,0.6);}.nexus-loader-bar-fill{height:100%;width:0%;background:#ffffff;border-radius:10px;transition:width 0.2s ease-out;}@keyframes nexus-bar-flash{0%,100%{background-color:#666666;}50%{background-color:#ffffff;}}.nexus-bar-flashing{animation:nexus-bar-flash 0.8s ease-in-out infinite !important;}</style><script>(function(){var b=document.getElementById('nexus-loader-bar');var o=document.getElementById('nexus-loading-screen');var d=false;var t=setTimeout(function(){if(!d&&b)b.classList.add('nexus-bar-flashing');},3000);function done(){if(d)return;d=true;clearTimeout(t);if(b)b.style.width='100%';if(o){o.style.opacity='0';o.style.pointerEvents='none';setTimeout(function(){if(o&&o.parentNode)o.parentNode.removeChild(o);},500);}}if(b)b.style.width='30%';document.addEventListener('DOMContentLoaded',function(){if(b&&!d)b.style.width='60%';});window.addEventListener('load',function(){if(b&&!d)b.style.width='90%';requestAnimationFrame(function(){setTimeout(done,250);});});setTimeout(function(){if(!d)done();},12000);})();<\/script>`;
+        const loadingBootstrap = `<div id="nexus-loading-screen"><div class="nexus-loader-bar-container"><div id="nexus-loader-bar" class="nexus-loader-bar-fill"></div></div></div><style>#nexus-loading-screen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:999999;background-color:#050505;background-image:url('Assets/loading_screen.png');background-size:cover;background-position:center;background-repeat:no-repeat;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;pointer-events:auto;opacity:1;transition:opacity 0.4s ease;}.nexus-loader-bar-container{width:clamp(260px,36vw,440px);height:16px;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.3);border-radius:10px;overflow:hidden;margin-bottom:clamp(60px,12vh,100px);box-shadow:0 4px 16px rgba(0,0,0,0.6);}.nexus-loader-bar-fill{height:100%;width:0%;background-color:#ffffff;border-radius:10px;transition:width 0.2s ease-out;}@keyframes nexus-stripes-backward{0%{background-position:56px 0;}100%{background-position:0 0;}}.nexus-bar-busy{background-image:repeating-linear-gradient(-45deg,#ffffff 0px,#ffffff 14px,#a8a8a8 14px,#a8a8a8 28px) !important;background-size:39.6px 100% !important;animation:nexus-stripes-backward 0.75s linear infinite !important;}</style><script>
+(function() {
+    var b = document.getElementById('nexus-loader-bar');
+    var o = document.getElementById('nexus-loading-screen');
+    var done = false;
+    var progress = 0;
+    var drawOps = 0;
+    var consecutiveActiveFrames = 0;
+    var engineReady = false;
+    var creepTimer = null;
+
+    try {
+        if (o) {
+            var base = window.location.href.split('?')[0].split('#')[0];
+            var resolvedBg = base.substring(0, base.lastIndexOf('/') + 1) + 'Assets/loading_screen.png';
+            o.style.backgroundImage = "url('" + resolvedBg + "')";
+        }
+    } catch(e) {}
+
+    function updatePct(pct) {
+        if (done || !b) return;
+        progress = Math.max(progress, Math.min(99, pct));
+        b.style.width = progress + '%';
+    }
+
+    var busyTimer = setTimeout(function() {
+        if (!done && b) b.classList.add('nexus-bar-busy');
+    }, 2000);
+
+    var creepStartTimer = setTimeout(function() {
+        if (done) return;
+        creepTimer = setInterval(function() {
+            if (done) {
+                clearInterval(creepTimer);
+                return;
+            }
+            if (progress < 99) {
+                var remaining = 99 - progress;
+                var step = Math.max(0.08, remaining * 0.04);
+                progress = Math.min(99, progress + step);
+                if (b) b.style.width = progress + '%';
+            }
+        }, 120);
+    }, 4000);
+
+    function completeLoading() {
+        if (done) return;
+        done = true;
+        clearTimeout(busyTimer);
+        clearTimeout(creepStartTimer);
+        if (creepTimer) clearInterval(creepTimer);
+        if (b) b.style.width = '100%';
+
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                if (o) {
+                    o.style.opacity = '0';
+                    o.style.pointerEvents = 'none';
+                    setTimeout(function() {
+                        try { if (o && o.parentNode) o.parentNode.removeChild(o); } catch(e) {}
+                    }, 400);
+                }
+            });
+        });
+    }
+
+    window.updateNexusProgress = updatePct;
+    window.completeNexusLoading = completeLoading;
+
+    updatePct(20);
+    document.addEventListener('DOMContentLoaded', function() { updatePct(50); });
+    window.addEventListener('load', function() { updatePct(75); });
+
+    // Hook WebGL/Canvas context draw operations
+    try {
+        var origGetContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function(type) {
+            var ctx = origGetContext.apply(this, arguments);
+            if (!ctx) return ctx;
+            if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+                var oDA = ctx.drawArrays;
+                if (oDA) ctx.drawArrays = function(m, f, count) { if (count > 0) drawOps++; return oDA.apply(this, arguments); };
+                var oDE = ctx.drawElements;
+                if (oDE) ctx.drawElements = function(m, count) { if (count > 0) drawOps++; return oDE.apply(this, arguments); };
+            } else if (type === '2d') {
+                var oDI = ctx.drawImage;
+                if (oDI) ctx.drawImage = function() { drawOps++; return oDI.apply(this, arguments); };
+                var oFR = ctx.fillRect;
+                if (oFR) ctx.fillRect = function() { drawOps++; return oFR.apply(this, arguments); };
+            }
+            return ctx;
+        };
+    } catch(e) {}
+
+    var lastDraws = 0;
+    function checkRender() {
+        if (done) return;
+        var canvases = document.querySelectorAll('canvas');
+        var visibleCanvas = false;
+        for (var i = 0; i < canvases.length; i++) {
+            var c = canvases[i];
+            var style = window.getComputedStyle ? window.getComputedStyle(c) : null;
+            if (style && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && c.width > 32 && c.height > 32) {
+                visibleCanvas = true;
+                break;
+            }
+        }
+
+        if (drawOps > lastDraws && visibleCanvas) {
+            consecutiveActiveFrames++;
+            updatePct(75 + Math.min(22, consecutiveActiveFrames * 5));
+        }
+        lastDraws = drawOps;
+
+        if (consecutiveActiveFrames >= 4 || (engineReady && consecutiveActiveFrames >= 1)) {
+            completeLoading();
+            return;
+        }
+
+        if (document.readyState === 'complete' && canvases.length === 0 && document.body && document.body.children.length > 1) {
+            completeLoading();
+            return;
+        }
+
+        requestAnimationFrame(checkRender);
+    }
+    requestAnimationFrame(checkRender);
+
+    window.addEventListener('message', function(e) {
+        if (e.data === 'bonk' || (e.data && e.data.type === 'nexus-game-ready')) {
+            engineReady = true;
+        }
+    });
+
+    var pokiCheck = setInterval(function() {
+        if (window.PokiSDK) {
+            var origF = window.PokiSDK.gameLoadingFinished;
+            window.PokiSDK.gameLoadingFinished = function() {
+                engineReady = true;
+                if (typeof origF === 'function') origF.apply(this, arguments);
+            };
+            clearInterval(pokiCheck);
+        }
+    }, 200);
+
+    setTimeout(function() {
+        if (!done) completeLoading();
+    }, 18000);
+})();
+<\/script>`;
         finalBootstrap = adBypassBootstrap + loadingBootstrap + finalBootstrap;
     } else {
         finalBootstrap = adBypassBootstrap + finalBootstrap;
@@ -1046,9 +1413,6 @@ function injectGameBootstrap(html, bootstrap) {
     return finalBootstrap + html;
 }
 
-// Ad SDKs do not load reliably in the embedded/offline game surface.  These
-// adapters preserve the callback contract the games expect: a reward request
-// completes immediately, and the game awards its normal in-game prize.
 let gameStatusFadeTimer = null;
 let isStashPreloaded = false;
 
@@ -1104,23 +1468,29 @@ function ensureStashPreloaded() {
     }
 }
 
-function loadGame(game, forceInternal = false) {
+async function loadGame(game, forceInternal = false) {
     const requestedLoadToken = ++gameLoadToken;
-    if (game && game.type === 'file' && (!game.content || !loadedGameSnapshots.has(game))) {
-        Promise.all([
-            game.content ? Promise.resolve() : initDB().then(() => new Promise(resolve => {
+    if (!game) return;
+
+    if (game.type === 'file') {
+        if (!game.content) {
+            await initDB();
+            const stored = await new Promise(resolve => {
                 const req = db.transaction("customGames", "readonly").objectStore("customGames").get(game.id);
-                req.onsuccess = () => { game.content = req.result && req.result.content; resolve(); };
-                req.onerror = () => resolve();
-            })),
-            getGameSnapshot(game.id)
-        ]).then(([, snapshot]) => {
-            loadedGameSnapshots.set(game, snapshot || {});
-            if (game.content && requestedLoadToken === gameLoadToken) loadGame(game, forceInternal);
-            else if (!game.content) nexusAlert("File unavailable.");
-        });
-        return;
+                req.onsuccess = () => resolve(req.result && req.result.content);
+                req.onerror = () => resolve(null);
+            });
+            if (stored) game.content = stored;
+            else { nexusAlert("File unavailable."); return; }
+        }
+
+        // Always fetch freshest snapshot directly from IndexedDB
+        const latestSnapshot = await getGameSnapshot(game.id);
+        loadedGameSnapshots.set(game, latestSnapshot || {});
+
+        if (requestedLoadToken !== gameLoadToken) return;
     }
+
     const localStorage = window.nexusStorage;
     const isDebugFS = localStorage.getItem('tb_debug_fullscreen') === 'true';
     const isPreloadEnabled = localStorage.getItem('tb_preload_stash') === 'true';
@@ -1184,7 +1554,7 @@ function loadGame(game, forceInternal = false) {
         frame.style.setProperty('visibility', 'hidden', 'important');
         frame.style.opacity = '0';
         frame.style.transition = 'opacity 0.25s ease';
-        frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock');
+        frame.removeAttribute('sandbox'); // Allow full storage & WebAssembly capabilities
 
         updateGameStatusUI('loading');
 
@@ -1199,20 +1569,14 @@ function loadGame(game, forceInternal = false) {
             let htmlContent;
             try { htmlContent = atob(base64Data); } catch(e) { nexusAlert("File corrupted."); return; }
 
-            // Unity WebGL needs a real worker/storage-capable document when
-            // Debug Fullscreen is enabled too. The normal launcher uses the
-            // unrestricted about:blank popup above; this covers the embedded
-            // debug path without relaxing other game documents.
             const isUnityRuntime = /(?:createUnityInstance|UnityLoader|unity-container|unity-canvas)/i.test(htmlContent);
-            if (isUnityRuntime) frame.removeAttribute('sandbox');
-            
             const snapshot = loadedGameSnapshots.get(game) || {};
             const snapshotJson = JSON.stringify(snapshot).replace(/</g, '\\u003c');
             const unityCompatibility = isUnityRuntime
                 ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
                 : '';
             const restoreScript = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
-            const autosaveBridge = `<script>(function(){let syncing=false;function send(){try{var s={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('tb_')!==0)s[k]=localStorage.getItem(k);}parent.postMessage({type:'nexus-game-save',localStorage:s},'*');}catch(e){}}function syncAndSend(){if(syncing)return;syncing=true;try{if(window.FS&&typeof FS.syncfs==='function'){FS.syncfs(false,function(){syncing=false;send();});return;}}catch(e){}syncing=false;send();}window.addEventListener('message',function(e){if(e.data&&e.data.type==='nexus-request-game-save')syncAndSend();});window.addEventListener('pagehide',syncAndSend,{passive:true});window.addEventListener('beforeunload',syncAndSend,{passive:true});})();<\/script>`;
+            const autosaveBridge = getUniversalAutosaveBridge(game.id);
             const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
             const finalHTML = injectGameBootstrap(htmlContent, unityCompatibility + restoreScript + persistenceScript + autosaveBridge);
 
