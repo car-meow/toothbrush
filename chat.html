@@ -18,6 +18,11 @@
         })();
     </script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script>
+        if (typeof mqtt === 'undefined') {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"><\/script>');
+        }
+    </script>
     <style>
         .status-header { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 20px; font-size: 11px; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
@@ -127,25 +132,25 @@
     </header>
 
     <main id="chat-home" style="display:flex; align-items:center; justify-content:center; flex:1;">
-        <div style="background: var(--modal-bg); padding:40px; border-radius:25px; border:1px solid var(--border-color); text-align:center; width:380px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
-            <h2 style="margin-bottom:20px; color:#fff;">Enter PIN</h2>
+        <div class="modal-box" style="padding:40px; border-radius:25px; border:2px solid var(--white-outline); text-align:center; width:380px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+            <h2 id="pin-header-title" style="margin-top:0; margin-bottom:20px; color:var(--title-color);">Enter PIN</h2>
             <input type="text" id="pin-entry" class="pin-input-large" placeholder="------" maxlength="6">
-            <div id="pin-error" style="color:#f44336; margin-bottom:15px; display:none; font-weight:bold;">Host Offline or Incorrect PIN!</div>
+            <div id="pin-error" style="color:#f44336; margin-top:10px; margin-bottom:15px; display:none; font-weight:bold;">Host Offline or Incorrect PIN!</div>
             
             <button id="join-btn" class="save-btn" style="background:#2E7D32; width:100%; height:55px; font-size:18px; margin-top: 15px;">Join Room</button>
-            <div style="margin:25px 0; color:#444; font-weight:bold;">OR</div>
-            <button id="open-host-panel" class="save-btn" style="background:rgba(255,255,255,0.05); border:1px solid #444; width:100%;">Host New Room</button>
+            <div style="margin:25px 0; color:var(--muted-text, #888); font-weight:bold;">OR</div>
+            <button id="open-host-panel" class="save-btn" style="width:100%;">Host New Room</button>
         </div>
     </main>
 
-    <div id="host-modal" class="overlay">
-        <div style="background: var(--modal-bg); padding:35px; border-radius:20px; width:350px; border:1px solid var(--border-color);">
-            <h3 style="margin-bottom:20px;">Host Room</h3>
-            <input type="text" id="host-name-input" placeholder="Room Name" style="width:100%; margin-top:15px;" class="pin-input-large" style="font-size:18px; letter-spacing:0;">
-            <input type="text" id="host-pin-input" placeholder="6-Digit PIN" maxlength="6" style="width:100%;" class="pin-input-large">
+    <div id="host-modal" class="overlay" style="z-index: 30000;">
+        <div class="modal-box" style="padding:35px; border-radius:20px; width:350px; border:2px solid var(--white-outline); text-align:center;">
+            <h3 style="margin-top:0; margin-bottom:20px; color:var(--title-color);">Host Room</h3>
+            <input type="text" id="host-name-input" placeholder="Room Name" class="pin-input-large" style="width:100%; margin-top:15px; font-size:18px; letter-spacing:0;">
+            <input type="text" id="host-pin-input" placeholder="6-Digit PIN" maxlength="6" class="pin-input-large" style="width:100%; margin-top:10px;">
             
             <button id="start-host-btn" class="save-btn" style="background:#2E7D32; width:100%; height:50px; margin-top:15px;">Go Live</button>
-            <button onclick="document.getElementById('host-modal').style.display='none'" class="save-btn" style="background:#444; width:100%; margin-top:10px;">Cancel</button>
+            <button onclick="document.getElementById('host-modal').style.display='none'" class="save-btn cancel-modal-btn" style="width:100%; margin-top:10px;">Cancel</button>
         </div>
     </div>
 
@@ -384,22 +389,57 @@
         // ═══════════════════════════════════════════════════
         //  5.  NETWORK — CONNECT
         // ═══════════════════════════════════════════════════
-        document.getElementById('open-host-panel').onclick = () => document.getElementById('host-modal').style.display = 'flex';
+        document.getElementById('open-host-panel').onclick = () => {
+            const hostModal = document.getElementById('host-modal');
+            if (hostModal) {
+                hostModal.style.display = 'flex';
+                const pinInput = document.getElementById('host-pin-input');
+                if (pinInput && !pinInput.value) {
+                    pinInput.value = Math.floor(100000 + Math.random() * 900000).toString();
+                }
+            }
+        };
 
         document.getElementById('start-host-btn').onclick = () => {
-            const name = document.getElementById('host-name-input').value.trim();
-            const pin  = document.getElementById('host-pin-input').value.trim();
-            if (name && pin.length === 6) { isHost = true; startNetwork(pin, name); }
+            const nameInput = document.getElementById('host-name-input');
+            const pinInput = document.getElementById('host-pin-input');
+            const name = (nameInput && nameInput.value ? nameInput.value.trim() : '') || 'Nexus Room';
+            let pin = (pinInput && pinInput.value ? pinInput.value.trim() : '');
+            if (!pin || pin.length !== 6 || isNaN(pin)) {
+                pin = Math.floor(100000 + Math.random() * 900000).toString();
+                if (pinInput) pinInput.value = pin;
+            }
+            isHost = true;
+            startNetwork(pin, name);
         };
 
         document.getElementById('join-btn').onclick = () => {
-            const pin = document.getElementById('pin-entry').value.trim();
-            if (pin.length === 6) { isHost = false; startNetwork(pin, null); }
+            const pinEntry = document.getElementById('pin-entry');
+            const pin = (pinEntry && pinEntry.value ? pinEntry.value.trim() : '');
+            const pinErr = document.getElementById('pin-error');
+            if (!pin || pin.length !== 6 || isNaN(pin)) {
+                if (pinErr) {
+                    pinErr.textContent = 'Please enter a valid 6-digit PIN.';
+                    pinErr.style.display = 'block';
+                }
+                return;
+            }
+            if (pinErr) pinErr.style.display = 'none';
+            isHost = false;
+            startNetwork(pin, null);
         };
 
         function startNetwork(pin, roomName) {
             setStatus('loading', 'Connecting to secure relay…');
-            if (mqttClient) mqttClient.end(true);
+            if (mqttClient) {
+                try { mqttClient.end(true); } catch(e) {}
+            }
+
+            if (typeof mqtt === 'undefined') {
+                setStatus('error', 'Relay Library Offline');
+                if (window.nexusAlert) nexusAlert('Network relay library is loading or blocked by your browser network. Please refresh or check connection.');
+                return;
+            }
 
             currentTopic = VERSION + pin;
 
@@ -409,16 +449,21 @@
                 ? { type: 'disband' }
                 : { type: 'leave', peerId: myUuid };
 
-            mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
-                keepalive: 30,
-                reconnectPeriod: 3000,
-                will: {
-                    topic:   currentTopic,
-                    payload: JSON.stringify(willPayload),
-                    qos: 1,
-                    retain: false
-                }
-            });
+            try {
+                mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+                    keepalive: 30,
+                    reconnectPeriod: 3000,
+                    will: {
+                        topic:   currentTopic,
+                        payload: JSON.stringify(willPayload),
+                        qos: 1,
+                        retain: false
+                    }
+                });
+            } catch(e) {
+                setStatus('error', 'Connection Error');
+                return;
+            }
 
             mqttClient.on('connect', () => {
                 mqttClient.subscribe(currentTopic, { qos: 1 }, (err) => {

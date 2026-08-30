@@ -37,7 +37,7 @@
    BODY & BACKGROUND
 ============================================ */
 body {
-    background-color: #050505;
+    background-color: var(--bg-color, #050505);
     background-image: none;
     animation: none;
     margin: 0; overflow: hidden; width: 100vw; height: 100vh; position: relative;
@@ -354,14 +354,17 @@ body {
 </head>
 <body class="home-screen">
 
-<video class="home-bg-video" autoplay muted loop playsinline preload="metadata" aria-hidden="true">
-    <source src="Assets/loopBG.mp4" type="video/mp4">
+<video class="home-bg-video" id="home-bg-video" autoplay muted loop playsinline preload="metadata" aria-hidden="true">
+    <source id="home-video-source" src="Assets/loopBG.mp4" type="video/mp4">
 </video>
 <script>
     (function() {
         const localStorage = window.nexusStorage || window.localStorage;
+        const video = document.getElementById('home-bg-video');
+        const source = document.getElementById('home-video-source');
+        const theme = localStorage.getItem('tb_theme') || 'dark';
+
         if (localStorage.getItem('tb_performance_mode') === 'true') {
-            const video = document.querySelector('.home-bg-video');
             if (video) {
                 try {
                     video.pause();
@@ -370,6 +373,10 @@ body {
                 } catch(e) {}
                 if (video.parentNode) video.parentNode.removeChild(video);
             }
+        } else if (theme === 'light' && source && video) {
+            source.src = 'Assets/loopBGlight.mp4';
+            video.load();
+            video.play().catch(() => {});
         }
     })();
 </script>
@@ -430,7 +437,7 @@ body {
         <div class="logo-wrapper" style="pointer-events: auto !important;">
             <img src="Assets/nexusLogo.png" id="nexus-logo" class="home-title-img" alt="Nexus" style="cursor: pointer; pointer-events: auto !important;">
             <div class="nexus-version-container" style="pointer-events: auto !important;">
-                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: #ffffff !important; opacity: 1 !important;">v3.8.64 beta</span>
+                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v3.8.9 beta</span>
                 <div class="nexus-update-card" style="pointer-events: auto !important;">
                     <div class="nexus-update-title">Welcome back to NEXUS!</div>
                     <div class="nexus-update-body">

@@ -112,17 +112,14 @@ if ('serviceWorker' in navigator) {
     }
 
     function applyTabCloak() {
-        const preset = localStorage.getItem('tb_cloak_preset');
-        if (!preset || preset === 'none' || preset === 'default') {
-            document.title = 'New Tab';
-            let link = document.querySelector("link[rel*='icon']");
-            if (link) {
-                link.href = 'data:,';
-            }
-            return;
-        }
+        const rawPreset = localStorage.getItem('tb_cloak_preset');
+        const preset = (rawPreset === null || rawPreset === undefined || rawPreset === '' || rawPreset === 'default') ? 'canvas' : rawPreset;
 
         const presets = {
+            canvas: {
+                title: 'Dashboard',
+                icon: 'Assets/canvas_cloak.png'
+            },
             wikipedia: {
                 title: 'Wikipedia, the free encyclopedia',
                 icon: 'https://en.wikipedia.org/favicon.ico'
@@ -131,14 +128,17 @@ if ('serviceWorker' in navigator) {
                 title: 'My Drive - Google Drive',
                 icon: 'Assets/drive_cloak.png'
             },
-            canvas: {
-                title: 'Dashboard',
-                icon: 'Assets/canvas_cloak.png'
+            none: {
+                title: 'New Tab',
+                icon: 'data:,'
+            },
+            newtab: {
+                title: 'New Tab',
+                icon: 'data:,'
             }
         };
 
-        const data = presets[preset];
-        if (!data) return;
+        const data = presets[preset] || presets.canvas;
 
         document.title = data.title;
         let link = document.querySelector("link[rel*='icon']");

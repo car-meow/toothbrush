@@ -99,8 +99,8 @@
     </div>
 
     <div id="rename-overlay" class="overlay">
-        <div style="background: var(--modal-bg); padding: 28px; border-radius: 24px; width: 440px; max-width: 90vw; border: 2px solid #2196F3; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.9);">
-            <h2 style="color: #2196F3; margin-top: 0; margin-bottom: 12px; font-size: 24px;">Rename App</h2>
+        <div class="modal-box" style="padding: 28px; border-radius: 24px; width: 440px; max-width: 90vw; text-align: center; border: 2px solid var(--white-outline);">
+            <h2 id="rename-modal-title" style="color: var(--title-color); margin-top: 0; margin-bottom: 12px; font-size: 24px;">Rename App</h2>
             <input type="text" id="rename-app-title" class="rename-input" placeholder="App Title">
             <div id="rename-color-swatches" class="rename-color-swatches"></div>
             <button id="rename-done-btn" class="rename-done-btn">Done</button>
@@ -108,18 +108,20 @@
     </div>
 
     <div id="backup-select-overlay" class="overlay" style="display:none; z-index:32000;">
-        <div class="modal-box" style="max-width:560px; width:92vw; text-align:left;">
-            <h2 id="backup-select-title" style="margin-top:0;">Select Games</h2>
-            <p id="backup-select-hint" style="color:var(--muted-text,#999); font-size:13px;">Choose which games to include.</p>
+        <div class="modal-box" style="width: 520px; max-width: 92vw; text-align: left; border: 2px solid #ffffff;">
+            <h2 id="backup-select-title" style="color: #ffffff; margin-top: 0; margin-bottom: 6px; font-size: 22px; font-weight: 700;">Select Games</h2>
+            <p id="backup-select-hint" style="color: var(--muted-text, #9e93b8); font-size: 13px; margin-bottom: 14px;">Choose which games to include.</p>
             <div style="display:flex; gap:8px; margin-bottom:12px;">
-                <button id="backup-select-all" class="action-btn" style="background:#2196F3;">Select All</button>
-                <button id="backup-select-none" class="action-btn" style="background:#555;">Select None</button>
+                <button id="backup-select-all" class="backup-modal-btn" style="background:#ffffff; color:#0b0713;">Select All</button>
+                <button id="backup-select-none" class="backup-modal-btn" style="background:#4a3b68; color:#ffffff;">Select None</button>
             </div>
-            <div id="backup-game-list" style="max-height: fortyvh; max-height:40vh; overflow:auto; display:flex; flex-direction:column; gap:6px;"></div>
-            <label style="display:flex; gap:8px; align-items:center; margin:14px 0; font-size:13px;"><input type="checkbox" id="backup-include-settings"> Include global settings</label>
+            <div id="backup-game-list" style="max-height: 38vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
+            <label style="display:flex; gap:10px; align-items:center; margin: 12px 0 16px 0; font-size: 13px; cursor: pointer; color: var(--text-color); user-select: none;">
+                <input type="checkbox" id="backup-include-settings" style="cursor: pointer; width: 16px; height: 16px; accent-color: #ffffff;"> Include global settings (Leave unchecked if unsure)
+            </label>
             <div style="display:flex; justify-content:flex-end; gap:10px;">
-                <button id="backup-select-cancel" class="action-btn" style="background:#555;">Cancel</button>
-                <button id="backup-select-confirm" class="action-btn" style="background:#4CAF50;">Continue</button>
+                <button id="backup-select-cancel" class="backup-modal-btn" style="background:#4a3b68; color:#ffffff;">Cancel</button>
+                <button id="backup-select-confirm" class="backup-modal-btn" style="background:#4CAF50; color:#ffffff;">Continue</button>
             </div>
         </div>
     </div>

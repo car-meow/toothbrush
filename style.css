@@ -24,22 +24,52 @@
     --splash-color: #D083DE;
     --settings-row-bg: #22163b;
     --settings-label-color: #ffffff;
+
+    /* Theme Tokens (Dark Mode) */
+    --accent-btn-bg: rgba(255, 255, 255, 0.08);
+    --accent-btn-bg-hover: rgba(255, 255, 255, 0.16);
+    --accent-btn-border: rgba(255, 255, 255, 0.92);
+    --accent-btn-border-hover: #ffffff;
+    --accent-btn-text: #ffffff;
+    --icon-filter: brightness(0) invert(1);
+    --logo-filter: drop-shadow(4px 4px 15px rgba(0, 0, 0, 0.8));
+    --white-outline: #ffffff;
+    --accent-border: #ffffff;
+    --card-border: #362854;
+    --hud-bg: rgba(15, 15, 15, 0.7);
+    --version-color: #ffffff;
+    --muted-text: #9e93b8;
 }
 
 html.light-mode {
-    --bg-color: #eae6f0;
-    --text-color: #120c1f;
-    --panel-bg: #dcd6e8;
-    --panel-bg-alt: #f0ecf7;
-    --border-color: #c4b9d6;
-    --zigzag-bg: #e5def0;
-    --zigzag-line: #faf9fc;
+    --bg-color: #ede8f5;
+    --text-color: #140d24;
+    --panel-bg: #ded6eb;
+    --panel-bg-alt: #d3c9e3;
+    --border-color: #4a366e;
+    --zigzag-bg: #e8e0f2;
+    --zigzag-line: #d8cde8;
     --input-bg: #ffffff;
-    --modal-bg: #ffffff;
-    --title-color: #2c1a4d;
-    --splash-color: #D083DE;
-    --settings-row-bg: #e8e2f2;
-    --settings-label-color: #120c1f;
+    --modal-bg: #f9f7fd;
+    --title-color: #140d24;
+    --splash-color: #7b1fa2;
+    --settings-row-bg: #ded4eb;
+    --settings-label-color: #140d24;
+
+    /* Darker Accent Palette for Light Theme */
+    --accent-btn-bg: rgba(20, 13, 36, 0.07);
+    --accent-btn-bg-hover: rgba(20, 13, 36, 0.15);
+    --accent-btn-border: #140d24;
+    --accent-btn-border-hover: #000000;
+    --accent-btn-text: #140d24;
+    --icon-filter: brightness(0) invert(0.08);
+    --logo-filter: brightness(0) invert(0.08) drop-shadow(2px 2px 8px rgba(20, 13, 36, 0.25));
+    --white-outline: #140d24;
+    --accent-border: #140d24;
+    --card-border: #4a366e;
+    --hud-bg: rgba(240, 235, 248, 0.88);
+    --version-color: #140d24;
+    --muted-text: #4a3c66;
 }
 
 body {
@@ -133,9 +163,9 @@ body:not(.media-bg) .action-btn,
 body:not(.media-bg) .buy-btn,
 body:not(.media-bg) .incinerate-btn,
 body:not(.media-bg) .rename-done-btn {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 2.5px solid rgba(255, 255, 255, 0.92) !important;
-    color: #ffffff !important;
+    background: var(--accent-btn-bg) !important;
+    border: 2.5px solid var(--accent-btn-border) !important;
+    color: var(--accent-btn-text) !important;
     text-shadow: none !important;
     box-shadow: none;
     border-radius: 999px !important;
@@ -149,9 +179,9 @@ body:not(.media-bg) .action-btn:hover,
 body:not(.media-bg) .buy-btn:hover,
 body:not(.media-bg) .incinerate-btn:hover,
 body:not(.media-bg) .rename-done-btn:hover {
-    background: rgba(255, 255, 255, 0.16) !important;
-    border: 2.5px solid #ffffff !important;
-    color: #ffffff !important;
+    background: var(--accent-btn-bg-hover) !important;
+    border: 2.5px solid var(--accent-btn-border-hover) !important;
+    color: var(--accent-btn-text) !important;
     filter: none;
 }
 
@@ -502,8 +532,9 @@ body:not(.media-bg) .rename-done-btn:hover {
     width: auto;
     cursor: pointer;
     margin: 0;
-    filter: drop-shadow(4px 4px 15px rgba(0, 0, 0, 0.8));
+    filter: var(--logo-filter);
     pointer-events: auto !important;
+    transition: filter 0.2s ease, transform 0.2s ease;
 }
 
 .material-nav-btn {
@@ -518,9 +549,9 @@ body:not(.media-bg) .rename-done-btn:hover {
     justify-content: center;
     gap: 0;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.08);
-    border: 2.5px solid #ffffff;
-    color: #ffffff;
+    background: var(--accent-btn-bg);
+    border: 2.5px solid var(--accent-btn-border);
+    color: var(--accent-btn-text);
     backdrop-filter: blur(18px);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
     cursor: pointer;
@@ -546,7 +577,8 @@ body:not(.media-bg) .rename-done-btn:hover {
     padding: 0 16px !important;
     gap: 10px;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.16);
+    background: var(--accent-btn-bg-hover);
+    border: 2.5px solid var(--accent-btn-border-hover);
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
     /* Hover: width expands immediately with ultra-smooth easing */
@@ -564,11 +596,12 @@ body:not(.media-bg) .rename-done-btn:hover {
     height: 24px;
     flex: 0 0 24px;
     object-fit: contain;
-    filter: brightness(0) invert(1);
+    filter: var(--icon-filter);
     flex-shrink: 0;
     display: block;
     margin: 0;
     pointer-events: none;
+    transition: filter 0.2s ease;
 }
 
 .material-nav-btn span {
@@ -576,7 +609,7 @@ body:not(.media-bg) .rename-done-btn:hover {
     opacity: 0;
     white-space: nowrap;
     overflow: hidden;
-    color: #ffffff;
+    color: var(--accent-btn-text);
     font-size: 16px;
     font-weight: 700;
     line-height: 1;
@@ -690,7 +723,7 @@ main {
     justify-content: space-between;
     align-items: center;
     transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
-    border: 2.5px solid #1c1430;
+    border: 2.5px solid var(--card-border);
     position: relative;
     --li-bg: var(--zigzag-line);  /* gradient color matches button bg */
 }
@@ -698,7 +731,7 @@ main {
 #game-list li:hover {
     background-color: var(--panel-bg-alt);
     transform: translateX(5px);
-    border-color: #ffffff;
+    border-color: var(--accent-border);
     box-shadow: -5px 5px 5px rgba(0, 0, 0, 0.3);
 }
 
@@ -829,20 +862,22 @@ body.app-is-dragging #game-list li:not(.dragging):not(.ugs-item):hover {
 }
 
 .ugs-item {
-    background-color: #ffffff !important;
-    border: 1px solid #ffffff !important;
-    color: var(--panel-bg) !important;
+    background-color: #120b20 !important;
+    border: 2px solid #2d1d4d !important;
+    color: #ffffff !important;
     font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
+    --li-bg: #120b20;
 }
 
 .ugs-item, .ugs-item * {
-    color: var(--panel-bg) !important;
+    color: #ffffff !important;
 }
 
 .ugs-item:hover, .ugs-item:hover * {
-    background-color: #fafafa !important;
-    border-color: #fafafa !important;
-    color: var(--panel-bg) !important;
+    background-color: #1c1232 !important;
+    border-color: #5c3b99 !important;
+    color: #ffffff !important;
 }
 
 /* =========================================
@@ -853,7 +888,7 @@ body.app-is-dragging #game-list li:not(.dragging):not(.ugs-item):hover {
 
 /* Set per-state gradient colors as overrides */
 #game-list li.new-game  { --li-bg: #2f972c; }
-.ugs-item               { --li-bg: #ffffff; }
+.ugs-item               { --li-bg: #120b20; }
 
 /* Clipping wrapper — single line by default */
 .game-title-wrapper {
@@ -1157,10 +1192,20 @@ input[type="file"],
 }
 
 .rename-input {
-    background: #333 !important;
+    background: var(--input-bg) !important;
+    color: var(--text-color) !important;
+    border: 1.5px solid var(--border-color) !important;
+    border-radius: 10px !important;
     padding: 12px !important;
     margin: 12px 0 18px !important;
     font-size: 16px;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.rename-input:focus {
+    border-color: var(--white-outline) !important;
 }
 
 .rename-done-btn {
@@ -1331,6 +1376,58 @@ iframe {
     flex-direction: column;
     overflow: hidden;
     box-shadow: 0 0 50px black;
+}
+
+.modal-box {
+    background: var(--modal-bg);
+    color: var(--text-color);
+    padding: 28px;
+    border-radius: 24px;
+    width: 520px;
+    max-width: 92vw;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+.backup-modal-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 9px 18px;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter 0.15s, transform 0.1s;
+    user-select: none;
+}
+
+.backup-modal-btn:hover {
+    filter: brightness(1.2);
+}
+
+.backup-modal-btn:active {
+    transform: scale(0.97);
+}
+
+#backup-game-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#backup-game-list::-webkit-scrollbar-track {
+    background: var(--input-bg);
+    border-radius: 4px;
+}
+
+#backup-game-list::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+#backup-game-list::-webkit-scrollbar-thumb:hover {
+    background: #ffffff;
 }
 
 /* =========================================
@@ -2109,6 +2206,192 @@ html.performance-mode #tab-url-btn {
 html.performance-mode #url-preview-badge {
     background: #0d1f33 !important;
     box-shadow: none !important;
+}
+
+/* =========================================
+   LIGHT THEME COMPLETE OVERHAUL & DARK ACCENTS
+========================================= */
+html.light-mode body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+html.light-mode #nexus-logo,
+html.light-mode .home-title-img {
+    filter: var(--logo-filter) !important;
+}
+
+html.light-mode .home-title {
+    color: var(--title-color) !important;
+    text-shadow: none !important;
+}
+
+html.light-mode .home-splash {
+    color: var(--splash-color) !important;
+    text-shadow: none !important;
+}
+
+html.light-mode header img,
+html.light-mode .controls img,
+html.light-mode .top-nav img,
+html.light-mode .modal-box h2 img,
+html.light-mode .status-header img,
+html.light-mode #tab-url-icon {
+    filter: var(--icon-filter) !important;
+}
+
+html.light-mode .status-text {
+    color: var(--text-color) !important;
+}
+
+html.light-mode .nexus-version-tag {
+    color: var(--version-color) !important;
+}
+
+html.light-mode .nexus-update-card {
+    background: var(--modal-bg) !important;
+    border: 2.5px solid var(--white-outline) !important;
+    color: var(--text-color) !important;
+    box-shadow: 0 8px 30px rgba(20, 13, 36, 0.18) !important;
+}
+
+html.light-mode .nexus-update-title,
+html.light-mode .nexus-update-body {
+    color: var(--text-color) !important;
+}
+
+html.light-mode .nexus-read-more-btn {
+    background: var(--accent-btn-bg) !important;
+    border: 2px solid var(--accent-btn-border) !important;
+    color: var(--accent-btn-text) !important;
+}
+
+html.light-mode .nexus-request-btn {
+    background: #6a1b9a !important;
+    color: #ffffff !important;
+}
+
+html.light-mode .modal-box {
+    background: var(--modal-bg) !important;
+    color: var(--text-color) !important;
+    border: 2px solid var(--white-outline) !important;
+    box-shadow: 0 10px 40px rgba(20, 13, 36, 0.22) !important;
+}
+
+html.light-mode #backup-select-title {
+    color: var(--title-color) !important;
+}
+
+html.light-mode #backup-select-all {
+    background: var(--accent-btn-border) !important;
+    color: #ffffff !important;
+}
+
+html.light-mode .currency-display,
+html.light-mode .swag-display {
+    background: var(--hud-bg) !important;
+    border-color: #2e7d32 !important;
+    box-shadow: 0 4px 16px rgba(20, 13, 36, 0.12) !important;
+}
+
+html.light-mode .currency-amount {
+    color: var(--text-color) !important;
+}
+
+html.light-mode .cps-display {
+    color: #795548 !important;
+}
+
+html.light-mode #game-list li {
+    background-color: var(--zigzag-bg);
+    border-color: var(--border-color);
+    color: var(--text-color);
+}
+
+html.light-mode #game-list li:hover {
+    background-color: var(--panel-bg-alt);
+    border-color: var(--white-outline);
+}
+
+html.light-mode .empty-state-title {
+    color: var(--title-color) !important;
+}
+
+html.light-mode .empty-state-subtitle {
+    color: var(--muted-text) !important;
+}
+
+html.light-mode .setting-row {
+    background: var(--settings-row-bg) !important;
+    border-color: var(--border-color) !important;
+}
+
+html.light-mode .custom-select {
+    background: var(--input-bg) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+html.light-mode .slider {
+    background-color: #baa8d4 !important;
+}
+
+html.light-mode input:checked + .slider {
+    background-color: #6a1b9a !important;
+}
+
+html.light-mode .app-action-btn {
+    background: rgba(20, 13, 36, 0.08) !important;
+    border-color: transparent !important;
+}
+
+html.light-mode .app-action-btn:hover {
+    background: rgba(20, 13, 36, 0.16) !important;
+}
+
+html.light-mode .app-action-btn img {
+    filter: brightness(0) invert(0.08) !important;
+}
+
+html.light-mode .rename-color-swatches {
+    background: rgba(20, 13, 36, 0.04) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+html.light-mode .sidebar-new-chat-btn {
+    background: var(--accent-btn-bg) !important;
+    border-color: var(--accent-btn-border) !important;
+    color: var(--accent-btn-text) !important;
+}
+
+html.light-mode .sidebar-new-chat-btn:hover {
+    background: var(--accent-btn-bg-hover) !important;
+    border-color: var(--accent-btn-border-hover) !important;
+    color: var(--accent-btn-text) !important;
+}
+
+html.light-mode .sidebar-new-chat-btn img {
+    filter: brightness(0) invert(0.08) !important;
+}
+
+html.light-mode.home-screen::before,
+html.light-mode .home-screen::before {
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+html.light-mode .chat-list li {
+    background-color: var(--zigzag-bg);
+    border-color: var(--border-color);
+    color: var(--text-color);
+}
+
+html.light-mode .chat-list li:hover {
+    background-color: var(--panel-bg-alt);
+    border-color: var(--white-outline);
+}
+
+html.light-mode .message {
+    border-color: var(--white-outline) !important;
 }
 
 

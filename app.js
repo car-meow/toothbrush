@@ -249,18 +249,78 @@ window.addStashGameToSidebar = async function(game) {
     notifyStashBookmarkAvailability();
 };
 
+function findGameByIdOrSource(idOrKey) {
+    if (!idOrKey) return null;
+    const lower = String(idOrKey).toLowerCase();
+    return games.find(g => {
+        if (!g) return false;
+        if (g.id === idOrKey || String(g.id).toLowerCase() === lower) return true;
+        if (g.sourceKey && String(g.sourceKey).toLowerCase() === lower) return true;
+        if (g.sourceFile) {
+            const sf = String(g.sourceFile).toLowerCase();
+            if (sf === lower || sf.replace(/\.html$/, '') === lower) return true;
+        }
+        if (g.title && (String(g.title).toLowerCase() === lower || String(g.title).toLowerCase().replace(/[^a-z0-9]/g, '') === lower)) return true;
+        return false;
+    }) || null;
+}
+
+function doesSnapshotBelongToGame(snapshot, game) {
+    if (!snapshot || !game) return false;
+    const snapId = String(snapshot.gameId || '').toLowerCase();
+    const gId = String(game.id || '').toLowerCase();
+    if (snapId === gId) return true;
+    if (game.sourceKey && snapId === String(game.sourceKey).toLowerCase()) return true;
+    if (game.sourceFile) {
+        const sf = String(game.sourceFile).toLowerCase();
+        const sfBase = sf.replace(/\.html$/, '');
+        if (snapId === sf || snapId === sfBase) return true;
+    }
+    if (game.title && (snapId === String(game.title).toLowerCase() || snapId === String(game.title).toLowerCase().replace(/[^a-z0-9]/g, ''))) return true;
+    return false;
+}
+
 async function getGameSnapshot(gameId) {
     if (!gameId) return null;
     await initDB();
+    const idsToCheck = [gameId];
+    const matched = findGameByIdOrSource(gameId);
+    if (matched) {
+        if (matched.id && !idsToCheck.includes(matched.id)) idsToCheck.push(matched.id);
+        if (matched.sourceKey && !idsToCheck.includes(matched.sourceKey)) idsToCheck.push(matched.sourceKey);
+        if (matched.sourceFile) {
+            if (!idsToCheck.includes(matched.sourceFile)) idsToCheck.push(matched.sourceFile);
+            const base = matched.sourceFile.replace(/\.html$/, '');
+            if (!idsToCheck.includes(base)) idsToCheck.push(base);
+        }
+    }
     return new Promise(resolve => {
-        const tx = db.transaction('gameSnapshots', 'readonly');
-        const req = tx.objectStore('gameSnapshots').get(gameId);
-        req.onsuccess = () => resolve(req.result ? req.result.localStorage : null);
-        req.onerror = () => resolve(null);
+        try {
+            const tx = db.transaction('gameSnapshots', 'readonly');
+            const store = tx.objectStore('gameSnapshots');
+            let found = null;
+            let checksLeft = idsToCheck.length;
+            idsToCheck.forEach(id => {
+                const req = store.get(id);
+                req.onsuccess = () => {
+                    if (req.result && req.result.localStorage && !found) {
+                        found = req.result.localStorage;
+                    }
+                    checksLeft--;
+                    if (checksLeft === 0) resolve(found);
+                };
+                req.onerror = () => {
+                    checksLeft--;
+                    if (checksLeft === 0) resolve(found);
+                };
+            });
+        } catch (e) {
+            resolve(null);
+        }
     });
 }
 
-async function saveGameSnapshot(gameId, localStorageData) {
+async function saveGameSnapshot(gameId, localStorageData, skipMirror = false) {
     if (!gameId || !localStorageData || typeof localStorageData !== 'object') return;
     await initDB();
 
@@ -303,12 +363,19 @@ async function saveGameSnapshot(gameId, localStorageData) {
 
     // Immediately synchronize in-memory caches across all references
     games.forEach(g => {
-        if (g && g.id === gameId) {
+        if (g && (g.id === gameId || (g.sourceFile && g.sourceFile === gameId))) {
             loadedGameSnapshots.set(g, dataToSave);
         }
     });
-    if (currentGame && currentGame.id === gameId) {
+    if (currentGame && (currentGame.id === gameId || (currentGame.sourceFile && currentGame.sourceFile === gameId))) {
         loadedGameSnapshots.set(currentGame, dataToSave);
+    }
+
+    if (!skipMirror) {
+        const matched = findGameByIdOrSource(gameId);
+        if (matched && matched.id && matched.id !== gameId) {
+            saveGameSnapshot(matched.id, dataToSave, true).catch(() => {});
+        }
     }
 
     return new Promise((resolve, reject) => {
@@ -484,7 +551,7 @@ function renderGameList() {
 
         if (isUserManagedGame(game)) {
             const rename = document.createElement('span');
-            rename.innerHTML = '<img src="Assets/Rename.svg" alt="Edit" style="width:18px;height:18px;filter:brightness(0) invert(1);vertical-align:middle;">';
+            rename.innerHTML = '<img src="Assets/Rename.svg" alt="Edit" style="width:18px;height:18px;filter:var(--icon-filter);vertical-align:middle;">';
             rename.className = "app-action-btn rename-btn";
             rename.title = "Edit app";
             rename.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -496,7 +563,7 @@ function renderGameList() {
             li.appendChild(rename);
 
             const del = document.createElement('span');
-            del.innerHTML = '<img src="Assets/Delete.svg" alt="Delete" style="width:18px;height:18px;filter:brightness(0) invert(1);vertical-align:middle;">';
+            del.innerHTML = '<img src="Assets/Delete.svg" alt="Delete" style="width:18px;height:18px;filter:var(--icon-filter);vertical-align:middle;">';
             del.className = "app-action-btn trash-btn";
             del.style.marginRight = "22px";
 
@@ -1032,6 +1099,41 @@ function getUniversalAutosaveBridge(gameId) {
 <\/script>`;
 }
 
+function getCloakData() {
+    try {
+        const localStorage = window.nexusStorage;
+        const rawPreset = localStorage.getItem('tb_cloak_preset');
+        const preset = (rawPreset === null || rawPreset === undefined || rawPreset === '' || rawPreset === 'default') ? 'canvas' : rawPreset;
+
+        const presets = {
+            canvas: {
+                title: 'Dashboard',
+                icon: 'Assets/canvas_cloak.png'
+            },
+            wikipedia: {
+                title: 'Wikipedia, the free encyclopedia',
+                icon: 'https://en.wikipedia.org/favicon.ico'
+            },
+            drive: {
+                title: 'My Drive - Google Drive',
+                icon: 'Assets/drive_cloak.png'
+            },
+            none: {
+                title: 'New Tab',
+                icon: 'data:,'
+            },
+            newtab: {
+                title: 'New Tab',
+                icon: 'data:,'
+            }
+        };
+
+        return presets[preset] || presets.canvas;
+    } catch(e) {
+        return { title: 'Dashboard', icon: 'Assets/canvas_cloak.png' };
+    }
+}
+
 function launchGameFullscreen(game) {
     if (!game || game.id === "ugs-stash") return;
 
@@ -1044,28 +1146,39 @@ function launchGameFullscreen(game) {
     if (game && game.id) popupGameWindows.set(game.id, win);
     try { win.focus(); } catch(e) {}
 
+    const cloak = getCloakData();
+
     // Apply Cloaking Preset
     try {
-        const localStorage = window.nexusStorage;
-        const preset = localStorage.getItem('tb_cloak_preset');
-        if (preset === 'drive') {
-            win.document.title = "My Drive - Google Drive";
-            const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'Assets/drive_cloak.png';
-            win.document.head.appendChild(link);
-        } else if (preset === 'wikipedia') {
-            win.document.title = "Wikipedia, the free encyclopedia";
-            const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'https://en.wikipedia.org/favicon.ico';
-            win.document.head.appendChild(link);
-        } else if (preset === 'canvas') {
-            win.document.title = "Dashboard";
-            const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'Assets/canvas_cloak.png';
-            win.document.head.appendChild(link);
-        } else {
-            win.document.title = game.title || "Game";
-            const link = win.document.createElement('link'); link.rel = 'icon'; link.href = 'data:,';
+        win.document.title = cloak.title;
+        let link = win.document.querySelector("link[rel*='icon']");
+        if (!link) {
+            link = win.document.createElement('link');
+            link.rel = 'shortcut icon';
             win.document.head.appendChild(link);
         }
+        link.href = cloak.icon;
     } catch(e) {}
+
+    const titleEnforceScript = `<script>
+    (function() {
+        var ct = ${JSON.stringify(cloak.title)};
+        var ci = ${JSON.stringify(cloak.icon)};
+        document.title = ct;
+        var fl = document.querySelector("link[rel*='icon']");
+        if (!fl) { fl = document.createElement('link'); fl.rel = 'shortcut icon'; document.head.appendChild(fl); }
+        fl.href = ci;
+        try {
+            Object.defineProperty(document, 'title', {
+                get: function() { return ct; },
+                set: function() { return ct; }
+            });
+        } catch(e) {}
+        setInterval(function() {
+            if (document.title !== ct) document.title = ct;
+        }, 300);
+    })();
+    <\/script>`;
 
     // Asynchronously load content/snapshots and initialize game document inside about:blank
     (async () => {
@@ -1088,7 +1201,8 @@ function launchGameFullscreen(game) {
                 const latestSnapshot = await getGameSnapshot(game.id);
                 loadedGameSnapshots.set(game, latestSnapshot || {});
 
-                const rawHtml = atob(game.content.split(',')[1]);
+                let rawHtml = atob(game.content.split(',')[1]);
+                rawHtml = rawHtml.replace(/<title>[\s\S]*?<\/title>/gi, `<title>${cloak.title}</title>`);
                 const isUnityRuntime = /(?:createUnityInstance|UnityLoader|unity-container|unity-canvas)/i.test(rawHtml);
                 const unityCompatibility = isUnityRuntime
                     ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
@@ -1119,7 +1233,7 @@ function launchGameFullscreen(game) {
                 })();
                 <\/script>`;
 
-                const gameSrcDoc = injectGameBootstrap(rawHtml, unityCompatibility + popupRestore + popupBridge + autoFocusScript);
+                const gameSrcDoc = injectGameBootstrap(rawHtml, unityCompatibility + popupRestore + popupBridge + autoFocusScript + titleEnforceScript);
                 win.document.open();
                 win.document.write(gameSrcDoc);
                 win.document.close();
@@ -1133,6 +1247,28 @@ function launchGameFullscreen(game) {
                 win.document.body.style.padding = '0';
                 win.document.body.style.overflow = 'hidden';
                 win.document.body.appendChild(ifr);
+
+                const enforceScriptEl = win.document.createElement('script');
+                enforceScriptEl.textContent = `
+                (function() {
+                    var ct = ${JSON.stringify(cloak.title)};
+                    var ci = ${JSON.stringify(cloak.icon)};
+                    document.title = ct;
+                    var fl = document.querySelector("link[rel*='icon']");
+                    if (!fl) { fl = document.createElement('link'); fl.rel = 'shortcut icon'; document.head.appendChild(fl); }
+                    fl.href = ci;
+                    try {
+                        Object.defineProperty(document, 'title', {
+                            get: function() { return ct; },
+                            set: function() { return ct; }
+                        });
+                    } catch(e) {}
+                    setInterval(function() {
+                        if (document.title !== ct) document.title = ct;
+                    }, 300);
+                })();
+                `;
+                win.document.head.appendChild(enforceScriptEl);
 
                 function doFocusAndClick() {
                     try {
@@ -1553,7 +1689,7 @@ function updateGameStatusUI(state) {
 
 function ensureStashPreloaded() {
     const localStorage = window.nexusStorage;
-    const isPreloadEnabled = localStorage.getItem('tb_preload_stash') === 'true';
+    const isPreloadEnabled = localStorage.getItem('tb_preload_stash') !== 'false';
     const stashFrame = document.getElementById('stash-frame');
 
     if (isPreloadEnabled && stashFrame && !isStashPreloaded) {
@@ -1575,12 +1711,10 @@ async function loadGame(game, forceInternal = false) {
     }
 
     const localStorage = window.nexusStorage;
-    const isDebugFS = localStorage.getItem('tb_debug_fullscreen') === 'true';
-    const isPreloadEnabled = localStorage.getItem('tb_preload_stash') === 'true';
+    const isPreloadEnabled = localStorage.getItem('tb_preload_stash') !== 'false';
 
-    // If Debug Fullscreen is OFF (default) and launching a non-stash game from sidebar,
-    // open the fullscreen window immediately on the synchronous user click event!
-    if (!isDebugFS && !forceInternal && game && game.id !== "ugs-stash") {
+    // Launch non-stash game from sidebar straight to new tab in fullscreen
+    if (!forceInternal && game && game.id !== "ugs-stash") {
         launchGameFullscreen(game);
         return;
     }
@@ -1610,11 +1744,7 @@ async function loadGame(game, forceInternal = false) {
     currentGame = game;
     const cloakBtn = document.getElementById('cloak-btn');
     if (cloakBtn) {
-        if (isDebugFS && game && game.id !== "ugs-stash") {
-            cloakBtn.style.display = 'inline-flex';
-        } else {
-            cloakBtn.style.display = 'none';
-        }
+        cloakBtn.style.display = 'none';
     }
 
     const frame = document.getElementById('game-frame');
@@ -1626,21 +1756,33 @@ async function loadGame(game, forceInternal = false) {
     if (emergencyBtn) emergencyBtn.style.display = 'inline-flex';
 
     // Handle Game Stash loading with Preload support
-    if (game && game.id === "ugs-stash" && isPreloadEnabled && stashFrame) {
-        if (frame) frame.style.setProperty('display', 'none', 'important');
-        stashFrame.style.setProperty('display', 'block', 'important');
-        stashFrame.style.setProperty('visibility', 'visible', 'important');
-        stashFrame.style.opacity = '1';
+    if (game && game.id === "ugs-stash") {
+        if (isPreloadEnabled && stashFrame) {
+            if (frame) frame.style.setProperty('display', 'none', 'important');
+            stashFrame.style.setProperty('display', 'block', 'important');
+            stashFrame.style.setProperty('visibility', 'visible', 'important');
+            stashFrame.style.opacity = '1';
 
-        if (!isStashPreloaded || !stashFrame.src || stashFrame.src.endsWith('about:blank')) {
+            if (!isStashPreloaded || !stashFrame.src || stashFrame.src.endsWith('about:blank')) {
+                updateGameStatusUI('loading');
+                stashFrame.src = 'clSINGLEFILE.html';
+                stashFrame.onload = () => {
+                    isStashPreloaded = true;
+                    updateGameStatusUI('loaded');
+                };
+            } else {
+                updateGameStatusUI('loaded');
+            }
+        } else if (frame) {
+            if (stashFrame) stashFrame.style.setProperty('display', 'none', 'important');
+            frame.style.setProperty('display', 'block', 'important');
+            frame.style.setProperty('visibility', 'visible', 'important');
+            frame.style.opacity = '1';
             updateGameStatusUI('loading');
-            stashFrame.src = 'clSINGLEFILE.html';
-            stashFrame.onload = () => {
-                isStashPreloaded = true;
+            frame.src = 'clSINGLEFILE.html';
+            frame.onload = () => {
                 updateGameStatusUI('loaded');
             };
-        } else {
-            updateGameStatusUI('loaded');
         }
         return;
     }
@@ -1980,20 +2122,39 @@ function openBackupSelection(gameList, title, hint) {
     document.getElementById('backup-select-title').textContent = title;
     document.getElementById('backup-select-hint').textContent = hint;
     list.innerHTML = '';
-    gameList.forEach(game => {
-        const label = document.createElement('label');
-        label.style.cssText = 'display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--border-color);border-radius:8px;';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox'; checkbox.value = game.id; checkbox.checked = true;
-        const text = document.createElement('span');
-        text.textContent = game.title || game.id;
-        label.append(checkbox, text);
-        list.appendChild(label);
-    });
+
+    if (!gameList || gameList.length === 0) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.style.cssText = 'padding: 16px; text-align: center; color: var(--muted-text, #9e93b8); font-size: 14px;';
+        emptyMsg.textContent = 'No custom games available.';
+        list.appendChild(emptyMsg);
+    } else {
+        gameList.forEach(game => {
+            const label = document.createElement('label');
+            label.style.cssText = 'display: flex; gap: 12px; align-items: center; padding: 10px 14px; background: var(--settings-row-bg, #22163b); border: 1px solid var(--border-color); border-radius: 10px; cursor: pointer; transition: background 0.15s, border-color 0.15s; user-select: none;';
+            label.onmouseenter = () => { label.style.borderColor = '#ffffff'; };
+            label.onmouseleave = () => { label.style.borderColor = 'var(--border-color)'; };
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = game.id;
+            checkbox.checked = true;
+            checkbox.style.cssText = 'width: 17px; height: 17px; cursor: pointer; accent-color: #ffffff; flex-shrink: 0;';
+
+            const text = document.createElement('span');
+            text.style.cssText = 'font-size: 14px; font-weight: 500; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+            text.textContent = (typeof getSidebarTitle === 'function' ? getSidebarTitle(game) : '') || game.title || game.id;
+
+            label.append(checkbox, text);
+            list.appendChild(label);
+        });
+    }
+
     const settings = document.getElementById('backup-include-settings');
-    settings.checked = false;
+    if (settings) settings.checked = false;
     overlay.style.display = 'flex';
     if (window.setGamePopupState) window.setGamePopupState('backup-select-overlay', true);
+
     return new Promise(resolve => {
         const finish = value => {
             overlay.style.display = 'none';
@@ -2003,66 +2164,53 @@ function openBackupSelection(gameList, title, hint) {
         document.getElementById('backup-select-all').onclick = () => list.querySelectorAll('input').forEach(input => input.checked = true);
         document.getElementById('backup-select-none').onclick = () => list.querySelectorAll('input').forEach(input => input.checked = false);
         document.getElementById('backup-select-cancel').onclick = () => finish(null);
-        document.getElementById('backup-select-confirm').onclick = () => finish({
-            ids: new Set(Array.from(list.querySelectorAll('input:checked')).map(input => input.value)),
-            includeSettings: settings.checked
-        });
+        document.getElementById('backup-select-confirm').onclick = () => {
+            const checkedInputs = Array.from(list.querySelectorAll('input:checked'));
+            finish({
+                ids: new Set(checkedInputs.map(input => input.value)),
+                includeSettings: settings ? settings.checked : false
+            });
+        };
     });
 }
 
 if (exportBtn) {
+    const defaultBackupHTML = '<img src="Assets/Backup.svg" alt=""><span>Backup</span>';
     exportBtn.onclick = async () => {
+        const selectableGames = games.filter(game => game.id !== 'ugs-stash' && isUserManagedGame(game));
         const selection = await openBackupSelection(
-            games.filter(game => game.id !== 'ugs-stash' && isUserManagedGame(game)),
+            selectableGames,
             'Select Games to Back Up',
             'Only selected games and their saves will be included.'
         );
-        if (!selection) return;
-        const originalText = exportBtn.textContent;
+        if (!selection || !selection.ids || selection.ids.size === 0) return;
+
         exportBtn.disabled = true;
-        exportBtn.textContent = "Saving...";
-
-        let fileHandle = null;
-        try {
-            // Try to open the modern Save File Picker instantly to capture user gesture
-            if ('showSaveFilePicker' in window) {
-                fileHandle = await window.showSaveFilePicker({
-                    suggestedName: 'nexus_backup.json',
-                    types: [{
-                        description: 'JSON Backup Files',
-                        accept: {
-                            'application/json': ['.json']
-                        }
-                    }]
-                });
-            }
-        } catch (err) {
-            if (err.name === 'AbortError') {
-                // User cancelled the file picker dialog
-                exportBtn.disabled = false;
-                exportBtn.textContent = originalText;
-                return;
-            }
-            console.warn("File System Access API failed or unsupported:", err);
-        }
+        exportBtn.innerHTML = '<img src="Assets/loadingRoll.gif" alt="" style="width:18px;height:18px;vertical-align:middle;">';
 
         try {
+            // 1. Request current game to flush its saves to storage immediately
+            requestCurrentGameAutosave();
+            await new Promise(r => setTimeout(r, 150));
+
             const localStorage = window.nexusStorage;
-            // Gather custom games
-            const tx = db.transaction('customGames', 'readonly');
-            const customGames = await new Promise(r => {
-                const req = tx.objectStore('customGames').getAll();
-                req.onsuccess = () => r(req.result);
-                req.onerror = () => r([]);
-            });
-            const snapshotTx = db.transaction('gameSnapshots', 'readonly');
-            const gameSnapshots = await new Promise(r => {
-                const req = snapshotTx.objectStore('gameSnapshots').getAll();
-                req.onsuccess = () => r(req.result || []);
-                req.onerror = () => r([]);
-            });
+            await initDB();
 
-            // Gather all saves from localStorage
+            // 2. Gather custom games in parallel
+            const [customGames, gameSnapshots] = await Promise.all([
+                new Promise(r => {
+                    const req = db.transaction('customGames', 'readonly').objectStore('customGames').getAll();
+                    req.onsuccess = () => r(req.result || []);
+                    req.onerror = () => r([]);
+                }),
+                new Promise(r => {
+                    const req = db.transaction('gameSnapshots', 'readonly').objectStore('gameSnapshots').getAll();
+                    req.onsuccess = () => r(req.result || []);
+                    req.onerror = () => r([]);
+                })
+            ]);
+
+            // 3. Gather localStorage if settings requested
             const allSaves = {};
             if (selection.includeSettings) {
                 for (let i = 0; i < localStorage.length; i++) {
@@ -2071,104 +2219,120 @@ if (exportBtn) {
                 }
             }
 
-            // Gather IndexedDB databases
+            // 4. Gather IndexedDB databases (fast parallel getAll)
             const idbData = {};
-            if (window.indexedDB.databases) {
-                const dbs = await window.indexedDB.databases();
-                for (let dbInfo of dbs) {
-                    if (dbInfo.name === "GameStorageDB") continue;
-                    
-                    const gameDB = await new Promise(res => {
-                        const req = indexedDB.open(dbInfo.name);
-                        req.onsuccess = () => res(req.result);
-                        req.onerror = () => res(null);
-                        req.onblocked = () => res(null);
-                    });
-                    if (!gameDB) continue;
+            if (window.indexedDB && window.indexedDB.databases) {
+                try {
+                    const dbs = await window.indexedDB.databases();
+                    for (let dbInfo of dbs) {
+                        if (!dbInfo.name || dbInfo.name === "GameStorageDB") continue;
 
-                    const dbContent = { __version: gameDB.version };
-                    for (let storeName of gameDB.objectStoreNames) {
-                        const storeTx = gameDB.transaction(storeName, 'readonly');
-                        const store = storeTx.objectStore(storeName);
-                        
-                        // Extract schema metadata
-                        const keyPath = store.keyPath;
-                        const autoIncrement = store.autoIncrement;
-                        const indexes = Array.from(store.indexNames).map(indexName => {
-                            const index = store.index(indexName);
-                            return { name: index.name, keyPath: index.keyPath, unique: index.unique, multiEntry: index.multiEntry };
+                        const gameDB = await new Promise(res => {
+                            const req = indexedDB.open(dbInfo.name);
+                            req.onsuccess = () => res(req.result);
+                            req.onerror = () => res(null);
+                            req.onblocked = () => res(null);
                         });
+                        if (!gameDB) continue;
 
-                        // Use a cursor to preserve both key and value
-                        const records = [];
-                        await new Promise(res => {
-                            const reqCursor = store.openCursor();
-                            reqCursor.onsuccess = e => {
-                                const cursor = e.target.result;
-                                if (cursor) {
-                                    records.push({ key: cursor.key, value: encodeBackupValue(cursor.value) });
-                                    cursor.continue();
-                                } else {
-                                    res();
-                                }
-                            };
-                            reqCursor.onerror = () => res();
-                        });
+                        const dbContent = { __version: gameDB.version };
+                        const storeNames = Array.from(gameDB.objectStoreNames);
+                        if (storeNames.length > 0) {
+                            const storeTx = gameDB.transaction(storeNames, 'readonly');
+                            await Promise.all(storeNames.map(async storeName => {
+                                const store = storeTx.objectStore(storeName);
+                                const keyPath = store.keyPath;
+                                const autoIncrement = store.autoIncrement;
+                                const indexes = Array.from(store.indexNames).map(indexName => {
+                                    const idx = store.index(indexName);
+                                    return { name: idx.name, keyPath: idx.keyPath, unique: idx.unique, multiEntry: idx.multiEntry };
+                                });
 
-                        dbContent[storeName] = {
-                            keyPath: keyPath,
-                            autoIncrement: autoIncrement,
-                            indexes,
-                            records: records
-                        };
+                                const [keys, values] = await Promise.all([
+                                    new Promise(res => {
+                                        const req = store.getAllKeys();
+                                        req.onsuccess = () => res(req.result || []);
+                                        req.onerror = () => res([]);
+                                    }),
+                                    new Promise(res => {
+                                        const req = store.getAll();
+                                        req.onsuccess = () => res(req.result || []);
+                                        req.onerror = () => res([]);
+                                    })
+                                ]);
+
+                                const records = keys.map((key, i) => ({
+                                    key: key,
+                                    value: encodeBackupValue(values[i])
+                                }));
+
+                                dbContent[storeName] = {
+                                    keyPath,
+                                    autoIncrement,
+                                    indexes,
+                                    records
+                                };
+                            }));
+                        }
+                        idbData[dbInfo.name] = dbContent;
+                        gameDB.close();
                     }
-                    idbData[dbInfo.name] = dbContent;
-                    gameDB.close();
+                } catch (idbErr) {
+                    console.warn("IndexedDB databases gathering failed:", idbErr);
                 }
             }
 
             const sidebarOrder = localStorage.getItem('sidebar-game-order');
             const selectedGames = customGames.filter(game => selection.ids.has(game.id));
             const selectedIds = new Set(selectedGames.map(game => game.id));
-            const selectedSnapshots = gameSnapshots.filter(snapshot => selectedIds.has(snapshot.gameId));
-            const selectedTokens = selectedGames.flatMap(game => [String(game.id), String(game.title || '')].map(value => value.toLowerCase().replace(/[^a-z0-9]/g, '')));
-            const selectedIndexedData = Object.fromEntries(Object.entries(idbData).filter(([name]) => {
-                const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-                return selectedTokens.some(token => token.length > 3 && normalized.includes(token));
-            }));
+            
+            // Match snapshots against selected games and their aliases (e.g. balatro, slope, battlebeavers)
+            const selectedSnapshots = gameSnapshots.filter(snapshot => {
+                if (selectedIds.has(snapshot.gameId)) return true;
+                return selectedGames.some(game => doesSnapshotBelongToGame(snapshot, game));
+            });
+
             const colors = {};
             selectedGames.forEach(game => {
                 if (game && game.sidebarColor) colors[game.id] = game.sidebarColor;
             });
+
             const backupData = {
                 version: 3,
                 scope: { type: 'selective', gameIds: Array.from(selectedIds), includeGlobalSettings: selection.includeSettings },
                 saves: allSaves,
-                indexedData: selectedIndexedData,
+                indexedData: idbData,
                 games: selectedGames,
                 gameLibrary: { games: selectedGames, sidebarOrder, colors },
                 gameSnapshots: selectedSnapshots
             };
-            const jsonStr = JSON.stringify(backupData);
 
-            if (fileHandle) {
-                const writable = await fileHandle.createWritable();
-                await writable.write(jsonStr);
-                await writable.close();
-            } else {
-                // Fallback to traditional link download
-                const blob = new Blob([jsonStr], { type: 'application/json' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = 'nexus_backup.json';
-                a.click();
-            }
+            const jsonStr = JSON.stringify(backupData, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'nexus_backup.json';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                try {
+                    URL.revokeObjectURL(a.href);
+                    a.remove();
+                } catch (e) {}
+            }, 1000);
+
+            // Show "Saved" briefly, then smoothly revert back to default icon + label
+            exportBtn.innerHTML = '<img src="Assets/Backup.svg" alt="" style="display:none;"><span>Saved</span>';
+            setTimeout(() => {
+                exportBtn.innerHTML = defaultBackupHTML;
+                exportBtn.disabled = false;
+            }, 1800);
+
         } catch (e) {
             console.error("Backup failed:", e);
             nexusAlert("Backup failed: " + e.message);
-        } finally {
+            exportBtn.innerHTML = defaultBackupHTML;
             exportBtn.disabled = false;
-            exportBtn.textContent = originalText;
         }
     };
 }
@@ -2278,7 +2442,26 @@ if (importBtn) {
                     const tx = db.transaction('gameSnapshots', 'readwrite');
                     const store = tx.objectStore('gameSnapshots');
                     selectedRestoreIds.forEach(id => store.delete(id));
-                    data.gameSnapshots.filter(snapshot => selectedRestoreIds.has(snapshot.gameId)).forEach(snapshot => store.put(snapshot));
+                    
+                    const validSnapshotIds = new Set(selectedRestoreIds);
+                    restoredGames.forEach(g => {
+                        if (g.id) validSnapshotIds.add(g.id);
+                        if (g.sourceKey) validSnapshotIds.add(g.sourceKey);
+                        if (g.sourceFile) {
+                            validSnapshotIds.add(g.sourceFile);
+                            validSnapshotIds.add(g.sourceFile.replace(/\.html$/, ''));
+                        }
+                        if (g.title) validSnapshotIds.add(g.title.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                    });
+
+                    data.gameSnapshots.forEach(snapshot => {
+                        if (!snapshot || !snapshot.gameId) return;
+                        const sId = snapshot.gameId;
+                        const matches = validSnapshotIds.has(sId) || restoredGames.some(g => doesSnapshotBelongToGame(snapshot, g));
+                        if (matches) {
+                            store.put(snapshot);
+                        }
+                    });
                     await new Promise(resolve => {
                         tx.oncomplete = resolve;
                         tx.onerror = resolve;

@@ -115,22 +115,11 @@
             <div class="setting-row">
                 <span class="setting-label">App Cloaking</span>
                 <select id="select-cloak" class="custom-select">
-                    <option value="none">Default</option>
+                    <option value="canvas">Canvas (Default)</option>
                     <option value="wikipedia">Wikipedia</option>
                     <option value="drive">Google Drive</option>
-                    <option value="canvas">Canvas</option>
+                    <option value="none">New Tab</option>
                 </select>
-            </div>
-
-            <div class="setting-row">
-                <div class="setting-label-group">
-                    <span class="setting-label">Debug Fullscreen</span>
-                    <span class="setting-hint">Open games inside the site header with a Fullscreen button instead of launching straight to new tab.</span>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggle-debug-fullscreen">
-                    <span class="slider"></span>
-                </label>
             </div>
 
             <div class="setting-row">
@@ -147,30 +136,13 @@
             <div class="setting-row">
                 <div class="setting-label-group">
                     <span class="setting-label">Preload Game Stash</span>
-                    <span class="setting-hint">Keep Game Stash loaded in the background so closing games opens it instantly.</span>
+                    <span class="setting-hint">Keep Game Stash loaded in the background so closing games opens it instantly. (Enabled by default)</span>
                 </div>
                 <label class="toggle-switch">
                     <input type="checkbox" id="toggle-preload-stash">
                     <span class="slider"></span>
                 </label>
             </div>
-
-            <div class="setting-row">
-                <div class="setting-label-group">
-                    <span class="setting-label">Browser Compatibility</span>
-                    <span class="setting-hint" id="compatibility-summary">Check WebGL, WASM, storage, and popup support.</span>
-                </div>
-                <button id="run-compatibility-check" class="action-btn" style="background:#2196F3;">Check</button>
-            </div>
-
-            <div class="setting-row">
-                <span class="setting-label">Sounds</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggle-mute">
-                    <span class="slider"></span>
-                </label>
-            </div>
-            
 
             <div class="setting-section-title">Media Settings</div>
 
@@ -317,8 +289,8 @@
         // App Cloaking
         const selectCloak = document.getElementById('select-cloak');
 
-        // Initialize state
-        const savedCloak = localStorage.getItem('tb_cloak_preset') || 'none';
+        // Initialize state (defaults to Canvas)
+        const savedCloak = localStorage.getItem('tb_cloak_preset') || 'canvas';
         selectCloak.value = savedCloak;
 
         selectCloak.addEventListener('change', (e) => {
@@ -329,15 +301,6 @@
                 window.applyTabCloak();
             }
         });
-
-        // Debug Fullscreen
-        const toggleDebugFS = document.getElementById('toggle-debug-fullscreen');
-        if (toggleDebugFS) {
-            toggleDebugFS.checked = localStorage.getItem('tb_debug_fullscreen') === 'true';
-            toggleDebugFS.addEventListener('change', (e) => {
-                localStorage.setItem('tb_debug_fullscreen', e.target.checked ? 'true' : 'false');
-            });
-        }
 
         // Performance Mode
         const togglePerf = document.getElementById('toggle-performance-mode');
@@ -355,54 +318,14 @@
             });
         }
 
-        // Preload Game Stash
+        // Preload Game Stash (defaults to true)
         const togglePreloadStash = document.getElementById('toggle-preload-stash');
         if (togglePreloadStash) {
-            togglePreloadStash.checked = localStorage.getItem('tb_preload_stash') === 'true';
+            togglePreloadStash.checked = localStorage.getItem('tb_preload_stash') !== 'false';
             togglePreloadStash.addEventListener('change', (e) => {
                 localStorage.setItem('tb_preload_stash', e.target.checked ? 'true' : 'false');
             });
         }
-
-        const compatibilitySummary = document.getElementById('compatibility-summary');
-        const compatibilityButton = document.getElementById('run-compatibility-check');
-        if (compatibilityButton && compatibilitySummary) {
-            compatibilityButton.addEventListener('click', async () => {
-                const canvas = document.createElement('canvas');
-                const webgl = !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
-                const wasm = typeof WebAssembly !== 'undefined';
-                const indexed = !!window.indexedDB;
-                const storage = !!(window.localStorage && navigator.storage);
-                const popup = !!window.open;
-                const results = [webgl && 'WebGL', wasm && 'WASM', indexed && 'IndexedDB', storage && 'Storage', popup && 'Popups'].filter(Boolean);
-                compatibilitySummary.textContent = `${results.join(', ')} supported${results.length < 5 ? ' — some features may be limited' : ''}.`;
-            });
-        }
-
-        // Sounds Toggle
-        const toggleMute = document.getElementById('toggle-mute');
-        function getMuted() {
-            try {
-                const raw = localStorage.getItem('tb_cookie_save');
-                if (raw) {
-                    const d = JSON.parse(raw);
-                    return d.muted || false;
-                }
-            } catch(e) {}
-            return false;
-        }
-        function setMuted(val) {
-            try {
-                const raw = localStorage.getItem('tb_cookie_save');
-                let d = raw ? JSON.parse(raw) : {};
-                d.muted = val;
-                localStorage.setItem('tb_cookie_save', JSON.stringify(d));
-            } catch(e) {}
-        }
-        toggleMute.checked = !getMuted();
-        toggleMute.addEventListener('change', (e) => {
-            setMuted(!e.target.checked);
-        });
 
         // Reset Stats
         document.getElementById('btn-reset-stats').onclick = async () => {
