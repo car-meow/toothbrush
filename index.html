@@ -442,7 +442,7 @@ html.performance-mode [class*="aura-"] {
         <div class="logo-wrapper" style="pointer-events: auto !important;">
             <img src="Assets/nexusLogo.png" id="nexus-logo" class="home-title-img" alt="Nexus" style="cursor: pointer; pointer-events: auto !important;">
             <div class="nexus-version-container" style="pointer-events: auto !important;">
-                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v3.9.25 beta</span>
+                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v3.9.22 beta</span>
                 <div class="nexus-update-card" style="pointer-events: auto !important;">
                     <div class="nexus-update-title">Welcome back to NEXUS!</div>
                     <div class="nexus-update-body">
@@ -534,22 +534,24 @@ html.performance-mode [class*="aura-"] {
             <div class="nexus-patchnotes-title">Patch Notes</div>
         </div>
         <div class="nexus-patchnotes-body" id="nexus-patchnotes-expanded-text">It's been one long summer, and we're all enthusiastic to get back to school. (not) And I've been hard at work at the latest revisions, updates, improvements, tweaks, and refinements of Nexus so your experience can be the best...
-		while my sleep schedule can be the worst! 🥲 Regardless, here are a few updates.
+while my sleep schedule can be the worst! :3 So let's hop right in to the updated Nexus!
 
-I added a brand-new & updated version of Nautilus Labs' beloved Gust proxy, which I just find insane. It's super quick, and it's mind boggling to think that it fits in ONE single file!
+With 3.9, performance is the name of the game. If you thought it was already decent, prepare for socks-blowing-off performance improvements-- backends have been completely reworked, and everything has been optimized so much more than I knew was possible at the time of creating this. All that... for these crappy Chromebooks/E-waste to run it at 1 frame more :,)
 
-Performance was a huge issue in 2.9, and with the 3.0 update bringing some new visuals it... was rough. 😔 So I've COMPLETELY overhauled the backend to ensure that your Chromebooks with specs from 1989 can at least run the site! 
-I've added an optional Performance mode, which removes some extra pizzazz to favor usability and performance. General performance improvements include: Less stuttering, higher frame rate animations, file sizes made way smaller, crazy fast loading times, and heavily decreased RAM usage.
+Some settings have been enabled by default, and a few new ones have been added to help with performance. If you have a low-end device, I highly recommend enabling Performance Mode in the Settings menu. It will make a world of difference. Also, settings have been removed to make it more user-friendly.
 
-Games Tab and the UI especially got some love too, improving the Loading Status Bar with a cleaner animated version that doesn't look super old, and the option to preload the Game Stash, which is under Settings. I do recommend turning that on!
+Expect more themes COMING SOON, but for now, you have LIGHT MODE to play with! If you want, of course. It completely changes the vibe, I highly recommend trying it out a little.
+
+The Stash has been updated as the font is now unified, saving and loading got a major revamp since you can now choose individually what games you want to save and load, and the Games Tab has been getting some backstage updates to ensure smoothness.
 
 I fixed tons of bugs, and when I say TONS, I mean it. Here's some of them, categorized from HUGE to SMALL but still impactful!
 
 MAJOR:
 White-screen bug and loading bug is FINALLY fixed after over 4 months! Now all the games in the Stash should work perfectly, especially Unity games.
-Some games (ahem, Unity) didn't save properly, like Balatro or War the Knights. I've revamped the saving system from the ground up to get them to work properly, and added a backup autosave feature that updates every 30 seconds.
+Some games (ahem, Unity) didn't save properly, like Balatro or War the Knights. I've revamped the saving system from the ground up to get them to work properly, and added a backup autosave feature that updates every 15-30 seconds.
 I expanded the backup and restore system to save entire libraries of games, not just saves, including color, save data, and order of all the games. 
 Added general loading and response improvements by reducing redundant prefetching and background work. Also greatly increased performance gain when Performance Mode is turned on.
+Movies and TV stuff not loading.
 
 MEDIUM:
 Fixed some games getting stuck on "Adding..." in the sidebar, and moved the newly added games to the top.
@@ -562,7 +564,14 @@ Search layouts in the Game Stash were fixed, removing those annoying gaps in Sea
 Fonts should now read properly on Chromebook, bundling the .ttf files locally instead of relying on Google Fonts.
 General polish update as per usual.
 
-Aaaaand that's all, folks. Remember, this is still a beta version-- bugs do exist, and I'll try my best to get all of them-- but I'm a solo dev. If you have any "Requests/Concerns" click that button and fill that out. TYSM and PEACE!</div>
+And stuff that's currently IN THE WORKS for 4.0 (coming to Chromebooks near you!):
+- More games-- they will definitely be more high quality than the current ones-- and more features and UI updates for the Stash, think pictures!
+- Updated media providers so some issues with media blockage will be solved
+- Tons more themes
+- AI chatbot not working sometimes due to "server full" issues, will be fixed with a new backend if I can figure it out and definitely less waiting times
+- More polish and bugfixes, as always, and more performance improvements
+
+Aaaaand that's all, folks. We're so close to 4.0, all I have to do is pass my classes while I work on the next update. If you have any "Requests/Concerns" click that button and fill that out. TYSM and PEACE!</div>
         <div class="nexus-patchnotes-footer">
             <button id="nexus-close-patchnotes-btn" class="nexus-close-patchnotes-btn">Cool! Close</button>
         </div>
