@@ -915,7 +915,7 @@ body.app-is-dragging #game-list li:not(.dragging):not(.ugs-item):hover {
     position: absolute;
     right: 0;
     top: 0;
-    width: 72px;
+    width: 52px;
     height: 100%;
     background: linear-gradient(to right, transparent, var(--li-bg));
     pointer-events: none;
@@ -2332,11 +2332,13 @@ html.light-mode #game-list li {
     background-color: var(--zigzag-bg);
     border-color: var(--border-color);
     color: var(--text-color);
+    --li-bg: var(--zigzag-bg);
 }
 
 html.light-mode #game-list li:hover {
     background-color: var(--panel-bg-alt);
     border-color: var(--white-outline);
+    --li-bg: var(--panel-bg-alt);
 }
 
 html.light-mode .empty-state-title {
