@@ -600,26 +600,9 @@
             if (bookmarkRefreshInFlight) return;
             bookmarkRefreshInFlight = true;
             try {
-                const customGames = await getCustomGamesFromDb();
                 bookmarkedSourceKeys.clear();
 
-                // 1. Read from IndexedDB
-                customGames.forEach(game => {
-                    if (!game) return;
-                    if (game.sourceKey) bookmarkedSourceKeys.add(String(game.sourceKey).toLowerCase());
-                    if (game.sourceFile) bookmarkedSourceKeys.add(buildBookmarkSourceKey(game.sourceFile).toLowerCase());
-                    if (game.id) {
-                        bookmarkedSourceKeys.add(String(game.id).toLowerCase());
-                        if (game.id.startsWith('bookmark_')) {
-                            try {
-                                const decoded = decodeURIComponent(game.id.substring(9));
-                                bookmarkedSourceKeys.add(decoded.toLowerCase());
-                            } catch(e) {}
-                        }
-                    }
-                });
-
-                // 2. Also read directly from parent window games in memory (instant)
+                // 1. Prioritize parent window games in memory (instant 0ms, 0 resource consumption)
                 if (window.parent && Array.isArray(window.parent.games)) {
                     window.parent.games.forEach(game => {
                         if (!game) return;
@@ -627,9 +610,26 @@
                         if (game.sourceFile) bookmarkedSourceKeys.add(buildBookmarkSourceKey(game.sourceFile).toLowerCase());
                         if (game.id) {
                             bookmarkedSourceKeys.add(String(game.id).toLowerCase());
-                            if (game.id.startsWith('bookmark_')) {
+                            if (String(game.id).startsWith('bookmark_')) {
                                 try {
-                                    const decoded = decodeURIComponent(game.id.substring(9));
+                                    const decoded = decodeURIComponent(String(game.id).substring(9));
+                                    bookmarkedSourceKeys.add(decoded.toLowerCase());
+                                } catch(e) {}
+                            }
+                        }
+                    });
+                } else {
+                    // Fallback to IndexedDB only when running standalone
+                    const customGames = await getCustomGamesFromDb();
+                    customGames.forEach(game => {
+                        if (!game) return;
+                        if (game.sourceKey) bookmarkedSourceKeys.add(String(game.sourceKey).toLowerCase());
+                        if (game.sourceFile) bookmarkedSourceKeys.add(buildBookmarkSourceKey(game.sourceFile).toLowerCase());
+                        if (game.id) {
+                            bookmarkedSourceKeys.add(String(game.id).toLowerCase());
+                            if (String(game.id).startsWith('bookmark_')) {
+                                try {
+                                    const decoded = decodeURIComponent(String(game.id).substring(9));
                                     bookmarkedSourceKeys.add(decoded.toLowerCase());
                                 } catch(e) {}
                             }
@@ -637,7 +637,7 @@
                     });
                 }
 
-                document.querySelectorAll('#sections-container input[type="button"]').forEach(btn => {
+                document.querySelectorAll('#sections-container input[type="button"], #search-results-container input[type="button"]').forEach(btn => {
                     const originalVal = btn.dataset.originalValue || btn.value;
                     const sourceKey = buildBookmarkSourceKey(originalVal);
                     btn.dataset.sourceKey = sourceKey;
@@ -663,20 +663,26 @@
             const sourceKey = buildBookmarkSourceKey(sourceFile);
             const bookmarkId = buildBookmarkIdFromSourceKey(sourceKey);
 
-            // Comprehensive check across in-memory set and parent window games
-            let isAlreadyAdded = bookmarkedSourceKeys.has(sourceKey.toLowerCase()) ||
-                                 bookmarkedSourceKeys.has(sourceFile.toLowerCase()) ||
-                                 bookmarkedSourceKeys.has(bookmarkId.toLowerCase());
-
-            if (!isAlreadyAdded && window.parent && Array.isArray(window.parent.games)) {
+            // Single authoritative source of truth is window.parent.games
+            let isAlreadyAdded = false;
+            if (window.parent && Array.isArray(window.parent.games)) {
                 isAlreadyAdded = window.parent.games.some(g =>
                     g && (
-                        g.id === bookmarkId ||
-                        (g.sourceKey && g.sourceKey.toLowerCase() === sourceKey.toLowerCase()) ||
-                        (g.sourceFile && g.sourceFile.toLowerCase() === sourceFile.toLowerCase()) ||
-                        (g.id && g.id.toLowerCase() === bookmarkId.toLowerCase())
+                        String(g.id).toLowerCase() === bookmarkId.toLowerCase() ||
+                        (g.sourceKey && String(g.sourceKey).toLowerCase() === sourceKey.toLowerCase()) ||
+                        (g.sourceFile && String(g.sourceFile).toLowerCase() === sourceFile.toLowerCase())
                     )
                 );
+                // Purge any stale local cache entry if parent games does not contain this game
+                if (!isAlreadyAdded) {
+                    bookmarkedSourceKeys.delete(sourceKey.toLowerCase());
+                    bookmarkedSourceKeys.delete(sourceFile.toLowerCase());
+                    bookmarkedSourceKeys.delete(bookmarkId.toLowerCase());
+                }
+            } else {
+                isAlreadyAdded = bookmarkedSourceKeys.has(sourceKey.toLowerCase()) ||
+                                 bookmarkedSourceKeys.has(sourceFile.toLowerCase()) ||
+                                 bookmarkedSourceKeys.has(bookmarkId.toLowerCase());
             }
             
             if (e) {
@@ -796,8 +802,8 @@
         }
 
         // Parent-side sidebar renders may request this frequently. Coalesce those requests
-        // into one IndexedDB read instead of starting a read for every DOM mutation.
-        window.refreshBookmarkAvailability = queueBookmarkAvailabilityRefresh;
+        window.refreshBookmarkAvailability = refreshBookmarkAvailability;
+        window.queueBookmarkAvailabilityRefresh = queueBookmarkAvailabilityRefresh;
         window.addEventListener('message', (e) => {
             if (e.data && e.data.type === 'nexus-refresh-bookmarks') {
                 refreshBookmarkAvailability();

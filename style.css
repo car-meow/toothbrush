@@ -722,7 +722,7 @@ main {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease, box-shadow 0.15s, transform 0.15s;
     border: 2.5px solid var(--card-border);
     position: relative;
     --li-bg: var(--zigzag-line);  /* gradient color matches button bg */
@@ -735,17 +735,38 @@ main {
     box-shadow: -5px 5px 5px rgba(0, 0, 0, 0.3);
 }
 
-#game-list li:has(.trash-btn:hover),
-#game-list li:has(.trash-btn.holding) {
-    background-color: #441a1a !important;
+/* Subtle hover hint on delete button */
+#game-list li:has(.trash-btn:hover:not(.holding)) {
     border-color: #ef5350 !important;
 }
 
-html.light-mode #game-list li:has(.trash-btn:hover),
+/* Hold-to-delete: smoothly fades from original color to one solid red with same red outline and pure white text */
+#game-list li.is-deleting,
+#game-list li:has(.trash-btn.holding),
+html.light-mode #game-list li.is-deleting,
 html.light-mode #game-list li:has(.trash-btn.holding) {
-    background-color: #ffcdd2 !important;
-    border-color: #e53935 !important;
-    color: #b71c1c !important;
+    background-color: #b71c1c !important;
+    border-color: #b71c1c !important;
+    color: #ffffff !important;
+    --li-bg: #b71c1c !important;
+    transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease !important;
+}
+
+#game-list li.is-deleting *,
+#game-list li:has(.trash-btn.holding) * {
+    color: #ffffff !important;
+}
+
+#game-list li.is-deleting .game-title-wrapper::after,
+#game-list li:has(.trash-btn.holding) .game-title-wrapper::after {
+    background: linear-gradient(to right, transparent, #b71c1c) !important;
+}
+
+#game-list li.is-deleting .app-action-btn img,
+#game-list li:has(.trash-btn.holding) .app-action-btn img,
+#game-list li.is-deleting .drag-handle-zone img,
+#game-list li:has(.trash-btn.holding) .drag-handle-zone img {
+    filter: brightness(0) invert(1) !important;
 }
 
 #game-list li:active {
@@ -980,10 +1001,21 @@ html:not(.performance-mode) .game-title-wrapper::after {
     pointer-events: none;
 }
 
-#game-list li.new-game {
+#game-list li.new-game,
+html.light-mode #game-list li.new-game,
+#game-list li.new-game:hover,
+html.light-mode #game-list li.new-game:hover {
     background-color: #2f972c !important;
     border-color: #1a5e18 !important;
-    color: white !important;
+    color: #ffffff !important;
+    --li-bg: #2f972c !important;
+}
+
+#game-list li.new-game .game-title-wrapper::after,
+html.light-mode #game-list li.new-game .game-title-wrapper::after,
+#game-list li.new-game:hover .game-title-wrapper::after,
+html.light-mode #game-list li.new-game:hover .game-title-wrapper::after {
+    background: linear-gradient(to right, transparent, #2f972c) !important;
 }
 
 .sidebar-loading-text {
@@ -1022,10 +1054,6 @@ html:not(.performance-mode) .game-title-wrapper::after {
 #game-list li.new-game .game-title {
     color: white !important;
     font-weight: bold;
-}
-
-#game-list li.new-game:hover {
-    background-color: #2f972c !important;
 }
 
 .app-action-btn {
@@ -1070,8 +1098,8 @@ li:hover .app-action-btn {
     border-radius: 50%;
     background: conic-gradient(
         from -90deg,
-        #e53935 var(--hold-progress, 0deg),
-        rgba(239, 83, 80, 0.15) var(--hold-progress, 0deg)
+        #ffffff var(--hold-progress, 0deg),
+        rgba(255, 255, 255, 0.3) var(--hold-progress, 0deg)
     );
     /* Mask the center out to make it look like a ring */
     -webkit-mask: radial-gradient(farthest-side, transparent 55%, black 57%);

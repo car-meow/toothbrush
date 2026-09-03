@@ -556,10 +556,10 @@ function renderGameList() {
         li.dataset.gameId = game.id;
         
         if (game.id === "ugs-stash") li.classList.add('ugs-item');
-        if (game.isNew) li.classList.add('new-game');
-
-        // Apply saved color scheme
-        if (game.id !== "ugs-stash" && game.sidebarColor) {
+        if (game.isNew) {
+            li.classList.add('new-game');
+            li.style.setProperty('--li-bg', '#2f972c');
+        } else if (game.id !== "ugs-stash" && game.sidebarColor) {
             applyGameColorToLi(li, game);
         }
         
@@ -573,6 +573,11 @@ function renderGameList() {
                 game.isNew = false;
                 saveGameRecord(game).catch(() => {});
                 li.classList.remove('new-game');
+                if (game.sidebarColor) {
+                    applyGameColorToLi(li, game);
+                } else {
+                    li.style.removeProperty('--li-bg');
+                }
             }
             loadGame(game);
             // Hold expanded state for 500ms after click, then slide back
@@ -624,6 +629,7 @@ function renderGameList() {
                     didDelete = false;
                     holdStart = performance.now();
                     del.classList.add('holding');
+                    li.classList.add('is-deleting');
 
                     function tick(now) {
                         const progress = Math.min((now - holdStart) / HOLD_MS, 1);
@@ -644,6 +650,7 @@ function renderGameList() {
                     holdStart = null;
                     del.classList.remove('holding');
                     del.style.removeProperty('--hold-progress');
+                    li.classList.remove('is-deleting');
                 }
 
                 del.addEventListener('pointerdown', startHold);
