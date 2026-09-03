@@ -228,11 +228,12 @@ function applyGameColorToLi(li, game) {
         li.style.removeProperty('--li-bg');
         return;
     }
+    if (li.classList.contains('is-deleting')) return;
     const colors = getGameColorScheme(game.sidebarColor);
     if (!colors) return;
-    li.style.setProperty('background-color', colors.fill, 'important');
-    li.style.setProperty('border-color', colors.border, 'important');
-    li.style.setProperty('color', colors.text, 'important');
+    li.style.setProperty('background-color', colors.fill);
+    li.style.setProperty('border-color', colors.border);
+    li.style.setProperty('color', colors.text);
     li.style.setProperty('--li-bg', colors.fill);
 }
 
@@ -630,6 +631,10 @@ function renderGameList() {
                     holdStart = performance.now();
                     del.classList.add('holding');
                     li.classList.add('is-deleting');
+                    li.style.setProperty('background-color', '#b71c1c', 'important');
+                    li.style.setProperty('border-color', '#b71c1c', 'important');
+                    li.style.setProperty('color', '#ffffff', 'important');
+                    li.style.setProperty('--li-bg', '#b71c1c');
 
                     function tick(now) {
                         const progress = Math.min((now - holdStart) / HOLD_MS, 1);
@@ -651,6 +656,19 @@ function renderGameList() {
                     del.classList.remove('holding');
                     del.style.removeProperty('--hold-progress');
                     li.classList.remove('is-deleting');
+                    if (game.isNew) {
+                        li.style.setProperty('background-color', '#2f972c', 'important');
+                        li.style.setProperty('border-color', '#1a5e18', 'important');
+                        li.style.setProperty('color', '#ffffff', 'important');
+                        li.style.setProperty('--li-bg', '#2f972c');
+                    } else if (game.sidebarColor) {
+                        applyGameColorToLi(li, game);
+                    } else {
+                        li.style.removeProperty('background-color');
+                        li.style.removeProperty('border-color');
+                        li.style.removeProperty('color');
+                        li.style.removeProperty('--li-bg');
+                    }
                 }
 
                 del.addEventListener('pointerdown', startHold);
