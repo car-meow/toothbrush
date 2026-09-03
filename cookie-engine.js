@@ -178,7 +178,7 @@ function spawnCookie(forceCookie = null, forceRarity = null) {
 let cookieAnimFrameId = null;
 
 function ensureCookieLoop() {
-    const localStorage = window.nexusStorage;
+    const localStorage = window.nexusStorage || window.localStorage;
     const isDisabled = localStorage.getItem('tb_cookie_disabled') !== 'false';
     if (!isDisabled && !document.hidden && !cookieAnimFrameId) {
         cookieAnimFrameId = requestAnimationFrame(animateCookies);
@@ -187,7 +187,7 @@ function ensureCookieLoop() {
 
 function animateCookies(now) {
     cookieAnimFrameId = null;
-    const localStorage = window.nexusStorage;
+    const localStorage = window.nexusStorage || window.localStorage;
     const isDisabled = localStorage.getItem('tb_cookie_disabled') !== 'false';
     if (isDisabled || document.hidden) return;
 
@@ -242,11 +242,16 @@ function animateCookies(now) {
 }
 
 document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) ensureCookieLoop();
+    if (!document.hidden) {
+        ensureCookieLoop();
+    } else if (cookieAnimFrameId) {
+        cancelAnimationFrame(cookieAnimFrameId);
+        cookieAnimFrameId = null;
+    }
 });
 
 function startSpawning() {
-    const localStorage = window.nexusStorage;
+    const localStorage = window.nexusStorage || window.localStorage;
     if (localStorage.getItem('tb_cookie_disabled') !== 'false') return;
     if (spawnTimer) clearInterval(spawnTimer);
     const interval = getSpawnInterval();
@@ -692,7 +697,7 @@ function startCookieGame() {
 }
 
 function toggleCookieGame() {
-    const localStorage = window.nexusStorage;
+    const localStorage = window.nexusStorage || window.localStorage;
     const disabled = localStorage.getItem('tb_cookie_disabled') !== 'false';
     const newDisabled = !disabled;
     localStorage.setItem('tb_cookie_disabled', newDisabled);
@@ -717,7 +722,7 @@ function closeAllModals() {
 
 // ==================== INIT ====================
 window.addEventListener('DOMContentLoaded', () => {
-    const localStorage = window.nexusStorage;
+    const localStorage = window.nexusStorage || window.localStorage;
     cacheDom();
 
     // Ensure default option for cookies is disabled (true) if not set

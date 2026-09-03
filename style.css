@@ -735,8 +735,17 @@ main {
     box-shadow: -5px 5px 5px rgba(0, 0, 0, 0.3);
 }
 
-#game-list li:has(.trash-btn:hover) {
+#game-list li:has(.trash-btn:hover),
+#game-list li:has(.trash-btn.holding) {
     background-color: #441a1a !important;
+    border-color: #ef5350 !important;
+}
+
+html.light-mode #game-list li:has(.trash-btn:hover),
+html.light-mode #game-list li:has(.trash-btn.holding) {
+    background-color: #ffcdd2 !important;
+    border-color: #e53935 !important;
+    color: #b71c1c !important;
 }
 
 #game-list li:active {
@@ -2124,9 +2133,7 @@ body.tutorial-active #nexus-logo {
 /* =========================================
    PERFORMANCE MODE OPTIMIZATIONS
 ========================================= */
-html.performance-mode *,
-html.performance-mode *::before,
-html.performance-mode *::after {
+html.performance-mode *:not(img):not(svg):not(.status-icon):not([class*="icon"]) {
     animation: none !important;
     transition: none !important;
     backdrop-filter: none !important;
@@ -2134,6 +2141,25 @@ html.performance-mode *::after {
     text-shadow: none !important;
     box-shadow: none !important;
     filter: none !important;
+}
+
+html.performance-mode img,
+html.performance-mode svg {
+    animation: none !important;
+    transition: none !important;
+    box-shadow: none !important;
+}
+
+html.light-mode.performance-mode .material-nav-btn img,
+html.light-mode.performance-mode .home-btn img,
+html.light-mode.performance-mode .status-icon,
+html.light-mode.performance-mode .btn-backup img,
+html.light-mode.performance-mode .btn-restore img,
+html.light-mode.performance-mode #cloak-btn img,
+html.light-mode.performance-mode #custom-app-btn img,
+html.light-mode.performance-mode .hud-btn img,
+html.light-mode.performance-mode #chat-back-btn img {
+    filter: brightness(0) invert(0.08) !important;
 }
 
 html.performance-mode body.home-screen {
@@ -2356,6 +2382,16 @@ html.light-mode .app-action-btn img {
 html.light-mode .rename-color-swatches {
     background: rgba(20, 13, 36, 0.04) !important;
     border: 1px solid var(--border-color) !important;
+}
+
+html.light-mode .color-swatch-reset {
+    background: #e0e0e0 !important;
+    box-shadow: 0 0 0 2px #aaa !important;
+}
+
+html.light-mode .color-swatch-btn.color-swatch-active,
+html.light-mode .color-swatch-reset.color-swatch-active {
+    box-shadow: 0 0 0 2px #222, 0 0 0 4px rgba(0, 0, 0, 0.2) !important;
 }
 
 html.light-mode .sidebar-new-chat-btn {

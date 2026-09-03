@@ -237,7 +237,7 @@
     </main>
 
     <script>
-        const localStorage = window.nexusStorage;
+        const localStorage = window.nexusStorage || window.localStorage;
         let db, currentChatId = null, activeHistory = [];
         let typeTimeoutId = null;
         let isGenerating = false;

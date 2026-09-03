@@ -73,6 +73,10 @@
     }
 
     function navigateWithFade(url) {
+        const video = document.querySelector('.home-bg-video');
+        if (video) {
+            try { video.pause(); } catch(e) {}
+        }
         const overlay = document.getElementById('page-fade-overlay');
         if (overlay) {
             overlay.classList.remove('fade-out');

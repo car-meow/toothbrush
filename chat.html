@@ -173,7 +173,7 @@
     </div>
 
     <script>
-        const localStorage = window.nexusStorage;
+        const localStorage = window.nexusStorage || window.localStorage;
         document.addEventListener('DOMContentLoaded', async () => {
 
         // ═══════════════════════════════════════════════════
@@ -509,7 +509,7 @@
         // ═══════════════════════════════════════════════════
         //  6.  MESSAGE HANDLER
         // ═══════════════════════════════════════════════════
-        function handleData(data) {
+        async function handleData(data) {
 
             // ─── HOST: incoming join ─────────────────────────
             if (isHost && data.type === 'join' && data.peerId !== myUuid) {

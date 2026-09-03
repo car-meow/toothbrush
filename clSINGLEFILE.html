@@ -36,8 +36,11 @@
             --border-color: rgba(18, 12, 31, 0.2);
         }
 
-        body {
+        body, input, button, select, textarea {
             font-family: 'Space Grotesk', sans-serif;
+        }
+
+        body {
             background: var(--bg-color);
             color: var(--text-color);
             min-height: 100vh;
@@ -183,6 +186,7 @@
             background: var(--btn-bg);
             border: none;
             padding: 15px 30px;
+            font-family: inherit;
             font-size: 16px;
             font-weight: 500;
             border-radius: 8px;

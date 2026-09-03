@@ -103,7 +103,7 @@ if ('serviceWorker' in navigator) {
 
 // App Cloaking Support
 (function() {
-    const localStorage = window.nexusStorage;
+    const localStorage = window.nexusStorage || window.localStorage;
     let originalTitle = document.title;
     let originalFavicon = '';
     const origLink = document.querySelector("link[rel*='icon']");

@@ -26,12 +26,12 @@
         .modal-box {
             background: var(--modal-bg); padding: 24px; border-radius: 18px;
             width: 560px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
-            border: 2px solid #9C27B0; text-align: center;
+            border: 2px solid var(--white-outline); text-align: center;
             box-shadow: 0 0 60px rgba(0,0,0,0.9);
             position: relative;
         }
 
-        .modal-box h2 { color: #D083DE; margin: 0 0 20px 0; font-size: 24px; }
+        .modal-box h2 { color: var(--title-color); margin: 0 0 20px 0; font-size: 24px; }
         .setting-row {
             display: flex; justify-content: space-between; align-items: center;
             background: var(--settings-row-bg); padding: 12px 18px; border-radius: 12px; border: 1px solid var(--border-color);
@@ -190,7 +190,7 @@
     </main>
 
     <script>
-        const localStorage = window.nexusStorage;
+        const localStorage = window.nexusStorage || window.localStorage;
         // Theme
         const selectTheme = document.getElementById('select-theme');
         const savedTheme = localStorage.getItem('tb_theme') || 'dark';

@@ -43,7 +43,7 @@ async function initDB() {
 }
 
 async function loadGames() {
-    const localStorage = window.nexusStorage;
+    const localStorage = window.nexusStorage || window.localStorage;
     await initDB();
     const tx = db.transaction("customGames", "readonly");
     const custom = await new Promise((resolve, reject) => {
@@ -95,18 +95,25 @@ async function loadGames() {
     if (savedOrder) {
         try {
             const orderIds = JSON.parse(savedOrder);
-            const gameMap = new Map(games.map(g => [g.id.toString(), g]));
-            const ordered = [];
-            // First place games in saved order
-            orderIds.forEach(id => {
-                if (gameMap.has(id)) {
-                    ordered.push(gameMap.get(id));
-                    gameMap.delete(id);
-                }
-            });
-            // Append any new games not in the saved order
-            gameMap.forEach(g => ordered.push(g));
-            games = ordered;
+            if (Array.isArray(orderIds)) {
+                const gameMap = new Map();
+                games.forEach(g => {
+                    const key = String(g.id);
+                    if (!gameMap.has(key)) gameMap.set(key, g);
+                });
+                const ordered = [];
+                // First place games in saved order
+                orderIds.forEach(rawId => {
+                    const id = String(rawId);
+                    if (gameMap.has(id)) {
+                        ordered.push(gameMap.get(id));
+                        gameMap.delete(id);
+                    }
+                });
+                // Append any new games not in the saved order
+                gameMap.forEach(g => ordered.push(g));
+                games = ordered;
+            }
         } catch(e) { /* ignore bad data */ }
     }
 
@@ -147,7 +154,7 @@ function getFirstMovableIndex() {
 }
 
 function saveGameOrder() {
-    const localStorage = window.nexusStorage;
+    const localStorage = window.nexusStorage || window.localStorage;
     pinMasterStash();
     const orderIds = games.map(g => g.id.toString());
     localStorage.setItem('sidebar-game-order', JSON.stringify(orderIds));
@@ -159,29 +166,59 @@ function saveGameOrder() {
    fill = background, border = slightly darker, text = contrast label color
 ========================================= */
 const SIDEBAR_COLOR_SCHEMES = [
-    { id: 'blue',   fill: 'hsl(213,70%,28%)',  border: 'hsl(213,70%,18%)',  text: '#e8f0ff' },
-    { id: 'green',  fill: 'hsl(140,55%,22%)',  border: 'hsl(140,55%,13%)',  text: '#d4f5e0' },
-    { id: 'red',    fill: 'hsl(0,62%,30%)',    border: 'hsl(0,62%,19%)',    text: '#ffdada' },
-    { id: 'orange', fill: 'hsl(28,72%,30%)',   border: 'hsl(28,72%,19%)',   text: '#ffe5c2' },
-    { id: 'yellow', fill: 'hsl(48,72%,26%)',   border: 'hsl(48,72%,15%)',   text: '#fff8c0' },
-    { id: 'purple', fill: 'hsl(275,55%,28%)',  border: 'hsl(275,55%,17%)',  text: '#f0daff' },
-    { id: 'pink',   fill: 'hsl(335,60%,28%)',  border: 'hsl(335,60%,17%)',  text: '#ffdaea' },
-    { id: 'teal',   fill: 'hsl(180,55%,22%)',  border: 'hsl(180,55%,13%)',  text: '#d0f5f5' },
-    { id: 'indigo', fill: 'hsl(240,55%,30%)',  border: 'hsl(240,55%,19%)',  text: '#dce0ff' },
+    {
+        id: 'blue',
+        dark:  { fill: 'hsl(213,70%,28%)', border: 'hsl(213,70%,18%)', text: '#e8f0ff', swatch: 'hsl(213,80%,50%)' },
+        light: { fill: 'hsl(213,85%,88%)', border: 'hsl(213,65%,68%)', text: 'hsl(213,85%,22%)', swatch: 'hsl(213,85%,65%)' }
+    },
+    {
+        id: 'green',
+        dark:  { fill: 'hsl(140,55%,22%)', border: 'hsl(140,55%,13%)', text: '#d4f5e0', swatch: 'hsl(140,65%,38%)' },
+        light: { fill: 'hsl(140,60%,86%)', border: 'hsl(140,45%,62%)', text: 'hsl(140,75%,18%)', swatch: 'hsl(140,65%,52%)' }
+    },
+    {
+        id: 'red',
+        dark:  { fill: 'hsl(0,62%,30%)',   border: 'hsl(0,62%,19%)',   text: '#ffdada', swatch: 'hsl(0,72%,50%)' },
+        light: { fill: 'hsl(0,80%,90%)',   border: 'hsl(0,60%,70%)',   text: 'hsl(0,75%,24%)',   swatch: 'hsl(0,80%,65%)' }
+    },
+    {
+        id: 'orange',
+        dark:  { fill: 'hsl(28,72%,30%)',  border: 'hsl(28,72%,19%)',  text: '#ffe5c2', swatch: 'hsl(28,88%,50%)' },
+        light: { fill: 'hsl(28,85%,88%)',  border: 'hsl(28,65%,65%)',  text: 'hsl(28,85%,22%)',  swatch: 'hsl(28,88%,62%)' }
+    },
+    {
+        id: 'yellow',
+        dark:  { fill: 'hsl(48,72%,26%)',  border: 'hsl(48,72%,15%)',  text: '#fff8c0', swatch: 'hsl(48,88%,50%)' },
+        light: { fill: 'hsl(48,85%,86%)',  border: 'hsl(48,60%,58%)',  text: 'hsl(48,85%,18%)',  swatch: 'hsl(48,88%,58%)' }
+    },
+    {
+        id: 'purple',
+        dark:  { fill: 'hsl(275,55%,28%)', border: 'hsl(275,55%,17%)', text: '#f0daff', swatch: 'hsl(275,70%,55%)' },
+        light: { fill: 'hsl(275,70%,90%)', border: 'hsl(275,50%,70%)', text: 'hsl(275,70%,24%)', swatch: 'hsl(275,70%,68%)' }
+    },
+    {
+        id: 'pink',
+        dark:  { fill: 'hsl(335,60%,28%)', border: 'hsl(335,60%,17%)', text: '#ffdaea', swatch: 'hsl(335,75%,55%)' },
+        light: { fill: 'hsl(335,75%,90%)', border: 'hsl(335,55%,70%)', text: 'hsl(335,75%,24%)', swatch: 'hsl(335,75%,68%)' }
+    },
+    {
+        id: 'teal',
+        dark:  { fill: 'hsl(180,55%,22%)', border: 'hsl(180,55%,13%)', text: '#d0f5f5', swatch: 'hsl(180,70%,38%)' },
+        light: { fill: 'hsl(180,60%,86%)', border: 'hsl(180,45%,60%)', text: 'hsl(180,75%,18%)', swatch: 'hsl(180,65%,50%)' }
+    },
+    {
+        id: 'indigo',
+        dark:  { fill: 'hsl(240,55%,30%)', border: 'hsl(240,55%,19%)', text: '#dce0ff', swatch: 'hsl(240,70%,58%)' },
+        light: { fill: 'hsl(240,75%,90%)', border: 'hsl(240,55%,70%)', text: 'hsl(240,75%,24%)', swatch: 'hsl(240,70%,70%)' }
+    }
 ];
 
-// Swatch fill colors (the circle itself) — vivid so they're recognizable
-const SWATCH_COLORS = [
-    'hsl(213,80%,50%)',
-    'hsl(140,65%,38%)',
-    'hsl(0,72%,50%)',
-    'hsl(28,88%,50%)',
-    'hsl(48,88%,50%)',
-    'hsl(275,70%,55%)',
-    'hsl(335,75%,55%)',
-    'hsl(180,70%,38%)',
-    'hsl(240,70%,58%)',
-];
+function getGameColorScheme(colorId) {
+    const scheme = SIDEBAR_COLOR_SCHEMES.find(s => s.id === colorId);
+    if (!scheme) return null;
+    const isLight = document.documentElement.classList.contains('light-mode');
+    return isLight ? scheme.light : scheme.dark;
+}
 
 function applyGameColorToLi(li, game) {
     if (!game || !game.sidebarColor) {
@@ -191,12 +228,12 @@ function applyGameColorToLi(li, game) {
         li.style.removeProperty('--li-bg');
         return;
     }
-    const scheme = SIDEBAR_COLOR_SCHEMES.find(s => s.id === game.sidebarColor);
-    if (!scheme) return;
-    li.style.setProperty('background-color', scheme.fill, 'important');
-    li.style.setProperty('border-color', scheme.border, 'important');
-    li.style.setProperty('color', scheme.text, 'important');
-    li.style.setProperty('--li-bg', scheme.fill);
+    const colors = getGameColorScheme(game.sidebarColor);
+    if (!colors) return;
+    li.style.setProperty('background-color', colors.fill, 'important');
+    li.style.setProperty('border-color', colors.border, 'important');
+    li.style.setProperty('color', colors.text, 'important');
+    li.style.setProperty('--li-bg', colors.fill);
 }
 
 async function saveGameRecord(game) {
@@ -239,8 +276,14 @@ window.addStashGameToSidebar = async function(game) {
     const sidebarGame = { ...game };
     delete sidebarGame.content;
 
-    const existingIndex = games.findIndex(item => item.id === sidebarGame.id);
-    if (existingIndex !== -1) games.splice(existingIndex, 1);
+    const existingIndex = games.findIndex(item => String(item.id) === String(sidebarGame.id));
+    if (existingIndex !== -1) {
+        // Game already exists on the sidebar; preserve its existing position!
+        games[existingIndex] = { ...games[existingIndex], ...sidebarGame };
+        renderGameList();
+        notifyStashBookmarkAvailability();
+        return;
+    }
 
     const stashIndex = games.findIndex(item => item.id === 'ugs-stash');
     games.splice(stashIndex === -1 ? 0 : stashIndex + 1, 0, sidebarGame);
@@ -761,6 +804,7 @@ function startDrag(e, li, index) {
 
     dragState = {
         li,
+        gameId: li.dataset.gameId,
         index,
         currentDropIndex: index,
         offsetY,
@@ -814,16 +858,28 @@ function onDragEnd(e) {
     document.removeEventListener('mousemove', onDragMove);
     document.removeEventListener('mouseup', onDragEnd);
 
-    const { li, index, indicator, list } = dragState;
+    const { li, gameId, indicator, list } = dragState;
 
-    let actualNewIndex = 0;
-    for (let sibling = indicator.previousElementSibling; sibling; sibling = sibling.previousElementSibling) {
-        if (sibling.matches('li:not(.dragging)')) actualNewIndex++;
+    // Determine target insertion index by checking which game li comes after indicator
+    let nextGameId = null;
+    let nextSibling = indicator.nextElementSibling;
+    while (nextSibling) {
+        if (nextSibling.dataset && nextSibling.dataset.gameId && !nextSibling.classList.contains('dragging')) {
+            nextGameId = nextSibling.dataset.gameId;
+            break;
+        }
+        nextSibling = nextSibling.nextElementSibling;
     }
 
     const firstMovableIndex = getFirstMovableIndex();
-    const maxInsertIndex = Math.max(firstMovableIndex, games.length - 1);
-    actualNewIndex = Math.max(firstMovableIndex, Math.min(actualNewIndex, maxInsertIndex));
+    const currentIdx = games.findIndex(g => String(g.id) === String(gameId));
+    let targetIdx;
+    if (nextGameId) {
+        targetIdx = games.findIndex(g => String(g.id) === String(nextGameId));
+        if (targetIdx === -1) targetIdx = games.length;
+    } else {
+        targetIdx = games.length;
+    }
 
     // Clean up the dragged element styles
     li.style.position = '';
@@ -838,9 +894,11 @@ function onDragEnd(e) {
     if (indicator.parentNode) indicator.parentNode.removeChild(indicator);
 
     // Move in the games array
-    if (index >= firstMovableIndex && index !== actualNewIndex) {
-        const [moved] = games.splice(index, 1);
-        games.splice(actualNewIndex, 0, moved);
+    if (currentIdx >= firstMovableIndex && currentIdx !== -1) {
+        const [moved] = games.splice(currentIdx, 1);
+        let insertIdx = currentIdx < targetIdx ? targetIdx - 1 : targetIdx;
+        insertIdx = Math.max(firstMovableIndex, Math.min(insertIdx, games.length));
+        games.splice(insertIdx, 0, moved);
         pinMasterStash();
         saveGameOrder();
     }
@@ -1101,7 +1159,7 @@ function getUniversalAutosaveBridge(gameId) {
 
 function getCloakData() {
     try {
-        const localStorage = window.nexusStorage;
+        const localStorage = window.nexusStorage || window.localStorage;
         const rawPreset = localStorage.getItem('tb_cloak_preset');
         const preset = (rawPreset === null || rawPreset === undefined || rawPreset === '' || rawPreset === 'default') ? 'canvas' : rawPreset;
 
@@ -1174,9 +1232,17 @@ function launchGameFullscreen(game) {
                 set: function() { return ct; }
             });
         } catch(e) {}
+        if (window.MutationObserver) {
+            var titleEl = document.querySelector('title');
+            if (titleEl) {
+                new MutationObserver(function() {
+                    if (document.title !== ct) document.title = ct;
+                }).observe(titleEl, { childList: true, characterData: true, subtree: true });
+            }
+        }
         setInterval(function() {
             if (document.title !== ct) document.title = ct;
-        }, 300);
+        }, 3000);
     })();
     <\/script>`;
 
@@ -1688,15 +1754,24 @@ function updateGameStatusUI(state) {
 }
 
 function ensureStashPreloaded() {
-    const localStorage = window.nexusStorage;
+    const localStorage = window.nexusStorage || window.localStorage;
     const isPreloadEnabled = localStorage.getItem('tb_preload_stash') !== 'false';
     const stashFrame = document.getElementById('stash-frame');
 
     if (isPreloadEnabled && stashFrame && !isStashPreloaded) {
-        stashFrame.src = 'clSINGLEFILE.html';
-        stashFrame.onload = () => {
-            isStashPreloaded = true;
+        const loadFn = () => {
+            if (isStashPreloaded || !stashFrame) return;
+            stashFrame.src = 'clSINGLEFILE.html';
+            stashFrame.onload = () => {
+                isStashPreloaded = true;
+            };
         };
+
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(loadFn, { timeout: 2500 });
+        } else {
+            setTimeout(loadFn, 1500);
+        }
     }
 }
 
@@ -1710,7 +1785,7 @@ async function loadGame(game, forceInternal = false) {
         if (li) li.classList.remove('new-game');
     }
 
-    const localStorage = window.nexusStorage;
+    const localStorage = window.nexusStorage || window.localStorage;
     const isPreloadEnabled = localStorage.getItem('tb_preload_stash') !== 'false';
 
     // Launch non-stash game from sidebar straight to new tab in fullscreen
@@ -1742,6 +1817,14 @@ async function loadGame(game, forceInternal = false) {
 
     releaseInactiveGameContent(game);
     currentGame = game;
+
+    // Stop background tasks and pause video to free CPU/GPU for Chromebooks
+    try {
+        if (typeof window.stopCookieGame === 'function') window.stopCookieGame();
+        const bgVid = document.querySelector('.home-bg-video') || document.getElementById('bg-video');
+        if (bgVid && !bgVid.paused) bgVid.pause();
+    } catch (e) {}
+
     const cloakBtn = document.getElementById('cloak-btn');
     if (cloakBtn) {
         cloakBtn.style.display = 'none';
@@ -1872,7 +1955,9 @@ if (addGameBtn) {
             const newG = { id: 'custom_' + Date.now(), title, type: 'file', content: e.target.result };
             const tx = db.transaction("customGames", "readwrite");
             tx.objectStore("customGames").put(newG);
-            games.push(newG); renderGameList();
+            games.push(newG);
+            saveGameOrder();
+            renderGameList();
         };
         reader.readAsDataURL(file);
     };
@@ -1933,13 +2018,15 @@ function buildRenameSwatches(game) {
     container.appendChild(resetBtn);
 
     // 9 color swatches
-    SIDEBAR_COLOR_SCHEMES.forEach((scheme, idx) => {
+    const isLight = document.documentElement.classList.contains('light-mode');
+    SIDEBAR_COLOR_SCHEMES.forEach((scheme) => {
+        const variant = isLight ? scheme.light : scheme.dark;
         const btn = document.createElement('button');
         btn.className = 'color-swatch-btn';
         btn.dataset.colorId = scheme.id;
         btn.title = scheme.id.charAt(0).toUpperCase() + scheme.id.slice(1);
-        btn.style.background = SWATCH_COLORS[idx];
-        btn.style.setProperty('--swatch-border', scheme.border);
+        btn.style.background = variant.swatch;
+        btn.style.setProperty('--swatch-border', variant.border);
         if (game.sidebarColor === scheme.id) btn.classList.add('color-swatch-active');
         btn.onclick = () => setGameColor(game.id, scheme.id);
         container.appendChild(btn);
@@ -2193,7 +2280,7 @@ if (exportBtn) {
             requestCurrentGameAutosave();
             await new Promise(r => setTimeout(r, 150));
 
-            const localStorage = window.nexusStorage;
+            const localStorage = window.nexusStorage || window.localStorage;
             await initDB();
 
             // 2. Gather custom games in parallel
@@ -2380,7 +2467,7 @@ if (importBtn) {
     }
 
     importBtn.onchange = (e) => {
-        const localStorage = window.nexusStorage;
+        const localStorage = window.nexusStorage || window.localStorage;
         const file = e.target.files[0];
         if (!file) return;
 
@@ -2594,7 +2681,7 @@ loadGames();
 let carmeowResizeListener = null;
 
 function initCarmeowTutorial() {
-    const localStorage = window.nexusStorage;
+    const localStorage = window.nexusStorage || window.localStorage;
     const step = localStorage.getItem('tb_tutorial_step');
     if (step !== 'games_clicked') return;
 
@@ -2635,7 +2722,7 @@ function initCarmeowTutorial() {
 }
 
 function goToControlsStep() {
-    const localStorage = window.nexusStorage;
+    const localStorage = window.nexusStorage || window.localStorage;
     const popup = document.getElementById('tutorial-popup');
     if (!popup) return;
 
@@ -2723,7 +2810,7 @@ function positionControlsPopup() {
 }
 
 function endCarmeowTutorial() {
-    const localStorage = window.nexusStorage;
+    const localStorage = window.nexusStorage || window.localStorage;
     localStorage.removeItem('tb_tutorial_step');
     document.body.classList.remove('tutorial-active');
     
@@ -2743,4 +2830,19 @@ function endCarmeowTutorial() {
         window.removeEventListener('resize', carmeowResizeListener);
         carmeowResizeListener = null;
     }
+}
+
+// Keep sidebar item colors in sync with theme changes (light/dark mode)
+if (window.MutationObserver) {
+    new MutationObserver(() => {
+        document.querySelectorAll('#game-list li[data-game-id]').forEach(li => {
+            const game = games.find(g => String(g.id) === String(li.dataset.gameId));
+            if (game) applyGameColorToLi(li, game);
+        });
+        const renameOverlay = document.getElementById('rename-overlay');
+        if (renameOverlay && renameOverlay.style.display !== 'none' && renameTargetId) {
+            const game = games.find(g => String(g.id) === String(renameTargetId));
+            if (game) buildRenameSwatches(game);
+        }
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 }

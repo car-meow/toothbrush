@@ -202,7 +202,7 @@
     </div>
 
     <script>
-        const localStorage = window.nexusStorage;
+        const localStorage = window.nexusStorage || window.localStorage;
         const TMDB_API_KEY = '1a7373301961d03f97f853a876dd1212';
         const IMG_URL = 'https://image.tmdb.org/t/p/w500';
 
@@ -257,6 +257,343 @@
             if (extraParams) {
                 Object.keys(extraParams).forEach((k) => {
                     if (extraParams[k] !== undefined && extraParams[k] !== null) params.set(k, String(extraParams[k]));
+                });
+            }
+            return 'https://api.themoviedb.org/3/' + path + '?' + params.toString();
+        }
+
+        async function fetchTMDB(endpoint, extraParams) {
+            const response = await fetch(buildTMDBUrl(endpoint, extraParams));
+            if (!response.ok) throw new Error(response.status + ' ' + response.statusText);
+            return response.json();
+        }
+
+        function inferMediaType(item) {
+            if (item.media_type === 'movie' || item.media_type === 'tv' || item.media_type === 'person') return item.media_type;
+            if (item.title) return 'movie';
+            if (item.name) return 'tv';
+            return 'unknown';
+        }
+
+        function dedupeResults(list) {
+            const seen = new Set();
+            return list.filter((item) => {
+                const t = inferMediaType(item);
+                if (t !== 'movie' && t !== 'tv') return false;
+                const key = t + ':' + item.id;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+        }
+
+        function escapeHtml(value) {
+            return String(value || '').replace(/[&<>"']/g, (ch) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[ch]));
+        }
+
+        function posterFallbackDataUrl(title) {
+            const safeTitle = escapeHtml(title || 'No Poster');
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 750">
+                <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#242424"/><stop offset="1" stop-color="#4a4a4a"/></linearGradient></defs>
+                <rect width="500" height="750" fill="url(#g)"/>
+                <rect x="34" y="34" width="432" height="682" rx="22" fill="none" stroke="#777" stroke-width="4" opacity=".55"/>
+                <text x="250" y="340" text-anchor="middle" fill="#fff" font-family="Arial, sans-serif" font-size="34" font-weight="700">Nexus</text>
+                <text x="250" y="392" text-anchor="middle" fill="#cfcfcf" font-family="Arial, sans-serif" font-size="24">Poster unavailable</text>
+                <text x="250" y="456" text-anchor="middle" fill="#e7e7e7" font-family="Arial, sans-serif" font-size="24">${safeTitle.slice(0, 28)}</text>
+            </svg>`;
+            return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+        }
+
+        function getPosterSources(item, title) {
+            if (!item.poster_path) return [posterFallbackDataUrl(title)];
+            return [
+                'https://image.tmdb.org/t/p/w500' + item.poster_path,
+                'https://image.tmdb.org/t/p/w780' + item.poster_path,
+                'https://image.tmdb.org/t/p/original' + item.poster_path,
+                posterFallbackDataUrl(title)
+            ];
+        }
+
+        function wirePosterFallback(img, sources) {
+            img.dataset.posterIndex = '0';
+            img.onerror = () => {
+                const nextIndex = Number(img.dataset.posterIndex || '0') + 1;
+                if (nextIndex >= sources.length) return;
+                img.dataset.posterIndex = String(nextIndex);
+                if (sources[nextIndex].startsWith('data:')) img.classList.add('is-fallback');
+                img.src = sources[nextIndex];
+            };
+        }
+
+        function createCard(item) {
+            const mediaType = inferMediaType(item);
+            if (mediaType !== 'movie' && mediaType !== 'tv') return null;
+
+            const card = document.createElement('div');
+            card.className = 'media-card';
+            card.setAttribute('data-id', item.id);
+            
+            const title = item.title || item.name || 'Untitled';
+            const date = item.release_date || item.first_air_date || '';
+            const year = (date && date.split('-')[0]) || '—';
+            const posterSources = getPosterSources(item, title);
+            
+            const isFav = getFavorites().some(f => String(f.id) === String(item.id));
+
+            card.innerHTML = `
+                <div class="fav-btn ${isFav ? 'active' : ''}" title="Toggle Favorite"><svg style="width:20px;height:20px;fill:currentColor;vertical-align:middle;" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></div>
+                <img src="${posterSources[0]}" class="poster-img${posterSources[0].startsWith('data:') ? ' is-fallback' : ''}" alt="${escapeHtml(title)}" loading="lazy" decoding="async">
+                <div class="media-overlay">
+                    <div class="media-date">${year}</div>
+                    <img src="Assets/mediaP.png" class="play-icon" alt="Play">
+                    <div class="media-title">${escapeHtml(title)}</div>
+                </div>
+            `;
+            
+            wirePosterFallback(card.querySelector('.poster-img'), posterSources);
+            card.querySelector('.fav-btn').onclick = (e) => toggleFavorite(e, item);
+            card.onclick = () => openPlayer(item, mediaType);
+            return card;
+        }
+
+        function createShowAllBtn(endpoint, title) {
+            const btn = document.createElement('div');
+            btn.className = 'show-all-btn';
+            btn.innerHTML = '<span style="font-size:28px;line-height:1;">+</span><span>Show All</span>';
+            btn.setAttribute('role', 'button');
+            btn.tabIndex = 0;
+            btn.onclick = () => showGrid(endpoint, title);
+            btn.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showGrid(endpoint, title); } };
+            return btn;
+        }
+
+        const BROWSE_SECTIONS = [
+            { id: 'row-trending-week', title: 'Trending This Week', endpoint: 'trending/all/week', preview: 6 },
+            { id: 'row-trending-day', title: 'Trending Today', endpoint: 'trending/all/day', preview: 6 },
+            { id: 'row-popular-movies', title: 'Popular Movies', endpoint: 'movie/popular', preview: 6 },
+            { id: 'row-top-rated-movies', title: 'Top Rated Movies', endpoint: 'movie/top_rated', preview: 6 },
+            { id: 'row-now-playing', title: 'Now Playing (Theaters)', endpoint: 'movie/now_playing', preview: 6 },
+            { id: 'row-upcoming', title: 'Upcoming Movies', endpoint: 'movie/upcoming', preview: 6 },
+            { id: 'row-popular-tv', title: 'Popular TV', endpoint: 'tv/popular', preview: 6 },
+            { id: 'row-top-tv', title: 'Top Rated TV', endpoint: 'tv/top_rated', preview: 6 },
+            { id: 'row-on-air', title: 'TV On The Air', endpoint: 'tv/on_the_air', preview: 6 },
+            { id: 'row-airing-today', title: 'TV Airing Today', endpoint: 'tv/airing_today', preview: 6 },
+            { id: 'row-action', title: 'Action', endpoint: 'discover/movie?with_genres=28&sort_by=popularity.desc', preview: 6 },
+            { id: 'row-comedy', title: 'Comedy', endpoint: 'discover/movie?with_genres=35&sort_by=popularity.desc', preview: 6 },
+            { id: 'row-animation', title: 'Animation', endpoint: 'discover/movie?with_genres=16&sort_by=popularity.desc', preview: 6 },
+            { id: 'row-scifi', title: 'Sci-Fi', endpoint: 'discover/movie?with_genres=878&sort_by=popularity.desc', preview: 6 },
+            { id: 'row-horror', title: 'Horror', endpoint: 'discover/movie?with_genres=27&sort_by=popularity.desc', preview: 6 },
+            { id: 'row-doc', title: 'Documentaries', endpoint: 'discover/movie?with_genres=99&sort_by=popularity.desc', preview: 6 },
+            { id: 'row-romance', title: 'Romance', endpoint: 'discover/movie?with_genres=10749&sort_by=popularity.desc', preview: 6 },
+            { id: 'row-fantasy', title: 'Fantasy', endpoint: 'discover/movie?with_genres=14&sort_by=popularity.desc', preview: 6 },
+            { id: 'row-crime-tv', title: 'Crime TV', endpoint: 'discover/tv?with_genres=80&sort_by=popularity.desc', preview: 6 },
+            { id: 'row-animation-tv', title: 'Animation TV', endpoint: 'discover/tv?with_genres=16&sort_by=popularity.desc', preview: 6 },
+            { id: 'row-reality', title: 'Reality TV', endpoint: 'discover/tv?with_genres=10764&sort_by=popularity.desc', preview: 6 },
+            { id: 'row-mystery', title: 'Mystery', endpoint: 'discover/movie?with_genres=9648&sort_by=popularity.desc', preview: 6 },
+            { id: 'row-family', title: 'Family', endpoint: 'discover/movie?with_genres=10751&sort_by=popularity.desc', preview: 6 }
+        ];
+
+        function buildBrowseDOM() {
+            const container = document.getElementById('categories-container');
+            container.innerHTML = '';
+            BROWSE_SECTIONS.forEach((sec) => {
+                const wrap = document.createElement('div');
+                wrap.className = 'media-section';
+                wrap.id = 'sec-' + sec.id;
+                wrap.innerHTML = `<div class="section-header"><div class="section-title">${sec.title}</div></div>
+                                  <div class="media-row" id="${sec.id}"><div class="loading-wrap"><div class="loading-spinner"></div></div></div>`;
+                container.appendChild(wrap);
+            });
+        }
+
+        async function loadSectionData(sec) {
+            const row = document.getElementById(sec.id);
+            if (!row || row.dataset.loaded === 'true') return;
+            row.dataset.loaded = 'true';
+            try {
+                const data = await fetchTMDB(sec.endpoint, { page: 1 });
+                row.innerHTML = '';
+                const slice = (data.results || []).filter((it) => inferMediaType(it) === 'movie' || inferMediaType(it) === 'tv').slice(0, sec.preview);
+                slice.forEach((item) => {
+                    const c = createCard(item);
+                    if (c) row.appendChild(c);
+                });
+                row.appendChild(createShowAllBtn(sec.endpoint, sec.title));
+            } catch (err) {
+                row.innerHTML = '<div style="color:#f44336;padding:12px;">Failed to load: ' + sec.title + '</div>';
+            }
+        }
+
+        async function init() {
+            renderFavoritesRow();
+            buildBrowseDOM();
+
+            const overlay = document.getElementById('page-fade-overlay');
+            if (overlay) overlay.classList.add('fade-out');
+
+            const initialSections = BROWSE_SECTIONS.slice(0, 4);
+            const remainingSections = BROWSE_SECTIONS.slice(4);
+
+            // Fetch top visible categories
+            initialSections.forEach(s => loadSectionData(s));
+
+            // Lazy-load remaining rows on scroll
+            if ('IntersectionObserver' in window) {
+                const observer = new IntersectionObserver((entries, obs) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const secId = entry.target.id.replace('sec-', '');
+                            const sec = BROWSE_SECTIONS.find(s => s.id === secId);
+                            if (sec) loadSectionData(sec);
+                            obs.unobserve(entry.target);
+                        }
+                    });
+                }, { rootMargin: '400px 0px' });
+
+                remainingSections.forEach(s => {
+                    const el = document.getElementById('sec-' + s.id);
+                    if (el) observer.observe(el);
+                });
+            } else {
+                for (const s of remainingSections) {
+                    loadSectionData(s);
+                }
+            }
+        }
+
+        async function collectPagedResults(endpoint, maxPages) {
+            const merged = [];
+            for (let page = 1; page <= maxPages; page++) {
+                const data = await fetchTMDB(endpoint, { page });
+                if (!data || !data.results || !data.results.length) break;
+                merged.push.apply(merged, data.results);
+                const totalPages = data.total_pages || 1;
+                if (page >= totalPages) break;
+            }
+            return merged;
+        }
+
+        async function showGrid(endpoint, title, options) {
+            const opts = options || {};
+            const maxPages = opts.maxPages != null ? opts.maxPages : 8;
+            const isSearch = endpoint.indexOf('search/multi') === 0;
+
+            const browseView = document.getElementById('browse-view');
+            const gridPanel = document.getElementById('grid-panel');
+            const gridView = document.getElementById('grid-view');
+            const backBtn = document.getElementById('back-btn');
+            const searchHint = document.getElementById('search-hint');
+            const srv = document.getElementById('search-results-view');
+
+            browseView.style.display = 'none';
+            if (srv) srv.style.display = 'none';
+            gridPanel.classList.add('active');
+            backBtn.classList.add('visible');
+            if (searchHint) searchHint.style.display = 'none';
+
+            document.getElementById('grid-view-title').textContent = title || 'Browse';
+            document.getElementById('grid-meta').textContent = 'Loading...';
+
+            gridView.innerHTML = '<div class="loading-wrap"><div class="loading-spinner"></div></div>';
+
+            try {
+                let results;
+                if (isSearch) {
+                    const first = await fetchTMDB(endpoint, { page: 1 });
+                    const totalPages = Math.min(first.total_pages || 1, maxPages);
+                    results = dedupeResults(first.results || []);
+                    for (let page = 2; page <= totalPages; page++) {
+                        const data = await fetchTMDB(endpoint, { page });
+                        results = dedupeResults(results.concat(data.results || []));
+                    }
+                } else {
+                    results = await collectPagedResults(endpoint, maxPages);
+                    results = dedupeResults(results);
+                }
+
+                gridView.innerHTML = '';
+                const playable = results.filter((it) => {
+                    const t = inferMediaType(it);
+                    return t === 'movie' || t === 'tv';
+                });
+
+                playable.forEach((item) => {
+                    const c = createCard(item);
+                    if (c) gridView.appendChild(c);
+                });
+
+                document.getElementById('grid-meta').textContent = playable.length + ' titles · multi-page where available';
+                if (!playable.length) {
+                    gridView.innerHTML = '<div class="loading-wrap" style="color:#aaa;font-weight:bold;">No results.</div>';
+                    document.getElementById('grid-meta').textContent = '';
+                }
+            } catch (e) {
+                gridView.innerHTML = '<div class="loading-wrap" style="color:#f44336;font-weight:bold;">Error: ' + (e.message || String(e)) + '</div>';
+                document.getElementById('grid-meta').textContent = '';
+            }
+            window.scrollTo(0, 0);
+        }
+
+        function showGridWithResults(results, title) {
+            const browseView = document.getElementById('browse-view');
+            const gridPanel = document.getElementById('grid-panel');
+            const gridView = document.getElementById('grid-view');
+            const backBtn = document.getElementById('back-btn');
+            const srv = document.getElementById('search-results-view');
+
+            browseView.style.display = 'none';
+            if (srv) srv.style.display = 'none';
+            gridPanel.classList.add('active');
+            backBtn.classList.add('visible');
+
+            document.getElementById('grid-view-title').textContent = title || 'Browse';
+            gridView.innerHTML = '';
+
+            const playable = results.filter(it => {
+                const t = inferMediaType(it);
+                return t === 'movie' || t === 'tv';
+            });
+            playable.forEach(item => {
+                const c = createCard(item);
+                if (c) gridView.appendChild(c);
+            });
+            document.getElementById('grid-meta').textContent = playable.length + ' titles';
+            if (!playable.length) {
+                gridView.innerHTML = '<div class="loading-wrap" style="color:#aaa;font-weight:bold;">No results.</div>';
+                document.getElementById('grid-meta').textContent = '';
+            }
+            window.scrollTo(0, 0);
+        }
+
+        function resetView() {
+            document.getElementById('browse-view').style.display = 'block';
+            document.getElementById('grid-panel').classList.remove('active');
+            document.getElementById('back-btn').classList.remove('visible');
+            document.getElementById('grid-view').innerHTML = '';
+            const srv = document.getElementById('search-results-view');
+            if (srv) srv.style.display = 'none';
+            const searchHint = document.getElementById('search-hint');
+            if (searchHint) searchHint.style.display = '';
+            renderFavoritesRow();
+        }
+
+        document.getElementById('back-btn').onclick = resetView;
+
+        // ═══════════════════════════════════════════════════
+        //  INTELLIGENT SEARCH ENGINE
+        // ═══════════════════════════════════════════════════
+        const MOVIE_GENRES = {
+            'action': 28, 'adventure': 12, 'animation': 16, 'animated': 16,
+            'comedy': 35, 'crime': 80, 'documentary': 99, 'drama': 18,
+            'family': 10751, 'fantasy': 14, 'history': 36, 'historical': 36,
+            'horror': 27, 'music': 10402, 'musical': 10402, 'mystery': 9648,
+            'romance': 10749, 'romantic': 10749, 'sci-fi': 878, 'scifi': 878,
             'science fiction': 878, 'thriller': 53, 'war': 10752, 'western': 37
         };
         const TV_GENRES = {
@@ -654,7 +991,7 @@
 <div id="peek-zone">
   <div class="peek-stack">
     <button type="button" class="peek-ico-btn" id="btn-back" title="Close Player"><img src="${backIconUrl}" alt=""></button>
-    <button type="button" class="peek-ico-btn" id="peek-open" title="Show Sidebar">â˜°</button>
+    <button type="button" class="peek-ico-btn" id="peek-open" title="Show Sidebar"><svg style="width:20px;height:20px;fill:currentColor;vertical-align:middle;" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></button>
   </div>
 </div>
 

@@ -19,7 +19,7 @@
     </script>
     <script>
         (function() {
-            const localStorage = window.nexusStorage;
+            const localStorage = window.nexusStorage || window.localStorage;
             if (localStorage.getItem('tb_cookie_disabled') !== 'false') {
                 document.write('<style id="tb-cookie-disabled-styles">#hud-top-left, .hud-bottom-right, #cookie-layer, #float-layer, #effects-container, #discovery-popup { display: none !important; }</style>');
             }
@@ -27,7 +27,7 @@
     </script>
     <script>
         (function() {
-            const localStorage = window.nexusStorage;
+            const localStorage = window.nexusStorage || window.localStorage;
             const theme = localStorage.getItem('tb_theme') || 'dark';
             if (theme === 'light') document.documentElement.classList.add('light-mode');
         })();
@@ -148,19 +148,24 @@ body {
 }
 
 /* Auras */
-.aura-basic{filter:drop-shadow(0 0 12px rgba(139,69,19,0.7))}
-.aura-cashew{filter:drop-shadow(0 0 12px rgba(210,180,140,0.7))}
-.aura-oatmeal{filter:drop-shadow(0 0 12px rgba(139,69,19,0.7)) drop-shadow(0 0 18px rgba(128,0,128,0.5))}
-.aura-peanut{filter:drop-shadow(0 0 12px rgba(205,133,63,0.7))}
-.aura-sugar{filter:drop-shadow(0 0 12px rgba(255,255,255,0.8)) drop-shadow(0 0 5px rgba(255,0,255,0.5)) drop-shadow(0 0 5px rgba(0,255,255,0.5))}
-.aura-chocolate{filter:drop-shadow(0 0 12px rgba(255,255,255,0.4)) drop-shadow(0 0 18px rgba(101,67,33,0.7))}
-.aura-snickerdoodle{filter:drop-shadow(0 0 12px rgba(160,82,45,0.7))}
-.aura-smore{filter:drop-shadow(0 0 12px rgba(255,255,255,0.7)) drop-shadow(0 0 18px rgba(139,69,19,0.7))}
-.aura-golden{filter:drop-shadow(0 0 15px rgba(255,215,0,0.9)) drop-shadow(0 0 28px rgba(255,215,0,0.5))}
-.aura-nebula{animation:nebula-flicker 1.5s alternate infinite}
+.aura-basic{filter:drop-shadow(0 0 10px rgba(139,69,19,0.7))}
+.aura-cashew{filter:drop-shadow(0 0 10px rgba(210,180,140,0.7))}
+.aura-oatmeal{filter:drop-shadow(0 0 12px rgba(139,69,19,0.7))}
+.aura-peanut{filter:drop-shadow(0 0 10px rgba(205,133,63,0.7))}
+.aura-sugar{filter:drop-shadow(0 0 12px rgba(255,255,255,0.8))}
+.aura-chocolate{filter:drop-shadow(0 0 12px rgba(101,67,33,0.8))}
+.aura-snickerdoodle{filter:drop-shadow(0 0 10px rgba(160,82,45,0.7))}
+.aura-smore{filter:drop-shadow(0 0 12px rgba(139,69,19,0.8))}
+.aura-golden{filter:drop-shadow(0 0 14px rgba(255,215,0,0.8))}
+.aura-nebula{animation:nebula-flicker 2s alternate infinite}
 @keyframes nebula-flicker {
-    0%{filter:drop-shadow(0 0 15px #00BCD4) drop-shadow(0 0 20px #9C27B0) drop-shadow(0 0 15px #FFEB3B)}
-    100%{filter:drop-shadow(0 0 25px #4CAF50) drop-shadow(0 0 30px #E91E63) drop-shadow(0 0 25px #FFEB3B)}
+    0%{filter:drop-shadow(0 0 12px #00BCD4)}
+    100%{filter:drop-shadow(0 0 18px #9C27B0)}
+}
+
+html.performance-mode [class*="aura-"] {
+    filter: none !important;
+    animation: none !important;
 }
 
 /* ============================================
@@ -437,7 +442,7 @@ body {
         <div class="logo-wrapper" style="pointer-events: auto !important;">
             <img src="Assets/nexusLogo.png" id="nexus-logo" class="home-title-img" alt="Nexus" style="cursor: pointer; pointer-events: auto !important;">
             <div class="nexus-version-container" style="pointer-events: auto !important;">
-                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v3.8.9 beta</span>
+                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v3.9.25 beta</span>
                 <div class="nexus-update-card" style="pointer-events: auto !important;">
                     <div class="nexus-update-title">Welcome back to NEXUS!</div>
                     <div class="nexus-update-body">
