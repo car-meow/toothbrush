@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>New Tab</title>
-<link rel="stylesheet" href="style.css?v=54">
+<link rel="stylesheet" href="style.css?v=55">
     <script src="bgm-manager.js?v=55"></script>
     <script>
         (function() {
@@ -378,8 +378,9 @@ html.performance-mode [class*="aura-"] {
                 } catch(e) {}
                 if (video.parentNode) video.parentNode.removeChild(video);
             }
-        } else if (theme === 'light' && source && video) {
-            source.src = 'Assets/loopBGlight.mp4';
+        } else if (theme === 'light' && video) {
+            if (source) source.src = 'Assets/loopBGlight.mp4';
+            video.src = 'Assets/loopBGlight.mp4';
             video.load();
             video.play().catch(() => {});
         }

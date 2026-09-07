@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexus-cache-v2';
+const CACHE_NAME = 'nexus-cache-v3';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -63,8 +63,11 @@ const ASSETS_TO_CACHE = [
     './Assets/photoIcon.png',
     './Assets/pop.gif',
     './Assets/tutorial.pdf',
+    './Assets/performanceBG.jpg',
+    './Assets/performanceBGlight.jpg',
     // Assets Videos
     './Assets/loopBG.mp4',
+    './Assets/loopBGlight.mp4',
     './Assets/purpleBG2.mp4'
 ];
 

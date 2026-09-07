@@ -2197,6 +2197,15 @@ html.performance-mode body.home-screen {
     background-color: #050505 !important;
 }
 
+html.light-mode.performance-mode body.home-screen {
+    background-image: url('Assets/performanceBGlight.jpg') !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed !important;
+    background-color: var(--bg-color, #ede8f5) !important;
+}
+
 html.performance-mode .home-bg-video {
     display: none !important;
     visibility: hidden !important;
@@ -2215,6 +2224,15 @@ html.performance-mode .material-nav-btn {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     background: rgba(40, 30, 60, 0.95) !important;
+}
+
+html.light-mode.performance-mode .material-nav-btn,
+html.light-mode.performance-mode .home-btn.material-nav-btn {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: #ded6eb !important;
+    border: 2.5px solid #140d24 !important;
+    color: #140d24 !important;
 }
 
 html.performance-mode .nexus-update-card {
@@ -2457,5 +2475,36 @@ html.light-mode .chat-list li:hover {
 html.light-mode .message {
     border-color: var(--white-outline) !important;
 }
+
+/* Material Nav & Main Menu Buttons Light Mode */
+html.light-mode .material-nav-btn,
+html.light-mode .home-btn.material-nav-btn {
+    background: rgba(20, 13, 36, 0.08) !important;
+    border: 2.5px solid #140d24 !important;
+    color: #140d24 !important;
+    box-shadow: 0 4px 14px rgba(20, 13, 36, 0.15) !important;
+}
+
+html.light-mode .material-nav-btn:hover,
+html.light-mode .material-nav-btn:focus-visible,
+html.light-mode .home-btn.material-nav-btn:hover,
+html.light-mode .home-btn.material-nav-btn:focus-visible {
+    background: rgba(20, 13, 36, 0.16) !important;
+    border: 2.5px solid #000000 !important;
+    color: #000000 !important;
+    box-shadow: 0 6px 20px rgba(20, 13, 36, 0.22) !important;
+}
+
+html.light-mode .material-nav-btn img,
+html.light-mode .home-btn img,
+html.light-mode .button-row img {
+    filter: brightness(0) invert(0.08) !important;
+}
+
+html.light-mode .material-nav-btn span,
+html.light-mode .home-btn span {
+    color: #140d24 !important;
+}
+
 
 
