@@ -280,8 +280,12 @@
       }
     );
 
-    // Universal Autosave Bridge for Slope
+    // Universal Autosave & Restore Bridge for Slope
     (function() {
+      function getFS() {
+        return window.FS || (window.gameInstance && window.gameInstance.Module && window.gameInstance.Module.FS);
+      }
+
       function sendSave() {
         try {
           var s = {};
@@ -302,20 +306,47 @@
 
       function syncAndSend() {
         try {
-          if (window.FS && typeof FS.syncfs === 'function') {
-            FS.syncfs(false, function() { sendSave(); });
+          var fs = getFS();
+          if (fs && typeof fs.syncfs === 'function') {
+            fs.syncfs(false, function() { sendSave(); });
             return;
           }
         } catch(e) {}
         sendSave();
       }
 
+      function applyRestore(data) {
+        if (!data) return;
+        if (data.localStorage && typeof data.localStorage === 'object') {
+          Object.keys(data.localStorage).forEach(function(k) {
+            if (k && k.indexOf('tb_') !== 0) localStorage.setItem(k, data.localStorage[k]);
+          });
+        }
+        var fs = getFS();
+        if (fs && typeof fs.syncfs === 'function') {
+          try { fs.syncfs(true, function() {}); } catch(e) {}
+        }
+      }
+
       window.addEventListener('message', function(e) {
-        if (e.data && e.data.type === 'nexus-request-game-save') syncAndSend();
+        if (!e.data) return;
+        if (e.data.type === 'nexus-request-game-save') syncAndSend();
+        if (e.data.type === 'nexus-apply-game-restore') applyRestore(e.data);
       });
+
       window.addEventListener('pagehide', syncAndSend, { passive: true });
       window.addEventListener('beforeunload', syncAndSend, { passive: true });
       setInterval(syncAndSend, 4000);
+
+      // Request restore immediately upon loading
+      var reqMsg = { type: 'nexus-request-game-restore', gameId: 'slope' };
+      if (window.parent && window.parent !== window) {
+        try { window.parent.postMessage(reqMsg, '*'); } catch(e) {}
+      }
+      var opener = (window.parent && window.parent.opener) || window.opener;
+      if (opener) {
+        try { opener.postMessage(reqMsg, '*'); } catch(e) {}
+      }
     })();
 
     setTimeout(function() {

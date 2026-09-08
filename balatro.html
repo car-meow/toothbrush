@@ -308,7 +308,174 @@
       }, 16000);
     };
 
-    // Universal Autosave Bridge for Balatro
+    // Helpers for binary conversion
+    function b64ToBytes(b64) {
+      var bin = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return bytes;
+    }
+    function bytesToB64(bytes) {
+      var bin = '';
+      var chunk = 0x8000;
+      for (var i = 0; i < bytes.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+      }
+      return btoa(bin);
+    }
+
+    // Capture virtual filesystem save files (/home/web_user/love)
+    function getBalatroFsFiles() {
+      var files = {};
+      if (!window.FS || typeof FS.readdir !== 'function') return files;
+      function walk(dir) {
+        try {
+          var list = FS.readdir(dir);
+          for (var i = 0; i < list.length; i++) {
+            var item = list[i];
+            if (item === '.' || item === '..') continue;
+            var full = (dir === '/' ? '' : dir) + '/' + item;
+            var stat = FS.stat(full);
+            if (FS.isDir(stat.mode)) {
+              walk(full);
+            } else if (FS.isFile(stat.mode)) {
+              var data = FS.readFile(full);
+              files[full] = {
+                data: bytesToB64(data),
+                mode: stat.mode,
+                timestamp: stat.mtime
+              };
+            }
+          }
+        } catch(e) {}
+      }
+      walk('/home/web_user/love');
+      return files;
+    }
+
+    // Restore virtual filesystem files into /home/web_user/love
+    function restoreBalatroFsFiles(files) {
+      if (!files || typeof files !== 'object' || !window.FS || typeof FS.writeFile !== 'function') return;
+      try {
+        Object.keys(files).forEach(function(fullPath) {
+          var item = files[fullPath];
+          if (!item || !item.data) return;
+          var parts = fullPath.split('/');
+          parts.pop();
+          var cur = '';
+          for (var i = 0; i < parts.length; i++) {
+            if (!parts[i]) continue;
+            cur += '/' + parts[i];
+            try {
+              var stat = FS.stat(cur);
+              if (!FS.isDir(stat.mode)) FS.mkdir(cur);
+            } catch(e) {
+              try { FS.mkdir(cur); } catch(err) {}
+            }
+          }
+          var bytes = b64ToBytes(item.data);
+          FS.writeFile(fullPath, bytes, { canOwn: true });
+          if (item.mode) { try { FS.chmod(fullPath, item.mode); } catch(e) {} }
+          if (item.timestamp) { try { FS.utime(fullPath, item.timestamp, item.timestamp); } catch(e) {} }
+        });
+        if (typeof FS.syncfs === 'function') {
+          FS.syncfs(false, function() {});
+        }
+      } catch(e) {
+        console.error("Balatro FS restore error:", e);
+      }
+    }
+
+    // Read IndexedDB /home/web_user/love directly
+    function readBalatroIdbRecords(callback) {
+      try {
+        var req = indexedDB.open('/home/web_user/love');
+        req.onerror = function() { callback(null); };
+        req.onsuccess = function(e) {
+          var idb = e.target.result;
+          idb.onversionchange = function() { try { idb.close(); } catch(err) {} };
+          if (!idb.objectStoreNames.contains('FILE_DATA')) {
+            idb.close();
+            return callback(null);
+          }
+          var tx = idb.transaction('FILE_DATA', 'readonly');
+          var store = tx.objectStore('FILE_DATA');
+          var kReq = store.getAllKeys();
+          var vReq = store.getAll();
+          var done = 0;
+          var keys = null, vals = null;
+          function check() {
+            done++;
+            if (done === 2) {
+              idb.close();
+              if (!keys || !vals || keys.length === 0) return callback(null);
+              var recs = {};
+              for (var j = 0; j < keys.length; j++) {
+                var v = vals[j];
+                recs[keys[j]] = {
+                  timestamp: v.timestamp,
+                  mode: v.mode,
+                  contents: v.contents ? bytesToB64(new Uint8Array(v.contents)) : null
+                };
+              }
+              callback(recs);
+            }
+          }
+          kReq.onsuccess = function() { keys = kReq.result; check(); };
+          kReq.onerror = function() { check(); };
+          vReq.onsuccess = function() { vals = vReq.result; check(); };
+          vReq.onerror = function() { check(); };
+        };
+      } catch(e) {
+        callback(null);
+      }
+    }
+
+    // Write IndexedDB /home/web_user/love directly (version 21, store FILE_DATA)
+    function writeBalatroIdbRecords(records, callback) {
+      if (!records || typeof records !== 'object' || Object.keys(records).length === 0) {
+        if (callback) callback();
+        return;
+      }
+      try {
+        var req = indexedDB.open('/home/web_user/love', 21);
+        req.onupgradeneeded = function(e) {
+          var idb = e.target.result;
+          var store;
+          if (!idb.objectStoreNames.contains('FILE_DATA')) {
+            store = idb.createObjectStore('FILE_DATA');
+          } else {
+            store = e.target.transaction.objectStore('FILE_DATA');
+          }
+          if (!store.indexNames.contains('timestamp')) {
+            store.createIndex('timestamp', 'timestamp', { unique: false });
+          }
+        };
+        req.onsuccess = function(e) {
+          var idb = e.target.result;
+          idb.onversionchange = function() { try { idb.close(); } catch(err) {} };
+          var tx = idb.transaction('FILE_DATA', 'readwrite');
+          var store = tx.objectStore('FILE_DATA');
+          Object.keys(records).forEach(function(path) {
+            var rec = records[path];
+            if (!rec) return;
+            var entry = {
+              timestamp: rec.timestamp || Date.now(),
+              mode: rec.mode || 33206,
+              contents: rec.contents ? b64ToBytes(rec.contents) : new Uint8Array(0)
+            };
+            store.put(entry, path);
+          });
+          tx.oncomplete = function() { idb.close(); if (callback) callback(); };
+          tx.onerror = function() { idb.close(); if (callback) callback(); };
+        };
+        req.onerror = function() { if (callback) callback(); };
+      } catch(e) {
+        if (callback) callback();
+      }
+    }
+
+    // Universal Autosave & Restore Bridge for Balatro
     (function() {
       function sendSave() {
         try {
@@ -317,14 +484,23 @@
             var k = localStorage.key(i);
             if (k && k.indexOf('tb_') !== 0) s[k] = localStorage.getItem(k);
           }
-          var msg = { type: 'nexus-game-save', gameId: 'balatro', localStorage: s };
-          if (window.parent && window.parent !== window) {
-            try { window.parent.postMessage(msg, '*'); } catch(e) {}
-          }
-          var opener = (window.parent && window.parent.opener) || window.opener;
-          if (opener) {
-            try { opener.postMessage(msg, '*'); } catch(e) {}
-          }
+          var fsFiles = getBalatroFsFiles();
+          readBalatroIdbRecords(function(idbRecs) {
+            var msg = {
+              type: 'nexus-game-save',
+              gameId: 'balatro',
+              localStorage: s,
+              fsData: (fsFiles && Object.keys(fsFiles).length > 0) ? fsFiles : null,
+              idbData: idbRecs || null
+            };
+            if (window.parent && window.parent !== window) {
+              try { window.parent.postMessage(msg, '*'); } catch(e) {}
+            }
+            var opener = (window.parent && window.parent.opener) || window.opener;
+            if (opener) {
+              try { opener.postMessage(msg, '*'); } catch(e) {}
+            }
+          });
         } catch(e) {}
       }
 
@@ -338,15 +514,87 @@
         sendSave();
       }
 
+      function applyRestore(data) {
+        if (!data) return;
+        if (data.localStorage && typeof data.localStorage === 'object') {
+          Object.keys(data.localStorage).forEach(function(k) {
+            if (k && k.indexOf('tb_') !== 0) localStorage.setItem(k, data.localStorage[k]);
+          });
+        }
+        if (data.idbData) {
+          writeBalatroIdbRecords(data.idbData, function() {
+            if (data.fsData) restoreBalatroFsFiles(data.fsData);
+          });
+        } else if (data.fsData) {
+          restoreBalatroFsFiles(data.fsData);
+        }
+      }
+
       window.addEventListener('message', function(e) {
-        if (e.data && e.data.type === 'nexus-request-game-save') syncAndSend();
+        if (!e.data) return;
+        if (e.data.type === 'nexus-request-game-save') syncAndSend();
+        if (e.data.type === 'nexus-apply-game-restore') applyRestore(e.data);
       });
+
       window.addEventListener('pagehide', syncAndSend, { passive: true });
       window.addEventListener('beforeunload', syncAndSend, { passive: true });
       setInterval(syncAndSend, 4000);
+
+      // Request restore immediately upon loading
+      var reqMsg = { type: 'nexus-request-game-restore', gameId: 'balatro' };
+      if (window.parent && window.parent !== window) {
+        try { window.parent.postMessage(reqMsg, '*'); } catch(e) {}
+      }
+      var opener = (window.parent && window.parent.opener) || window.opener;
+      if (opener) {
+        try { opener.postMessage(reqMsg, '*'); } catch(e) {}
+      }
     })();
   </script>
   <script type="text/javascript" src="game.js?v=d7e34743-2fea-4de6-8a0e-1103b5fcf07f"></script>
-  <script async type="text/javascript" src="love.js" onload="applicationLoad(this)"></script>
+  <script>
+    // Patched Love.js loader exposing window.FS and window.IDBFS
+    (function() {
+      var origin = window.location.origin;
+      var path = window.location.pathname;
+      var localLoveUrl = origin + path.substring(0, path.lastIndexOf('/') + 1) + 'balatro_love.js';
+      var cdnLoveUrl = 'https://cdn.jsdelivr.net/gh/55gms/55gms@master/static/misc/balatro/love.js';
+
+      function inject(code) {
+        var s = document.createElement('script');
+        s.textContent = code;
+        document.body.appendChild(s);
+        applicationLoad();
+      }
+
+      function fetchAndRun(url, fallback) {
+        fetch(url)
+          .then(function(res) {
+            if (!res.ok) throw new Error('Fetch status ' + res.status);
+            return res.text();
+          })
+          .then(function(code) {
+            if (!code.includes('window.FS')) {
+              code = code.replace('var FS = {', 'var FS = window.FS = {')
+                         .replace('var IDBFS = {', 'var IDBFS = window.IDBFS = {');
+            }
+            inject(code);
+          })
+          .catch(function(err) {
+            if (fallback) {
+              fetchAndRun(fallback, null);
+            } else {
+              console.warn("Loading standard love.js tag fallback:", err);
+              var s = document.createElement('script');
+              s.src = cdnLoveUrl;
+              s.onload = applicationLoad;
+              document.body.appendChild(s);
+            }
+          });
+      }
+
+      fetchAndRun(localLoveUrl, cdnLoveUrl);
+    })();
+  </script>
 </body>
 </html>

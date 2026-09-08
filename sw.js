@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexus-cache-v3';
+const CACHE_NAME = 'nexus-cache-v4';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -8,6 +8,10 @@ const ASSETS_TO_CACHE = [
     './media.html',
     './settings.html',
     './clSINGLEFILE.html',
+    './balatro.html',
+    './balatro_love.js',
+    './slope.html',
+    './battlebeavers.html',
     './style.css',
     './app.js',
     './cookie-engine.js',

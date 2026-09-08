@@ -217,7 +217,7 @@
 
         updateNexusProgress(15);
 
-        // Universal Autosave Bridge for Battle Beavers
+        // Universal Autosave & Restore Bridge for Battle Beavers
         (function() {
             function sendSave() {
                 try {
@@ -237,12 +237,34 @@
                 } catch(e) {}
             }
 
+            function applyRestore(data) {
+                if (!data) return;
+                if (data.localStorage && typeof data.localStorage === 'object') {
+                    Object.keys(data.localStorage).forEach(function(k) {
+                        if (k && k.indexOf('tb_') !== 0) localStorage.setItem(k, data.localStorage[k]);
+                    });
+                }
+            }
+
             window.addEventListener('message', function(e) {
-                if (e.data && e.data.type === 'nexus-request-game-save') sendSave();
+                if (!e.data) return;
+                if (e.data.type === 'nexus-request-game-save') sendSave();
+                if (e.data.type === 'nexus-apply-game-restore') applyRestore(e.data);
             });
+
             window.addEventListener('pagehide', sendSave, { passive: true });
             window.addEventListener('beforeunload', sendSave, { passive: true });
             setInterval(sendSave, 4000);
+
+            // Request restore immediately upon loading
+            var reqMsg = { type: 'nexus-request-game-restore', gameId: 'battlebeavers' };
+            if (window.parent && window.parent !== window) {
+                try { window.parent.postMessage(reqMsg, '*'); } catch(e) {}
+            }
+            var opener = (window.parent && window.parent.opener) || window.opener;
+            if (opener) {
+                try { opener.postMessage(reqMsg, '*'); } catch(e) {}
+            }
         })();
 
         window.RufflePlayer = window.RufflePlayer || {};
