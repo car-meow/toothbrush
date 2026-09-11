@@ -878,7 +878,7 @@ function renderGameList() {
         if (game.id !== "ugs-stash") {
             const dragZone = document.createElement('div');
             dragZone.className = 'drag-handle-zone';
-            dragZone.innerHTML = '<img src="Assets/drag.svg" alt="drag">';
+            dragZone.innerHTML = '<img src="Assets/nexus-drag.svg" alt="" aria-hidden="true">';
             dragZone.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
                 e.preventDefault();

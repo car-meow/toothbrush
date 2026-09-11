@@ -59,6 +59,9 @@
         background-size: 39.6px 100% !important;
         animation: nexus-stripes-backward 0.75s linear infinite !important;
       }
+      #unity-warning, #unity-loading-bar, #loading-text {
+        display: none !important;
+      }
     </style>
   </head>
   <body>
@@ -71,10 +74,18 @@
 
     <div id="unity-container">
       <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
-      <div id="unity-warning"> </div>
+      <div id="unity-warning" style="display:none !important;"></div>
     </div>
 
     <script>
+    // Suppress non-fatal Unity alerts & warnings
+    (function() {
+      var nativeAlert = window.alert;
+      window.alert = function(msg) {
+        console.warn("Suppressed Unity alert:", msg);
+      };
+    })();
+
     (function() {
       var nexusBar = document.getElementById('nexus-loader-bar');
       var nexusOverlay = document.getElementById('nexus-loading-screen');
@@ -246,7 +257,14 @@
             companyName: "Stef Morojna",
             productName: "Spaceflight Simulator",
             productVersion: "1.6.00.16",
-            showBanner: function() {}
+            showBanner: function() {},
+            errorHandler: function(err, url, line) {
+              console.warn("Handled Unity error:", err, url, line);
+              return true;
+            },
+            startupErrorHandler: function(err) {
+              console.warn("Handled Unity startup error:", err);
+            }
           };
 
           if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
@@ -273,6 +291,12 @@
                 window.Module = unityInstance.Module;
                 window.FS = unityInstance.Module.FS;
               }
+              // Trigger initial FS sync and startup restore
+              try {
+                if (window.FS && typeof FS.syncfs === 'function') {
+                  FS.syncfs(true, function() {});
+                }
+              } catch(e) {}
               completeNexusLoading();
             }).catch((message) => {
               console.error('Unity instance error:', message);
@@ -308,6 +332,192 @@
         'bookmark_stash:SpaceflightSimulator/sfs.html',
         'bookmark_stash:sfs.html'
       ];
+
+      // Helpers for binary base64 conversion
+      function b64ToBytes(b64) {
+        var bin = atob(b64);
+        var bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return bytes;
+      }
+      function bytesToB64(bytes) {
+        var bin = '';
+        var chunk = 0x8000;
+        for (var i = 0; i < bytes.length; i += chunk) {
+          bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        }
+        return btoa(bin);
+      }
+
+      function getFS() {
+        return window.FS || (window.unityInstance && window.unityInstance.Module && window.unityInstance.Module.FS);
+      }
+
+      // Capture all files in the Unity virtual filesystem (/idbfs and /)
+      function getSfsFsFiles() {
+        var files = {};
+        var fs = getFS();
+        if (!fs || typeof fs.readdir !== 'function') return files;
+        function walk(dir) {
+          try {
+            var list = fs.readdir(dir);
+            for (var i = 0; i < list.length; i++) {
+              var item = list[i];
+              if (item === '.' || item === '..' || item === 'dev' || item === 'proc' || item === 'tmp') continue;
+              var full = (dir === '/' ? '' : dir) + '/' + item;
+              var stat = fs.stat(full);
+              if (fs.isDir(stat.mode)) {
+                walk(full);
+              } else if (fs.isFile(stat.mode)) {
+                var data = fs.readFile(full);
+                files[full] = {
+                  data: bytesToB64(data),
+                  mode: stat.mode,
+                  timestamp: (stat.mtime instanceof Date) ? stat.mtime.getTime() : (stat.mtime || Date.now())
+                };
+              }
+            }
+          } catch(e) {}
+        }
+        walk('/idbfs');
+        return files;
+      }
+
+      // Restore files into Unity virtual filesystem
+      function restoreSfsFsFiles(files) {
+        if (!files || typeof files !== 'object') return;
+        var fs = getFS();
+        if (!fs || typeof fs.writeFile !== 'function') return;
+        try {
+          Object.keys(files).forEach(function(fullPath) {
+            var item = files[fullPath];
+            if (!item || !item.data) return;
+            var parts = fullPath.split('/');
+            parts.pop();
+            var cur = '';
+            for (var i = 0; i < parts.length; i++) {
+              if (!parts[i]) continue;
+              cur += '/' + parts[i];
+              try {
+                var stat = fs.stat(cur);
+                if (!fs.isDir(stat.mode)) fs.mkdir(cur);
+              } catch(e) {
+                try { fs.mkdir(cur); } catch(err) {}
+              }
+            }
+            var bytes = b64ToBytes(item.data);
+            fs.writeFile(fullPath, bytes, { canOwn: true });
+            if (item.mode) { try { fs.chmod(fullPath, item.mode); } catch(e) {} }
+            if (item.timestamp) { try { fs.utime(fullPath, item.timestamp, item.timestamp); } catch(e) {} }
+          });
+          if (typeof fs.syncfs === 'function') {
+            try { fs.syncfs(false, function() {}); } catch(e) {}
+          }
+        } catch(e) {
+          console.error("SFS FS restore error:", e);
+        }
+      }
+
+      // Read Unity IndexedDB /idbfs store FILE_DATA directly
+      function readSfsIdbRecords(callback) {
+        try {
+          var req = indexedDB.open('/idbfs');
+          req.onerror = function() { callback(null); };
+          req.onsuccess = function(e) {
+            var idb = e.target.result;
+            idb.onversionchange = function() { try { idb.close(); } catch(err) {} };
+            if (!idb.objectStoreNames.contains('FILE_DATA')) {
+              idb.close();
+              return callback(null);
+            }
+            var tx = idb.transaction('FILE_DATA', 'readonly');
+            var store = tx.objectStore('FILE_DATA');
+            var kReq = store.getAllKeys();
+            var vReq = store.getAll();
+            var done = 0;
+            var keys = null, vals = null;
+            function check() {
+              done++;
+              if (done === 2) {
+                idb.close();
+                if (!keys || !vals || keys.length === 0) return callback(null);
+                var recs = {};
+                for (var j = 0; j < keys.length; j++) {
+                  var v = vals[j];
+                  recs[keys[j]] = {
+                    timestamp: (v && v.timestamp instanceof Date) ? v.timestamp.getTime() : (v ? v.timestamp : Date.now()),
+                    mode: v ? v.mode : 33206,
+                    contents: v && v.contents ? bytesToB64(new Uint8Array(v.contents)) : null
+                  };
+                }
+                callback(recs);
+              }
+            }
+            kReq.onsuccess = function() { keys = kReq.result; check(); };
+            kReq.onerror = function() { check(); };
+            vReq.onsuccess = function() { vals = vReq.result; check(); };
+            vReq.onerror = function() { check(); };
+          };
+        } catch(e) {
+          callback(null);
+        }
+      }
+
+      // Write Unity IndexedDB /idbfs store FILE_DATA directly
+      function writeSfsIdbRecords(records, callback) {
+        if (!records || typeof records !== 'object' || Object.keys(records).length === 0) {
+          if (callback) callback();
+          return;
+        }
+        try {
+          var req = indexedDB.open('/idbfs', 21);
+          req.onupgradeneeded = function(e) {
+            var idb = e.target.result;
+            var store;
+            if (!idb.objectStoreNames.contains('FILE_DATA')) {
+              store = idb.createObjectStore('FILE_DATA');
+            } else {
+              store = e.target.transaction.objectStore('FILE_DATA');
+            }
+            if (!store.indexNames.contains('timestamp')) {
+              try { store.createIndex('timestamp', 'timestamp', { unique: false }); } catch(err) {}
+            }
+          };
+          req.onsuccess = function(e) {
+            var idb = e.target.result;
+            idb.onversionchange = function() { try { idb.close(); } catch(err) {} };
+            try {
+              var tx = idb.transaction('FILE_DATA', 'readwrite');
+              var store = tx.objectStore('FILE_DATA');
+              Object.keys(records).forEach(function(pathKey) {
+                var r = records[pathKey];
+                if (!r) return;
+                var rawBytes = r.contents ? b64ToBytes(r.contents) : new Uint8Array(0);
+                var entry = {
+                  timestamp: r.timestamp ? new Date(r.timestamp) : new Date(),
+                  mode: r.mode || 33206,
+                  contents: rawBytes
+                };
+                try { store.put(entry, pathKey); } catch(putErr) {}
+              });
+              tx.oncomplete = function() {
+                idb.close();
+                if (callback) callback();
+              };
+              tx.onerror = function() {
+                idb.close();
+                if (callback) callback();
+              };
+            } catch(txErr) {
+              try { idb.close(); } catch(cErr) {}
+              if (callback) callback();
+            }
+          };
+          req.onerror = function() { if (callback) callback(); };
+        } catch(err) {
+          if (callback) callback();
+        }
+      }
 
       function saveSnapshotDirectToDB(incomingData) {
         if (!incomingData) return;
@@ -428,10 +638,6 @@
         }
       }
 
-      function getFS() {
-        return window.FS || (window.unityInstance && window.unityInstance.Module && window.unityInstance.Module.FS);
-      }
-
       function sendSave() {
         try {
           var s = {};
@@ -439,15 +645,24 @@
             var k = localStorage.key(i);
             if (k && k.indexOf('tb_') !== 0) s[k] = localStorage.getItem(k);
           }
-          var msg = { type: 'nexus-game-save', gameId: 'spaceflightsimulator', localStorage: s };
-          saveSnapshotDirectToDB(msg);
-          if (window.parent && window.parent !== window) {
-            try { window.parent.postMessage(msg, '*'); } catch(e) {}
-          }
-          var opener = (window.parent && window.parent.opener) || window.opener;
-          if (opener) {
-            try { opener.postMessage(msg, '*'); } catch(e) {}
-          }
+          var fsFiles = getSfsFsFiles();
+          readSfsIdbRecords(function(idbRecs) {
+            var msg = {
+              type: 'nexus-game-save',
+              gameId: 'spaceflightsimulator',
+              localStorage: s,
+              fsData: (fsFiles && Object.keys(fsFiles).length > 0) ? fsFiles : null,
+              idbData: (idbRecs && Object.keys(idbRecs).length > 0) ? idbRecs : null
+            };
+            saveSnapshotDirectToDB(msg);
+            if (window.parent && window.parent !== window) {
+              try { window.parent.postMessage(msg, '*'); } catch(e) {}
+            }
+            var opener = (window.parent && window.parent.opener) || window.opener;
+            if (opener) {
+              try { opener.postMessage(msg, '*'); } catch(e) {}
+            }
+          });
         } catch(e) {}
       }
 
@@ -469,9 +684,16 @@
             if (k && k.indexOf('tb_') !== 0) localStorage.setItem(k, data.localStorage[k]);
           });
         }
-        var fs = getFS();
-        if (fs && typeof fs.syncfs === 'function') {
-          try { fs.syncfs(true, function() {}); } catch(e) {}
+        if (data.idbData && typeof data.idbData === 'object' && Object.keys(data.idbData).length > 0) {
+          writeSfsIdbRecords(data.idbData, function() {
+            var fs = getFS();
+            if (fs && typeof fs.syncfs === 'function') {
+              try { fs.syncfs(true, function() {}); } catch(e) {}
+            }
+          });
+        }
+        if (data.fsData && typeof data.fsData === 'object' && Object.keys(data.fsData).length > 0) {
+          restoreSfsFsFiles(data.fsData);
         }
       }
 
@@ -486,6 +708,17 @@
       document.addEventListener('visibilitychange', function() {
         if (document.hidden) syncAndSend();
       }, { passive: true });
+
+      // Periodic filesystem sync and snapshot commit
+      setInterval(function() {
+        try {
+          var fs = getFS();
+          if (fs && typeof fs.syncfs === 'function') {
+            fs.syncfs(false, function() {});
+          }
+        } catch(e) {}
+      }, 2500);
+
       setInterval(syncAndSend, 4000);
 
       // Proactively request restore from parent and opener, and load directly from IDB
