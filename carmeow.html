@@ -11,6 +11,7 @@
             const theme = localStorage.getItem('tb_theme') || 'dark';
             if (theme === 'light') document.documentElement.classList.add('light-mode');
             if (localStorage.getItem('tb_performance_mode') === 'true') document.documentElement.classList.add('performance-mode');
+            else if (localStorage.getItem('tb_performance_mode_lite') === 'true') document.documentElement.classList.add('performance-mode-lite');
         })();
     </script>
     <link rel="prefetch" href="site-core.js">

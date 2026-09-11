@@ -2159,7 +2159,7 @@ body.tutorial-active #nexus-logo {
 /* =========================================
    PERFORMANCE MODE OPTIMIZATIONS
 ========================================= */
-html.performance-mode *:not(img):not(svg):not(.status-icon):not([class*="icon"]) {
+html.performance-mode *:not(img):not(svg):not(.status-icon):not([class*="icon"]):not(.floating-sidebar-warning) {
     animation: none !important;
     transition: none !important;
     backdrop-filter: none !important;
@@ -2167,6 +2167,11 @@ html.performance-mode *:not(img):not(svg):not(.status-icon):not([class*="icon"])
     text-shadow: none !important;
     box-shadow: none !important;
     filter: none !important;
+}
+
+html.performance-mode .floating-sidebar-warning,
+html.performance-mode-lite .floating-sidebar-warning {
+    animation: float-up-fade 1s ease-out forwards !important;
 }
 
 html.performance-mode img,
@@ -2188,7 +2193,8 @@ html.light-mode.performance-mode #chat-back-btn img {
     filter: brightness(0) invert(0.08) !important;
 }
 
-html.performance-mode body.home-screen {
+html.performance-mode body.home-screen,
+html.performance-mode-lite body.home-screen {
     background-image: url('Assets/performanceBG.jpg') !important;
     background-size: cover !important;
     background-position: center !important;
@@ -2197,7 +2203,8 @@ html.performance-mode body.home-screen {
     background-color: #050505 !important;
 }
 
-html.light-mode.performance-mode body.home-screen {
+html.light-mode.performance-mode body.home-screen,
+html.light-mode.performance-mode-lite body.home-screen {
     background-image: url('Assets/performanceBGlight.jpg') !important;
     background-size: cover !important;
     background-position: center !important;
@@ -2206,7 +2213,8 @@ html.light-mode.performance-mode body.home-screen {
     background-color: var(--bg-color, #ede8f5) !important;
 }
 
-html.performance-mode .home-bg-video {
+html.performance-mode .home-bg-video,
+html.performance-mode-lite .home-bg-video {
     display: none !important;
     visibility: hidden !important;
 }
@@ -2215,9 +2223,17 @@ html.performance-mode .chat-bg,
 html.performance-mode .empty-state-bg,
 html.performance-mode body.media-bg,
 html.performance-mode body.chat-bg,
-html.performance-mode body {
+html.performance-mode body,
+html.performance-mode-lite .chat-bg,
+html.performance-mode-lite .empty-state-bg,
+html.performance-mode-lite body.media-bg,
+html.performance-mode-lite body.chat-bg {
     animation: none !important;
     background-position: 0 0 !important;
+}
+
+html.performance-mode-lite #magnet-visual {
+    animation: none !important;
 }
 
 html.performance-mode .material-nav-btn {
@@ -2291,7 +2307,8 @@ html.light-mode .home-title-img {
     filter: var(--logo-filter) !important;
 }
 
-html.light-mode .home-title {
+html.light-mode .home-title,
+html.light-mode header h1 {
     color: var(--title-color) !important;
     text-shadow: none !important;
 }

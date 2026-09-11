@@ -13,6 +13,8 @@
                 if (theme === 'light') document.write('<style>body { background-color: #bbbbbb; }</style>');
                 if (storage.getItem('tb_performance_mode') === 'true') {
                     document.documentElement.classList.add('performance-mode');
+                } else if (storage.getItem('tb_performance_mode_lite') === 'true') {
+                    document.documentElement.classList.add('performance-mode-lite');
                 }
             } catch(e) {}
         })();
@@ -163,9 +165,13 @@ body {
     100%{filter:drop-shadow(0 0 18px #9C27B0)}
 }
 
+html.performance-mode [class*="aura-"],
+html.performance-mode-lite [class*="aura-"] {
+    animation: none !important;
+}
+
 html.performance-mode [class*="aura-"] {
     filter: none !important;
-    animation: none !important;
 }
 
 /* ============================================
@@ -353,6 +359,8 @@ html.performance-mode [class*="aura-"] {
         const localStorage = window.nexusStorage || window.localStorage;
         if (localStorage.getItem('tb_performance_mode') === 'true') {
             document.documentElement.classList.add('performance-mode');
+        } else if (localStorage.getItem('tb_performance_mode_lite') === 'true') {
+            document.documentElement.classList.add('performance-mode-lite');
         }
     })();
 </script>
@@ -369,7 +377,7 @@ html.performance-mode [class*="aura-"] {
         const source = document.getElementById('home-video-source');
         const theme = localStorage.getItem('tb_theme') || 'dark';
 
-        if (localStorage.getItem('tb_performance_mode') === 'true') {
+        if (localStorage.getItem('tb_performance_mode') === 'true' || localStorage.getItem('tb_performance_mode_lite') === 'true') {
             if (video) {
                 try {
                     video.pause();
@@ -390,7 +398,7 @@ html.performance-mode [class*="aura-"] {
     // Stop decoding the decorative background while the tab is hidden.
     document.addEventListener('visibilitychange', () => {
         const video = document.querySelector('.home-bg-video');
-        if (!video || document.documentElement.classList.contains('performance-mode')) return;
+        if (!video || document.documentElement.classList.contains('performance-mode') || document.documentElement.classList.contains('performance-mode-lite')) return;
         if (document.hidden) video.pause();
         else video.play().catch(() => {});
     }, { passive: true });
@@ -443,7 +451,7 @@ html.performance-mode [class*="aura-"] {
         <div class="logo-wrapper" style="pointer-events: auto !important;">
             <img src="Assets/nexusLogo.png" id="nexus-logo" class="home-title-img" alt="Nexus" style="cursor: pointer; pointer-events: auto !important;">
             <div class="nexus-version-container" style="pointer-events: auto !important;">
-                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v3.9.22 beta</span>
+                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v3.9.61 beta</span>
                 <div class="nexus-update-card" style="pointer-events: auto !important;">
                     <div class="nexus-update-title">Welcome back to NEXUS!</div>
                     <div class="nexus-update-body">

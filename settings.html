@@ -13,6 +13,8 @@
                 if (theme === 'light') document.documentElement.classList.add('light-mode');
                 if (storage.getItem('tb_performance_mode') === 'true') {
                     document.documentElement.classList.add('performance-mode');
+                } else if (storage.getItem('tb_performance_mode_lite') === 'true') {
+                    document.documentElement.classList.add('performance-mode-lite');
                 }
             } catch(e) {}
         })();
@@ -125,10 +127,21 @@
             <div class="setting-row">
                 <div class="setting-label-group">
                     <span class="setting-label">Performance Mode</span>
-                    <span class="setting-hint">Disables animations and background video, favors raw speed over visual polish.</span>
+                    <span class="setting-hint">Cuts all animations and some backend stuff to massively increase performance.</span>
                 </div>
                 <label class="toggle-switch">
                     <input type="checkbox" id="toggle-performance-mode">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label-group">
+                    <span class="setting-label">Performance Mode Lite</span>
+                    <span class="setting-hint">Increases performance with less visual sacrifices.</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-performance-mode-lite">
                     <span class="slider"></span>
                 </label>
             </div>
@@ -302,18 +315,43 @@
             }
         });
 
-        // Performance Mode
+        // Performance Mode & Performance Mode Lite
         const togglePerf = document.getElementById('toggle-performance-mode');
+        const togglePerfLite = document.getElementById('toggle-performance-mode-lite');
+        const storage = window.nexusStorage || window.localStorage;
+
         if (togglePerf) {
-            const storage = window.nexusStorage || window.localStorage;
             togglePerf.checked = storage.getItem('tb_performance_mode') === 'true';
             togglePerf.addEventListener('change', (e) => {
                 const enabled = e.target.checked;
                 storage.setItem('tb_performance_mode', enabled ? 'true' : 'false');
                 if (enabled) {
                     document.documentElement.classList.add('performance-mode');
+                    if (togglePerfLite && togglePerfLite.checked) {
+                        togglePerfLite.checked = false;
+                        storage.setItem('tb_performance_mode_lite', 'false');
+                        document.documentElement.classList.remove('performance-mode-lite');
+                    }
                 } else {
                     document.documentElement.classList.remove('performance-mode');
+                }
+            });
+        }
+
+        if (togglePerfLite) {
+            togglePerfLite.checked = storage.getItem('tb_performance_mode_lite') === 'true';
+            togglePerfLite.addEventListener('change', (e) => {
+                const enabled = e.target.checked;
+                storage.setItem('tb_performance_mode_lite', enabled ? 'true' : 'false');
+                if (enabled) {
+                    document.documentElement.classList.add('performance-mode-lite');
+                    if (togglePerf && togglePerf.checked) {
+                        togglePerf.checked = false;
+                        storage.setItem('tb_performance_mode', 'false');
+                        document.documentElement.classList.remove('performance-mode');
+                    }
+                } else {
+                    document.documentElement.classList.remove('performance-mode-lite');
                 }
             });
         }

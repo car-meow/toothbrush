@@ -282,6 +282,127 @@
 
     // Universal Autosave & Restore Bridge for Slope
     (function() {
+      var gameAliases = ['slope', 'bookmark_stash:slope.html'];
+
+      function saveSnapshotDirectToDB(incomingData) {
+        if (!incomingData) return;
+        var incomingLs = incomingData.localStorage || {};
+        var incomingFs = incomingData.fsData || null;
+        var incomingIdb = incomingData.idbData || null;
+        try {
+          var req = indexedDB.open("GameStorageDB", 3);
+          req.onupgradeneeded = function(e) {
+            var d = e.target.result;
+            if (!d.objectStoreNames.contains('customGames')) d.createObjectStore('customGames', { keyPath: 'id' });
+            if (!d.objectStoreNames.contains('gameSnapshots')) d.createObjectStore('gameSnapshots', { keyPath: 'gameId' });
+          };
+          req.onsuccess = function(e) {
+            var db = e.target.result;
+            db.onversionchange = function() { try { db.close(); } catch(err) {} };
+            try {
+              if (!db.objectStoreNames.contains('gameSnapshots')) return;
+              var tx = db.transaction('gameSnapshots', 'readwrite');
+              var store = tx.objectStore('gameSnapshots');
+              var getReq = store.get(gameAliases[0]);
+              getReq.onsuccess = function() {
+                var existing = getReq.result || null;
+                var existingData = (existing && existing.localStorage && typeof existing.localStorage === 'object') ? existing.localStorage : {};
+                var incomingKeys = Object.keys(incomingLs);
+                var existingKeys = Object.keys(existingData);
+
+                var lsToSave = Object.assign({}, incomingLs);
+                if (incomingKeys.length === 0 && existingKeys.length > 0) {
+                  lsToSave = Object.assign({}, existingData);
+                } else if (incomingKeys.length > 0 && existingKeys.length > 0) {
+                  lsToSave = Object.assign({}, existingData, incomingLs);
+                }
+
+                var fsToSave = (existing && existing.fsData) ? Object.assign({}, existing.fsData) : null;
+                if (incomingFs && Object.keys(incomingFs).length > 0) {
+                  fsToSave = Object.assign({}, fsToSave || {}, incomingFs);
+                }
+
+                var idbToSave = (existing && existing.idbData) ? Object.assign({}, existing.idbData) : null;
+                if (incomingIdb && Object.keys(incomingIdb).length > 0) {
+                  idbToSave = Object.assign({}, idbToSave || {}, incomingIdb);
+                }
+
+                var savedAt = Date.now();
+                var history = Array.isArray(existing && existing.history) ? existing.history.slice(-4) : [];
+                if (existing && (existing.localStorage || existing.fsData || existing.idbData)) {
+                  history.push({
+                    localStorage: existing.localStorage,
+                    fsData: existing.fsData,
+                    idbData: existing.idbData,
+                    savedAt: existing.savedAt || savedAt
+                  });
+                }
+
+                gameAliases.forEach(function(targetId) {
+                  if (!targetId) return;
+                  var record = {
+                    gameId: targetId,
+                    localStorage: lsToSave,
+                    fsData: fsToSave,
+                    idbData: idbToSave,
+                    savedAt: savedAt,
+                    history: history
+                  };
+                  try { store.put(record); } catch(err) {}
+                });
+              };
+            } catch(txErr) {}
+          };
+        } catch(err) {}
+      }
+
+      function readSnapshotDirectFromDB(callback) {
+        try {
+          var req = indexedDB.open("GameStorageDB", 3);
+          req.onupgradeneeded = function(e) {
+            var d = e.target.result;
+            if (!d.objectStoreNames.contains('customGames')) d.createObjectStore('customGames', { keyPath: 'id' });
+            if (!d.objectStoreNames.contains('gameSnapshots')) d.createObjectStore('gameSnapshots', { keyPath: 'gameId' });
+          };
+          req.onsuccess = function(e) {
+            var db = e.target.result;
+            db.onversionchange = function() { try { db.close(); } catch(err) {} };
+            try {
+              if (!db.objectStoreNames.contains('gameSnapshots')) {
+                if (callback) callback(null);
+                return;
+              }
+              var tx = db.transaction('gameSnapshots', 'readonly');
+              var store = tx.objectStore('gameSnapshots');
+              var idx = 0;
+              function checkNext() {
+                if (idx >= gameAliases.length) {
+                  if (callback) callback(null);
+                  return;
+                }
+                var curId = gameAliases[idx++];
+                var getReq = store.get(curId);
+                getReq.onsuccess = function() {
+                  var res = getReq.result;
+                  if (res && (res.localStorage || res.fsData || res.idbData)) {
+                    if (callback) callback(res);
+                  } else {
+                    checkNext();
+                  }
+                };
+                getReq.onerror = function() { checkNext(); };
+              }
+              checkNext();
+            } catch(txErr) {
+              if (callback) callback(null);
+            }
+          };
+          req.onerror = function() { if (callback) callback(null); };
+        } catch(err) {
+          if (callback) callback(null);
+        }
+      }
+
       function getFS() {
         return window.FS || (window.gameInstance && window.gameInstance.Module && window.gameInstance.Module.FS);
       }
@@ -294,6 +415,7 @@
             if (k && k.indexOf('tb_') !== 0) s[k] = localStorage.getItem(k);
           }
           var msg = { type: 'nexus-game-save', gameId: 'slope', localStorage: s };
+          saveSnapshotDirectToDB(msg);
           if (window.parent && window.parent !== window) {
             try { window.parent.postMessage(msg, '*'); } catch(e) {}
           }
@@ -347,6 +469,9 @@
       if (opener) {
         try { opener.postMessage(reqMsg, '*'); } catch(e) {}
       }
+      readSnapshotDirectFromDB(function(snap) {
+        if (snap) applyRestore(snap);
+      });
     })();
 
     setTimeout(function() {

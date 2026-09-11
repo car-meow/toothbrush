@@ -8,6 +8,7 @@
             const theme = localStorage.getItem('tb_theme') || 'dark';
             if (theme === 'light') document.documentElement.classList.add('light-mode');
             if (localStorage.getItem('tb_performance_mode') === 'true') document.documentElement.classList.add('performance-mode');
+            else if (localStorage.getItem('tb_performance_mode_lite') === 'true') document.documentElement.classList.add('performance-mode-lite');
         })();
     </script>
     <style>
@@ -361,6 +362,7 @@
             { sourceFile: 'battlebeavers.html', externalUrl: 'battlebeavers.html', displayName: 'battle beavers', letter: 'B' },
             { sourceFile: 'resent.html', externalUrl: 'resent.html', displayName: 'Resent Client', letter: 'R' },
             { sourceFile: 'slope.html', externalUrl: 'slope.html', displayName: 'Slope OG', letter: 'S' },
+            { sourceFile: 'SpaceflightSimulator/sfs.html', externalUrl: 'SpaceflightSimulator/sfs.html', displayName: 'Spaceflight Simulator', letter: 'S' },
             { sourceFile: 'survivalrace/index.html', externalUrl: 'survivalrace/index.html', displayName: 'Survival Race', letter: 'S' }
         ];
 

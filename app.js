@@ -319,8 +319,14 @@ function doesSnapshotBelongToGame(snapshot, game) {
         const sf = String(game.sourceFile).toLowerCase();
         const sfBase = sf.replace(/\.html$/, '');
         if (snapId === sf || snapId === sfBase) return true;
+        const filename = sf.split('/').pop();
+        if (filename && (snapId === filename || snapId === filename.replace(/\.html$/, ''))) return true;
     }
-    if (game.title && (snapId === String(game.title).toLowerCase() || snapId === String(game.title).toLowerCase().replace(/[^a-z0-9]/g, ''))) return true;
+    if (game.title) {
+        const titleLower = String(game.title).toLowerCase();
+        const titleClean = titleLower.replace(/[^a-z0-9]/g, '');
+        if (snapId === titleLower || (titleClean && snapId === titleClean)) return true;
+    }
     return false;
 }
 
@@ -942,7 +948,15 @@ function showSidebarPointerMessage(text, clientX, clientY) {
     message.style.left = `${clientX}px`;
     message.style.top = `${clientY}px`;
     document.body.appendChild(message);
-    message.addEventListener('animationend', () => message.remove(), { once: true });
+    let removed = false;
+    const remove = () => {
+        if (!removed) {
+            removed = true;
+            if (message.parentNode) message.remove();
+        }
+    };
+    message.addEventListener('animationend', remove, { once: true });
+    setTimeout(remove, 1050);
 }
 
 function isUserManagedGame(game) {
@@ -952,6 +966,9 @@ function isUserManagedGame(game) {
 
 function getSidebarTitle(game) {
     if (game && game.sourceKey && !game.userRenamed && typeof humanizeBookmarkDisplayName === "function") {
+        if (game.title && game.sourceFile && (game.sourceFile.includes('/') || game.sourceFile.endsWith('index.html') || game.sourceFile.endsWith('sfs.html'))) {
+            return game.title;
+        }
         return humanizeBookmarkDisplayName(game.sourceFile || game.title, true);
     }
     return game.title;
@@ -1238,6 +1255,75 @@ function getUniversalAutosaveBridge(gameId) {
     var syncTimer = null;
     var lastSavedHash = '';
 
+    function saveSnapshotDirectToDB(targetId, snapshotData) {
+        if (!snapshotData || !targetId) return;
+        var incomingLs = snapshotData.localStorage || {};
+        var incomingFs = snapshotData.fsData || null;
+        var incomingIdb = snapshotData.idbData || null;
+        try {
+            var req = indexedDB.open("GameStorageDB", 3);
+            req.onupgradeneeded = function(e) {
+                var d = e.target.result;
+                if (!d.objectStoreNames.contains('customGames')) d.createObjectStore('customGames', { keyPath: 'id' });
+                if (!d.objectStoreNames.contains('gameSnapshots')) d.createObjectStore('gameSnapshots', { keyPath: 'gameId' });
+            };
+            req.onsuccess = function(e) {
+                var db = e.target.result;
+                db.onversionchange = function() { try { db.close(); } catch(err) {} };
+                try {
+                    if (!db.objectStoreNames.contains('gameSnapshots')) return;
+                    var tx = db.transaction('gameSnapshots', 'readwrite');
+                    var store = tx.objectStore('gameSnapshots');
+                    var getReq = store.get(targetId);
+                    getReq.onsuccess = function() {
+                        var existing = getReq.result || null;
+                        var existingData = (existing && existing.localStorage && typeof existing.localStorage === 'object') ? existing.localStorage : {};
+                        var incomingKeys = Object.keys(incomingLs);
+                        var existingKeys = Object.keys(existingData);
+
+                        var lsToSave = Object.assign({}, incomingLs);
+                        if (incomingKeys.length === 0 && existingKeys.length > 0) {
+                            lsToSave = Object.assign({}, existingData);
+                        } else if (incomingKeys.length > 0 && existingKeys.length > 0) {
+                            lsToSave = Object.assign({}, existingData, incomingLs);
+                        }
+
+                        var fsToSave = (existing && existing.fsData) ? Object.assign({}, existing.fsData) : null;
+                        if (incomingFs && Object.keys(incomingFs).length > 0) {
+                            fsToSave = Object.assign({}, fsToSave || {}, incomingFs);
+                        }
+
+                        var idbToSave = (existing && existing.idbData) ? Object.assign({}, existing.idbData) : null;
+                        if (incomingIdb && Object.keys(incomingIdb).length > 0) {
+                            idbToSave = Object.assign({}, idbToSave || {}, incomingIdb);
+                        }
+
+                        var savedAt = Date.now();
+                        var history = Array.isArray(existing && existing.history) ? existing.history.slice(-4) : [];
+                        if (existing && (existing.localStorage || existing.fsData || existing.idbData)) {
+                            history.push({
+                                localStorage: existing.localStorage,
+                                fsData: existing.fsData,
+                                idbData: existing.idbData,
+                                savedAt: existing.savedAt || savedAt
+                            });
+                        }
+
+                        var record = {
+                            gameId: targetId,
+                            localStorage: lsToSave,
+                            fsData: fsToSave,
+                            idbData: idbToSave,
+                            savedAt: savedAt,
+                            history: history
+                        };
+                        try { store.put(record); } catch(err) {}
+                    };
+                } catch(txErr) {}
+            };
+        } catch(err) {}
+    }
+
     function getStorageSnapshot() {
         var s = {};
         try {
@@ -1259,6 +1345,7 @@ function getUniversalAutosaveBridge(gameId) {
             lastSavedHash = currentHash;
 
             var msg = { type: 'nexus-game-save', gameId: gameId, localStorage: data };
+            saveSnapshotDirectToDB(gameId, msg);
             if (window.parent && window.parent !== window) {
                 try { window.parent.postMessage(msg, '*'); } catch(e) {}
             }
@@ -1368,32 +1455,43 @@ function getCloakData() {
         const rawPreset = localStorage.getItem('tb_cloak_preset');
         const preset = (rawPreset === null || rawPreset === undefined || rawPreset === '' || rawPreset === 'default') ? 'canvas' : rawPreset;
 
-        const presets = {
+        const cloaks = {
             canvas: {
                 title: 'Dashboard',
-                icon: 'Assets/canvas_cloak.png'
+                icon: 'https://du11hjcvx0uqb.cloudfront.net/dist/images/favicon-e10d657a73.ico'
             },
-            wikipedia: {
-                title: 'Wikipedia, the free encyclopedia',
-                icon: 'https://en.wikipedia.org/favicon.ico'
+            classroom: {
+                title: 'Home',
+                icon: 'https://ssl.gstatic.com/classroom/favicon.png'
+            },
+            desmos: {
+                title: 'Desmos | Graphing Calculator',
+                icon: 'https://www.desmos.com/favicon.ico'
             },
             drive: {
                 title: 'My Drive - Google Drive',
-                icon: 'Assets/drive_cloak.png'
+                icon: 'https://ssl.gstatic.com/docs/doclist/images/drive_2022q3_32dp.png'
             },
-            none: {
-                title: 'New Tab',
-                icon: 'data:,'
+            docs: {
+                title: 'Google Docs',
+                icon: 'https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico'
             },
-            newtab: {
-                title: 'New Tab',
-                icon: 'data:,'
+            bing: {
+                title: 'Bing',
+                icon: 'https://www.bing.com/favicon.ico'
+            },
+            khan: {
+                title: 'Dashboard | Khan Academy',
+                icon: 'https://www.khanacademy.org/favicon.ico'
             }
         };
 
-        return presets[preset] || presets.canvas;
-    } catch(e) {
-        return { title: 'Dashboard', icon: 'Assets/canvas_cloak.png' };
+        return cloaks[preset] || cloaks.canvas;
+    } catch (e) {
+        return {
+            title: 'Dashboard',
+            icon: 'https://du11hjcvx0uqb.cloudfront.net/dist/images/favicon-e10d657a73.ico'
+        };
     }
 }
 
@@ -1535,11 +1633,31 @@ function launchGameFullscreen(game) {
                 win.document.body.style.overflow = 'hidden';
                 win.document.body.appendChild(ifr);
 
-                const enforceScriptEl = win.document.createElement('script');
-                enforceScriptEl.textContent = `
+                const targetGameAliases = [game.id];
+                if (game.sourceKey && !targetGameAliases.includes(game.sourceKey)) targetGameAliases.push(game.sourceKey);
+                if (game.sourceFile) {
+                    if (!targetGameAliases.includes(game.sourceFile)) targetGameAliases.push(game.sourceFile);
+                    const base = game.sourceFile.replace(/\.html$/, '');
+                    if (!targetGameAliases.includes(base)) targetGameAliases.push(base);
+                }
+                const matchedGame = findGameByIdOrSource(game.id);
+                if (matchedGame) {
+                    if (matchedGame.id && !targetGameAliases.includes(matchedGame.id)) targetGameAliases.push(matchedGame.id);
+                    if (matchedGame.sourceKey && !targetGameAliases.includes(matchedGame.sourceKey)) targetGameAliases.push(matchedGame.sourceKey);
+                    if (matchedGame.sourceFile) {
+                        if (!targetGameAliases.includes(matchedGame.sourceFile)) targetGameAliases.push(matchedGame.sourceFile);
+                        const base = matchedGame.sourceFile.replace(/\.html$/, '');
+                        if (!targetGameAliases.includes(base)) targetGameAliases.push(base);
+                    }
+                }
+
+                const controllerScriptEl = win.document.createElement('script');
+                controllerScriptEl.textContent = `
                 (function() {
                     var ct = ${JSON.stringify(cloak.title)};
                     var ci = ${JSON.stringify(cloak.icon)};
+                    var gameAliases = ${JSON.stringify(targetGameAliases)};
+                    var primaryGameId = ${JSON.stringify(game.id)};
                     document.title = ct;
                     var fl = document.querySelector("link[rel*='icon']");
                     if (!fl) { fl = document.createElement('link'); fl.rel = 'shortcut icon'; document.head.appendChild(fl); }
@@ -1553,9 +1671,181 @@ function launchGameFullscreen(game) {
                     setInterval(function() {
                         if (document.title !== ct) document.title = ct;
                     }, 300);
+
+                    // Standalone IndexedDB snapshot persistence engine for about:blank popup
+                    function saveToIDB(incomingData) {
+                        if (!incomingData) return;
+                        var ids = gameAliases.slice();
+                        if (incomingData.gameId && ids.indexOf(incomingData.gameId) === -1) {
+                            ids.push(incomingData.gameId);
+                        }
+                        var incomingLs = incomingData.localStorage || {};
+                        var incomingFs = incomingData.fsData || null;
+                        var incomingIdb = incomingData.idbData || null;
+                        try {
+                            var req = indexedDB.open("GameStorageDB", 3);
+                            req.onupgradeneeded = function(e) {
+                                var d = e.target.result;
+                                if (!d.objectStoreNames.contains('customGames')) d.createObjectStore('customGames', { keyPath: 'id' });
+                                if (!d.objectStoreNames.contains('gameSnapshots')) d.createObjectStore('gameSnapshots', { keyPath: 'gameId' });
+                            };
+                            req.onsuccess = function(e) {
+                                var db = e.target.result;
+                                db.onversionchange = function() { try { db.close(); } catch(err) {} };
+                                try {
+                                    if (!db.objectStoreNames.contains('gameSnapshots')) return;
+                                    var tx = db.transaction('gameSnapshots', 'readwrite');
+                                    var store = tx.objectStore('gameSnapshots');
+                                    var getReq = store.get(ids[0]);
+                                    getReq.onsuccess = function() {
+                                        var existing = getReq.result || null;
+                                        var existingData = (existing && existing.localStorage && typeof existing.localStorage === 'object') ? existing.localStorage : {};
+                                        var incomingKeys = Object.keys(incomingLs);
+                                        var existingKeys = Object.keys(existingData);
+
+                                        var lsToSave = Object.assign({}, incomingLs);
+                                        if (incomingKeys.length === 0 && existingKeys.length > 0) {
+                                            lsToSave = Object.assign({}, existingData);
+                                        } else if (incomingKeys.length > 0 && existingKeys.length > 0) {
+                                            lsToSave = Object.assign({}, existingData, incomingLs);
+                                        }
+
+                                        var fsToSave = (existing && existing.fsData) ? Object.assign({}, existing.fsData) : null;
+                                        if (incomingFs && Object.keys(incomingFs).length > 0) {
+                                            fsToSave = Object.assign({}, fsToSave || {}, incomingFs);
+                                        }
+
+                                        var idbToSave = (existing && existing.idbData) ? Object.assign({}, existing.idbData) : null;
+                                        if (incomingIdb && Object.keys(incomingIdb).length > 0) {
+                                            idbToSave = Object.assign({}, idbToSave || {}, incomingIdb);
+                                        }
+
+                                        var savedAt = Date.now();
+                                        var history = Array.isArray(existing && existing.history) ? existing.history.slice(-4) : [];
+                                        if (existing && (existing.localStorage || existing.fsData || existing.idbData)) {
+                                            history.push({
+                                                localStorage: existing.localStorage,
+                                                fsData: existing.fsData,
+                                                idbData: existing.idbData,
+                                                savedAt: existing.savedAt || savedAt
+                                            });
+                                        }
+
+                                        ids.forEach(function(targetId) {
+                                            if (!targetId) return;
+                                            var record = {
+                                                gameId: targetId,
+                                                localStorage: lsToSave,
+                                                fsData: fsToSave,
+                                                idbData: idbToSave,
+                                                savedAt: savedAt,
+                                                history: history
+                                            };
+                                            try { store.put(record); } catch(err) {}
+                                        });
+                                    };
+                                } catch(txErr) {}
+                            };
+                        } catch(err) {}
+                    }
+
+                    function loadFromIDB(callback) {
+                        try {
+                            var req = indexedDB.open("GameStorageDB", 3);
+                            req.onupgradeneeded = function(e) {
+                                var d = e.target.result;
+                                if (!d.objectStoreNames.contains('customGames')) d.createObjectStore('customGames', { keyPath: 'id' });
+                                if (!d.objectStoreNames.contains('gameSnapshots')) d.createObjectStore('gameSnapshots', { keyPath: 'gameId' });
+                            };
+                            req.onsuccess = function(e) {
+                                var db = e.target.result;
+                                db.onversionchange = function() { try { db.close(); } catch(err) {} };
+                                try {
+                                    if (!db.objectStoreNames.contains('gameSnapshots')) {
+                                        if (callback) callback(null);
+                                        return;
+                                    }
+                                    var tx = db.transaction('gameSnapshots', 'readonly');
+                                    var store = tx.objectStore('gameSnapshots');
+                                    var idx = 0;
+                                    function checkNext() {
+                                        if (idx >= gameAliases.length) {
+                                            if (callback) callback(null);
+                                            return;
+                                        }
+                                        var curId = gameAliases[idx++];
+                                        var getReq = store.get(curId);
+                                        getReq.onsuccess = function() {
+                                            var res = getReq.result;
+                                            if (res && (res.localStorage || res.fsData || res.idbData)) {
+                                                if (callback) callback(res);
+                                            } else {
+                                                checkNext();
+                                            }
+                                        };
+                                        getReq.onerror = function() { checkNext(); };
+                                    }
+                                    checkNext();
+                                } catch(txErr) {
+                                    if (callback) callback(null);
+                                }
+                            };
+                            req.onerror = function() { if (callback) callback(null); };
+                        } catch(err) {
+                            if (callback) callback(null);
+                        }
+                    }
+
+                    // Autonomous Message Bus: persists even if opener tab was closed
+                    window.addEventListener('message', function(e) {
+                        if (!e.data) return;
+                        if (e.data.type === 'nexus-game-save') {
+                            saveToIDB(e.data);
+                            try {
+                                if (window.opener && !window.opener.closed) {
+                                    window.opener.postMessage(e.data, '*');
+                                }
+                            } catch(err) {}
+                        } else if (e.data.type === 'nexus-request-game-restore') {
+                            loadFromIDB(function(snap) {
+                                if (snap && e.source) {
+                                    try {
+                                        e.source.postMessage({
+                                            type: 'nexus-apply-game-restore',
+                                            gameId: e.data.gameId || primaryGameId,
+                                            localStorage: snap.localStorage || {},
+                                            fsData: snap.fsData || null,
+                                            idbData: snap.idbData || null
+                                        }, '*');
+                                    } catch(err) {}
+                                }
+                            });
+                            try {
+                                if (window.opener && !window.opener.closed) {
+                                    window.opener.postMessage(e.data, '*');
+                                }
+                            } catch(err) {}
+                        }
+                    });
+
+                    // Flush saves on tab exit / hide
+                    function triggerAutosaveFlush() {
+                        var frame = document.querySelector('iframe');
+                        if (frame && frame.contentWindow) {
+                            try {
+                                frame.contentWindow.postMessage({ type: 'nexus-request-game-save' }, '*');
+                            } catch(err) {}
+                        }
+                    }
+                    window.addEventListener('pagehide', triggerAutosaveFlush, { passive: true });
+                    window.addEventListener('beforeunload', triggerAutosaveFlush, { passive: true });
+                    document.addEventListener('visibilitychange', function() {
+                        if (document.hidden) triggerAutosaveFlush();
+                    }, { passive: true });
+                    setInterval(triggerAutosaveFlush, 4000);
                 })();
                 `;
-                win.document.head.appendChild(enforceScriptEl);
+                win.document.head.appendChild(controllerScriptEl);
 
                 function doFocusAndClick() {
                     try {

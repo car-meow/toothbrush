@@ -12,6 +12,8 @@
                 if (theme === 'light') document.documentElement.classList.add('light-mode');
                 if (storage.getItem('tb_performance_mode') === 'true') {
                     document.documentElement.classList.add('performance-mode');
+                } else if (storage.getItem('tb_performance_mode_lite') === 'true') {
+                    document.documentElement.classList.add('performance-mode-lite');
                 }
             } catch(e) {}
         })();

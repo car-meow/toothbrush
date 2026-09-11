@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexus-cache-v4';
+const CACHE_NAME = 'nexus-cache-v8';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -12,6 +12,12 @@ const ASSETS_TO_CACHE = [
     './balatro_love.js',
     './slope.html',
     './battlebeavers.html',
+    './sfs.html',
+    './SpaceflightSimulator/sfs.html',
+    './SpaceflightSimulator/Build/sfsim.loader.js',
+    './SpaceflightSimulator/Build/sfsim.framework.js',
+    './SpaceflightSimulator/TemplateData/style.css',
+    './SpaceflightSimulator/TemplateData/favicon.ico',
     './style.css',
     './app.js',
     './cookie-engine.js',
