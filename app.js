@@ -878,7 +878,8 @@ function renderGameList() {
         if (game.id !== "ugs-stash") {
             const dragZone = document.createElement('div');
             dragZone.className = 'drag-handle-zone';
-            dragZone.innerHTML = '<img src="Assets/nexus-drag.svg" alt="" aria-hidden="true">';
+            dragZone.setAttribute('title', 'Drag to reorder');
+            dragZone.innerHTML = '<svg class="drag-handle-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M360-160q-33 0-56.5-23.5T280-240q0-33 23.5-56.5T360-320q33 0 56.5 23.5T440-240q0 33-23.5 56.5T360-160Zm240 0q-33 0-56.5-23.5T520-240q0-33 23.5-56.5T600-320q33 0 56.5 23.5T680-240q0 33-23.5 56.5T600-160ZM360-400q-33 0-56.5-23.5T280-480q0-33 23.5-56.5T360-560q33 0 56.5 23.5T440-480q0 33-23.5 56.5T360-400Zm240 0q-33 0-56.5-23.5T520-480q0-33 23.5-56.5T600-560q33 0 56.5 23.5T680-480q0 33-23.5 56.5T600-400ZM360-640q-33 0-56.5-23.5T280-720q0-33 23.5-56.5T360-800q33 0 56.5 23.5T440-720q0 33-23.5 56.5T360-640Zm240 0q-33 0-56.5-23.5T520-720q0-33 23.5-56.5T600-800q33 0 56.5 23.5T680-720q0 33-23.5 56.5T600-640Z"/></svg>';
             dragZone.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -1009,6 +1010,22 @@ function startDrag(e, li, index) {
     indicator.className = 'drop-indicator';
     indicator.style.setProperty('--drop-space', `${liRect.height + 8}px`);
     
+    // Dynamically match drop indicator color to the dragged item's color / theme
+    const game = games.find(g => String(g.id) === String(li.dataset.gameId));
+    const isLight = document.documentElement.classList.contains('light-mode');
+    let indicatorColor = null;
+    if (game && game.sidebarColor) {
+        const colors = getGameColorScheme(game.sidebarColor);
+        if (colors) indicatorColor = colors.swatch || colors.fill;
+    } else if (li.classList.contains('new-game')) {
+        indicatorColor = '#2f972c';
+    }
+    if (indicatorColor) {
+        indicator.style.setProperty('--drop-indicator-color', indicatorColor);
+        indicator.style.setProperty('--drop-indicator-glow', indicatorColor + (isLight ? '66' : '99'));
+        li.style.setProperty('--drop-indicator-color', indicatorColor);
+    }
+
     // Calculate offset from mouse to top of the li
     const offsetY = e.clientY - liRect.top;
 
@@ -1109,6 +1126,7 @@ function onDragEnd(e) {
     li.style.left = '';
     li.style.top = '';
     li.style.margin = '';
+    li.style.removeProperty('--drop-indicator-color');
     li.classList.remove('dragging');
     document.body.classList.remove('app-is-dragging');
 

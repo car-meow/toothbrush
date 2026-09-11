@@ -336,12 +336,11 @@ body:not(.media-bg) .rename-done-btn:hover {
 }
 
 .nexus-update-title {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 800;
     color: #ffffff;
     margin-bottom: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
+    letter-spacing: 0.4px;
 }
 
 .nexus-update-body {
@@ -428,15 +427,15 @@ body:not(.media-bg) .rename-done-btn:hover {
     border: 2px solid #B388FF;
     border-radius: 20px;
     padding: 28px;
-    width: fit-content;
-    min-width: 320px;
-    max-width: 800px;
+    width: min(90vw, 780px);
+    box-sizing: border-box;
     max-height: 85vh;
     display: flex;
     flex-direction: column;
     box-shadow: 0 0 50px rgba(179, 136, 255, 0.25);
     color: #ffffff;
     font-family: 'Space Grotesk', sans-serif;
+    position: relative;
 }
 
 .nexus-patchnotes-header {
@@ -447,12 +446,11 @@ body:not(.media-bg) .rename-done-btn:hover {
     color: #B388FF;
     font-size: 24px;
     font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
 }
 
 .nexus-patchnotes-body {
-    font-size: 16px;
+    font-size: 15px;
     color: #e0e0e0;
     line-height: 1.6;
     font-weight: 500;
@@ -466,6 +464,21 @@ body:not(.media-bg) .rename-done-btn:hover {
 .nexus-patchnotes-footer {
     display: flex;
     justify-content: flex-end;
+}
+
+html.light-mode .nexus-patchnotes-modal {
+    background: rgba(255, 255, 255, 0.98);
+    border: 2px solid #7b1fa2;
+    box-shadow: 0 10px 40px rgba(20, 13, 36, 0.2);
+    color: var(--text-color);
+}
+
+html.light-mode .nexus-patchnotes-title {
+    color: #7b1fa2;
+}
+
+html.light-mode .nexus-patchnotes-body {
+    color: var(--text-color);
 }
 
 .nexus-close-patchnotes-btn {
@@ -879,14 +892,24 @@ body.app-is-dragging #game-list li:not(.dragging):has(.trash-btn:hover) {
     border-color: transparent !important;
 }
 
+html.light-mode body.app-is-dragging #game-list li:not(.dragging):has(.trash-btn:hover) {
+    background-color: var(--zigzag-bg) !important;
+    border-color: var(--border-color) !important;
+}
+
 body.app-is-dragging #game-list li:not(.dragging).ugs-item:hover {
     background-color: #ffffff !important;
     border-color: #ffffff !important;
 }
 
-body.app-is-dragging #game-list li:not(.dragging):not(.ugs-item):hover {
+body.app-is-dragging #game-list li:not(.dragging):not(.ugs-item):not([style*="background-color"]):hover {
     background-color: #2c2c2c !important;
     border-color: transparent !important;
+}
+
+html.light-mode body.app-is-dragging #game-list li:not(.dragging):not(.ugs-item):not([style*="background-color"]):hover {
+    background-color: var(--zigzag-bg) !important;
+    border-color: var(--border-color) !important;
 }
 
 .ugs-item {
@@ -1158,38 +1181,58 @@ li:hover .app-action-btn {
     cursor: grab;
     z-index: 5;
     border-radius: 0 10px 10px 0;
+    color: inherit;
 }
 
 .drag-handle-zone:active {
     cursor: grabbing;
 }
 
+.drag-handle-zone svg,
 .drag-handle-zone img {
     width: 16px;
     height: 16px;
     pointer-events: none;
-    opacity: 0.5;
-    transition: opacity 0.2s;
+    opacity: 0.55;
+    transition: opacity 0.2s, transform 0.2s, color 0.2s;
+    color: inherit;
+    fill: currentColor;
 }
 
+#game-list li:hover .drag-handle-zone svg,
 #game-list li:hover .drag-handle-zone img {
+    opacity: 0.9;
+}
+
+.drag-handle-zone:hover svg,
+.drag-handle-zone:hover img {
     opacity: 1;
+    transform: scale(1.15);
+}
+
+/* Fallback img filter in light mode */
+html.light-mode .drag-handle-zone img:not([style*="filter"]) {
+    filter: var(--icon-filter);
 }
 
 /* Dragging state for the item being moved */
 #game-list li.dragging {
-    opacity: 0.85;
+    opacity: 0.92;
     z-index: 9999;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.65), 0 0 0 1.5px var(--drop-indicator-color, rgba(171, 71, 188, 0.6));
     pointer-events: none;
     transition: none;
+}
+
+html.light-mode #game-list li.dragging {
+    box-shadow: 0 8px 24px rgba(20, 13, 36, 0.25), 0 0 0 1.5px var(--drop-indicator-color, rgba(123, 31, 162, 0.5));
 }
 
 /* Drop indicator line */
 .drop-indicator {
     height: var(--drop-space, 52px);
     margin: 0 15px;
-    border-radius: 1px;
+    border-radius: 6px;
     pointer-events: none;
     position: relative;
     transition: height 0.16s ease, opacity 0.15s;
@@ -1201,10 +1244,17 @@ li:hover .app-action-btn {
     left: 0;
     right: 0;
     top: 50%;
-    height: 2px;
-    background: #575757;
-    border-radius: 1px;
+    height: 3px;
+    background: var(--drop-indicator-color, #ab47bc);
+    box-shadow: 0 0 10px var(--drop-indicator-glow, rgba(171, 71, 188, 0.65));
+    border-radius: 3px;
     transform: translateY(-50%);
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+html.light-mode .drop-indicator::before {
+    background: var(--drop-indicator-color, #7b1fa2);
+    box-shadow: 0 0 10px var(--drop-indicator-glow, rgba(123, 31, 162, 0.45));
 }
 
 .add-game {
