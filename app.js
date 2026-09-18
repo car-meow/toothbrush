@@ -427,17 +427,39 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
         idbToSave = { ...(idbToSave || {}), ...incomingIdb };
     }
 
-    const hashPayload = { ls: lsToSave, fs: fsToSave, idb: idbToSave };
-    const hash = JSON.stringify(hashPayload);
-    if (snapshotHashes.get(gameId) === hash && existing) return;
+    // Lightweight signature to check for modifications without multi-megabyte JSON stringification
+    let sig = '';
+    if (lsToSave) {
+        const lsKeys = Object.keys(lsToSave);
+        sig += 'L' + lsKeys.length;
+        for (let i = 0; i < lsKeys.length; i++) {
+            const v = String(lsToSave[lsKeys[i]]);
+            sig += ':' + lsKeys[i] + '=' + v.length;
+        }
+    }
+    if (fsToSave) {
+        const fsKeys = Object.keys(fsToSave);
+        sig += '|F' + fsKeys.length;
+        for (let i = 0; i < fsKeys.length; i++) {
+            const f = fsToSave[fsKeys[i]];
+            sig += ':' + fsKeys[i] + '=' + (f && f.data ? f.data.length : 0);
+        }
+    }
+    if (idbToSave) {
+        const idbKeys = Object.keys(idbToSave);
+        sig += '|I' + idbKeys.length;
+        for (let i = 0; i < idbKeys.length; i++) {
+            const ent = idbToSave[idbKeys[i]];
+            sig += ':' + idbKeys[i] + '=' + (ent && ent.contents ? ent.contents.length : 0);
+        }
+    }
+    if (snapshotHashes.get(gameId) === sig && existing) return;
 
     const savedAt = Date.now();
-    const history = Array.isArray(existing && existing.history) ? existing.history.slice(-4) : [];
-    if (existing && (existing.localStorage || existing.fsData || existing.idbData)) {
+    const history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
+    if (existing && existing.localStorage) {
         history.push({
             localStorage: existing.localStorage,
-            fsData: existing.fsData,
-            idbData: existing.idbData,
             savedAt: existing.savedAt || savedAt
         });
     }
@@ -454,7 +476,7 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
     const tx = db.transaction('gameSnapshots', 'readwrite');
     const store = tx.objectStore('gameSnapshots');
     store.put(snapshotRecord);
-    snapshotHashes.set(gameId, hash);
+    snapshotHashes.set(gameId, sig);
 
     const memorySnapshot = { localStorage: lsToSave, fsData: fsToSave, idbData: idbToSave };
     // Immediately synchronize in-memory caches across all references
@@ -657,8 +679,8 @@ function decodeBackupValue(value) {
 
 function startGameAutosave() {
     if (gameAutosaveTimer) clearInterval(gameAutosaveTimer);
-    // Continuous periodic sync heartbeat
-    gameAutosaveTimer = setInterval(requestCurrentGameAutosave, 5000);
+    // Continuous periodic sync heartbeat (15s throttled to reduce CPU/RAM thrashing)
+    gameAutosaveTimer = setInterval(requestCurrentGameAutosave, 15000);
 }
 
 window.addEventListener('message', event => {
@@ -1317,12 +1339,10 @@ function getUniversalAutosaveBridge(gameId) {
                         }
 
                         var savedAt = Date.now();
-                        var history = Array.isArray(existing && existing.history) ? existing.history.slice(-4) : [];
-                        if (existing && (existing.localStorage || existing.fsData || existing.idbData)) {
+                        var history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
+                        if (existing && existing.localStorage) {
                             history.push({
                                 localStorage: existing.localStorage,
-                                fsData: existing.fsData,
-                                idbData: existing.idbData,
                                 savedAt: existing.savedAt || savedAt
                             });
                         }
@@ -1428,25 +1448,31 @@ function getUniversalAutosaveBridge(gameId) {
     } catch(e) {}
 
     // Emscripten / WASM Filesystem Sync Hook
+    var hookAttempts = 0;
+    var hookTimer = null;
     function hookFS() {
         try {
             var fs = window.FS || (window.Module && window.Module.FS);
             if (fs && typeof fs.syncfs === 'function' && !fs._nexusHooked) {
                 fs._nexusHooked = true;
+                if (hookTimer) { clearInterval(hookTimer); hookTimer = null; }
                 var origSyncfs = fs.syncfs;
                 fs.syncfs = function(populate, callback) {
                     return origSyncfs.call(this, populate, function(err) {
                         if (typeof callback === 'function') callback(err);
                         if (!populate) {
-                            debounceSync(200);
+                            debounceSync(1000);
                         }
                     });
                 };
+            } else if (++hookAttempts > 30 && hookTimer) {
+                clearInterval(hookTimer);
+                hookTimer = null;
             }
         } catch(e) {}
     }
     hookFS();
-    setInterval(hookFS, 1000);
+    hookTimer = setInterval(hookFS, 2000);
 
     // Multi-Trigger Auto-Sync
     window.addEventListener('storage', function() { debounceSync(200); }, { passive: true });
@@ -1460,9 +1486,7 @@ function getUniversalAutosaveBridge(gameId) {
     window.addEventListener('pagehide', function() { syncAndSend(true); }, { passive: true });
     window.addEventListener('beforeunload', function() { syncAndSend(true); }, { passive: true });
 
-    setInterval(function() { syncAndSend(false); }, 3000);
-    window.addEventListener('pointerup', function() { debounceSync(1500); }, { passive: true });
-    window.addEventListener('keyup', function() { debounceSync(1500); }, { passive: true });
+    setInterval(function() { syncAndSend(false); }, 15000);
 })();
 <\/script>`;
 }
@@ -1688,7 +1712,7 @@ function launchGameFullscreen(game) {
                     } catch(e) {}
                     setInterval(function() {
                         if (document.title !== ct) document.title = ct;
-                    }, 300);
+                    }, 2000);
 
                     // Standalone IndexedDB snapshot persistence engine for about:blank popup
                     function saveToIDB(incomingData) {
@@ -1739,12 +1763,10 @@ function launchGameFullscreen(game) {
                                         }
 
                                         var savedAt = Date.now();
-                                        var history = Array.isArray(existing && existing.history) ? existing.history.slice(-4) : [];
-                                        if (existing && (existing.localStorage || existing.fsData || existing.idbData)) {
+                                        var history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
+                                        if (existing && existing.localStorage) {
                                             history.push({
                                                 localStorage: existing.localStorage,
-                                                fsData: existing.fsData,
-                                                idbData: existing.idbData,
                                                 savedAt: existing.savedAt || savedAt
                                             });
                                         }
@@ -1860,7 +1882,7 @@ function launchGameFullscreen(game) {
                     document.addEventListener('visibilitychange', function() {
                         if (document.hidden) triggerAutosaveFlush();
                     }, { passive: true });
-                    setInterval(triggerAutosaveFlush, 4000);
+                    setInterval(triggerAutosaveFlush, 15000);
                 })();
                 `;
                 win.document.head.appendChild(controllerScriptEl);
@@ -2284,6 +2306,8 @@ function updateGameStatusUI(state) {
 
 function ensureStashPreloaded() {
     const localStorage = window.nexusStorage || window.localStorage;
+    const isPerfMode = localStorage.getItem('tb_performance_mode') === 'true' || localStorage.getItem('tb_performance_mode_lite') === 'true';
+    if (isPerfMode) return;
     const isPreloadEnabled = localStorage.getItem('tb_preload_stash') !== 'false';
     const stashFrame = document.getElementById('stash-frame');
 
@@ -2400,7 +2424,14 @@ async function loadGame(game, forceInternal = false) {
     }
 
     // Standard Game Loading
-    if (stashFrame) stashFrame.style.setProperty('display', 'none', 'important');
+    if (stashFrame) {
+        stashFrame.style.setProperty('display', 'none', 'important');
+        const isPerfMode = localStorage.getItem('tb_performance_mode') === 'true' || localStorage.getItem('tb_performance_mode_lite') === 'true';
+        if (isPerfMode && stashFrame.src && !stashFrame.src.endsWith('about:blank')) {
+            stashFrame.src = 'about:blank';
+            isStashPreloaded = false;
+        }
+    }
     if (frame) {
         try {
             if (frame.src && frame.src.startsWith('blob:')) URL.revokeObjectURL(frame.src);

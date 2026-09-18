@@ -563,12 +563,10 @@
                 }
 
                 var savedAt = Date.now();
-                var history = Array.isArray(existing && existing.history) ? existing.history.slice(-4) : [];
-                if (existing && (existing.localStorage || existing.fsData || existing.idbData)) {
+                var history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
+                if (existing && existing.localStorage) {
                   history.push({
                     localStorage: existing.localStorage,
-                    fsData: existing.fsData,
-                    idbData: existing.idbData,
                     savedAt: existing.savedAt || savedAt
                   });
                 }
@@ -717,9 +715,9 @@
             fs.syncfs(false, function() {});
           }
         } catch(e) {}
-      }, 2500);
+      }, 10000);
 
-      setInterval(syncAndSend, 4000);
+      setInterval(syncAndSend, 15000);
 
       // Proactively request restore from parent and opener, and load directly from IDB
       var reqMsg = { type: 'nexus-request-game-restore', gameId: 'spaceflightsimulator' };

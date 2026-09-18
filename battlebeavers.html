@@ -265,12 +265,10 @@
                                 }
 
                                 var savedAt = Date.now();
-                                var history = Array.isArray(existing && existing.history) ? existing.history.slice(-4) : [];
-                                if (existing && (existing.localStorage || existing.fsData || existing.idbData)) {
+                                var history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
+                                if (existing && existing.localStorage) {
                                     history.push({
                                         localStorage: existing.localStorage,
-                                        fsData: existing.fsData,
-                                        idbData: existing.idbData,
                                         savedAt: existing.savedAt || savedAt
                                     });
                                 }
@@ -376,7 +374,10 @@
 
             window.addEventListener('pagehide', sendSave, { passive: true });
             window.addEventListener('beforeunload', sendSave, { passive: true });
-            setInterval(sendSave, 4000);
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) sendSave();
+            }, { passive: true });
+            setInterval(sendSave, 15000);
 
             // Request restore immediately upon loading
             var reqMsg = { type: 'nexus-request-game-restore', gameId: 'battlebeavers' };

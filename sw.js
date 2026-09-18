@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexus-cache-v9';
+const CACHE_NAME = 'nexus-cache-v10';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -30,8 +30,6 @@ const ASSETS_TO_CACHE = [
     './Assets/SpaceGrotesk-Medium.ttf',
     './Assets/SpaceGrotesk-SemiBold.ttf',
     './Assets/SpaceGrotesk-Bold.ttf',
-    './survivalrace/Build/2af43bcf95e2c5402294f39cb5883fcb.wasm.unityweb.part1',
-    './survivalrace/Build/2af43bcf95e2c5402294f39cb5883fcb.wasm.unityweb.part2',
     // Assets SVGs
     './Assets/AI.svg',
     './Assets/Active%20Timer.svg',
@@ -75,11 +73,7 @@ const ASSETS_TO_CACHE = [
     './Assets/pop.gif',
     './Assets/tutorial.pdf',
     './Assets/performanceBG.jpg',
-    './Assets/performanceBGlight.jpg',
-    // Assets Videos
-    './Assets/loopBG.mp4',
-    './Assets/loopBGlight.mp4',
-    './Assets/purpleBG2.mp4'
+    './Assets/performanceBGlight.jpg'
 ];
 
 // Install Event - Pre-cache Core Assets

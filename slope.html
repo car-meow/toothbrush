@@ -328,12 +328,10 @@
                 }
 
                 var savedAt = Date.now();
-                var history = Array.isArray(existing && existing.history) ? existing.history.slice(-4) : [];
-                if (existing && (existing.localStorage || existing.fsData || existing.idbData)) {
+                var history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
+                if (existing && existing.localStorage) {
                   history.push({
                     localStorage: existing.localStorage,
-                    fsData: existing.fsData,
-                    idbData: existing.idbData,
                     savedAt: existing.savedAt || savedAt
                   });
                 }
@@ -458,7 +456,10 @@
 
       window.addEventListener('pagehide', syncAndSend, { passive: true });
       window.addEventListener('beforeunload', syncAndSend, { passive: true });
-      setInterval(syncAndSend, 4000);
+      document.addEventListener('visibilitychange', function() {
+        if (document.hidden) syncAndSend();
+      }, { passive: true });
+      setInterval(syncAndSend, 15000);
 
       // Request restore immediately upon loading
       var reqMsg = { type: 'nexus-request-game-restore', gameId: 'slope' };

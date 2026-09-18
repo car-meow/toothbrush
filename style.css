@@ -2217,6 +2217,12 @@ html.performance-mode *:not(img):not(svg):not(.status-icon):not([class*="icon"])
     text-shadow: none !important;
     box-shadow: none !important;
     filter: none !important;
+    will-change: auto !important;
+}
+
+html.performance-mode *,
+html.performance-mode-lite * {
+    will-change: auto !important;
 }
 
 html.performance-mode .floating-sidebar-warning,
@@ -2229,6 +2235,7 @@ html.performance-mode svg {
     animation: none !important;
     transition: none !important;
     box-shadow: none !important;
+    will-change: auto !important;
 }
 
 html.light-mode.performance-mode .material-nav-btn img,

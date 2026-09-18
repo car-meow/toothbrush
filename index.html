@@ -367,40 +367,37 @@ html.performance-mode [class*="aura-"] {
 </head>
 <body class="home-screen">
 
-<video class="home-bg-video" id="home-bg-video" autoplay muted loop playsinline preload="metadata" aria-hidden="true">
-    <source id="home-video-source" src="Assets/loopBG.mp4" type="video/mp4">
-</video>
+<video class="home-bg-video" id="home-bg-video" autoplay muted loop playsinline preload="none" aria-hidden="true"></video>
 <script>
     (function() {
         const localStorage = window.nexusStorage || window.localStorage;
+        const isPerf = localStorage.getItem('tb_performance_mode') === 'true' ||
+                       localStorage.getItem('tb_performance_mode_lite') === 'true' ||
+                       document.documentElement.classList.contains('performance-mode-lite') ||
+                       document.documentElement.classList.contains('performance-mode');
         const video = document.getElementById('home-bg-video');
-        const source = document.getElementById('home-video-source');
-        const theme = localStorage.getItem('tb_theme') || 'dark';
-
-        if (localStorage.getItem('tb_performance_mode') === 'true' || localStorage.getItem('tb_performance_mode_lite') === 'true') {
-            if (video) {
-                try {
-                    video.pause();
-                    video.removeAttribute('src');
-                    video.load();
-                } catch(e) {}
-                if (video.parentNode) video.parentNode.removeChild(video);
-            }
-        } else if (theme === 'light' && video) {
-            if (source) source.src = 'Assets/loopBGlight.mp4';
-            video.src = 'Assets/loopBGlight.mp4';
-            video.load();
+        if (isPerf) {
+            if (video && video.parentNode) video.parentNode.removeChild(video);
+            return;
+        }
+        if (video) {
+            const theme = localStorage.getItem('tb_theme') || 'dark';
+            const vidSrc = theme === 'light' ? 'Assets/loopBGlight.mp4' : 'Assets/loopBG.mp4';
+            video.src = vidSrc;
             video.play().catch(() => {});
         }
     })();
 </script>
 <script>
-    // Stop decoding the decorative background while the tab is hidden.
+    // Stop decoding and release video playback buffers while the tab is hidden
     document.addEventListener('visibilitychange', () => {
         const video = document.querySelector('.home-bg-video');
-        if (!video || document.documentElement.classList.contains('performance-mode') || document.documentElement.classList.contains('performance-mode-lite')) return;
-        if (document.hidden) video.pause();
-        else video.play().catch(() => {});
+        if (!video) return;
+        if (document.hidden) {
+            video.pause();
+        } else {
+            video.play().catch(() => {});
+        }
     }, { passive: true });
 </script>
 
