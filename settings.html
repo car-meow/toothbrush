@@ -16,6 +16,9 @@
                 } else if (storage.getItem('tb_performance_mode_lite') === 'true') {
                     document.documentElement.classList.add('performance-mode-lite');
                 }
+                if (storage.getItem('tb_dev_mode') === 'true') {
+                    document.documentElement.classList.add('dev-mode');
+                }
             } catch(e) {}
         })();
     </script>
@@ -80,6 +83,17 @@
     <link rel="prefetch" href="site-core.js">
 </head>
 <body class="chat-bg">
+    <!-- Hidden top-left Dev Mode Trigger & Toggle Widget -->
+    <div id="nexus-dev-mode-trigger"></div>
+    <div id="nexus-dev-mode-widget" aria-label="Developer Mode Widget">
+        <span class="dev-mode-dot"></span>
+        <span class="dev-mode-tag">Dev Mode</span>
+        <label class="dev-mode-switch" title="Toggle Developer Mode">
+            <input type="checkbox" id="dev-mode-checkbox">
+            <span class="dev-slider"></span>
+        </label>
+    </div>
+
     <div id="page-fade-overlay"></div>
     <script>
         (function() {
@@ -157,6 +171,21 @@
                 </label>
             </div>
 
+            <!-- Developer Mode / To Be Removed Section (Only visible when Dev Mode is ON) -->
+            <div id="dev-mode-settings-section" style="display: none;">
+                <div class="setting-section-title" style="color: #ff5252; display: flex; align-items: center; gap: 8px;">
+                    <img src="Assets/report.svg" alt="" style="width: 20px; height: 20px; filter: invert(30%) sepia(90%) saturate(2000%) hue-rotate(345deg) brightness(95%) contrast(100%);">
+                    Developer Mode
+                </div>
+                <div id="dev-to-be-removed-row" class="setting-row" style="border-color: rgba(239, 83, 80, 0.4); background: rgba(239, 83, 80, 0.08);">
+                    <div class="setting-label-group">
+                        <span class="setting-label" style="color: #ff5252;">To Be Removed Games (<span id="dev-reported-count">0</span>)</span>
+                        <span class="setting-hint">Games reported in Game Stash for deletion by unique ID</span>
+                    </div>
+                    <button id="btn-view-reported-games" class="action-btn dev-action-btn-primary" type="button">View List</button>
+                </div>
+            </div>
+
             <div class="setting-section-title">Media Settings</div>
 
             <div class="setting-row">
@@ -201,6 +230,32 @@
             </div>
         </div>
     </main>
+
+    <!-- Modal for Viewing "To Be Removed" Reported Games -->
+    <div id="dev-reported-modal-overlay" role="dialog" aria-modal="true">
+        <div class="dev-modal-box">
+            <div class="dev-modal-header">
+                <h3 class="dev-modal-title">
+                    <img src="Assets/report.svg" alt="" style="width: 20px; height: 20px; filter: invert(30%) sepia(90%) saturate(2000%) hue-rotate(345deg) brightness(95%) contrast(100%);">
+                    To Be Removed Games (<span id="modal-reported-count">0</span>)
+                </h3>
+                <button id="btn-close-reported-modal-x" type="button" style="background:none;border:none;color:#aaa;font-size:24px;cursor:pointer;line-height:1;" title="Close">&times;</button>
+            </div>
+            <div class="dev-modal-body">
+                <div style="font-size: 13.5px; color: var(--muted-text, #aaa); line-height: 1.4; text-align: left;">
+                    The following games were flagged for removal from the Game Stash. Copy this text or the unique IDs and send them to the developer to permanently delete the buttons:
+                </div>
+                <textarea id="dev-reported-text" class="dev-reported-textarea" readonly placeholder="No games reported yet."></textarea>
+                <div id="dev-reported-items-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 160px; overflow-y: auto;"></div>
+            </div>
+            <div class="dev-modal-actions">
+                <button id="btn-clear-reported-list" class="dev-action-btn dev-action-btn-danger" type="button">Clear List</button>
+                <button id="btn-copy-reported-ids" class="dev-action-btn dev-action-btn-secondary" type="button">Copy IDs Only</button>
+                <button id="btn-copy-reported-list" class="dev-action-btn dev-action-btn-primary" type="button">Copy Full List</button>
+                <button id="btn-close-reported-modal" class="dev-action-btn dev-action-btn-secondary" type="button">Close</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         const localStorage = window.nexusStorage || window.localStorage;
@@ -382,6 +437,208 @@
             localStorage.removeItem('tb_tutorial_step');
             await nexusAlert('Tutorial progress has been reset!');
         };
+
+        // =========================================
+        // DEVELOPER MODE & "TO BE REMOVED" SYSTEM
+        // =========================================
+        const devModeSection = document.getElementById('dev-mode-settings-section');
+        const devReportedCountEl = document.getElementById('dev-reported-count');
+        const modalReportedCountEl = document.getElementById('modal-reported-count');
+        const btnViewReported = document.getElementById('btn-view-reported-games');
+        const devReportedModal = document.getElementById('dev-reported-modal-overlay');
+        const devReportedTextarea = document.getElementById('dev-reported-text');
+        const devReportedItemsContainer = document.getElementById('dev-reported-items-container');
+        const btnCloseModal = document.getElementById('btn-close-reported-modal');
+        const btnCloseModalX = document.getElementById('btn-close-reported-modal-x');
+        const btnCopyFullList = document.getElementById('btn-copy-reported-list');
+        const btnCopyIdsOnly = document.getElementById('btn-copy-reported-ids');
+        const btnClearList = document.getElementById('btn-clear-reported-list');
+
+        function getReportedGamesList() {
+            try {
+                return JSON.parse(localStorage.getItem('tb_dev_reported_games') || '[]');
+            } catch(e) { return []; }
+        }
+
+        function saveReportedGamesList(list) {
+            localStorage.setItem('tb_dev_reported_games', JSON.stringify(list));
+            updateDevModeUI();
+            try {
+                window.dispatchEvent(new Event('storage'));
+            } catch(err) {}
+        }
+
+        function formatReportedText(list) {
+            if (!list || list.length === 0) {
+                return 'No games currently reported in the "To Be Removed" list.\nTurn Dev Mode ON in the Game Stash and click the report icon next to any game to queue it here.';
+            }
+            let out = `=== GAME STASH - TO BE REMOVED LIST (${list.length} ${list.length === 1 ? 'game' : 'games'}) ===\n\n`;
+            list.forEach((item, idx) => {
+                const dateStr = item.reportedAt ? new Date(item.reportedAt).toLocaleString() : 'N/A';
+                out += `${idx + 1}. Title: ${item.title || 'Unknown Title'}\n`;
+                out += `   Unique ID: ${item.id}\n`;
+                out += `   Source File: ${item.file || 'N/A'}\n`;
+                if (item.section) out += `   Section: ${item.section}\n`;
+                out += `   Reported: ${dateStr}\n\n`;
+            });
+            out += `=================================================\n`;
+            out += `Unique IDs only (for direct code removal):\n`;
+            out += list.map(i => i.id).join('\n');
+            return out;
+        }
+
+        function renderReportedItemsCards(list) {
+            if (!devReportedItemsContainer) return;
+            devReportedItemsContainer.innerHTML = '';
+            if (!list || list.length === 0) return;
+
+            list.forEach((item, idx) => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.06); padding:8px 12px; border-radius:8px; border:1px solid rgba(239,83,80,0.3); font-size:13px; text-align:left;';
+                
+                const info = document.createElement('div');
+                info.style.cssText = 'display:flex; flex-direction:column; gap:2px; overflow:hidden;';
+                info.innerHTML = `<span style="font-weight:700; color:var(--text-color);">${idx + 1}. ${item.title}</span><code style="font-size:11.5px; color:#ff8a80;">${item.id}</code>`;
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.title = 'Remove from report list';
+                removeBtn.textContent = '✖';
+                removeBtn.style.cssText = 'background:rgba(244,67,54,0.2); border:1px solid #d32f2f; color:#ff8a80; border-radius:6px; width:26px; height:26px; cursor:pointer; font-weight:bold; font-size:13px; line-height:1; display:flex; align-items:center; justify-content:center;';
+                removeBtn.onclick = () => {
+                    const updated = getReportedGamesList().filter(g => g.id !== item.id);
+                    saveReportedGamesList(updated);
+                    openReportedModal();
+                };
+
+                row.appendChild(info);
+                row.appendChild(removeBtn);
+                devReportedItemsContainer.appendChild(row);
+            });
+        }
+
+        function openReportedModal() {
+            const list = getReportedGamesList();
+            if (devReportedTextarea) devReportedTextarea.value = formatReportedText(list);
+            if (modalReportedCountEl) modalReportedCountEl.textContent = String(list.length);
+            renderReportedItemsCards(list);
+            if (devReportedModal) devReportedModal.classList.add('active');
+        }
+
+        function closeReportedModal() {
+            if (devReportedModal) devReportedModal.classList.remove('active');
+        }
+
+        function updateDevModeUI() {
+            const isDev = storage.getItem('tb_dev_mode') === 'true';
+            document.documentElement.classList.toggle('dev-mode', isDev);
+            if (devModeSection) {
+                devModeSection.style.display = isDev ? 'block' : 'none';
+            }
+            const widget = document.getElementById('nexus-dev-mode-widget');
+            const checkbox = document.getElementById('dev-mode-checkbox');
+            if (checkbox) checkbox.checked = isDev;
+            if (widget) widget.classList.toggle('dev-active', isDev);
+
+            const count = getReportedGamesList().length;
+            if (devReportedCountEl) devReportedCountEl.textContent = String(count);
+            if (modalReportedCountEl) modalReportedCountEl.textContent = String(count);
+        }
+
+        // Top-left Proximity Dev Mode Widget in Settings
+        const devWidget = document.getElementById('nexus-dev-mode-widget');
+        const devCheckbox = document.getElementById('dev-mode-checkbox');
+
+        if (devCheckbox && devWidget) {
+            devCheckbox.addEventListener('change', (e) => {
+                const enabled = e.target.checked;
+                storage.setItem('tb_dev_mode', enabled ? 'true' : 'false');
+                updateDevModeUI();
+                try {
+                    window.dispatchEvent(new Event('storage'));
+                } catch(err) {}
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                const dist = Math.hypot(e.clientX, e.clientY);
+                if (dist < 160) {
+                    devWidget.classList.add('near-cursor');
+                } else {
+                    devWidget.classList.remove('near-cursor');
+                }
+            }, { passive: true });
+        }
+
+        if (btnViewReported) {
+            btnViewReported.addEventListener('click', openReportedModal);
+        }
+        if (btnCloseModal) btnCloseModal.addEventListener('click', closeReportedModal);
+        if (btnCloseModalX) btnCloseModalX.addEventListener('click', closeReportedModal);
+        if (devReportedModal) {
+            devReportedModal.addEventListener('click', (e) => {
+                if (e.target === devReportedModal) closeReportedModal();
+            });
+        }
+
+        if (btnCopyFullList) {
+            btnCopyFullList.addEventListener('click', async () => {
+                const list = getReportedGamesList();
+                const text = formatReportedText(list);
+                try {
+                    await navigator.clipboard.writeText(text);
+                    const orig = btnCopyFullList.textContent;
+                    btnCopyFullList.textContent = 'Copied Full List!';
+                    setTimeout(() => { btnCopyFullList.textContent = orig; }, 1800);
+                } catch(err) {
+                    if (devReportedTextarea) {
+                        devReportedTextarea.select();
+                        document.execCommand('copy');
+                        const orig = btnCopyFullList.textContent;
+                        btnCopyFullList.textContent = 'Copied!';
+                        setTimeout(() => { btnCopyFullList.textContent = orig; }, 1800);
+                    }
+                }
+            });
+        }
+
+        if (btnCopyIdsOnly) {
+            btnCopyIdsOnly.addEventListener('click', async () => {
+                const list = getReportedGamesList();
+                const text = list.map(i => i.id).join('\n');
+                try {
+                    await navigator.clipboard.writeText(text || 'No IDs');
+                    const orig = btnCopyIdsOnly.textContent;
+                    btnCopyIdsOnly.textContent = 'Copied IDs!';
+                    setTimeout(() => { btnCopyIdsOnly.textContent = orig; }, 1800);
+                } catch(err) {
+                    alert('Could not copy to clipboard.');
+                }
+            });
+        }
+
+        if (btnClearList) {
+            btnClearList.addEventListener('click', async () => {
+                const list = getReportedGamesList();
+                if (list.length === 0) return;
+                const ok = await nexusConfirm(`Are you sure you want to clear all ${list.length} reported games from the "To Be Removed" list?`);
+                if (ok) {
+                    saveReportedGamesList([]);
+                    openReportedModal();
+                    await nexusAlert('Reported list cleared.');
+                }
+            });
+        }
+
+        updateDevModeUI();
+
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'tb_dev_mode' || e.key === 'tb_dev_reported_games') {
+                updateDevModeUI();
+                if (devReportedModal && devReportedModal.classList.contains('active')) {
+                    openReportedModal();
+                }
+            }
+        });
 
         // Fade page in once settings are fully rendered
         const overlay = document.getElementById('page-fade-overlay');

@@ -2580,5 +2580,344 @@ html.light-mode .home-btn span {
     color: #140d24 !important;
 }
 
+/* =========================================
+   DEV MODE & GAME STASH REPORTING SYSTEM
+========================================= */
+#nexus-dev-mode-trigger {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 170px;
+    height: 80px;
+    z-index: 999998;
+    pointer-events: auto;
+}
+
+#nexus-dev-mode-widget {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(18, 6, 6, 0.88);
+    border: 1.5px solid #d32f2f;
+    border-radius: 20px;
+    padding: 6px 14px 6px 12px;
+    box-shadow: 0 4px 18px rgba(211, 47, 47, 0.35);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-8px) scale(0.96);
+    transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                visibility 0.25s;
+    user-select: none;
+    font-family: 'Space Grotesk', sans-serif;
+}
+
+#nexus-dev-mode-trigger:hover + #nexus-dev-mode-widget,
+#nexus-dev-mode-widget:hover,
+#nexus-dev-mode-widget.near-cursor {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    transform: translateY(0) scale(1) !important;
+}
+
+.dev-mode-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #ff5252;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.dev-mode-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #f44336;
+    box-shadow: 0 0 8px #f44336;
+    transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+#nexus-dev-mode-widget.dev-active .dev-mode-dot {
+    background-color: #ff1744;
+    box-shadow: 0 0 12px #ff1744;
+}
+
+/* Red Toggle Switch */
+.dev-mode-switch {
+    position: relative;
+    width: 38px;
+    height: 20px;
+    display: inline-block;
+    cursor: pointer;
+    margin: 0;
+}
+
+.dev-mode-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.dev-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #381a1a;
+    border: 1px solid #7f1d1d;
+    transition: .25s ease;
+    border-radius: 20px;
+}
+
+.dev-slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    bottom: 2px;
+    background-color: #fff;
+    transition: .25s ease;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.dev-mode-switch input:checked + .dev-slider {
+    background-color: #d32f2f;
+    border-color: #ff5252;
+    box-shadow: 0 0 10px rgba(244, 67, 54, 0.7);
+}
+
+.dev-mode-switch input:checked + .dev-slider:before {
+    transform: translateX(18px);
+}
+
+/* Light mode adjustments for Dev Mode widget */
+html.light-mode #nexus-dev-mode-widget {
+    background: rgba(255, 245, 245, 0.95);
+    border-color: #d32f2f;
+    box-shadow: 0 4px 18px rgba(211, 47, 47, 0.25);
+}
+
+html.light-mode .dev-slider {
+    background-color: #e0b4b4;
+    border-color: #c62828;
+}
+
+/* Game Stash Report Buttons */
+.stash-report-btn {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(211, 47, 47, 0.15);
+    border: 1.5px solid rgba(239, 83, 80, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 5px;
+    box-sizing: border-box;
+}
+
+html.dev-mode .stash-report-btn {
+    display: flex !important;
+}
+
+.stash-report-btn:hover {
+    background: rgba(211, 47, 47, 0.4);
+    border-color: #ff5252;
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 0 12px rgba(239, 83, 80, 0.6);
+}
+
+.stash-report-btn.reported {
+    background: #d32f2f !important;
+    border-color: #ff1744 !important;
+    box-shadow: 0 0 14px rgba(255, 23, 68, 0.75) !important;
+}
+
+.stash-report-btn img {
+    width: 18px;
+    height: 18px;
+    pointer-events: none;
+    filter: invert(30%) sepia(90%) saturate(2000%) hue-rotate(345deg) brightness(95%) contrast(100%);
+    transition: filter 0.2s ease;
+}
+
+.stash-report-btn.reported img {
+    filter: brightness(0) invert(1) !important;
+}
+
+/* Floating animation when reporting */
+@keyframes floatReportUp {
+    0% { transform: translateY(0); opacity: 1; }
+    100% { transform: translateY(-45px); opacity: 0; }
+}
+
+.floating-reported-text {
+    position: fixed;
+    pointer-events: none;
+    color: #ff5252;
+    font-weight: 800;
+    font-size: 19px;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    z-index: 10001;
+    animation: floatReportUp 1.2s ease-out forwards;
+    font-family: 'Space Grotesk', sans-serif;
+}
+
+/* Dev Mode "To Be Removed" Modal in Settings */
+#dev-reported-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 20000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+#dev-reported-modal-overlay.active {
+    display: flex;
+}
+
+.dev-modal-box {
+    background: var(--modal-bg, #1a102b);
+    border: 2px solid #ef5350;
+    border-radius: 18px;
+    width: min(92vw, 680px);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(211, 47, 47, 0.35);
+    overflow: hidden;
+    font-family: 'Space Grotesk', sans-serif;
+}
+
+.dev-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 22px;
+    background: rgba(211, 47, 47, 0.12);
+    border-bottom: 1.5px solid rgba(239, 83, 80, 0.3);
+}
+
+.dev-modal-title {
+    color: #ff5252;
+    font-size: 20px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.dev-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.dev-reported-textarea {
+    width: 100%;
+    height: 220px;
+    background: rgba(10, 5, 15, 0.7);
+    border: 1px solid rgba(239, 83, 80, 0.4);
+    border-radius: 10px;
+    color: #f1f1f1;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12.5px;
+    padding: 12px;
+    box-sizing: border-box;
+    resize: vertical;
+    line-height: 1.45;
+}
+
+html.light-mode .dev-reported-textarea {
+    background: #fdf2f2;
+    color: #1a0808;
+    border-color: #ef9a9a;
+}
+
+.dev-modal-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    padding: 14px 20px;
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+.dev-action-btn {
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 13.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.dev-action-btn-primary {
+    background: #d32f2f;
+    color: #ffffff;
+}
+
+.dev-action-btn-primary:hover {
+    background: #b71c1c;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(211, 47, 47, 0.4);
+}
+
+.dev-action-btn-secondary {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text-color, #ffffff);
+}
+
+.dev-action-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.dev-action-btn-danger {
+    background: rgba(183, 28, 28, 0.3);
+    color: #ff8a80;
+    border: 1px solid #c62828;
+}
+
+.dev-action-btn-danger:hover {
+    background: #c62828;
+    color: #ffffff;
+}
+
 
 

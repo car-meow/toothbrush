@@ -3,12 +3,14 @@
 
 <head>
     <title>Nexus Files</title>
+    <link rel="stylesheet" href="style.css?v=56">
     <script>
         (function() {
             const theme = localStorage.getItem('tb_theme') || 'dark';
             if (theme === 'light') document.documentElement.classList.add('light-mode');
             if (localStorage.getItem('tb_performance_mode') === 'true') document.documentElement.classList.add('performance-mode');
             else if (localStorage.getItem('tb_performance_mode_lite') === 'true') document.documentElement.classList.add('performance-mode-lite');
+            if (localStorage.getItem('tb_dev_mode') === 'true') document.documentElement.classList.add('dev-mode');
         })();
     </script>
     <style>
@@ -313,6 +315,17 @@
 </head>
 
 <body>
+    <!-- Hidden top-left Dev Mode Trigger & Toggle Widget -->
+    <div id="nexus-dev-mode-trigger"></div>
+    <div id="nexus-dev-mode-widget" aria-label="Developer Mode Widget">
+        <span class="dev-mode-dot"></span>
+        <span class="dev-mode-tag">Dev Mode</span>
+        <label class="dev-mode-switch" title="Toggle Developer Mode">
+            <input type="checkbox" id="dev-mode-checkbox">
+            <span class="dev-slider"></span>
+        </label>
+    </div>
+
     <div class="sidebar" id="sidebar">
     </div>
 
@@ -383,6 +396,173 @@
         searchResultsContainer.appendChild(noResultsMessage);
         sectionsContainer.parentNode.insertBefore(searchResultsContainer, sectionsContainer);
 
+        // Blocklist of removed Game Stash IDs (managed by developer upon receiving reports)
+        const REMOVED_STASH_IDS = new Set([
+            // Add reported unique IDs here to permanently delete them from the Stash
+        ]);
+
+        const stashOccurrences = new Map();
+        function getStashUniqueId(btn) {
+            if (btn.dataset.stashId) return btn.dataset.stashId;
+            const extraApp = EXTRA_STASH_APPS.find(app => 
+                app.sourceFile === btn.dataset.extraSource || 
+                app.sourceFile === btn.dataset.originalValue ||
+                app.displayName === btn.value
+            );
+            if (extraApp) {
+                const id = `stash_extra_${extraApp.sourceFile.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+                btn.dataset.stashId = id;
+                return id;
+            }
+
+            const raw = String(btn.dataset.originalValue || btn.value || '').trim();
+            const section = btn.closest('.letter-section');
+            const sectionChar = (section?.querySelector('.letter-header')?.textContent || '?').trim().toLowerCase();
+            const fileClean = raw.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+            const key = `${sectionChar}:${fileClean}`;
+            const occ = (stashOccurrences.get(key) || 0) + 1;
+            stashOccurrences.set(key, occ);
+            const id = occ === 1 ? `stash_${sectionChar}_${fileClean}` : `stash_${sectionChar}_${fileClean}_dup${occ}`;
+            btn.dataset.stashId = id;
+            return id;
+        }
+
+        function getReportedGames() {
+            try {
+                return JSON.parse(localStorage.getItem('tb_dev_reported_games') || '[]');
+            } catch(e) { return []; }
+        }
+
+        function isGameReported(id) {
+            return getReportedGames().some(g => g.id === id);
+        }
+
+        function toggleReportGame(btn, id, e) {
+            let list = getReportedGames();
+            const existingIdx = list.findIndex(g => g.id === id);
+            const wrapper = btn.closest('.game-btn-wrapper');
+            const reportBtn = wrapper ? wrapper.querySelector('.stash-report-btn') : null;
+
+            if (existingIdx !== -1) {
+                list.splice(existingIdx, 1);
+                localStorage.setItem('tb_dev_reported_games', JSON.stringify(list));
+                if (reportBtn) {
+                    reportBtn.classList.remove('reported');
+                    reportBtn.title = 'Dev: Report game to be removed';
+                }
+                showReportToast('Removed from Report List', e, '#ff9800');
+            } else {
+                const title = btn.value || getStashDisplayName(btn.dataset.originalValue || id);
+                const rawFile = btn.dataset.originalValue || btn.dataset.extraSource || id;
+                const char = (btn.closest('.letter-section')?.querySelector('.letter-header')?.textContent || '?').trim();
+                list.push({
+                    id: id,
+                    title: title,
+                    file: rawFile,
+                    section: char,
+                    reportedAt: Date.now()
+                });
+                localStorage.setItem('tb_dev_reported_games', JSON.stringify(list));
+                if (reportBtn) {
+                    reportBtn.classList.add('reported');
+                    reportBtn.title = 'Dev: Reported (in To Be Removed list)';
+                }
+                showReportToast('Added to "To Be Removed" List!', e, '#ff5252');
+            }
+
+            try {
+                window.dispatchEvent(new Event('storage'));
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({ type: 'nexus-reported-games-updated' }, '*');
+                }
+            } catch(err) {}
+        }
+
+        function showReportToast(text, e, color) {
+            const floating = document.createElement('div');
+            floating.className = 'floating-reported-text';
+            floating.textContent = text;
+            if (color) floating.style.color = color;
+            floating.style.left = (e ? e.clientX : (window.innerWidth / 2 - 100)) + 'px';
+            floating.style.top = (e ? e.clientY - 25 : 100) + 'px';
+            document.body.appendChild(floating);
+            setTimeout(() => floating.remove(), 1200);
+        }
+
+        function ensureReportButton(wrapper, btn, uniqueId) {
+            if (!wrapper || wrapper.querySelector('.stash-report-btn')) return;
+            const reportBtn = document.createElement('button');
+            reportBtn.type = 'button';
+            reportBtn.className = 'stash-report-btn';
+            reportBtn.title = 'Dev: Report game to be removed';
+            reportBtn.setAttribute('aria-label', 'Report game');
+            const reportImg = document.createElement('img');
+            reportImg.src = 'Assets/report.svg';
+            reportImg.alt = 'Report';
+            reportBtn.appendChild(reportImg);
+
+            if (isGameReported(uniqueId)) {
+                reportBtn.classList.add('reported');
+                reportBtn.title = 'Dev: Reported (in To Be Removed list)';
+            }
+
+            reportBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleReportGame(btn, uniqueId, e);
+            };
+            wrapper.appendChild(reportBtn);
+        }
+
+        function refreshReportButtonsState() {
+            const reported = new Set(getReportedGames().map(g => g.id));
+            document.querySelectorAll('.stash-report-btn').forEach(btn => {
+                const wrapper = btn.closest('.game-btn-wrapper');
+                const id = wrapper?.dataset.stashId;
+                if (id && reported.has(id)) {
+                    btn.classList.add('reported');
+                    btn.title = 'Dev: Reported (in To Be Removed list)';
+                } else {
+                    btn.classList.remove('reported');
+                    btn.title = 'Dev: Report game to be removed';
+                }
+            });
+        }
+
+        function initDevModeWidget() {
+            const checkbox = document.getElementById('dev-mode-checkbox');
+            const widget = document.getElementById('nexus-dev-mode-widget');
+            if (!checkbox || !widget) return;
+
+            const isDev = localStorage.getItem('tb_dev_mode') === 'true';
+            checkbox.checked = isDev;
+            widget.classList.toggle('dev-active', isDev);
+            document.documentElement.classList.toggle('dev-mode', isDev);
+
+            checkbox.addEventListener('change', (e) => {
+                const enabled = e.target.checked;
+                localStorage.setItem('tb_dev_mode', enabled ? 'true' : 'false');
+                widget.classList.toggle('dev-active', enabled);
+                document.documentElement.classList.toggle('dev-mode', enabled);
+
+                try {
+                    window.dispatchEvent(new Event('storage'));
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage({ type: 'nexus-dev-mode-change', enabled: enabled }, '*');
+                    }
+                } catch(err) {}
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                const dist = Math.hypot(e.clientX, e.clientY);
+                if (dist < 160) {
+                    widget.classList.add('near-cursor');
+                } else {
+                    widget.classList.remove('near-cursor');
+                }
+            }, { passive: true });
+        }
+
         function getStashDisplayName(name, stripExtension = false) {
             return humanizeBookmarkDisplayName(name, stripExtension);
         }
@@ -391,6 +571,9 @@
             if (!btn.dataset.originalValue) {
                 btn.dataset.originalValue = btn.value;
             }
+
+            const uniqueId = getStashUniqueId(btn);
+            btn.dataset.stashId = uniqueId;
 
             const displayName = getStashDisplayName(btn.dataset.originalValue);
             btn.value = displayName;
@@ -476,6 +659,8 @@
 
         function ensureExtraStashButtons(allowCreate = false) {
             EXTRA_STASH_APPS.forEach(extraApp => {
+                const extraId = `stash_extra_${extraApp.sourceFile.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+                if (REMOVED_STASH_IDS.has(extraId)) return;
                 const section = getExistingLetterSection(extraApp.letter) || (allowCreate ? getOrCreateLetterSection(extraApp.letter) : null);
                 if (!section) return;
                 const container = section.querySelector('.buttons-container');
@@ -486,6 +671,7 @@
                 btn.value = extraApp.displayName;
                 btn.dataset.originalValue = extraApp.sourceFile;
                 btn.dataset.extraSource = extraApp.sourceFile;
+                btn.dataset.stashId = extraId;
                 if (extraApp.externalUrl) btn.dataset.externalUrl = extraApp.externalUrl;
                 btn.onclick = (e) => {
                     e.preventDefault();
@@ -826,28 +1012,72 @@
                 buttonWrapFrame = 0;
                 // Find all input[type="button"] that are NOT yet wrapped
                 document.querySelectorAll('#sections-container input[type="button"]').forEach(btn => {
+                    const uniqueId = getStashUniqueId(btn);
+                    if (REMOVED_STASH_IDS.has(uniqueId)) {
+                        const w = btn.closest('.game-btn-wrapper') || btn;
+                        w.remove();
+                        return;
+                    }
                     prepareGameButton(btn);
-                    if (btn.parentElement && btn.parentElement.classList.contains('game-btn-wrapper')) return; // already wrapped
+                    if (btn.parentElement && btn.parentElement.classList.contains('game-btn-wrapper')) {
+                        btn.parentElement.dataset.stashId = uniqueId;
+                        ensureReportButton(btn.parentElement, btn, uniqueId);
+                        return;
+                    }
 
                     const wrapper = document.createElement('div');
                     wrapper.className = 'game-btn-wrapper';
                     wrapper.dataset.stashIndex = String(stashButtonIndex++);
+                    wrapper.dataset.stashId = uniqueId;
                     wrapper.__stashHomeParent = btn.parentNode;
 
                     btn.parentNode.insertBefore(wrapper, btn);
                     wrapper.appendChild(btn);
+                    ensureReportButton(wrapper, btn, uniqueId);
                 });
 
                 ensureExtraStashButtons(false);
                 removeLegacySurvivalRaceV2();
                 queueBookmarkAvailabilityRefresh();
+                refreshReportButtonsState();
                 if (searchInput.value.trim() && !searchLayoutIsUpdating) queueStashSearch();
             });
         });
 
         observer.observe(sectionsContainer, { childList: true, subtree: true });
-        setTimeout(() => { ensureExtraStashButtons(true); removeLegacySurvivalRaceV2(); }, 1200);
+        setTimeout(() => { ensureExtraStashButtons(true); removeLegacySurvivalRaceV2(); refreshReportButtonsState(); }, 1200);
         refreshBookmarkAvailability();
+        initDevModeWidget();
+        refreshReportButtonsState();
+
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'tb_dev_reported_games') {
+                refreshReportButtonsState();
+            }
+            if (e.key === 'tb_dev_mode') {
+                const enabled = e.newValue === 'true';
+                const checkbox = document.getElementById('dev-mode-checkbox');
+                const widget = document.getElementById('nexus-dev-mode-widget');
+                if (checkbox) checkbox.checked = enabled;
+                if (widget) widget.classList.toggle('dev-active', enabled);
+                document.documentElement.classList.toggle('dev-mode', enabled);
+            }
+        });
+
+        window.addEventListener('message', (e) => {
+            if (!e.data) return;
+            if (e.data.type === 'nexus-dev-mode-change') {
+                const enabled = Boolean(e.data.enabled);
+                const checkbox = document.getElementById('dev-mode-checkbox');
+                const widget = document.getElementById('nexus-dev-mode-widget');
+                if (checkbox) checkbox.checked = enabled;
+                if (widget) widget.classList.toggle('dev-active', enabled);
+                document.documentElement.classList.toggle('dev-mode', enabled);
+            }
+            if (e.data.type === 'nexus-reported-games-updated') {
+                refreshReportButtonsState();
+            }
+        });
     </script>
     <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/games.js"></script>
 	<script>
