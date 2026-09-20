@@ -283,9 +283,10 @@
     // Universal Autosave & Restore Bridge for Slope
     (function() {
       var gameAliases = ['slope', 'bookmark_stash:slope.html'];
+      var autosaveDisarmed = false;
 
       function saveSnapshotDirectToDB(incomingData) {
-        if (!incomingData) return;
+        if (autosaveDisarmed || !incomingData) return;
         var incomingLs = incomingData.localStorage || {};
         var incomingFs = incomingData.fsData || null;
         var incomingIdb = incomingData.idbData || null;
@@ -406,6 +407,7 @@
       }
 
       function sendSave() {
+        if (autosaveDisarmed) return;
         try {
           var s = {};
           for (var i = 0; i < localStorage.length; i++) {
@@ -425,10 +427,11 @@
       }
 
       function syncAndSend() {
+        if (autosaveDisarmed) return;
         try {
           var fs = getFS();
           if (fs && typeof fs.syncfs === 'function') {
-            fs.syncfs(false, function() { sendSave(); });
+            fs.syncfs(false, function() { if (!autosaveDisarmed) sendSave(); });
             return;
           }
         } catch(e) {}
@@ -450,16 +453,28 @@
 
       window.addEventListener('message', function(e) {
         if (!e.data) return;
-        if (e.data.type === 'nexus-request-game-save') syncAndSend();
+        if (e.data.type === 'nexus-disarm-autosave') autosaveDisarmed = true;
+        if (e.data.type === 'nexus-wipe-game-storage') {
+          autosaveDisarmed = true;
+          try {
+            var toDel = [];
+            for (var i = 0; i < localStorage.length; i++) {
+              var k = localStorage.key(i);
+              if (k && k.indexOf('tb_') !== 0) toDel.push(k);
+            }
+            toDel.forEach(function(k) { localStorage.removeItem(k); });
+          } catch(err) {}
+        }
+        if (e.data.type === 'nexus-request-game-save' && !autosaveDisarmed) syncAndSend();
         if (e.data.type === 'nexus-apply-game-restore') applyRestore(e.data);
       });
 
-      window.addEventListener('pagehide', syncAndSend, { passive: true });
-      window.addEventListener('beforeunload', syncAndSend, { passive: true });
+      window.addEventListener('pagehide', function() { if (!autosaveDisarmed) syncAndSend(); }, { passive: true });
+      window.addEventListener('beforeunload', function() { if (!autosaveDisarmed) syncAndSend(); }, { passive: true });
       document.addEventListener('visibilitychange', function() {
-        if (document.hidden) syncAndSend();
+        if (document.hidden && !autosaveDisarmed) syncAndSend();
       }, { passive: true });
-      setInterval(syncAndSend, 15000);
+      setInterval(function() { if (!autosaveDisarmed) syncAndSend(); }, 15000);
 
       // Request restore immediately upon loading
       var reqMsg = { type: 'nexus-request-game-restore', gameId: 'slope' };

@@ -132,12 +132,12 @@
 
     <!-- Saves Selection Overlay -->
     <div id="saves-select-overlay" class="overlay" style="display:none; z-index:32000;">
-        <div class="modal-box" style="width: 520px; max-width: 92vw; text-align: left; border: 2px solid #ffffff;">
-            <h2 id="saves-select-title" style="color: #ffffff; margin-top: 0; margin-bottom: 6px; font-size: 22px; font-weight: 700;">Clear Game Saves</h2>
-            <p id="saves-select-hint" style="color: var(--muted-text, #9e93b8); font-size: 13px; margin-bottom: 14px;">Select games to clear save data for.</p>
+        <div class="modal-box saves-modal-box" style="width: 520px; max-width: 92vw; text-align: left;">
+            <h2 id="saves-select-title" class="saves-modal-title">Clear Game Saves</h2>
+            <p id="saves-select-hint" class="saves-modal-hint">Select games to clear save data for.</p>
             <div style="display:flex; gap:8px; margin-bottom:12px;">
-                <button id="saves-select-all" class="backup-modal-btn saves-util-btn" style="background:#ffffff; color:#0b0713;">Select All</button>
-                <button id="saves-select-none" class="backup-modal-btn saves-util-btn" style="background:#4a3b68; color:#ffffff;">Select None</button>
+                <button id="saves-select-all" class="backup-modal-btn saves-btn-all">Select All</button>
+                <button id="saves-select-none" class="backup-modal-btn saves-btn-none">Select None</button>
             </div>
             <div id="saves-game-list" style="max-height: 38vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;"></div>
             <div style="display:flex; justify-content:flex-end; gap:10px;">
@@ -149,7 +149,7 @@
 
     <script src="tutorial-engine.js?v=1"></script>
     <script src="game-title-utils.js?v=48"></script>
-    <script src="app.js?v=49"></script>
+    <script src="app.js?v=50"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (window.TutorialEngine) TutorialEngine.initGames();

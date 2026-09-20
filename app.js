@@ -1294,9 +1294,10 @@ function getUniversalAutosaveBridge(gameId) {
     var syncing = false;
     var syncTimer = null;
     var lastSavedHash = '';
+    var autosaveDisarmed = false;
 
     function saveSnapshotDirectToDB(targetId, snapshotData) {
-        if (!snapshotData || !targetId) return;
+        if (autosaveDisarmed || !snapshotData || !targetId) return;
         var incomingLs = snapshotData.localStorage || {};
         var incomingFs = snapshotData.fsData || null;
         var incomingIdb = snapshotData.idbData || null;
@@ -1311,11 +1312,12 @@ function getUniversalAutosaveBridge(gameId) {
                 var db = e.target.result;
                 db.onversionchange = function() { try { db.close(); } catch(err) {} };
                 try {
-                    if (!db.objectStoreNames.contains('gameSnapshots')) return;
+                    if (autosaveDisarmed || !db.objectStoreNames.contains('gameSnapshots')) return;
                     var tx = db.transaction('gameSnapshots', 'readwrite');
                     var store = tx.objectStore('gameSnapshots');
                     var getReq = store.get(targetId);
                     getReq.onsuccess = function() {
+                        if (autosaveDisarmed) return;
                         var existing = getReq.result || null;
                         var existingData = (existing && existing.localStorage && typeof existing.localStorage === 'object') ? existing.localStorage : {};
                         var incomingKeys = Object.keys(incomingLs);
@@ -1376,6 +1378,7 @@ function getUniversalAutosaveBridge(gameId) {
     }
 
     function sendSave(immediate) {
+        if (autosaveDisarmed) return;
         try {
             var data = getStorageSnapshot();
             var currentHash = JSON.stringify(data);
@@ -1395,7 +1398,7 @@ function getUniversalAutosaveBridge(gameId) {
     }
 
     function syncAndSend(immediate) {
-        if (syncing) return;
+        if (autosaveDisarmed || syncing) return;
         syncing = true;
         try {
             var fs = window.FS || (window.Module && window.Module.FS);
@@ -1412,6 +1415,7 @@ function getUniversalAutosaveBridge(gameId) {
     }
 
     function debounceSync(delay) {
+        if (autosaveDisarmed) return;
         if (syncTimer) clearTimeout(syncTimer);
         syncTimer = setTimeout(function() {
             syncTimer = null;
@@ -1424,7 +1428,7 @@ function getUniversalAutosaveBridge(gameId) {
         var origSetItem = Storage.prototype.setItem;
         Storage.prototype.setItem = function(k, v) {
             var res = origSetItem.apply(this, arguments);
-            if (this === localStorage && k && k.indexOf('tb_') !== 0) {
+            if (!autosaveDisarmed && this === localStorage && k && k.indexOf('tb_') !== 0) {
                 debounceSync(300);
             }
             return res;
@@ -1432,7 +1436,7 @@ function getUniversalAutosaveBridge(gameId) {
         var origRemoveItem = Storage.prototype.removeItem;
         Storage.prototype.removeItem = function(k) {
             var res = origRemoveItem.apply(this, arguments);
-            if (this === localStorage && k && k.indexOf('tb_') !== 0) {
+            if (!autosaveDisarmed && this === localStorage && k && k.indexOf('tb_') !== 0) {
                 debounceSync(300);
             }
             return res;
@@ -1440,7 +1444,7 @@ function getUniversalAutosaveBridge(gameId) {
         var origClear = Storage.prototype.clear;
         Storage.prototype.clear = function() {
             var res = origClear.apply(this, arguments);
-            if (this === localStorage) {
+            if (!autosaveDisarmed && this === localStorage) {
                 debounceSync(300);
             }
             return res;
@@ -1460,7 +1464,7 @@ function getUniversalAutosaveBridge(gameId) {
                 fs.syncfs = function(populate, callback) {
                     return origSyncfs.call(this, populate, function(err) {
                         if (typeof callback === 'function') callback(err);
-                        if (!populate) {
+                        if (!populate && !autosaveDisarmed) {
                             debounceSync(1000);
                         }
                     });
@@ -1474,19 +1478,38 @@ function getUniversalAutosaveBridge(gameId) {
     hookFS();
     hookTimer = setInterval(hookFS, 2000);
 
-    // Multi-Trigger Auto-Sync
-    window.addEventListener('storage', function() { debounceSync(200); }, { passive: true });
+    // Multi-Trigger Auto-Sync & Clear Handlers
+    window.addEventListener('storage', function() { if (!autosaveDisarmed) debounceSync(200); }, { passive: true });
     window.addEventListener('message', function(e) {
-        if (e.data && e.data.type === 'nexus-request-game-save') syncAndSend(true);
+        if (!e.data) return;
+        if (e.data.type === 'nexus-disarm-autosave') {
+            autosaveDisarmed = true;
+            if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
+        }
+        if (e.data.type === 'nexus-wipe-game-storage') {
+            autosaveDisarmed = true;
+            if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
+            try {
+                var toDel = [];
+                for (var i = 0; i < localStorage.length; i++) {
+                    var k = localStorage.key(i);
+                    if (k && k.indexOf('tb_') !== 0) toDel.push(k);
+                }
+                toDel.forEach(function(k) { localStorage.removeItem(k); });
+            } catch(err) {}
+        }
+        if (e.data.type === 'nexus-request-game-save') {
+            if (!autosaveDisarmed) syncAndSend(true);
+        }
     });
     document.addEventListener('visibilitychange', function() {
-        if (document.hidden) syncAndSend(true);
+        if (document.hidden && !autosaveDisarmed) syncAndSend(true);
     }, { passive: true });
-    window.addEventListener('blur', function() { syncAndSend(false); }, { passive: true });
-    window.addEventListener('pagehide', function() { syncAndSend(true); }, { passive: true });
-    window.addEventListener('beforeunload', function() { syncAndSend(true); }, { passive: true });
+    window.addEventListener('blur', function() { if (!autosaveDisarmed) syncAndSend(false); }, { passive: true });
+    window.addEventListener('pagehide', function() { if (!autosaveDisarmed) syncAndSend(true); }, { passive: true });
+    window.addEventListener('beforeunload', function() { if (!autosaveDisarmed) syncAndSend(true); }, { passive: true });
 
-    setInterval(function() { syncAndSend(false); }, 15000);
+    setInterval(function() { if (!autosaveDisarmed) syncAndSend(false); }, 15000);
 })();
 <\/script>`;
 }
@@ -2786,27 +2809,118 @@ async function clearGameSaves(gameIds) {
     if (!gameIds || gameIds.length === 0) return;
     await initDB();
 
+    const selectedGames = [];
     const allAliases = new Set();
     gameIds.forEach(id => {
-        allAliases.add(String(id));
+        const sId = String(id);
+        allAliases.add(sId);
         const matched = findGameByIdOrSource(id);
         if (matched) {
+            selectedGames.push(matched);
             if (matched.id) allAliases.add(String(matched.id));
             if (matched.sourceKey) allAliases.add(String(matched.sourceKey));
             if (matched.sourceFile) {
                 allAliases.add(String(matched.sourceFile));
                 allAliases.add(String(matched.sourceFile.replace(/\.html$/, '')));
+                const sfName = String(matched.sourceFile).split('/').pop();
+                if (sfName) {
+                    allAliases.add(sfName);
+                    allAliases.add(sfName.replace(/\.html$/, ''));
+                }
+            }
+            if (matched.title) {
+                allAliases.add(String(matched.title).toLowerCase());
+                allAliases.add(String(matched.title).toLowerCase().replace(/[^a-z0-9]/g, ''));
+            }
+            if (matched.sourceKey) {
+                allAliases.add('bookmark_' + matched.sourceKey);
+                allAliases.add('bookmark_' + encodeURIComponent(matched.sourceKey));
             }
         }
     });
 
-    // Delete snapshots from IndexedDB
-    await new Promise((resolve) => {
+    // 1. Immediately disarm autosaves and issue wipe commands to active iframe and popups
+    const disarmMsg = { type: 'nexus-disarm-autosave' };
+    const wipeMsg = { type: 'nexus-wipe-game-storage' };
+
+    const frame = document.getElementById('game-frame');
+    if (frame && frame.contentWindow) {
+        try {
+            frame.contentWindow.postMessage(disarmMsg, '*');
+            frame.contentWindow.postMessage(wipeMsg, '*');
+        } catch (e) {}
+    }
+
+    popupGameWindows.forEach((win) => {
+        if (win && !win.closed) {
+            try {
+                win.postMessage(disarmMsg, '*');
+                win.postMessage(wipeMsg, '*');
+            } catch (e) {}
+        }
+    });
+
+    // Allow a short tick for disarm messages to be processed
+    await new Promise(r => setTimeout(r, 60));
+
+    // 2. Discover all snapshots in gameSnapshots belonging to these games
+    const keysToRemoveFromLS = new Set();
+    const idbDatabasesToWipe = new Set();
+
+    // Check specific known game candidates
+    const isBalatro = selectedGames.some(g => {
+        const str = ((g.id || '') + ' ' + (g.title || '') + ' ' + (g.sourceFile || '')).toLowerCase();
+        return str.includes('balatro');
+    });
+    if (isBalatro) {
+        idbDatabasesToWipe.add('/home/web_user/love');
+    }
+
+    const snapshotsToDelete = [];
+    await new Promise(resolve => {
+        try {
+            const tx = db.transaction('gameSnapshots', 'readonly');
+            const store = tx.objectStore('gameSnapshots');
+            const req = store.openCursor();
+            req.onsuccess = e => {
+                const cursor = e.target.result;
+                if (!cursor) return resolve();
+                const snap = cursor.value;
+                const snapKey = String(cursor.key);
+                const matches = selectedGames.some(g => doesSnapshotBelongToGame(snap, g)) ||
+                                allAliases.has(String(snap.gameId)) ||
+                                allAliases.has(snapKey);
+                if (matches) {
+                    snapshotsToDelete.push(cursor.key);
+                    if (snap.localStorage && typeof snap.localStorage === 'object') {
+                        Object.keys(snap.localStorage).forEach(k => {
+                            if (k && !k.startsWith('tb_')) keysToRemoveFromLS.add(k);
+                        });
+                    }
+                    if (snap.idbData && typeof snap.idbData === 'object') {
+                        Object.keys(snap.idbData).forEach(dbN => {
+                            if (dbN && dbN !== 'GameStorageDB') idbDatabasesToWipe.add(dbN);
+                        });
+                    }
+                }
+                cursor.continue();
+            };
+            req.onerror = () => resolve();
+        } catch (e) {
+            resolve();
+        }
+    });
+
+    // 3. Delete all matching snapshots and alias keys from gameSnapshots
+    await new Promise(resolve => {
         try {
             const tx = db.transaction('gameSnapshots', 'readwrite');
             const store = tx.objectStore('gameSnapshots');
+            snapshotsToDelete.forEach(k => {
+                try { store.delete(k); } catch (e) {}
+            });
             allAliases.forEach(alias => {
-                store.delete(alias);
+                try { store.delete(alias); } catch (e) {}
             });
             tx.oncomplete = resolve;
             tx.onerror = resolve;
@@ -2816,46 +2930,78 @@ async function clearGameSaves(gameIds) {
         }
     });
 
-    // Clear from loadedGameSnapshots cache in memory
+    // 4. Clear in-memory caches and hashes
+    allAliases.forEach(alias => {
+        snapshotHashes.delete(alias);
+    });
     games.forEach(g => {
         if (g && (allAliases.has(String(g.id)) || (g.sourceKey && allAliases.has(String(g.sourceKey))) || (g.sourceFile && allAliases.has(String(g.sourceFile))))) {
             loadedGameSnapshots.delete(g);
         }
     });
+    if (currentGame && (allAliases.has(String(currentGame.id)) || (currentGame.sourceKey && allAliases.has(String(currentGame.sourceKey))) || (currentGame.sourceFile && allAliases.has(String(currentGame.sourceFile))))) {
+        loadedGameSnapshots.delete(currentGame);
+    }
 
-    // Clear localStorage keys if prefix-based or matching
+    // 5. Clean localStorage
     try {
         const ls = window.nexusStorage || window.localStorage;
         allAliases.forEach(alias => {
             ls.removeItem(`tb_snap_${alias}`);
             ls.removeItem(`nexus_save_${alias}`);
+            ls.removeItem(`save_${alias}`);
+        });
+        keysToRemoveFromLS.forEach(k => {
+            if (k && !k.startsWith('tb_')) ls.removeItem(k);
         });
     } catch (e) {}
 
-    // Message active game frames / popups to reset state if currently running
-    const frame = document.getElementById('game-frame');
-    if (frame && frame.contentWindow && currentGame && allAliases.has(String(currentGame.id))) {
+    // 6. Delete or clear game-specific IndexedDB databases
+    for (const dbName of idbDatabasesToWipe) {
         try {
-            frame.contentWindow.postMessage({
-                type: 'nexus-apply-game-restore',
-                gameId: currentGame.id,
-                localStorage: {},
-                fsData: null,
-                idbData: null
-            }, '*');
+            window.indexedDB.deleteDatabase(dbName);
         } catch (e) {}
     }
 
+    // 7. If currently loaded game in main frame was cleared, wipe iframe local storage and reload fresh
+    const isCurrentGameCleared = currentGame && (
+        allAliases.has(String(currentGame.id)) ||
+        (currentGame.sourceKey && allAliases.has(String(currentGame.sourceKey))) ||
+        (currentGame.sourceFile && allAliases.has(String(currentGame.sourceFile))) ||
+        selectedGames.some(g => g.id === currentGame.id)
+    );
+
+    if (isCurrentGameCleared && frame) {
+        try {
+            if (frame.contentWindow && frame.contentWindow.localStorage) {
+                const subLs = frame.contentWindow.localStorage;
+                const toDel = [];
+                for (let i = 0; i < subLs.length; i++) {
+                    const k = subLs.key(i);
+                    if (k && !k.startsWith('tb_')) toDel.push(k);
+                }
+                toDel.forEach(k => subLs.removeItem(k));
+            }
+        } catch (e) {}
+        loadGame(currentGame, true);
+    }
+
+    // 8. If any popup is open for a cleared game, reload it
     popupGameWindows.forEach((win, gId) => {
-        if (win && !win.closed && allAliases.has(String(gId))) {
+        if (win && !win.closed && (allAliases.has(String(gId)) || selectedGames.some(g => String(g.id) === String(gId)))) {
             try {
-                win.postMessage({
-                    type: 'nexus-apply-game-restore',
-                    gameId: gId,
-                    localStorage: {},
-                    fsData: null,
-                    idbData: null
-                }, '*');
+                if (win.localStorage) {
+                    const subLs = win.localStorage;
+                    const toDel = [];
+                    for (let i = 0; i < subLs.length; i++) {
+                        const k = subLs.key(i);
+                        if (k && !k.startsWith('tb_')) toDel.push(k);
+                    }
+                    toDel.forEach(k => subLs.removeItem(k));
+                }
+            } catch (e) {}
+            try {
+                win.location.reload();
             } catch (e) {}
         }
     });
@@ -2885,7 +3031,6 @@ function openSavesSelection(gameList) {
 
             const text = document.createElement('span');
             text.className = 'saves-item-text';
-            text.style.cssText = 'font-size: 14px; font-weight: 500; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.15s;';
             text.textContent = (typeof getSidebarTitle === 'function' ? getSidebarTitle(game) : '') || game.title || game.id;
 
             const updateVisual = () => {
@@ -2952,52 +3097,22 @@ function showRedConfirmDialog(message) {
         if (!overlay) {
             overlay = document.createElement('div');
             overlay.id = 'nexus-red-confirm-overlay';
-            overlay.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.88); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px);';
             overlay.innerHTML = `
-                <div class="red-confirm-box" style="padding:28px; border-radius:20px; width:480px; max-width:92vw; max-height:85vh; text-align:center; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 0 50px rgba(220,20,60,0.4); font-family:'Space Grotesk', sans-serif;">
-                    <div id="nexus-red-confirm-title" style="font-size:22px; font-weight:bold; margin-bottom:14px;">Warning</div>
-                    <div id="nexus-red-confirm-msg" style="font-size:15px; line-height:1.5; margin-bottom:22px; white-space:pre-wrap; max-height:50vh; overflow-y:auto; word-break:break-word;"></div>
+                <div class="red-confirm-box">
+                    <div id="nexus-red-confirm-title">Warning</div>
+                    <div id="nexus-red-confirm-msg"></div>
                     <div style="display:flex; gap:14px; justify-content:center; margin-top:8px;">
-                        <button id="nexus-red-confirm-ok" class="red-dialog-ok-btn" style="padding:10px 24px; border-radius:999px; font-weight:bold; color:white; cursor:pointer; flex:1; min-width:100px; text-shadow:none;">OK</button>
-                        <button id="nexus-red-confirm-cancel" class="red-dialog-cancel-btn" style="padding:10px 24px; border-radius:999px; font-weight:bold; cursor:pointer; flex:1; min-width:100px; text-shadow:none;">Cancel</button>
+                        <button id="nexus-red-confirm-ok" class="red-dialog-ok-btn">OK</button>
+                        <button id="nexus-red-confirm-cancel" class="red-dialog-cancel-btn">Cancel</button>
                     </div>
                 </div>
             `;
             document.body.appendChild(overlay);
         }
 
-        const isLight = document.documentElement.classList.contains('light-mode');
-        const box = overlay.querySelector('.red-confirm-box');
-        const titleEl = overlay.querySelector('#nexus-red-confirm-title');
         const msgEl = overlay.querySelector('#nexus-red-confirm-msg');
         const okBtn = overlay.querySelector('#nexus-red-confirm-ok');
         const cancelBtn = overlay.querySelector('#nexus-red-confirm-cancel');
-
-        if (isLight) {
-            box.style.background = '#fbf7f8';
-            box.style.border = '2.5px solid #d32f2f';
-            box.style.boxShadow = '0 10px 40px rgba(198, 40, 40, 0.25)';
-            box.style.color = '#140d24';
-            titleEl.style.color = '#c62828';
-            msgEl.style.color = '#331a24';
-            okBtn.style.background = '#c62828';
-            okBtn.style.border = '2px solid #b71c1c';
-            cancelBtn.style.background = '#ded4eb';
-            cancelBtn.style.border = '2px solid rgba(20,13,36,0.2)';
-            cancelBtn.style.color = '#140d24';
-        } else {
-            box.style.background = '#1a0c14';
-            box.style.border = '2.5px solid #ff3333';
-            box.style.boxShadow = '0 0 50px rgba(255, 51, 51, 0.4)';
-            box.style.color = '#ffffff';
-            titleEl.style.color = '#ff4d4d';
-            msgEl.style.color = '#f5d5db';
-            okBtn.style.background = '#d32f2f';
-            okBtn.style.border = '2px solid #ff4d4d';
-            cancelBtn.style.background = 'rgba(255,255,255,0.1)';
-            cancelBtn.style.border = '2px solid rgba(255,255,255,0.4)';
-            cancelBtn.style.color = '#dddddd';
-        }
 
         msgEl.textContent = message;
         overlay.style.display = 'flex';
