@@ -60,7 +60,7 @@
         .message li { margin-bottom: 4px; }
         
         .user-msg { align-self: flex-end; background: rgba(156, 39, 176, 0.9); color: white; }
-        .ai-msg { align-self: flex-start; background: var(--panel-bg-alt); color: var(--text-color); border: 1px solid var(--border-color); backdrop-filter: blur(4px); }
+        .ai-msg { align-self: flex-start; background: var(--panel-bg-alt); color: var(--text-color); border: 1px solid var(--border-color); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
         
         /* AI Loading phrases styling */
         #loading-phrase {
@@ -183,8 +183,6 @@
         }
     </style>
     <link rel="prefetch" href="index.html">
-    <link rel="prefetch" href="cookie-engine.js">
-    <link rel="prefetch" href="cookie-core.js">
 </head>
 <body class="chat-bg">
     <div id="page-fade-overlay"></div>

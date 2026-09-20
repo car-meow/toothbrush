@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Settings - Nexus</title>
-    <link rel="stylesheet" href="style.css?v=55">
+    <link rel="stylesheet" href="style.css?v=20">
     <script src="bgm-manager.js?v=55"></script>
     <script>
         (function() {
@@ -80,7 +80,7 @@
         }
         .custom-select:disabled { opacity: 0.65; cursor: not-allowed; }
     </style>
-    <link rel="prefetch" href="site-core.js">
+    <link rel="prefetch" href="site-core.js?v=2">
 </head>
 <body class="chat-bg">
     <!-- Hidden bottom-left Dev Mode Trigger & Toggle Widget -->
@@ -163,7 +163,7 @@
             <div class="setting-row">
                 <div class="setting-label-group">
                     <span class="setting-label">Preload Game Stash</span>
-                    <span class="setting-hint">Keep Game Stash loaded in the background so closing games opens it instantly. (Enabled by default)</span>
+                    <span class="setting-hint">Keep Game Stash loaded in the background. Disabled automatically on low-memory Chromebooks unless you enable it.</span>
                 </div>
                 <label class="toggle-switch">
                     <input type="checkbox" id="toggle-preload-stash">

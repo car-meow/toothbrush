@@ -4,6 +4,15 @@
 // ============================================================
 
 (function () {
+    const storage = window.nexusStorage || window.localStorage;
+    const isChromebook = /CrOS/i.test(navigator.userAgent);
+    const isLowTierHardware = isChromebook ||
+        (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
+        (navigator.deviceMemory && navigator.deviceMemory <= 4);
+    if (storage.getItem('tb_performance_mode') === null && isLowTierHardware) {
+        storage.setItem('tb_preload_stash', 'false');
+    }
+
     // --- Splashes ---
     const splashes = [
         "Assisted by Jayden!", "No, please don't close my ta-", "Y'all, Vivian says hi!", "are u srs rn vro", 
@@ -88,6 +97,28 @@
         "Chaos Mode Enabled", "Chaos Is Loading", "Maximum Chaos", "Controlled Chaos", "Uncontrolled Chaos", "Mildly Concerning", "Deeply Concerning", "Extremely Concerning", "Probably Haunted", "Definitely Haunted", "Ghosts Are Optional", "Ghost Detected", "Spooky Season Forever", "Do Not Open", "Definitely Open It", "You Opened It", "That Was A Mistake", "Worth It", "Probably Worth It", "No Regrets", "Several Regrets", "Immediate Regret", "Excellent Decision", "Terrible Decision", "Questionable Decision", "Decision Pending", "Decision Made", "Too Late Now", "We Ball", "Balling Continues", "Never Stop Balling", "Absolute Cinema", "Peak Gaming", "Gaming Has Occurred", "Game Detected", "Gamer Fuel Required", "Snack Break Incoming", "Hydration Check", "Touch Grass Reminder", "Grass Texture Loading", "Grass Successfully Touched", "Return To Game", "One More Round", "One More Run", "One More Turn", "One More Level", "One More Dungeon", "One More Chest", "One More Hour", "It Is Midnight", "Sleep Is Optional", "Sleep Later", "Tomorrow Is Fine", "Future Me Problem", "Past Me Failed", "Present Me Is Confused", "Brain Loading...", "Brain Has Left", "Brain Not Found", "Thinking...", "Still Thinking...", "Thought Complete", "No Thoughts Detected", "Certified Classic", "Instant Classic", "Retro Mode", "Nostalgia Unlocked", "Memory Card Missing", "Save File Found", "Press Start To Begin", "Press Start To Continue", "Continue The Adventure", "Adventure Continues", "To Be Continued", "End Of Demo", "Thanks For Playing", "Thanks For Visiting", "See You Next Time"
 
     ];
+    window.NEXUS_SPLASHES = splashes;
+
+    function getHomeVideo() {
+        return document.querySelector('.home-bg-video') || document.getElementById('bg-video');
+    }
+
+    function pauseHomeVideo() {
+        const video = getHomeVideo();
+        if (video) {
+            try { video.pause(); } catch (e) {}
+        }
+    }
+
+    function resumeHomeVideo() {
+        const video = getHomeVideo();
+        if (video && !document.hidden && document.body.classList.contains('home-screen') && !document.fullscreenElement) {
+            video.play().catch(() => {});
+        }
+    }
+
+    window.nexusPauseHomeVideo = pauseHomeVideo;
+    window.nexusResumeHomeVideo = resumeHomeVideo;
 
     function cycleSplash() {
         const splashEl = document.getElementById('splash-text');
@@ -101,10 +132,7 @@
     }
 
     function navigateWithFade(url) {
-        const video = document.querySelector('.home-bg-video');
-        if (video) {
-            try { video.pause(); } catch(e) {}
-        }
+        pauseHomeVideo();
         const overlay = document.getElementById('page-fade-overlay');
         if (overlay) {
             overlay.classList.remove('fade-out');
@@ -118,6 +146,15 @@
     window.navigateWithFade = navigateWithFade;
 
     document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) pauseHomeVideo();
+            else resumeHomeVideo();
+        }, { passive: true });
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) pauseHomeVideo();
+            else resumeHomeVideo();
+        }, { passive: true });
+
         // Page Fade In
         const overlay = document.getElementById('page-fade-overlay');
         if (overlay) {

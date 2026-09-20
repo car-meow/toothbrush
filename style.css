@@ -8,6 +8,9 @@
     margin: 0;
     padding: 0;
     font-family: 'Space Grotesk', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
 }
 
 :root {
@@ -87,7 +90,6 @@ body {
     background-image: linear-gradient(135deg, var(--zigzag-line) 25%, transparent 25%), linear-gradient(225deg, var(--zigzag-line) 25%, transparent 25%), linear-gradient(45deg, var(--zigzag-line) 25%, transparent 25%), linear-gradient(315deg, var(--zigzag-line) 25%, transparent 25%);
     background-position: 40px 0, 40px 0, 0 0, 0 0;
     background-size: 80px 80px;
-    animation: moveBackground 40s linear infinite;
 }
 
 @keyframes moveBackground {
@@ -565,7 +567,10 @@ html.light-mode .nexus-patchnotes-body {
     background: var(--accent-btn-bg);
     border: 2.5px solid var(--accent-btn-border);
     color: var(--accent-btn-text);
+    transform: translateZ(0);
+    backface-visibility: hidden;
     backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
     cursor: pointer;
     vertical-align: middle;
@@ -1334,7 +1339,6 @@ iframe {
     background-image: linear-gradient(135deg, var(--zigzag-line) 25%, transparent 25%), linear-gradient(225deg, var(--zigzag-line) 25%, transparent 25%), linear-gradient(45deg, var(--zigzag-line) 25%, transparent 25%), linear-gradient(315deg, var(--zigzag-line) 25%, transparent 25%);
     background-position: 40px 0, 40px 0, 0 0, 0 0;
     background-size: 80px 80px;
-    animation: moveBackground 40s linear infinite;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1472,6 +1476,8 @@ iframe {
     max-width: 92vw;
     border: 2px solid #ffffff;
     box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
+    transform: translateZ(0);
+    backface-visibility: hidden;
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
@@ -1557,6 +1563,8 @@ iframe {
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
     user-select: none;
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .saves-item-label:hover {
@@ -1697,7 +1705,9 @@ html.light-mode .saves-cancel-btn:hover {
     z-index: 999999;
     align-items: center;
     justify-content: center;
+    background: rgba(0, 0, 0, 0.94);
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 html.light-mode #nexus-red-confirm-overlay {
@@ -2409,6 +2419,16 @@ body.tutorial-active #nexus-logo {
     color: #e8d9ff;
 }
 
+html.light-mode .tutorial-popup {
+    background: rgba(249, 247, 253, 0.96);
+    color: var(--text-color);
+    border-color: var(--white-outline);
+}
+
+html.light-mode .tutorial-popup strong {
+    color: var(--text-color);
+}
+
 @keyframes popupSlideUp {
     from { opacity: 0; transform: translateY(20px) scale(0.95); }
     to { opacity: 1; transform: translateY(0) scale(1); }
@@ -2558,20 +2578,54 @@ body.tutorial-active #nexus-logo {
 /* =========================================
    PERFORMANCE MODE OPTIMIZATIONS
 ========================================= */
-html.performance-mode *:not(img):not(svg):not(.status-icon):not([class*="icon"]):not(.floating-sidebar-warning) {
-    animation: none !important;
-    transition: none !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    text-shadow: none !important;
-    box-shadow: none !important;
-    filter: none !important;
-    will-change: auto !important;
+html.performance-mode,
+html.performance-mode * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
 }
 
+html.performance-mode,
 html.performance-mode *,
 html.performance-mode-lite * {
     will-change: auto !important;
+}
+
+html.performance-mode .home-bg-video,
+html.performance-mode #bg-video {
+    display: none !important;
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    .material-nav-btn,
+    .nexus-update-card,
+    .tutorial-popup,
+    #nexus-red-confirm-overlay,
+    #nexus-dev-mode-widget {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    .material-nav-btn,
+    .nexus-update-card,
+    .tutorial-popup {
+        background: rgba(24, 16, 43, 0.94) !important;
+    }
+
+    #nexus-red-confirm-overlay,
+    #nexus-dev-mode-widget {
+        background: rgba(18, 6, 6, 0.94) !important;
+    }
+
+    html.light-mode .material-nav-btn,
+    html.light-mode .nexus-update-card,
+    html.light-mode .tutorial-popup {
+        background: rgba(249, 247, 253, 0.96) !important;
+    }
+
+    html.light-mode #nexus-red-confirm-overlay,
+    html.light-mode #nexus-dev-mode-widget {
+        background: rgba(249, 247, 253, 0.96) !important;
+    }
 }
 
 html.performance-mode .floating-sidebar-warning,

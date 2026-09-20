@@ -1,3 +1,12 @@
+const isChromebook = /CrOS/i.test(navigator.userAgent);
+const isLowTierHardware = isChromebook ||
+    (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
+    (navigator.deviceMemory && navigator.deviceMemory <= 4);
+const appStorage = window.nexusStorage || window.localStorage;
+if (appStorage.getItem('tb_performance_mode') === null && isLowTierHardware) {
+    appStorage.setItem('tb_preload_stash', 'false');
+}
+
 const dbName = "GameStorageDB";
 let db, games =[], currentGame = null;
 const popupMuteSources = new Set();
@@ -9,6 +18,20 @@ let gameAutosaveTimer = null;
 const loadedGameSnapshots = new WeakMap();
 const snapshotHashes = new Map();
 const popupGameWindows = new Map();
+
+function releaseIframe(frame) {
+    if (!frame) return;
+    try {
+        if (frame.contentWindow && frame.contentWindow.localStorage) {
+            frame.contentWindow.postMessage({ type: 'nexus-disarm-autosave' }, '*');
+        }
+    } catch (e) {}
+    try {
+        if (frame.src && frame.src.startsWith('blob:')) URL.revokeObjectURL(frame.src);
+    } catch (e) {}
+    frame.removeAttribute('srcdoc');
+    frame.src = 'about:blank';
+}
 
 
 window.showAddingState = function(sourceKey, title) {
@@ -58,25 +81,7 @@ async function loadGames() {
         };
         req.onerror = () => reject(req.error);
     });
-    const isLegacySurvivalRaceV2 = game => {
-        const values = [game && game.id, game && game.sourceKey, game && game.sourceFile, game && game.title, game && game.url];
-        return values.some(value => String(value || '').toLowerCase()
-            .replace(/\.(?:html?|url)$/i, '')
-            .replace(/[\s_-]+/g, '')
-            .includes('survivalracev2'));
-    };
-    const legacyIds = custom.filter(isLegacySurvivalRaceV2).map(game => game.id);
-    if (legacyIds.length) {
-        const cleanupTx = db.transaction(['customGames', 'gameSnapshots'], 'readwrite');
-        const cleanupStore = cleanupTx.objectStore('customGames');
-        const snapshotStore = cleanupTx.objectStore('gameSnapshots');
-        legacyIds.forEach(id => {
-            cleanupStore.delete(id);
-            snapshotStore.delete(id);
-        });
-        await new Promise(resolve => { cleanupTx.oncomplete = cleanupTx.onerror = cleanupTx.onabort = resolve; });
-    }
-    const activeCustom = custom.filter(game => !isLegacySurvivalRaceV2(game));
+    const activeCustom = custom;
     try {
         // Default games do not change while the page is open. Reusing this request avoids
         // a network round-trip and JSON parsing every time a Stash item is added.
@@ -2455,16 +2460,13 @@ async function loadGame(game, forceInternal = false) {
         stashFrame.style.setProperty('display', 'none', 'important');
         const isPerfMode = localStorage.getItem('tb_performance_mode') === 'true' || localStorage.getItem('tb_performance_mode_lite') === 'true';
         if (isPerfMode && stashFrame.src && !stashFrame.src.endsWith('about:blank')) {
-            stashFrame.src = 'about:blank';
+            releaseIframe(stashFrame);
             isStashPreloaded = false;
         }
     }
     if (frame) {
-        try {
-            if (frame.src && frame.src.startsWith('blob:')) URL.revokeObjectURL(frame.src);
-        } catch (e) {}
-        frame.removeAttribute('src');
-        frame.removeAttribute('srcdoc');
+        requestCurrentGameAutosave();
+        releaseIframe(frame);
         frame.style.setProperty('display', 'block', 'important');
         frame.style.setProperty('visibility', 'hidden', 'important');
         frame.style.opacity = '0';
@@ -3430,14 +3432,7 @@ if (importBtn) {
         });
         popupGameWindows.clear();
 
-        [document.getElementById('game-frame'), document.getElementById('stash-frame')].forEach(frame => {
-            if (!frame) return;
-            try {
-                if (frame.src && frame.src.startsWith('blob:')) URL.revokeObjectURL(frame.src);
-            } catch (e) {}
-            frame.removeAttribute('srcdoc');
-            frame.src = 'about:blank';
-        });
+        [document.getElementById('game-frame'), document.getElementById('stash-frame')].forEach(releaseIframe);
         isStashPreloaded = false;
         // Give embedded games and background processes a chance to close their IndexedDB connections.
         await new Promise(resolve => setTimeout(resolve, 300));

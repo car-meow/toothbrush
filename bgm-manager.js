@@ -184,7 +184,7 @@ window.BGMManager = {
         if (!overlay) {
             overlay = document.createElement('div');
             overlay.id = 'nexus-inapp-dialog-overlay';
-            overlay.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.86); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px);';
+            overlay.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.94); z-index:999999; align-items:center; justify-content:center; -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);';
             
             overlay.innerHTML = `
                 <div style="background:var(--modal-bg, #18102b); padding:28px; border-radius:20px; width:460px; max-width:92vw; max-height:85vh; border:2px solid #2196F3; text-align:center; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 0 50px rgba(0,0,0,0.9); color:var(--text-color, #fff); font-family:'Space Grotesk', sans-serif;">

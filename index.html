@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>New Tab</title>
-<link rel="stylesheet" href="style.css?v=55">
+<link rel="stylesheet" href="style.css?v=20">
     <script src="bgm-manager.js?v=55"></script>
     <script>
         (function() {
@@ -59,7 +59,7 @@ body {
 .currency-display {
     background: rgba(15,15,15,0.7); border: 2px solid #4CAF50; border-radius: 14px;
     padding: 10px 18px; display: flex; align-items: center; gap: 10px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.6); backdrop-filter: blur(6px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
 }
 .currency-symbol { color: #4CAF50; font-size: 26px; font-weight: 900; }
 .currency-amount { color: #fff; font-size: 22px; font-weight: 700; }
@@ -67,7 +67,7 @@ body {
 .swag-display {
     background: rgba(15,15,15,0.7); border: 2px solid #b71c1c; border-radius: 14px;
     padding: 6px 14px; display: flex; align-items: center; gap: 8px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.6); backdrop-filter: blur(6px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
 }
 .swag-symbol { color: #ef5350; font-size: 20px; font-weight: 900; }
 .swag-amount { color: #ffcdd2; font-size: 16px; font-weight: 700; }
@@ -564,6 +564,8 @@ MEDIUM:
 Fixed some games getting stuck on "Adding..." in the sidebar, and moved the newly added games to the top.
 Fixed outdated IndexedDB version issues, which caused a rare bug that made adding games fail.
 Fixed deleted games not being re-addeable in the Stash until you refreshed it.
+Added dev mode.
+Added a nice
 
 Kinda SMALL:
 Fixed crazy high RAM usage for Balatro specifically, its file had some errored loops going on so I fixed that.
@@ -594,7 +596,7 @@ Aaaaand that's all, folks. We're so close to 4.0, all I have to do is pass my cl
 </div>
 
 <!-- ========== JAVASCRIPT ========== -->
-<script src="site-core.js?v=1"></script>
+<script src="site-core.js?v=2"></script>
 <script src="tutorial-engine.js?v=1"></script>
 <script>
     (function() {
