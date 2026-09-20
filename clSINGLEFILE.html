@@ -145,8 +145,7 @@
             margin-left: auto;
             margin-right: auto;
             min-height: 100px;
-            content-visibility: auto;
-            contain-intrinsic-size: 1px 120px;
+            scroll-margin-top: 100px;
         }
 
         .letter-section.empty {
@@ -1012,7 +1011,13 @@
                         sidebarBtn.onclick = () => {
                             const targetSection = document.getElementById(`section-${char}`);
                             if (targetSection) {
-                                targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                const searchBox = document.getElementById('search-container');
+                                const headerOffset = searchBox ? searchBox.getBoundingClientRect().height + 15 : 90;
+                                const targetY = targetSection.getBoundingClientRect().top + window.pageYOffset - headerOffset;
+                                window.scrollTo({
+                                    top: Math.max(0, targetY),
+                                    behavior: 'smooth'
+                                });
                             }
                         };
                     }
