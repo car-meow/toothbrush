@@ -2780,8 +2780,284 @@ if (healthBtn) {
         const report = checks.map(([label, ok]) => `${ok ? '✓' : '⚠'} ${label}`).join('\n');
         nexusAlert(`${game.title || game.id}\n\n${report}`);
     };
-
 }
+
+async function clearGameSaves(gameIds) {
+    if (!gameIds || gameIds.length === 0) return;
+    await initDB();
+
+    const allAliases = new Set();
+    gameIds.forEach(id => {
+        allAliases.add(String(id));
+        const matched = findGameByIdOrSource(id);
+        if (matched) {
+            if (matched.id) allAliases.add(String(matched.id));
+            if (matched.sourceKey) allAliases.add(String(matched.sourceKey));
+            if (matched.sourceFile) {
+                allAliases.add(String(matched.sourceFile));
+                allAliases.add(String(matched.sourceFile.replace(/\.html$/, '')));
+            }
+        }
+    });
+
+    // Delete snapshots from IndexedDB
+    await new Promise((resolve) => {
+        try {
+            const tx = db.transaction('gameSnapshots', 'readwrite');
+            const store = tx.objectStore('gameSnapshots');
+            allAliases.forEach(alias => {
+                store.delete(alias);
+            });
+            tx.oncomplete = resolve;
+            tx.onerror = resolve;
+            tx.onabort = resolve;
+        } catch (e) {
+            resolve();
+        }
+    });
+
+    // Clear from loadedGameSnapshots cache in memory
+    games.forEach(g => {
+        if (g && (allAliases.has(String(g.id)) || (g.sourceKey && allAliases.has(String(g.sourceKey))) || (g.sourceFile && allAliases.has(String(g.sourceFile))))) {
+            loadedGameSnapshots.delete(g);
+        }
+    });
+
+    // Clear localStorage keys if prefix-based or matching
+    try {
+        const ls = window.nexusStorage || window.localStorage;
+        allAliases.forEach(alias => {
+            ls.removeItem(`tb_snap_${alias}`);
+            ls.removeItem(`nexus_save_${alias}`);
+        });
+    } catch (e) {}
+
+    // Message active game frames / popups to reset state if currently running
+    const frame = document.getElementById('game-frame');
+    if (frame && frame.contentWindow && currentGame && allAliases.has(String(currentGame.id))) {
+        try {
+            frame.contentWindow.postMessage({
+                type: 'nexus-apply-game-restore',
+                gameId: currentGame.id,
+                localStorage: {},
+                fsData: null,
+                idbData: null
+            }, '*');
+        } catch (e) {}
+    }
+
+    popupGameWindows.forEach((win, gId) => {
+        if (win && !win.closed && allAliases.has(String(gId))) {
+            try {
+                win.postMessage({
+                    type: 'nexus-apply-game-restore',
+                    gameId: gId,
+                    localStorage: {},
+                    fsData: null,
+                    idbData: null
+                }, '*');
+            } catch (e) {}
+        }
+    });
+}
+
+function openSavesSelection(gameList) {
+    const overlay = document.getElementById('saves-select-overlay');
+    const list = document.getElementById('saves-game-list');
+    if (!overlay || !list) return Promise.resolve(null);
+    list.innerHTML = '';
+
+    if (!gameList || gameList.length === 0) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.style.cssText = 'padding: 16px; text-align: center; color: var(--muted-text, #9e93b8); font-size: 14px;';
+        emptyMsg.textContent = 'No games in your sidebar.';
+        list.appendChild(emptyMsg);
+    } else {
+        gameList.forEach(game => {
+            const label = document.createElement('label');
+            label.className = 'saves-item-label';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'saves-item-checkbox';
+            checkbox.value = game.id;
+            checkbox.checked = false;
+
+            const text = document.createElement('span');
+            text.className = 'saves-item-text';
+            text.style.cssText = 'font-size: 14px; font-weight: 500; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.15s;';
+            text.textContent = (typeof getSidebarTitle === 'function' ? getSidebarTitle(game) : '') || game.title || game.id;
+
+            const updateVisual = () => {
+                if (checkbox.checked) {
+                    label.classList.add('saves-selected');
+                } else {
+                    label.classList.remove('saves-selected');
+                }
+            };
+
+            checkbox.addEventListener('change', updateVisual);
+
+            label.append(checkbox, text);
+            list.appendChild(label);
+        });
+    }
+
+    overlay.style.display = 'flex';
+    if (window.setGamePopupState) window.setGamePopupState('saves-select-overlay', true);
+
+    return new Promise(resolve => {
+        const finish = value => {
+            overlay.style.display = 'none';
+            if (window.setGamePopupState) window.setGamePopupState('saves-select-overlay', false);
+            resolve(value);
+        };
+
+        const selectAllBtn = document.getElementById('saves-select-all');
+        if (selectAllBtn) {
+            selectAllBtn.onclick = () => {
+                list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                    cb.checked = true;
+                    cb.closest('.saves-item-label')?.classList.add('saves-selected');
+                });
+            };
+        }
+
+        const selectNoneBtn = document.getElementById('saves-select-none');
+        if (selectNoneBtn) {
+            selectNoneBtn.onclick = () => {
+                list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                    cb.checked = false;
+                    cb.closest('.saves-item-label')?.classList.remove('saves-selected');
+                });
+            };
+        }
+
+        const cancelBtn = document.getElementById('saves-select-cancel');
+        if (cancelBtn) cancelBtn.onclick = () => finish(null);
+
+        const confirmBtn = document.getElementById('saves-select-confirm');
+        if (confirmBtn) {
+            confirmBtn.onclick = () => {
+                const checked = Array.from(list.querySelectorAll('input[type="checkbox"]:checked'));
+                finish(checked.map(cb => cb.value));
+            };
+        }
+    });
+}
+
+function showRedConfirmDialog(message) {
+    return new Promise((resolve) => {
+        let overlay = document.getElementById('nexus-red-confirm-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'nexus-red-confirm-overlay';
+            overlay.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.88); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px);';
+            overlay.innerHTML = `
+                <div class="red-confirm-box" style="padding:28px; border-radius:20px; width:480px; max-width:92vw; max-height:85vh; text-align:center; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 0 50px rgba(220,20,60,0.4); font-family:'Space Grotesk', sans-serif;">
+                    <div id="nexus-red-confirm-title" style="font-size:22px; font-weight:bold; margin-bottom:14px;">Warning</div>
+                    <div id="nexus-red-confirm-msg" style="font-size:15px; line-height:1.5; margin-bottom:22px; white-space:pre-wrap; max-height:50vh; overflow-y:auto; word-break:break-word;"></div>
+                    <div style="display:flex; gap:14px; justify-content:center; margin-top:8px;">
+                        <button id="nexus-red-confirm-ok" class="red-dialog-ok-btn" style="padding:10px 24px; border-radius:999px; font-weight:bold; color:white; cursor:pointer; flex:1; min-width:100px; text-shadow:none;">OK</button>
+                        <button id="nexus-red-confirm-cancel" class="red-dialog-cancel-btn" style="padding:10px 24px; border-radius:999px; font-weight:bold; cursor:pointer; flex:1; min-width:100px; text-shadow:none;">Cancel</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        const isLight = document.documentElement.classList.contains('light-mode');
+        const box = overlay.querySelector('.red-confirm-box');
+        const titleEl = overlay.querySelector('#nexus-red-confirm-title');
+        const msgEl = overlay.querySelector('#nexus-red-confirm-msg');
+        const okBtn = overlay.querySelector('#nexus-red-confirm-ok');
+        const cancelBtn = overlay.querySelector('#nexus-red-confirm-cancel');
+
+        if (isLight) {
+            box.style.background = '#fbf7f8';
+            box.style.border = '2.5px solid #d32f2f';
+            box.style.boxShadow = '0 10px 40px rgba(198, 40, 40, 0.25)';
+            box.style.color = '#140d24';
+            titleEl.style.color = '#c62828';
+            msgEl.style.color = '#331a24';
+            okBtn.style.background = '#c62828';
+            okBtn.style.border = '2px solid #b71c1c';
+            cancelBtn.style.background = '#ded4eb';
+            cancelBtn.style.border = '2px solid rgba(20,13,36,0.2)';
+            cancelBtn.style.color = '#140d24';
+        } else {
+            box.style.background = '#1a0c14';
+            box.style.border = '2.5px solid #ff3333';
+            box.style.boxShadow = '0 0 50px rgba(255, 51, 51, 0.4)';
+            box.style.color = '#ffffff';
+            titleEl.style.color = '#ff4d4d';
+            msgEl.style.color = '#f5d5db';
+            okBtn.style.background = '#d32f2f';
+            okBtn.style.border = '2px solid #ff4d4d';
+            cancelBtn.style.background = 'rgba(255,255,255,0.1)';
+            cancelBtn.style.border = '2px solid rgba(255,255,255,0.4)';
+            cancelBtn.style.color = '#dddddd';
+        }
+
+        msgEl.textContent = message;
+        overlay.style.display = 'flex';
+        setTimeout(() => okBtn.focus(), 50);
+
+        const cleanup = () => {
+            overlay.style.display = 'none';
+            okBtn.onclick = null;
+            cancelBtn.onclick = null;
+            document.removeEventListener('keydown', keyHandler);
+        };
+
+        const keyHandler = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                cleanup();
+                resolve(true);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cleanup();
+                resolve(false);
+            }
+        };
+
+        document.addEventListener('keydown', keyHandler);
+
+        okBtn.onclick = (e) => {
+            e.preventDefault();
+            cleanup();
+            resolve(true);
+        };
+
+        cancelBtn.onclick = (e) => {
+            e.preventDefault();
+            cleanup();
+            resolve(false);
+        };
+    });
+}
+
+const savesBtn = document.getElementById('saves-btn');
+if (savesBtn) {
+    savesBtn.onclick = async () => {
+        // List games in the user's sidebar (excluding Game Stash)
+        const sidebarGames = games.filter(g => g && g.id !== 'ugs-stash');
+        const selectedIds = await openSavesSelection(sidebarGames);
+        if (!selectedIds || selectedIds.length === 0) return;
+
+        // Show red popup confirmation dialog
+        const confirmed = await showRedConfirmDialog(
+            "Hold up, these games' saves will be deleted forever (A long time!) Are you sure you want to proceed?"
+        );
+
+        if (!confirmed) return;
+
+        await clearGameSaves(selectedIds);
+        nexusAlert("Selected games' saves have been cleared.");
+    };
+}
+
 function openBackupSelection(gameList, title, hint) {
     const overlay = document.getElementById('backup-select-overlay');
     const list = document.getElementById('backup-game-list');

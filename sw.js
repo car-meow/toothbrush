@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexus-cache-v11';
+const CACHE_NAME = 'nexus-cache-v12';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -51,6 +51,7 @@ const ASSETS_TO_CACHE = [
     './Assets/Rename.svg',
     './Assets/Restore.svg',
     './Assets/Robot.svg',
+    './Assets/Saves.svg',
     './Assets/Settings.svg',
     './Assets/media-back-arrow.svg',
     './Assets/nexus-ai.svg',

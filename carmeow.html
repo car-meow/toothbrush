@@ -31,6 +31,9 @@
             <button id="cloak-btn" class="material-nav-btn" style="--expanded-width: 165px; display: none;">
                 <img src="Assets/Fullscreen.svg" alt=""><span>Fullscreen</span>
             </button>
+            <button id="saves-btn" class="material-nav-btn" style="--expanded-width: 125px;">
+                <img src="Assets/Saves.svg" alt=""><span>Saves</span>
+            </button>
             <button id="export-btn" class="material-nav-btn btn-backup" style="--expanded-width: 140px;">
                 <img src="Assets/Backup.svg" alt=""><span>Backup</span>
             </button>
@@ -123,6 +126,23 @@
             <div style="display:flex; justify-content:flex-end; gap:10px;">
                 <button id="backup-select-cancel" class="backup-modal-btn" style="background:#4a3b68; color:#ffffff;">Cancel</button>
                 <button id="backup-select-confirm" class="backup-modal-btn" style="background:#4CAF50; color:#ffffff;">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Saves Selection Overlay -->
+    <div id="saves-select-overlay" class="overlay" style="display:none; z-index:32000;">
+        <div class="modal-box" style="width: 520px; max-width: 92vw; text-align: left; border: 2px solid #ffffff;">
+            <h2 id="saves-select-title" style="color: #ffffff; margin-top: 0; margin-bottom: 6px; font-size: 22px; font-weight: 700;">Clear Game Saves</h2>
+            <p id="saves-select-hint" style="color: var(--muted-text, #9e93b8); font-size: 13px; margin-bottom: 14px;">Select games to clear save data for.</p>
+            <div style="display:flex; gap:8px; margin-bottom:12px;">
+                <button id="saves-select-all" class="backup-modal-btn saves-util-btn" style="background:#ffffff; color:#0b0713;">Select All</button>
+                <button id="saves-select-none" class="backup-modal-btn saves-util-btn" style="background:#4a3b68; color:#ffffff;">Select None</button>
+            </div>
+            <div id="saves-game-list" style="max-height: 38vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;"></div>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button id="saves-select-cancel" class="backup-modal-btn saves-cancel-btn">Cancel</button>
+                <button id="saves-select-confirm" class="backup-modal-btn saves-clear-btn">Clear Saves</button>
             </div>
         </div>
     </div>
