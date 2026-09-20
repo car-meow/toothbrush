@@ -83,7 +83,7 @@
     <link rel="prefetch" href="site-core.js">
 </head>
 <body class="chat-bg">
-    <!-- Hidden top-left Dev Mode Trigger & Toggle Widget -->
+    <!-- Hidden bottom-left Dev Mode Trigger & Toggle Widget -->
     <div id="nexus-dev-mode-trigger"></div>
     <div id="nexus-dev-mode-widget" aria-label="Developer Mode Widget">
         <span class="dev-mode-dot"></span>
@@ -545,7 +545,7 @@
             if (modalReportedCountEl) modalReportedCountEl.textContent = String(count);
         }
 
-        // Top-left Proximity Dev Mode Widget in Settings
+        // Bottom-left Proximity Dev Mode Widget in Settings
         const devWidget = document.getElementById('nexus-dev-mode-widget');
         const devCheckbox = document.getElementById('dev-mode-checkbox');
 
@@ -560,7 +560,7 @@
             });
 
             document.addEventListener('mousemove', (e) => {
-                const dist = Math.hypot(e.clientX, e.clientY);
+                const dist = Math.hypot(e.clientX, window.innerHeight - e.clientY);
                 if (dist < 160) {
                     devWidget.classList.add('near-cursor');
                 } else {
