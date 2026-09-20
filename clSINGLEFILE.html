@@ -325,11 +325,6 @@
             style="position: sticky; top: 0; padding: 15px 0; background: var(--panel-bg-alt); z-index: 900; display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
             <input type="text" placeholder="Search..." id="searchInput"
                 style="padding: 13px; width: 100%; max-width: 420px; border-radius: 8px; border: none; box-shadow: 0 2px 4px rgba(156, 39, 176, 0.1); background: var(--btn-bg); color: var(--text-color);">
-            <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/searchbut.js"></script>
-            <button id="lolbutton"
-                onclick="const script = document.createElement('script');script.src = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@latest/game.js';document.body.appendChild(script);"
-                style="padding: 13px; border-radius: 8px; border: none; background: var(--btn-bg); color: var(--text-color); cursor: pointer; font-size: 14px;">Click
-                to load if it isnt loading</button>
         </div>
 
 
@@ -392,7 +387,18 @@
             // Add reported unique IDs here to permanently delete them from the Stash
         ]);
 
+        const stashManifestMap = new Map();
         const stashOccurrences = new Map();
+
+        function computeStashUniqueId(raw, sectionChar) {
+            const char = (sectionChar || '?').trim().toLowerCase();
+            const fileClean = String(raw || '').trim().replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+            const key = `${char}:${fileClean}`;
+            const occ = (stashOccurrences.get(key) || 0) + 1;
+            stashOccurrences.set(key, occ);
+            return occ === 1 ? `stash_${char}_${fileClean}` : `stash_${char}_${fileClean}_dup${occ}`;
+        }
+
         function getStashUniqueId(btn) {
             if (btn.dataset.stashId) return btn.dataset.stashId;
             const extraApp = EXTRA_STASH_APPS.find(app => 
@@ -409,11 +415,7 @@
             const raw = String(btn.dataset.originalValue || btn.value || '').trim();
             const section = btn.closest('.letter-section');
             const sectionChar = (section?.querySelector('.letter-header')?.textContent || '?').trim().toLowerCase();
-            const fileClean = raw.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
-            const key = `${sectionChar}:${fileClean}`;
-            const occ = (stashOccurrences.get(key) || 0) + 1;
-            stashOccurrences.set(key, occ);
-            const id = occ === 1 ? `stash_${sectionChar}_${fileClean}` : `stash_${sectionChar}_${fileClean}_dup${occ}`;
+            const id = computeStashUniqueId(raw, sectionChar);
             btn.dataset.stashId = id;
             return id;
         }
@@ -520,71 +522,8 @@
             });
         }
 
-        function initDevModeWidget() {
-            const checkbox = document.getElementById('dev-mode-checkbox');
-            const widget = document.getElementById('nexus-dev-mode-widget');
-            if (!checkbox || !widget) return;
-
-            const isDev = localStorage.getItem('tb_dev_mode') === 'true';
-            checkbox.checked = isDev;
-            widget.classList.toggle('dev-active', isDev);
-            document.documentElement.classList.toggle('dev-mode', isDev);
-
-            checkbox.addEventListener('change', (e) => {
-                const enabled = e.target.checked;
-                localStorage.setItem('tb_dev_mode', enabled ? 'true' : 'false');
-                widget.classList.toggle('dev-active', enabled);
-                document.documentElement.classList.toggle('dev-mode', enabled);
-
-                try {
-                    window.dispatchEvent(new Event('storage'));
-                    if (window.parent && window.parent !== window) {
-                        window.parent.postMessage({ type: 'nexus-dev-mode-change', enabled: enabled }, '*');
-                    }
-                } catch(err) {}
-            });
-
-            document.addEventListener('mousemove', (e) => {
-                const dist = Math.hypot(e.clientX, e.clientY);
-                if (dist < 160) {
-                    widget.classList.add('near-cursor');
-                } else {
-                    widget.classList.remove('near-cursor');
-                }
-            }, { passive: true });
-        }
-
         function getStashDisplayName(name, stripExtension = false) {
             return humanizeBookmarkDisplayName(name, stripExtension);
-        }
-
-        function prepareGameButton(btn) {
-            if (!btn.dataset.originalValue) {
-                btn.dataset.originalValue = btn.value;
-            }
-
-            const uniqueId = getStashUniqueId(btn);
-            btn.dataset.stashId = uniqueId;
-
-            const displayName = getStashDisplayName(btn.dataset.originalValue);
-            btn.value = displayName;
-            btn.dataset.searchName = `${displayName} ${btn.dataset.originalValue}`.toLowerCase();
-            btn.dataset.sourceKey = buildBookmarkSourceKey(btn.dataset.originalValue);
-
-            if (btn.dataset.displayGuardAttached) return;
-            btn.dataset.displayGuardAttached = 'true';
-            btn.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                addBookmarkToSidebar(btn.dataset.originalValue, e);
-            };
-            btn.addEventListener('click', () => {
-                const originalValue = btn.dataset.originalValue;
-                btn.value = originalValue;
-                setTimeout(() => {
-                    btn.value = getStashDisplayName(originalValue);
-                }, 0);
-            }, true);
         }
 
         function getLetterSections() {
@@ -596,81 +535,6 @@
             return getLetterSections().find(section => {
                 const header = section.querySelector('.letter-header');
                 return header && header.textContent.trim().toUpperCase() === upper;
-            });
-        }
-
-        function removeLegacySurvivalRaceV2() {
-            document.querySelectorAll('#sections-container input[type="button"]').forEach(btn => {
-                const source = String(btn.dataset.originalValue || btn.value || '')
-                    .toLowerCase()
-                    .replace(/\.(?:html?|url)$/i, '')
-                    .replace(/[\s_-]+/g, '');
-                if (source === 'survivalracev2') {
-                    const wrapper = btn.closest('.game-btn-wrapper');
-                    (wrapper || btn).remove();
-                }
-            });
-        }
-
-        function getOrCreateLetterSection(letter) {
-            const existing = getExistingLetterSection(letter);
-            if (existing) return existing;
-
-            const upper = letter.toUpperCase();
-            const section = document.createElement('div');
-            section.className = 'letter-section';
-
-            const header = document.createElement('div');
-            header.className = 'letter-header';
-            header.textContent = upper;
-
-            const container = document.createElement('div');
-            container.className = 'buttons-container';
-
-            section.appendChild(header);
-            section.appendChild(container);
-            sectionsContainer.appendChild(section);
-            rememberSectionOrder();
-            return section;
-        }
-
-        function openExtraStashApp(extraApp) {
-            if (window.parent && window.parent !== window && typeof window.parent.loadGame === 'function') {
-                window.parent.loadGame({
-                    id: `local_${extraApp.sourceFile}`,
-                    title: extraApp.displayName,
-                    type: 'url',
-                    url: extraApp.sourceFile
-                });
-                return;
-            }
-
-            window.location.href = extraApp.sourceFile;
-        }
-
-        function ensureExtraStashButtons(allowCreate = false) {
-            EXTRA_STASH_APPS.forEach(extraApp => {
-                const extraId = `stash_extra_${extraApp.sourceFile.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-                if (REMOVED_STASH_IDS.has(extraId)) return;
-                const section = getExistingLetterSection(extraApp.letter) || (allowCreate ? getOrCreateLetterSection(extraApp.letter) : null);
-                if (!section) return;
-                const container = section.querySelector('.buttons-container');
-                if (!container || container.querySelector(`[data-extra-source="${extraApp.sourceFile}"]`)) return;
-
-                const btn = document.createElement('input');
-                btn.type = 'button';
-                btn.value = extraApp.displayName;
-                btn.dataset.originalValue = extraApp.sourceFile;
-                btn.dataset.extraSource = extraApp.sourceFile;
-                btn.dataset.stashId = extraId;
-                if (extraApp.externalUrl) btn.dataset.externalUrl = extraApp.externalUrl;
-                btn.onclick = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    addBookmarkToSidebar(btn.dataset.originalValue, e);
-                };
-                container.appendChild(btn);
-                prepareGameButton(btn);
             });
         }
 
@@ -897,7 +761,7 @@
             // other relative assets continue to resolve after being added.
             if (extraStashApp && extraStashApp.externalUrl) {
                 const newG = {
-                    id: buildBookmarkIdFromSourceKey(sourceKey),
+                    id: bookmarkId,
                     sourceKey,
                     sourceFile,
                     title: extraStashApp.displayName,
@@ -923,10 +787,42 @@
                 return;
             }
 
-            const isExtraStashApp = Boolean(extraStashApp);
-            const gameUrl = isExtraStashApp
-                ? `${sourceFile}?t=${Date.now()}`
-                : `https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/${encoded}?t=${Date.now()}`;
+            // Local singlefile-bubbls games
+            const manifestItem = stashManifestMap.get(sourceFile.toLowerCase()) || 
+                                 stashManifestMap.get(originalValue.toLowerCase()) ||
+                                 stashManifestMap.get((sourceFile.replace(/\.html$/, '')).toLowerCase());
+            const isLocal = manifestItem ? (manifestItem.isLocal !== false) : true;
+
+            if (isLocal) {
+                const newG = {
+                    id: bookmarkId,
+                    sourceKey,
+                    sourceFile,
+                    title: getStashDisplayName(sourceFile, true),
+                    userRenamed: false,
+                    type: 'url',
+                    url: `singlefile-bubbls/UGS-Files/${encoded}`,
+                    isNew: true
+                };
+                try {
+                    if (!window.parent || window.parent === window || typeof window.parent.addStashGameToSidebar !== 'function') {
+                        throw new Error('Game Stash must be opened inside Nexus Files');
+                    }
+                    await window.parent.addStashGameToSidebar(newG);
+                    await refreshBookmarkAvailability();
+                } catch (error) {
+                    console.error('Failed to save bookmarked game:', error);
+                    nexusAlert('Could not add this game. Please try again.');
+                } finally {
+                    if (window.parent && typeof window.parent.hideAddingState === 'function') {
+                        window.parent.hideAddingState(sourceKey);
+                    }
+                }
+                return;
+            }
+
+            // Remote fallback for games not present in local folder
+            const gameUrl = `https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/${encoded}?t=${Date.now()}`;
 
             try {
                 const response = await fetch(gameUrl);
@@ -938,7 +834,7 @@
                 reader.onload = async function (e) {
                     const dataUrl = e.target.result;
                     const newG = {
-                        id: buildBookmarkIdFromSourceKey(sourceKey),
+                        id: bookmarkId,
                         sourceKey,
                         sourceFile,
                         title: getStashDisplayName(sourceFile, true),
@@ -958,7 +854,6 @@
                         console.error('Failed to save bookmarked game:', error);
                         nexusAlert('Could not add this game. Please try again.');
                     } finally {
-                        // Always clear the temporary sidebar item, including on errors.
                         if (window.parent && typeof window.parent.hideAddingState === 'function') {
                             window.parent.hideAddingState(sourceKey);
                         }
@@ -992,54 +887,160 @@
         searchInput.addEventListener('input', queueStashSearch);
         searchInput.addEventListener('change', queueStashSearch);
 
-        // ---- Wrap every game button that gets loaded by the external script ----
-        // We use a MutationObserver to catch buttons as they are injected by games.js
-        let buttonWrapFrame = 0;
-        const observer = new MutationObserver(() => {
-            // games.js can add many buttons in one burst. Batch the full-list
-            // scan so we do one layout pass per frame instead of one per node.
-            if (buttonWrapFrame) return;
-            buttonWrapFrame = requestAnimationFrame(() => {
-                buttonWrapFrame = 0;
-                // Find all input[type="button"] that are NOT yet wrapped
-                document.querySelectorAll('#sections-container input[type="button"]').forEach(btn => {
-                    const uniqueId = getStashUniqueId(btn);
-                    if (REMOVED_STASH_IDS.has(uniqueId)) {
-                        const w = btn.closest('.game-btn-wrapper') || btn;
-                        w.remove();
-                        return;
-                    }
-                    prepareGameButton(btn);
-                    if (btn.parentElement && btn.parentElement.classList.contains('game-btn-wrapper')) {
-                        btn.parentElement.dataset.stashId = uniqueId;
-                        ensureReportButton(btn.parentElement, btn, uniqueId);
-                        return;
-                    }
+        const STASH_SECTIONS = [
+            "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+            "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+            "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "#"
+        ];
+
+        function buildStashInterface(manifestGames) {
+            const filesByChar = new Map();
+            STASH_SECTIONS.forEach(c => filesByChar.set(c, []));
+
+            manifestGames.forEach(item => {
+                const rawLower = String(item.raw || item.file || '').toLowerCase().replace(/\.(?:html?|url)$/i, '').replace(/[\s_-]+/g, '');
+                if (rawLower === 'survivalracev2') return;
+
+                stashManifestMap.set(item.file.toLowerCase(), item);
+                stashManifestMap.set(item.raw.toLowerCase(), item);
+                const baseName = item.file.replace(/\.html$/, '').toLowerCase();
+                stashManifestMap.set(baseName, item);
+
+                let char = String(item.letter || '').toUpperCase();
+                if (!filesByChar.has(char)) char = '#';
+                filesByChar.get(char).push(item);
+            });
+
+            EXTRA_STASH_APPS.forEach(extra => {
+                let char = String(extra.letter || '').toUpperCase();
+                if (!filesByChar.has(char)) char = '#';
+                filesByChar.get(char).push({
+                    file: extra.sourceFile,
+                    raw: extra.sourceFile,
+                    title: extra.displayName,
+                    letter: char,
+                    isLocal: true,
+                    isExtra: true,
+                    externalUrl: extra.externalUrl
+                });
+            });
+
+            sectionsContainer.innerHTML = '';
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) sidebar.innerHTML = '';
+
+            const fragment = document.createDocumentFragment();
+            const sidebarFragment = document.createDocumentFragment();
+
+            STASH_SECTIONS.forEach((char, sectionIndex) => {
+                const list = filesByChar.get(char) || [];
+                list.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
+
+                const section = document.createElement('div');
+                section.className = 'letter-section';
+                section.id = `section-${char}`;
+                section.dataset.stashSectionIndex = String(sectionIndex);
+
+                const header = document.createElement('div');
+                header.className = 'letter-header';
+                header.textContent = char;
+                section.appendChild(header);
+
+                const container = document.createElement('div');
+                container.className = 'buttons-container';
+
+                let renderedCount = 0;
+                list.forEach(game => {
+                    const raw = game.raw || game.file;
+                    const isExtra = Boolean(game.isExtra);
+                    const uniqueId = isExtra
+                        ? `stash_extra_${game.file.replace(/[^a-zA-Z0-9_-]/g, '_')}`
+                        : computeStashUniqueId(raw, char);
+
+                    if (REMOVED_STASH_IDS.has(uniqueId)) return;
 
                     const wrapper = document.createElement('div');
                     wrapper.className = 'game-btn-wrapper';
                     wrapper.dataset.stashIndex = String(stashButtonIndex++);
                     wrapper.dataset.stashId = uniqueId;
-                    wrapper.__stashHomeParent = btn.parentNode;
+                    wrapper.__stashHomeParent = container;
 
-                    btn.parentNode.insertBefore(wrapper, btn);
+                    const btn = document.createElement('input');
+                    btn.type = 'button';
+                    btn.value = game.title;
+                    btn.dataset.originalValue = raw;
+                    btn.dataset.stashFile = game.file;
+                    btn.dataset.stashId = uniqueId;
+                    btn.dataset.searchName = `${game.title} ${raw}`.toLowerCase();
+                    btn.dataset.sourceKey = buildBookmarkSourceKey(raw);
+                    if (game.isLocal !== undefined) btn.dataset.isLocal = String(game.isLocal);
+                    if (isExtra && game.externalUrl) {
+                        btn.dataset.externalUrl = game.externalUrl;
+                        btn.dataset.extraSource = game.file;
+                    }
+
+                    btn.onclick = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        addBookmarkToSidebar(raw, e);
+                    };
+
                     wrapper.appendChild(btn);
                     ensureReportButton(wrapper, btn, uniqueId);
+                    container.appendChild(wrapper);
+                    renderedCount++;
                 });
 
-                ensureExtraStashButtons(false);
-                removeLegacySurvivalRaceV2();
-                queueBookmarkAvailabilityRefresh();
-                refreshReportButtonsState();
-                if (searchInput.value.trim() && !searchLayoutIsUpdating) queueStashSearch();
-            });
-        });
+                if (renderedCount === 0) {
+                    section.classList.add('empty');
+                    const emptyMsg = document.createElement('div');
+                    emptyMsg.className = 'empty-message';
+                    emptyMsg.textContent = 'No files';
+                    container.appendChild(emptyMsg);
+                }
 
-        observer.observe(sectionsContainer, { childList: true, subtree: true });
-        setTimeout(() => { ensureExtraStashButtons(true); removeLegacySurvivalRaceV2(); refreshReportButtonsState(); }, 1200);
-        refreshBookmarkAvailability();
-        initDevModeWidget();
-        refreshReportButtonsState();
+                section.appendChild(container);
+                fragment.appendChild(section);
+
+                if (sidebar) {
+                    const sidebarBtn = document.createElement('button');
+                    sidebarBtn.className = 'sidebar-btn';
+                    sidebarBtn.textContent = char;
+                    if (renderedCount === 0) {
+                        sidebarBtn.classList.add('empty');
+                    } else {
+                        sidebarBtn.onclick = () => {
+                            const targetSection = document.getElementById(`section-${char}`);
+                            if (targetSection) {
+                                targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        };
+                    }
+                    sidebarFragment.appendChild(sidebarBtn);
+                }
+            });
+
+            sectionsContainer.appendChild(fragment);
+            if (sidebar) sidebar.appendChild(sidebarFragment);
+
+            refreshBookmarkAvailability();
+            refreshReportButtonsState();
+            if (searchInput.value.trim() && !searchLayoutIsUpdating) queueStashSearch();
+        }
+
+        async function initStash() {
+            try {
+                const response = await fetch('stash-manifest.json');
+                if (!response.ok) throw new Error('Failed to load stash manifest: ' + response.status);
+                const manifestGames = await response.json();
+                buildStashInterface(manifestGames);
+            } catch (err) {
+                console.error('Failed to load Game Stash manifest:', err);
+                sectionsContainer.innerHTML = '<div class="empty-message" style="padding: 40px; font-size: 18px;">Failed to load Game Stash. Please verify stash-manifest.json is present.</div>';
+            }
+        }
+
+        initStash();
 
         window.addEventListener('storage', (e) => {
             if (e.key === 'tb_dev_reported_games') {
@@ -1047,10 +1048,6 @@
             }
             if (e.key === 'tb_dev_mode') {
                 const enabled = e.newValue === 'true';
-                const checkbox = document.getElementById('dev-mode-checkbox');
-                const widget = document.getElementById('nexus-dev-mode-widget');
-                if (checkbox) checkbox.checked = enabled;
-                if (widget) widget.classList.toggle('dev-active', enabled);
                 document.documentElement.classList.toggle('dev-mode', enabled);
             }
         });
@@ -1059,10 +1056,6 @@
             if (!e.data) return;
             if (e.data.type === 'nexus-dev-mode-change') {
                 const enabled = Boolean(e.data.enabled);
-                const checkbox = document.getElementById('dev-mode-checkbox');
-                const widget = document.getElementById('nexus-dev-mode-widget');
-                if (checkbox) checkbox.checked = enabled;
-                if (widget) widget.classList.toggle('dev-active', enabled);
                 document.documentElement.classList.toggle('dev-mode', enabled);
             }
             if (e.data.type === 'nexus-reported-games-updated') {
@@ -1070,7 +1063,6 @@
             }
         });
     </script>
-    <script src="https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/games.js"></script>
 	<script>
         document.addEventListener('DOMContentLoaded', () => {
             // Intercept clicks on any link in the stash container using event delegation

@@ -1669,7 +1669,11 @@ function launchGameFullscreen(game) {
                         }
                     });
                 };
-                ifr.src = game.url;
+                let resolvedUrl = game.url;
+                try {
+                    resolvedUrl = new URL(game.url, window.location.href).href;
+                } catch (e) {}
+                ifr.src = resolvedUrl;
                 win.document.body.style.margin = '0';
                 win.document.body.style.padding = '0';
                 win.document.body.style.overflow = 'hidden';
