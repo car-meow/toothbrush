@@ -685,12 +685,19 @@ function decodeBackupValue(value) {
 function startGameAutosave() {
     if (gameAutosaveTimer) clearInterval(gameAutosaveTimer);
     // Continuous periodic sync heartbeat (15s throttled to reduce CPU/RAM thrashing)
-    gameAutosaveTimer = setInterval(requestCurrentGameAutosave, 15000);
+    gameAutosaveTimer = setInterval(() => {
+        if (currentGame && currentGame.id !== 'ugs-stash') requestCurrentGameAutosave();
+    }, 15000);
 }
 
 window.addEventListener('message', event => {
     const message = event.data;
     if (!message) return;
+
+    if (message.type === 'nexus-popup-closed' && message.gameId) {
+        popupGameWindows.delete(message.gameId);
+        return;
+    }
 
     const frame = document.getElementById('game-frame');
     const isEmbeddedGame = frame && event.source === frame.contentWindow;
@@ -1565,6 +1572,46 @@ function getCloakData() {
     }
 }
 
+function getVerifiedGameFallbackUrl(game) {
+    if (!game || !game.sourceFile) return null;
+    const sourceFile = String(game.sourceFile).replace(/^\/+/, '');
+    if (!sourceFile || sourceFile.includes('..')) return null;
+    return `https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/${encodeURIComponent(sourceFile)}`;
+}
+
+async function resolveGameUrl(game) {
+    const localUrl = game && game.url;
+    const fallbackUrl = getVerifiedGameFallbackUrl(game);
+    if (!localUrl || !fallbackUrl || !/^singlefile-bubbls\/UGS-Files\//i.test(localUrl)) {
+        return { url: localUrl, usedFallback: false };
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    try {
+        let response = await fetch(localUrl, {
+            method: 'HEAD',
+            cache: 'no-store',
+            signal: controller.signal
+        });
+        if (response.status === 405 || response.status === 501) {
+            response = await fetch(localUrl, {
+                headers: { Range: 'bytes=0-0' },
+                cache: 'no-store',
+                signal: controller.signal
+            });
+        }
+        if (response.ok) return { url: localUrl, usedFallback: false };
+        if (response.status !== 404 && response.status !== 410) return { url: localUrl, usedFallback: false };
+        return { url: fallbackUrl, usedFallback: true };
+    } catch (error) {
+        // Network errors must not turn an offline local game into a promised CDN fallback.
+        return { url: localUrl, usedFallback: false };
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
 function launchGameFullscreen(game) {
     if (!game || game.id === "ugs-stash") return;
 
@@ -1576,6 +1623,7 @@ function launchGameFullscreen(game) {
     }
     if (game && game.id) popupGameWindows.set(game.id, win);
     try { win.focus(); } catch(e) {}
+    let popupLoader = null;
 
     const cloak = getCloakData();
 
@@ -1674,15 +1722,26 @@ function launchGameFullscreen(game) {
                 <\/script>`;
 
                 const gameSrcDoc = injectGameBootstrap(rawHtml, unityCompatibility + popupRestore + popupBridge + autoFocusScript + titleEnforceScript);
-                win.document.open();
-                win.document.write(gameSrcDoc);
-                win.document.close();
+                win.document.body.innerHTML = '';
+                win.document.body.style.margin = '0';
+                win.document.body.style.padding = '0';
+                win.document.body.style.overflow = 'hidden';
+                popupLoader = createNexusLoadingOverlay(win.document, getLoadingScreenBgUrl());
+                const ifr = win.document.createElement('iframe');
+                Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
+                ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
+                ifr.onload = () => popupLoader.complete();
+                ifr.onerror = () => popupLoader.complete();
+                ifr.srcdoc = gameSrcDoc;
+                win.document.body.appendChild(ifr);
                 setTimeout(() => { try { win.focus(); } catch (e) {} }, 100);
             } else {
                 const ifr = win.document.createElement('iframe');
                 Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
                 ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
+                popupLoader = createNexusLoadingOverlay(win.document, getLoadingScreenBgUrl());
                 ifr.onload = () => {
+                    popupLoader.complete();
                     getGameSnapshot(game.id).then(snap => {
                         if (snap && ifr.contentWindow) {
                             try {
@@ -1697,10 +1756,13 @@ function launchGameFullscreen(game) {
                         }
                     });
                 };
-                let resolvedUrl = game.url;
+                ifr.onerror = () => popupLoader.complete();
+                const resolved = await resolveGameUrl(game);
+                let resolvedUrl = resolved.url || game.url;
                 try {
                     resolvedUrl = new URL(game.url, window.location.href).href;
                 } catch (e) {}
+                if (resolved.usedFallback) resolvedUrl = resolved.url;
                 ifr.src = resolvedUrl;
                 win.document.body.style.margin = '0';
                 win.document.body.style.padding = '0';
@@ -1742,9 +1804,17 @@ function launchGameFullscreen(game) {
                             set: function() { return ct; }
                         });
                     } catch(e) {}
-                    setInterval(function() {
+                    var titleTimer = setInterval(function() {
                         if (document.title !== ct) document.title = ct;
                     }, 2000);
+                    window.addEventListener('beforeunload', function() {
+                        clearInterval(titleTimer);
+                        try {
+                            if (window.opener && !window.opener.closed) {
+                                window.opener.postMessage({ type: 'nexus-popup-closed', gameId: primaryGameId }, '*');
+                            }
+                        } catch(err) {}
+                    }, { once: true });
 
                     // Standalone IndexedDB snapshot persistence engine for about:blank popup
                     function saveToIDB(incomingData) {
@@ -1942,6 +2012,8 @@ function launchGameFullscreen(game) {
             }
         } catch(err) {
             console.error("Error launching game in fullscreen window:", err);
+            try { win.close(); } catch (e) {}
+            nexusAlert('Could not launch this game. Please retry or return to Game Stash.');
         }
     })();
 }
@@ -2049,7 +2121,8 @@ function injectGameBootstrap(html, bootstrap) {
 
     // Inject loading screen styles & safe overlay creator if not already present in the custom game HTML
     let loadingScripts = '';
-    if (!html.includes('nexus-loading-screen')) {
+    // Loading is owned by the Nexus host shell; game documents must not receive a second loader.
+    if (false && !html.includes('nexus-loading-screen')) {
         loadingScripts = `<style>
 #nexus-loading-screen {
     position: fixed !important;
@@ -2254,10 +2327,29 @@ function injectGameBootstrap(html, bootstrap) {
         window.addEventListener('load', onDocumentComplete);
     }
 
-    // Max wait timer failsafe
+    // Long, bounded failure state: ordinary slow games are not treated as failed at 8 seconds.
     maxWaitTimer = setTimeout(function() {
-        if (!isDone) completeLoading();
-    }, 8000);
+        if (isDone) return;
+        isDone = true;
+        if (stepTimer1) clearTimeout(stepTimer1);
+        if (stepTimer2) clearTimeout(stepTimer2);
+        if (busyTimer) clearTimeout(busyTimer);
+        if (creepStartTimer) clearTimeout(creepStartTimer);
+        if (creepTimer) clearInterval(creepTimer);
+        if (overlay) {
+            overlay.style.justifyContent = 'center';
+            overlay.style.gap = '14px';
+            var notice = document.createElement('div');
+            notice.textContent = 'This game is taking longer than expected.';
+            notice.style.cssText = 'color:#fff;font:600 15px Space Grotesk,sans-serif;text-align:center;padding:0 20px;';
+            var retry = document.createElement('button');
+            retry.textContent = 'Retry';
+            retry.style.cssText = 'padding:9px 20px;border:2px solid #fff;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;font:700 14px Space Grotesk,sans-serif;cursor:pointer;';
+            retry.onclick = function() { location.reload(); };
+            overlay.appendChild(notice);
+            overlay.appendChild(retry);
+        }
+    }, 45000);
 
     window.addEventListener('message', function(e) {
         if (e.data === 'bonk' || (e.data && e.data.type === 'nexus-game-ready')) {
@@ -2296,6 +2388,19 @@ function injectGameBootstrap(html, bootstrap) {
 
 let gameStatusFadeTimer = null;
 let isStashPreloaded = false;
+let activeHostLoader = null;
+
+function beginHostLoader(parentDoc = document) {
+    if (activeHostLoader) activeHostLoader.complete();
+    activeHostLoader = createNexusLoadingOverlay(parentDoc);
+    return activeHostLoader;
+}
+
+function completeHostLoader() {
+    if (!activeHostLoader) return;
+    activeHostLoader.complete();
+    activeHostLoader = null;
+}
 
 function updateGameStatusUI(state) {
     const container = document.getElementById('game-status-container');
@@ -2303,6 +2408,8 @@ function updateGameStatusUI(state) {
     const text = document.getElementById('game-status-text');
 
     if (!container || !icon || !text) return;
+
+    if (state !== 'error') container.onclick = null;
 
     if (gameStatusFadeTimer) {
         clearTimeout(gameStatusFadeTimer);
@@ -2334,6 +2441,24 @@ function updateGameStatusUI(state) {
         container.style.visibility = 'hidden';
         container.classList.remove('active');
     }
+}
+
+function showGameLoadError(game, frame) {
+    const container = document.getElementById('game-status-container');
+    const icon = document.getElementById('game-status-icon');
+    const text = document.getElementById('game-status-text');
+    if (!container || !icon || !text) return;
+    if (gameStatusFadeTimer) clearTimeout(gameStatusFadeTimer);
+    icon.src = 'Assets/Delete.svg';
+    text.textContent = 'Load failed - Retry';
+    container.style.opacity = '1';
+    container.style.visibility = 'visible';
+    container.classList.add('active');
+    container.onclick = () => {
+        container.onclick = null;
+        if (frame) releaseIframe(frame);
+        loadGame(game, true);
+    };
 }
 
 function ensureStashPreloaded() {
@@ -2380,6 +2505,7 @@ async function loadGame(game, forceInternal = false) {
     }
 
     const requestedLoadToken = ++gameLoadToken;
+    let resolvedGameUrl = game.url;
 
     if (game.type === 'file') {
         if (!game.content) {
@@ -2398,6 +2524,10 @@ async function loadGame(game, forceInternal = false) {
         loadedGameSnapshots.set(game, latestSnapshot || {});
 
         if (requestedLoadToken !== gameLoadToken) return;
+    } else if (game.type === 'url') {
+        const resolved = await resolveGameUrl(game);
+        if (requestedLoadToken !== gameLoadToken) return;
+        resolvedGameUrl = resolved.url || game.url;
     }
 
     releaseInactiveGameContent(game);
@@ -2433,11 +2563,14 @@ async function loadGame(game, forceInternal = false) {
 
             if (!isStashPreloaded || !stashFrame.src || stashFrame.src.endsWith('about:blank')) {
                 updateGameStatusUI('loading');
+                beginHostLoader(document);
                 stashFrame.src = 'clSINGLEFILE.html';
                 stashFrame.onload = () => {
                     isStashPreloaded = true;
                     updateGameStatusUI('loaded');
+                    completeHostLoader();
                 };
+                stashFrame.onerror = () => { completeHostLoader(); showGameLoadError(game, stashFrame); };
             } else {
                 updateGameStatusUI('loaded');
             }
@@ -2447,10 +2580,13 @@ async function loadGame(game, forceInternal = false) {
             frame.style.setProperty('visibility', 'visible', 'important');
             frame.style.opacity = '1';
             updateGameStatusUI('loading');
+            beginHostLoader(document);
             frame.src = 'clSINGLEFILE.html';
             frame.onload = () => {
                 updateGameStatusUI('loaded');
+                completeHostLoader();
             };
+            frame.onerror = () => { completeHostLoader(); showGameLoadError(game, frame); };
         }
         return;
     }
@@ -2474,8 +2610,10 @@ async function loadGame(game, forceInternal = false) {
         frame.removeAttribute('sandbox'); // Allow full storage & WebAssembly capabilities
 
         updateGameStatusUI('loading');
+        beginHostLoader(document);
 
         frame.onload = () => {
+            completeHostLoader();
             updateGameStatusUI('loaded');
             frame.style.setProperty('visibility', 'visible', 'important');
             frame.style.opacity = '1';
@@ -2495,6 +2633,7 @@ async function loadGame(game, forceInternal = false) {
                 });
             }
         };
+        frame.onerror = () => { completeHostLoader(); showGameLoadError(game, frame); };
 
         if (game.type === 'file') {
             const base64Data = game.content.split(',')[1];
@@ -2527,7 +2666,7 @@ async function loadGame(game, forceInternal = false) {
         } else {
             frame.removeAttribute('srcdoc');
             if (game.url.endsWith('.pdf')) frame.removeAttribute('sandbox');
-            frame.src = game.url;
+            frame.src = resolvedGameUrl;
         }
     }
 

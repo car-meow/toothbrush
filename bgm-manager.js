@@ -217,11 +217,14 @@ window.BGMManager = {
         return new Promise((resolve) => {
             const els = getDialogElements();
             if (!els.overlay.parentNode) document.body.appendChild(els.overlay);
+            const restoreTarget = document.activeElement;
+            const isPrompt = Boolean(options.isPrompt);
+            const isConfirm = Boolean(options.isConfirm || isPrompt);
             
             els.title.textContent = options.title || 'Nexus';
             els.msg.textContent = options.message || '';
             
-            if (options.isPrompt) {
+            if (isPrompt) {
                 els.input.style.display = 'block';
                 els.input.value = options.defaultValue || '';
             } else {
@@ -229,10 +232,10 @@ window.BGMManager = {
             }
 
             els.okBtn.style.display = 'inline-block';
-            els.cancelBtn.style.display = 'inline-block';
+            els.cancelBtn.style.display = isConfirm ? 'inline-block' : 'none';
             els.overlay.style.display = 'flex';
             
-            if (options.isPrompt) {
+            if (isPrompt) {
                 setTimeout(() => { els.input.focus(); els.input.select(); }, 50);
             } else {
                 setTimeout(() => { els.okBtn.focus(); }, 50);
@@ -243,17 +246,20 @@ window.BGMManager = {
                 els.okBtn.onclick = null;
                 els.cancelBtn.onclick = null;
                 document.removeEventListener('keydown', keyHandler);
+                if (restoreTarget && typeof restoreTarget.focus === 'function') {
+                    setTimeout(() => restoreTarget.focus(), 0);
+                }
             };
 
             const keyHandler = (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     cleanup();
-                    resolve(options.isPrompt ? els.input.value : true);
-                } else if (e.key === 'Escape') {
+                    resolve(isPrompt ? els.input.value : true);
+                } else if (e.key === 'Escape' && isConfirm) {
                     e.preventDefault();
                     cleanup();
-                    resolve(options.isPrompt ? null : false);
+                    resolve(isPrompt ? null : false);
                 }
             };
 
@@ -262,13 +268,13 @@ window.BGMManager = {
             els.okBtn.onclick = (e) => {
                 e.preventDefault();
                 cleanup();
-                resolve(options.isPrompt ? els.input.value : true);
+                resolve(isPrompt ? els.input.value : true);
             };
 
             els.cancelBtn.onclick = (e) => {
                 e.preventDefault();
                 cleanup();
-                resolve(options.isPrompt ? null : false);
+                resolve(isPrompt ? null : false);
             };
         });
     }

@@ -98,7 +98,10 @@
                 <div id="url-preview-badge" style="display:none; margin-top: 10px; padding: 8px 14px; background: rgba(33,150,243,0.12); border: 1px solid #2196F3; border-radius: 8px; font-size: 13px; color: #64b5f6; word-break: break-all; text-align: left;"></div>
             </div>
 
-            <button id="add-game-btn" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 999px; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; transition: filter 0.2s;">Add App</button>
+            <div style="display:flex; gap:10px; margin-top:12px;">
+                <button id="custom-app-cancel-btn" type="button" style="flex:1; background: var(--accent-btn-bg); color: var(--accent-btn-text); border: 2px solid var(--accent-btn-border); padding: 12px; border-radius: 999px; font-size: 16px; font-weight: bold; cursor: pointer;">Back</button>
+                <button id="add-game-btn" style="flex:1; background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 999px; font-size: 16px; font-weight: bold; cursor: pointer; transition: filter 0.2s;">Add App</button>
+            </div>
         </div>
     </div>
 
@@ -265,6 +268,8 @@
             _confirmedUrl = null;
             if (window.setGamePopupState) window.setGamePopupState('custom-app-overlay', false);
         }
+
+        document.getElementById('custom-app-cancel-btn').addEventListener('click', closeCustomOverlay);
 
         document.addEventListener('keydown', (e) => {
             const customOverlay = document.getElementById('custom-app-overlay');
