@@ -1580,7 +1580,14 @@ function getVerifiedGameFallbackUrl(game) {
     return 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/' + encodedPath;
 }
 
-async function fetchExternalGameHtml(url, bootstrap = '') {
+function isTagC3Game(game) {
+    const sourceFile = String(game && (game.sourceFile || game.url) || '').replace(/\\/g, '/').toLowerCase();
+    const fileName = sourceFile.split(/[?#]/, 1)[0];
+    const gameId = String(game && game.id || '').toLowerCase();
+    return fileName === 'cltagc3.html' || fileName.endsWith('/cltagc3.html') || gameId.includes('cltagc3');
+}
+
+async function fetchExternalGameHtml(url, bootstrap = '', options = {}) {
     const requestUrl = new URL(url, window.location.href);
     requestUrl.searchParams.set('t', String(Date.now()));
 
@@ -1601,13 +1608,32 @@ async function fetchExternalGameHtml(url, bootstrap = '') {
         .replace(/"/g, '&quot;');
     const baseTag = '<base href="' + baseHref + '">';
     const existingBase = /<base\b[^>]*>/i;
-    let documentHtml;
-    if (existingBase.test(html)) {
-        documentHtml = html.replace(existingBase, baseTag);
-    } else if (/<head(?:\s[^>]*)?>/i.test(html)) {
-        documentHtml = html.replace(/<head(?:\s[^>]*)?>/i, head => head + baseTag);
-    } else {
-        documentHtml = baseTag + html;
+    let documentHtml = html;
+    // A page may deliberately host its assets from a different base path.
+    // Preserve that declared path; use the source document directory only
+    // when the HTML does not specify a base URL.
+    if (!existingBase.test(documentHtml)) {
+        if (/<head(?:\s[^>]*)?>/i.test(documentHtml)) {
+            documentHtml = documentHtml.replace(/<head(?:\s[^>]*)?>/i, head => head + baseTag);
+        } else {
+            documentHtml = baseTag + documentHtml;
+        }
+    }
+
+    // Construct's offline worker is optional for gameplay. This export loads
+    // its runtime from a separate CDN origin, so its worker cannot register
+    // against Nexus's GitHub Pages origin.
+    if (options.disableServiceWorker) {
+        documentHtml = documentHtml.replace(
+            /<script\b(?=[^>]*\bsrc\s*=\s*["'][^"']*register-sw\.js(?:[?#][^"']*)?["'])[^>]*>\s*<\/script\s*>/gi,
+            ''
+        );
+        const swShim = '<script>window.C3_RegisterSW=function(){return Promise.resolve(null);};</script>';
+        if (/<head(?:\s[^>]*)?>/i.test(documentHtml)) {
+            documentHtml = documentHtml.replace(/<head(?:\s[^>]*)?>/i, head => head + swShim);
+        } else {
+            documentHtml = swShim + documentHtml;
+        }
     }
 
     return injectGameBootstrap(documentHtml, bootstrap);
@@ -1822,7 +1848,7 @@ function launchGameFullscreen(game) {
                 } catch (e) {}
                 if (resolved.usedFallback) resolvedUrl = resolved.url;
                 if (resolved.usedFallback) game = { ...game, nexusExternalSource: true };
-                if (game.nexusExternalSource) {
+                if (game.nexusExternalSource || isTagC3Game(game)) {
                     const snapshot = await getGameSnapshot(game.id);
                     const savedLocalStorage = snapshot && snapshot.localStorage ? snapshot.localStorage : {};
                     const snapshotJson = JSON.stringify(savedLocalStorage).replace(/</g, '\\u003c');
@@ -1830,7 +1856,8 @@ function launchGameFullscreen(game) {
                     const popupBridge = getUniversalAutosaveBridge(game.id);
                     ifr.srcdoc = await fetchExternalGameHtml(
                         resolvedUrl,
-                        restoreScript + popupBridge + titleEnforceScript
+                        restoreScript + popupBridge + titleEnforceScript,
+                        { disableServiceWorker: isTagC3Game(game) }
                     );
                 } else {
                     ifr.src = resolvedUrl;
@@ -2737,7 +2764,7 @@ async function loadGame(game, forceInternal = false) {
                     frame.src = game.content; 
                 }
             }
-        } else if (game.nexusExternalSource) {
+        } else if (game.nexusExternalSource || isTagC3Game(game)) {
             try {
                 const snapshot = await getGameSnapshot(game.id);
                 if (requestedLoadToken !== gameLoadToken) return;
@@ -2749,7 +2776,8 @@ async function loadGame(game, forceInternal = false) {
                 const autosaveBridge = getUniversalAutosaveBridge(game.id);
                 const gameHtml = await fetchExternalGameHtml(
                     resolvedGameUrl,
-                    restoreScript + persistenceScript + autosaveBridge
+                    restoreScript + persistenceScript + autosaveBridge,
+                    { disableServiceWorker: isTagC3Game(game) }
                 );
                 if (requestedLoadToken !== gameLoadToken) return;
 
