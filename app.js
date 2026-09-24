@@ -1576,7 +1576,41 @@ function getVerifiedGameFallbackUrl(game) {
     if (!game || !game.sourceFile) return null;
     const sourceFile = String(game.sourceFile).replace(/^\/+/, '');
     if (!sourceFile || sourceFile.includes('..')) return null;
-    return `https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/${encodeURIComponent(sourceFile)}`;
+    const encodedPath = sourceFile.split('/').map(part => encodeURIComponent(part)).join('/');
+    return 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/' + encodedPath;
+}
+
+async function fetchExternalGameHtml(url, bootstrap = '') {
+    const requestUrl = new URL(url, window.location.href);
+    requestUrl.searchParams.set('t', String(Date.now()));
+
+    const response = await fetch(requestUrl.href, { cache: 'no-store' });
+    if (!response.ok) {
+        throw new Error('External game request failed (' + response.status + ')');
+    }
+
+    const html = await response.text();
+    if (!/<(?:!doctype\s+html|html|head|body)\b/i.test(html)) {
+        throw new Error('The external source did not return a game HTML document.');
+    }
+
+    // jsDelivr may serve HTML files as text/plain. Build a real HTML document
+    // and resolve its relative resources from the directory that served it.
+    const baseHref = new URL('.', new URL(url, window.location.href)).href
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;');
+    const baseTag = '<base href="' + baseHref + '">';
+    const existingBase = /<base\b[^>]*>/i;
+    let documentHtml;
+    if (existingBase.test(html)) {
+        documentHtml = html.replace(existingBase, baseTag);
+    } else if (/<head(?:\s[^>]*)?>/i.test(html)) {
+        documentHtml = html.replace(/<head(?:\s[^>]*)?>/i, head => head + baseTag);
+    } else {
+        documentHtml = baseTag + html;
+    }
+
+    return injectGameBootstrap(documentHtml, bootstrap);
 }
 
 async function resolveGameUrl(game) {
@@ -1624,13 +1658,14 @@ function applyGameRunMode(game) {
 
     const externalUrl = getVerifiedGameFallbackUrl(game);
     if (!externalUrl) return game;
-    if (game.type === 'url' && game.url === externalUrl) return game;
+    if (game.type === 'url' && game.url === externalUrl && game.nexusExternalSource) return game;
 
     return {
         ...game,
         type: 'url',
         url: externalUrl,
-        content: undefined
+        content: undefined,
+        nexusExternalSource: true
     };
 }
 
@@ -1786,7 +1821,20 @@ function launchGameFullscreen(game) {
                     resolvedUrl = new URL(game.url, window.location.href).href;
                 } catch (e) {}
                 if (resolved.usedFallback) resolvedUrl = resolved.url;
-                ifr.src = resolvedUrl;
+                if (resolved.usedFallback) game = { ...game, nexusExternalSource: true };
+                if (game.nexusExternalSource) {
+                    const snapshot = await getGameSnapshot(game.id);
+                    const savedLocalStorage = snapshot && snapshot.localStorage ? snapshot.localStorage : {};
+                    const snapshotJson = JSON.stringify(savedLocalStorage).replace(/</g, '\\u003c');
+                    const restoreScript = '<script>(function(){try{var s=' + snapshotJson + ';Object.keys(s).forEach(function(k){if(k.indexOf("tb_")!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>';
+                    const popupBridge = getUniversalAutosaveBridge(game.id);
+                    ifr.srcdoc = await fetchExternalGameHtml(
+                        resolvedUrl,
+                        restoreScript + popupBridge + titleEnforceScript
+                    );
+                } else {
+                    ifr.src = resolvedUrl;
+                }
                 win.document.body.style.margin = '0';
                 win.document.body.style.padding = '0';
                 win.document.body.style.overflow = 'hidden';
@@ -2553,6 +2601,7 @@ async function loadGame(game, forceInternal = false) {
         const resolved = await resolveGameUrl(game);
         if (requestedLoadToken !== gameLoadToken) return;
         resolvedGameUrl = resolved.url || game.url;
+        if (resolved.usedFallback) game = { ...game, nexusExternalSource: true };
     }
 
     releaseInactiveGameContent(game);
@@ -2687,6 +2736,29 @@ async function loadGame(game, forceInternal = false) {
                 } catch (err2) {
                     frame.src = game.content; 
                 }
+            }
+        } else if (game.nexusExternalSource) {
+            try {
+                const snapshot = await getGameSnapshot(game.id);
+                if (requestedLoadToken !== gameLoadToken) return;
+
+                const savedLocalStorage = snapshot && snapshot.localStorage ? snapshot.localStorage : {};
+                const snapshotJson = JSON.stringify(savedLocalStorage).replace(/</g, '\\u003c');
+                const restoreScript = '<script>(function(){try{var s=' + snapshotJson + ';Object.keys(s).forEach(function(k){if(k.indexOf("tb_")!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>';
+                const persistenceScript = '<script>try{window.localStorage.setItem("p","1");}catch(e){}<\/script>';
+                const autosaveBridge = getUniversalAutosaveBridge(game.id);
+                const gameHtml = await fetchExternalGameHtml(
+                    resolvedGameUrl,
+                    restoreScript + persistenceScript + autosaveBridge
+                );
+                if (requestedLoadToken !== gameLoadToken) return;
+
+                frame.removeAttribute('src');
+                frame.srcdoc = gameHtml;
+            } catch (error) {
+                console.error('Failed to load external Game Stash source:', error);
+                completeHostLoader();
+                showGameLoadError(game, frame);
             }
         } else {
             frame.removeAttribute('srcdoc');
