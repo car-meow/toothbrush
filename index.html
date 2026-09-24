@@ -448,11 +448,11 @@ html.performance-mode [class*="aura-"] {
         <div class="logo-wrapper" style="pointer-events: auto !important;">
             <img src="Assets/nexusLogo.png" id="nexus-logo" class="home-title-img" alt="Nexus" style="cursor: pointer; pointer-events: auto !important;">
             <div class="nexus-version-container" style="pointer-events: auto !important;">
-                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v3.9.99 beta</span>
+                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v4.0.2 beta</span>
                 <div class="nexus-update-card" style="pointer-events: auto !important;">
-                    <div class="nexus-update-title">FALL UPDATE!!! (4.0 coming soon...)</div>
+                    <div class="nexus-update-title">Autumn update is OUT!</div>
                     <div class="nexus-update-body">
-                        Welcome back children! TONS of new game additions, INSANE new performance updates, a DIABOLICAL amount of bugfixes, and a WHOLE lot more. Read all about it by clicking the aptly named button below.
+                        Oh yeah, there's so much to get into. Optimizations, to new settings, to fixed games, to MORE games. Read all about it by pressing the button below! NOW!
                     </div>
                     <div class="nexus-update-footer">
                         <button id="nexus-read-more-btn" class="nexus-read-more-btn">Read More</button>
@@ -539,17 +539,15 @@ html.performance-mode [class*="aura-"] {
         <div class="nexus-patchnotes-header">
             <div class="nexus-patchnotes-title">Patch Notes</div>
         </div>
-        <div class="nexus-patchnotes-body" id="nexus-patchnotes-expanded-text">It's been one long summer, and we're all enthusiastic to get back to school. (not) And I've been hard at work at the latest revisions, updates, improvements, tweaks, and refinements of Nexus so your experience can be the best...
-while my sleep schedule can be the worst! :3 So let's hop right in to the new shiny Nexus!
+        <div class="nexus-patchnotes-body" id="nexus-patchnotes-expanded-text">4.0 is here! This update is a big one, and I can't wait for y'all to check it out.
 
-With 3.9, performance is the name of the game. If you thought it was already decent, prepare for socks-blowing-off performance improvements-- backends have been completely reworked, and everything has been optimized so much more than I knew was possible at the time of creating this. All that... for these crappy Chromebooks/E-waste to run it at 1 frame more :,)
-Also added Performance Mode Lite, which is kind of the middle ground between visual flair and performance. Good for mid-range devices.
+Let's do a quick overview. The Stash has been completely localized, meaning that old deprecated system is now only a fallback (you can enable it in settings if some games don't work, I'm still bugfixing). The Stash is now a lot more user-friendly, and the Games Tab has been updated to be more responsive and smooth. So has every single facet of this site; in fact, the amount of optimizations I had to make probably totals to ~150 hours. It should be a lot smoother now on those crappy Chromebooks (also known as E-waste).
 
 Some settings have been enabled by default, and a few new ones have been added to help with performance. If you have a low-end device, I highly recommend enabling Performance Mode in the Settings menu. It will make a world of difference. Also, settings have been removed to make it more user-friendly.
 
-Expect more themes COMING SOON, but for now, you have LIGHT MODE to play with! If you want, of course. It completely changes the vibe, I highly recommend trying it out a little.
+Light Mode has been fully fleshed out with new backgrounds, and a more unified font.
 
-The Stash has been updated as the font is now unified, saving and loading got a major revamp since you can now choose individually what games you want to save and load, and the Games Tab has been getting some backstage updates to ensure smoothness.
+The Stash has been updated as the font is now unified, saving and loading got a major revamp since you can now choose individually what games you want to save and load, and there's a (not fully done) saving manager where you can delete save files for specific games.
 
 I fixed tons of bugs, and when I say TONS, I mean it. Here's some of them, categorized from HUGE to SMALL but still impactful!
 
@@ -559,16 +557,17 @@ Saving used to only work if the Nexus tab was open, now it works regardless of i
 I expanded the backup and restore system to save entire libraries of games, not just saves, including color, save data, and order of all the games. 
 Added general loading and response improvements by reducing redundant prefetching and background work. Also greatly increased performance gain when Performance Mode is turned on.
 Movies and TV stuff not loading.
+Tag game is now fixed, it should load properly.
+Search functionality is pretty much instant now.
 
 MEDIUM:
 Fixed some games getting stuck on "Adding..." in the sidebar, and moved the newly added games to the top.
 Fixed outdated IndexedDB version issues, which caused a rare bug that made adding games fail.
 Fixed deleted games not being re-addeable in the Stash until you refreshed it.
 Added dev mode.
-Added a nice
+Sidebar games will now never lose their order when you refresh the page, and will always be in the order you set them to. They will also keep their color.
 
 Kinda SMALL:
-Fixed crazy high RAM usage for Balatro specifically, its file had some errored loops going on so I fixed that.
 Search layouts in the Game Stash were fixed, removing those annoying gaps in Search.
 Fonts should now read properly on Chromebook, bundling the .ttf files locally instead of relying on Google Fonts.
 General polish update as per usual.
@@ -579,7 +578,7 @@ And stuff that's currently IN THE WORKS for 4.0 (coming to Chromebooks near you!
 - AI chatbot not working sometimes due to "server full" issues, will be fixed with a new backend if I can figure it out and definitely less waiting times
 - More polish and bugfixes, as always, and more performance improvements
 
-Aaaaand that's all, folks. We're so close to 4.0, all I have to do is pass my classes while I work on the next update. If you have any "Requests/Concerns" click that button and fill that out. TYSM and PEACE!</div>
+Aaaaand that's all, folks. 4.0 is here, but that doesn't mean that we're done with Nexus! I'm definitely going to hold off on any more major updates for now, since I need to pass my classes, but if you have any "Requests/Concerns" click that button and fill it out, and I should try and do something about it in a day or two. I'll catch you later, dev OUT!</div>
         <div class="nexus-patchnotes-footer">
             <button id="nexus-close-patchnotes-btn" class="nexus-close-patchnotes-btn">Cool! Close</button>
         </div>

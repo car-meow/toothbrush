@@ -18,6 +18,114 @@ let gameAutosaveTimer = null;
 const loadedGameSnapshots = new WeakMap();
 const snapshotHashes = new Map();
 const popupGameWindows = new Map();
+const sidebarOrderDbName = 'NexusSidebarSettings';
+let sidebarOrderDbPromise = null;
+let lastSidebarOrderSavedAt = 0;
+
+function openSidebarOrderDB() {
+    if (sidebarOrderDbPromise) return sidebarOrderDbPromise;
+    sidebarOrderDbPromise = new Promise(resolve => {
+        let request;
+        try {
+            request = indexedDB.open(sidebarOrderDbName, 1);
+        } catch (error) {
+            sidebarOrderDbPromise = null;
+            resolve(null);
+            return;
+        }
+        request.onupgradeneeded = event => {
+            const database = event.target.result;
+            if (!database.objectStoreNames.contains('settings')) {
+                database.createObjectStore('settings', { keyPath: 'key' });
+            }
+        };
+        request.onsuccess = event => {
+            const database = event.target.result;
+            database.onversionchange = () => {
+                database.close();
+                sidebarOrderDbPromise = null;
+            };
+            resolve(database);
+        };
+        request.onerror = request.onblocked = () => {
+            sidebarOrderDbPromise = null;
+            resolve(null);
+        };
+    });
+    return sidebarOrderDbPromise;
+}
+
+function parseSidebarOrder(value) {
+    if (typeof value !== 'string' || !value) return null;
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.map(id => String(id)) : null;
+    } catch (error) {
+        return null;
+    }
+}
+
+async function readSavedSidebarOrder(localStorage) {
+    const legacyOrder = parseSidebarOrder(localStorage.getItem('sidebar-game-order'));
+    const legacyUpdatedAt = Number(localStorage.getItem('sidebar-game-order-updated-at')) || 0;
+    const database = await openSidebarOrderDB();
+    if (database) {
+        try {
+            const saved = await new Promise(resolve => {
+                const transaction = database.transaction('settings', 'readonly');
+                const request = transaction.objectStore('settings').get('sidebar-game-order');
+                request.onsuccess = () => resolve(request.result || null);
+                request.onerror = () => resolve(null);
+            });
+            if (legacyOrder && legacyUpdatedAt > Number(saved && saved.updatedAt || 0)) {
+                persistSidebarOrder(legacyOrder, legacyUpdatedAt);
+                lastSidebarOrderSavedAt = legacyUpdatedAt;
+                return legacyOrder;
+            }
+            if (saved && Array.isArray(saved.order)) {
+                const order = saved.order.map(id => String(id));
+                lastSidebarOrderSavedAt = Number(saved.updatedAt) || 0;
+                try {
+                    localStorage.setItem('sidebar-game-order', JSON.stringify(order));
+                    localStorage.setItem('sidebar-game-order-updated-at', String(lastSidebarOrderSavedAt));
+                } catch (error) {}
+                return order;
+            }
+        } catch (error) {}
+    }
+
+    // Migrate the existing localStorage value once, then keep both copies in sync.
+    if (legacyOrder) {
+        lastSidebarOrderSavedAt = legacyUpdatedAt || Date.now();
+        persistSidebarOrder(legacyOrder, lastSidebarOrderSavedAt);
+    }
+    return legacyOrder;
+}
+
+function persistSidebarOrder(order, updatedAt = Date.now()) {
+    openSidebarOrderDB().then(database => {
+        if (!database) return;
+        try {
+            const transaction = database.transaction('settings', 'readwrite');
+            transaction.objectStore('settings').put({
+                key: 'sidebar-game-order',
+                order: order.slice(),
+                updatedAt
+            });
+        } catch (error) {}
+    });
+}
+
+function saveSidebarOrderToStorage(localStorage, order) {
+    const updatedAt = Math.max(Date.now(), lastSidebarOrderSavedAt + 1);
+    lastSidebarOrderSavedAt = updatedAt;
+    const serialized = JSON.stringify(order);
+    try {
+        localStorage.setItem('sidebar-game-order', serialized);
+        localStorage.setItem('sidebar-game-order-updated-at', String(updatedAt));
+    } catch (error) {}
+    persistSidebarOrder(order, updatedAt);
+}
 
 function releaseIframe(frame) {
     if (!frame) return;
@@ -68,6 +176,7 @@ async function initDB() {
 async function loadGames() {
     const localStorage = window.nexusStorage || window.localStorage;
     await initDB();
+    const savedOrder = await readSavedSidebarOrder(localStorage);
     const tx = db.transaction("customGames", "readonly");
     const custom = await new Promise((resolve, reject) => {
         const metadata = [];
@@ -96,33 +205,28 @@ async function loadGames() {
     } catch { games = [...activeCustom]; }
 
     // Apply saved order
-    const savedOrder = localStorage.getItem('sidebar-game-order');
     if (savedOrder) {
-        try {
-            const orderIds = JSON.parse(savedOrder);
-            if (Array.isArray(orderIds)) {
-                const gameMap = new Map();
-                games.forEach(g => {
-                    const key = String(g.id);
-                    if (!gameMap.has(key)) gameMap.set(key, g);
-                });
-                const ordered = [];
-                // First place games in saved order
-                orderIds.forEach(rawId => {
-                    const id = String(rawId);
-                    if (gameMap.has(id)) {
-                        ordered.push(gameMap.get(id));
-                        gameMap.delete(id);
-                    }
-                });
-                // Append any new games not in the saved order
-                gameMap.forEach(g => ordered.push(g));
-                games = ordered;
+        const gameMap = new Map();
+        games.forEach(g => {
+            const key = String(g.id);
+            if (!gameMap.has(key)) gameMap.set(key, g);
+        });
+        const ordered = [];
+        const seen = new Set();
+        savedOrder.forEach(id => {
+            if (gameMap.has(id) && !seen.has(id)) {
+                ordered.push(gameMap.get(id));
+                seen.add(id);
+                gameMap.delete(id);
             }
-        } catch(e) { /* ignore bad data */ }
+        });
+        // Keep newly added games and deterministically append IDs absent from the saved order.
+        gameMap.forEach(g => ordered.push(g));
+        games = ordered;
     }
 
-    if (pinMasterStash()) saveGameOrder();
+    pinMasterStash();
+    saveGameOrder();
     renderGameList();
     openDefaultGame();
 
@@ -162,7 +266,7 @@ function saveGameOrder() {
     const localStorage = window.nexusStorage || window.localStorage;
     pinMasterStash();
     const orderIds = games.map(g => g.id.toString());
-    localStorage.setItem('sidebar-game-order', JSON.stringify(orderIds));
+    saveSidebarOrderToStorage(localStorage, orderIds);
 }
 
 /* =========================================
@@ -1635,6 +1739,15 @@ async function fetchExternalGameHtml(url, bootstrap = '', options = {}) {
             documentHtml = swShim + documentHtml;
         }
     }
+    if (options.disableRemotePokiSdk) {
+        // Nexus injects a local, non-networking Poki-compatible stub before
+        // game scripts. The export's remote SDK loader pulls a text/plain
+        // core script from jsDelivr, which browsers correctly refuse to run.
+        documentHtml = documentHtml.replace(
+            /<script\b(?=[^>]*\bsrc\s*=\s*["'][^"']*poki-sdk\.js(?:[?#][^"']*)?["'])[^>]*>\s*<\/script\s*>/gi,
+            ''
+        );
+    }
 
     return injectGameBootstrap(documentHtml, bootstrap);
 }
@@ -1782,7 +1895,7 @@ function launchGameFullscreen(game) {
                 const lsData = (snapshot && snapshot.localStorage && typeof snapshot.localStorage === 'object') ? snapshot.localStorage : snapshot;
                 const snapshotJson = JSON.stringify(lsData).replace(/</g, '\\u003c');
                 const popupBridge = getUniversalAutosaveBridge(game.id);
-                const popupRestore = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
+                const popupRestore = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0&&k!=='sidebar-game-order'&&k!=='sidebar-game-order-updated-at')localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
                 const autoFocusScript = `<script>
                 (function(){
                     function triggerClickFocus() {
@@ -1852,12 +1965,12 @@ function launchGameFullscreen(game) {
                     const snapshot = await getGameSnapshot(game.id);
                     const savedLocalStorage = snapshot && snapshot.localStorage ? snapshot.localStorage : {};
                     const snapshotJson = JSON.stringify(savedLocalStorage).replace(/</g, '\\u003c');
-                    const restoreScript = '<script>(function(){try{var s=' + snapshotJson + ';Object.keys(s).forEach(function(k){if(k.indexOf("tb_")!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>';
+                    const restoreScript = '<script>(function(){try{var s=' + snapshotJson + ';Object.keys(s).forEach(function(k){if(k.indexOf("tb_")!==0&&k!=="sidebar-game-order"&&k!=="sidebar-game-order-updated-at")localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>';
                     const popupBridge = getUniversalAutosaveBridge(game.id);
                     ifr.srcdoc = await fetchExternalGameHtml(
                         resolvedUrl,
                         restoreScript + popupBridge + titleEnforceScript,
-                        { disableServiceWorker: isTagC3Game(game) }
+                        { disableServiceWorker: isTagC3Game(game), disableRemotePokiSdk: isTagC3Game(game) }
                     );
                 } else {
                     ifr.src = resolvedUrl;
@@ -2748,7 +2861,7 @@ async function loadGame(game, forceInternal = false) {
             const unityCompatibility = isUnityRuntime
                 ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
                 : '';
-            const restoreScript = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
+            const restoreScript = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0&&k!=='sidebar-game-order'&&k!=='sidebar-game-order-updated-at')localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
             const autosaveBridge = getUniversalAutosaveBridge(game.id);
             const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
             const finalHTML = injectGameBootstrap(htmlContent, unityCompatibility + restoreScript + persistenceScript + autosaveBridge);
@@ -2771,13 +2884,13 @@ async function loadGame(game, forceInternal = false) {
 
                 const savedLocalStorage = snapshot && snapshot.localStorage ? snapshot.localStorage : {};
                 const snapshotJson = JSON.stringify(savedLocalStorage).replace(/</g, '\\u003c');
-                const restoreScript = '<script>(function(){try{var s=' + snapshotJson + ';Object.keys(s).forEach(function(k){if(k.indexOf("tb_")!==0)localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>';
+                const restoreScript = '<script>(function(){try{var s=' + snapshotJson + ';Object.keys(s).forEach(function(k){if(k.indexOf("tb_")!==0&&k!=="sidebar-game-order"&&k!=="sidebar-game-order-updated-at")localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>';
                 const persistenceScript = '<script>try{window.localStorage.setItem("p","1");}catch(e){}<\/script>';
                 const autosaveBridge = getUniversalAutosaveBridge(game.id);
                 const gameHtml = await fetchExternalGameHtml(
                     resolvedGameUrl,
                     restoreScript + persistenceScript + autosaveBridge,
-                    { disableServiceWorker: isTagC3Game(game) }
+                    { disableServiceWorker: isTagC3Game(game), disableRemotePokiSdk: isTagC3Game(game) }
                 );
                 if (requestedLoadToken !== gameLoadToken) return;
 
@@ -3759,7 +3872,7 @@ if (importBtn) {
                     const stashIndex = mergedOrder.indexOf('ugs-stash');
                     const insertAt = stashIndex >= 0 ? stashIndex + 1 : 0;
                     mergedOrder.splice(insertAt, 0, ...incomingOrder.filter(id => selectedRestoreIds.has(id)));
-                    localStorage.setItem('sidebar-game-order', JSON.stringify(mergedOrder));
+                    saveSidebarOrderToStorage(localStorage, mergedOrder);
                 }
                 if (Array.isArray(data.gameSnapshots)) {
                     const tx = db.transaction('gameSnapshots', 'readwrite');
