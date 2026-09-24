@@ -171,6 +171,17 @@
                 </label>
             </div>
 
+            <div class="setting-row">
+                <div class="setting-label-group">
+                    <span class="setting-label">Run Game Stash Games Locally</span>
+                    <span class="setting-hint">On: use the bundled file-based system. Off: use the legacy external game source. Applies to the next game you launch.</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-local-game-files">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
             <!-- Developer Mode / To Be Removed Section (Only visible when Dev Mode is ON) -->
             <div id="dev-mode-settings-section" style="display: none;">
                 <div class="setting-section-title" style="color: #ff5252; display: flex; align-items: center; gap: 8px;">
@@ -374,6 +385,15 @@
         const togglePerf = document.getElementById('toggle-performance-mode');
         const togglePerfLite = document.getElementById('toggle-performance-mode-lite');
         const storage = window.nexusStorage || window.localStorage;
+
+        // Local file-based Game Stash launching remains the default.
+        const toggleLocalGameFiles = document.getElementById('toggle-local-game-files');
+        if (toggleLocalGameFiles) {
+            toggleLocalGameFiles.checked = storage.getItem('tb_game_run_mode') !== 'external';
+            toggleLocalGameFiles.addEventListener('change', (e) => {
+                storage.setItem('tb_game_run_mode', e.target.checked ? 'local' : 'external');
+            });
+        }
 
         if (togglePerf) {
             togglePerf.checked = storage.getItem('tb_performance_mode') === 'true';

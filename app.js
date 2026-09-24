@@ -1612,7 +1612,30 @@ async function resolveGameUrl(game) {
     }
 }
 
+function applyGameRunMode(game) {
+    if (!game || !game.sourceFile) return game;
+
+    const storage = window.nexusStorage || window.localStorage;
+    if (storage.getItem('tb_game_run_mode') !== 'external') return game;
+
+    // Only Game Stash entries carry a sourceFile/sourceKey pair. Leave user-added
+    // URLs and local custom files on their existing launch paths.
+    if (!game.sourceKey && !String(game.id || '').startsWith('stash_')) return game;
+
+    const externalUrl = getVerifiedGameFallbackUrl(game);
+    if (!externalUrl) return game;
+    if (game.type === 'url' && game.url === externalUrl) return game;
+
+    return {
+        ...game,
+        type: 'url',
+        url: externalUrl,
+        content: undefined
+    };
+}
+
 function launchGameFullscreen(game) {
+    game = applyGameRunMode(game);
     if (!game || game.id === "ugs-stash") return;
 
     // Open about:blank synchronously on the user click gesture to avoid browser popup blocking
@@ -2494,6 +2517,8 @@ async function loadGame(game, forceInternal = false) {
         const li = document.querySelector(`li[data-game-id="${game.id}"]`);
         if (li) li.classList.remove('new-game');
     }
+
+    game = applyGameRunMode(game);
 
     const localStorage = window.nexusStorage || window.localStorage;
     const isPreloadEnabled = localStorage.getItem('tb_preload_stash') !== 'false';
