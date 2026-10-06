@@ -361,7 +361,8 @@
             { sourceFile: 'resent.html', externalUrl: 'resent.html', displayName: 'Resent Client', letter: 'R' },
             { sourceFile: 'slope.html', externalUrl: 'slope.html', displayName: 'Slope OG', letter: 'S' },
             { sourceFile: 'SpaceflightSimulator/sfs.html', externalUrl: 'SpaceflightSimulator/sfs.html', displayName: 'Spaceflight Simulator', letter: 'S' },
-            { sourceFile: 'survivalrace/index.html', externalUrl: 'survivalrace/index.html', displayName: 'Survival Race', letter: 'S' }
+            { sourceFile: 'survivalrace/index.html', externalUrl: 'survivalrace/index.html', displayName: 'Survival Race', letter: 'S' },
+            { sourceFile: 'vus.html', externalUrl: 'vus.html', displayName: 'Vus Unblocked Tools', letter: 'V', skipLoadingScreen: true, keepLocalUrl: true, preserveStashTitle: true }
         ];
 
         const sectionsContainer = document.getElementById('sections-container');
@@ -767,6 +768,9 @@
                     userRenamed: false,
                     type: 'url',
                     url: extraStashApp.externalUrl,
+                    preserveStashTitle: Boolean(extraStashApp.preserveStashTitle),
+                    nexusSkipLoadingScreen: Boolean(extraStashApp.skipLoadingScreen),
+                    nexusKeepLocalUrl: Boolean(extraStashApp.keepLocalUrl),
                     isNew: true
                 };
                 try {

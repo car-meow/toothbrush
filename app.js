@@ -1104,6 +1104,7 @@ function isUserManagedGame(game) {
 }
 
 function getSidebarTitle(game) {
+    if (game && game.preserveStashTitle) return game.title;
     if (game && game.sourceKey && !game.userRenamed && typeof humanizeBookmarkDisplayName === "function") {
         if (game.title && game.sourceFile && (game.sourceFile.includes('/') || game.sourceFile.endsWith('index.html') || game.sourceFile.endsWith('sfs.html'))) {
             return game.title;
@@ -1823,6 +1824,9 @@ async function resolveGameUrl(game) {
 
 function applyGameRunMode(game) {
     if (!game || !game.sourceFile) return game;
+    // Standalone Nexus pages registered as extra stash entries already have
+    // their own local URL and must not be rewritten to the UGS CDN.
+    if (game.nexusKeepLocalUrl) return game;
 
     const storage = window.nexusStorage || window.localStorage;
     if (storage.getItem('tb_game_run_mode') !== 'external') return game;
@@ -1959,7 +1963,7 @@ function launchGameFullscreen(game) {
                 win.document.body.style.margin = '0';
                 win.document.body.style.padding = '0';
                 win.document.body.style.overflow = 'hidden';
-                popupLoader = createNexusLoadingOverlay(win.document, getLoadingScreenBgUrl());
+                if (!game.nexusSkipLoadingScreen) popupLoader = createNexusLoadingOverlay(win.document, getLoadingScreenBgUrl());
                 const ifr = win.document.createElement('iframe');
                 Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
                 ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
@@ -1972,9 +1976,9 @@ function launchGameFullscreen(game) {
                 const ifr = win.document.createElement('iframe');
                 Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
                 ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
-                popupLoader = createNexusLoadingOverlay(win.document, getLoadingScreenBgUrl());
+                if (!game.nexusSkipLoadingScreen) popupLoader = createNexusLoadingOverlay(win.document, getLoadingScreenBgUrl());
                 ifr.onload = () => {
-                    popupLoader.complete();
+                    if (popupLoader) popupLoader.complete();
                     getGameSnapshot(game.id).then(snap => {
                         if (snap && ifr.contentWindow) {
                             try {
@@ -1989,7 +1993,7 @@ function launchGameFullscreen(game) {
                         }
                     });
                 };
-                ifr.onerror = () => popupLoader.complete();
+                ifr.onerror = () => { if (popupLoader) popupLoader.complete(); };
                 const resolved = await resolveGameUrl(game);
                 let resolvedUrl = resolved.url || game.url;
                 try {
@@ -2864,7 +2868,7 @@ async function loadGame(game, forceInternal = false) {
         frame.removeAttribute('sandbox'); // Allow full storage & WebAssembly capabilities
 
         updateGameStatusUI('loading');
-        beginHostLoader(document);
+        if (!game.nexusSkipLoadingScreen) beginHostLoader(document);
 
         frame.onload = () => {
             completeHostLoader();

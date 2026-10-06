@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VUS Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0e1a;--el:#111827;--card:rgba(17,24,39,.6);--hover:rgba(30,41,59,.7);--border:rgba(51,65,85,.5);--bh:rgba(74,222,128,.3);--fg:#f1f5f9;--mut:#94a3b8;--dim:#475569;--accent:#22c55e;--soft:rgba(34,197,94,.08);--r:14px;--font:'Space Grotesk',sans-serif;--mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(ellipse at 50% -10%,rgba(34,197,94,.12),transparent 60%) var(--bg);background-attachment:fixed;color:var(--fg);font-family:var(--font);min-height:100vh;overflow-x:hidden}
+.shell{max-width:1100px;margin:0 auto;padding:20px 20px 40px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 0 16px}
+.logo,.hr{display:flex;align-items:center;gap:12px}
+.hr{gap:10px}
+.mark{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#10b981);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;color:#000;overflow:hidden}
+.mark img{width:100%;height:100%;object-fit:cover;display:block}
+.sname{font-size:24px;font-weight:700;letter-spacing:-.5px}
+.clock{font:500 14px var(--mono);color:var(--dim);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 14px}
+.ibtn{height:32px;padding:0 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--mut);font:600 13px var(--font);cursor:pointer}
+.ibtn:hover{color:var(--fg);border-color:var(--bh)}
+.vus-message{display:flex;gap:12px;align-items:baseline;margin-bottom:16px;padding:12px 16px;background:var(--soft);border:1px solid rgba(34,197,94,.3);border-radius:12px;font-size:14px;line-height:1.5}
+.vus-message[hidden]{display:none}
+.vm-label{font:500 11px var(--mono);color:var(--accent);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.sticky{position:sticky;top:0;z-index:20;padding-top:8px;background:linear-gradient(var(--bg) 85%,transparent)}
+.search{width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;font:15px var(--font);color:var(--fg);outline:none;backdrop-filter:blur(12px);margin-bottom:14px}
+.search:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(34,197,94,.15)}
+.tabs{display:flex;gap:4px;padding:4px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:20px;backdrop-filter:blur(12px);position:relative}
+.tab{flex:1;padding:10px 12px;border-radius:9px;cursor:pointer;font:500 14px var(--font);color:var(--mut);background:transparent;border:none;position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:8px}
+.tab:hover{color:var(--fg)}.tab.active{color:#000}
+.ind{position:absolute;top:4px;bottom:4px;background:var(--accent);border-radius:9px;transition:left .35s cubic-bezier(.4,0,.2,1),width .35s cubic-bezier(.4,0,.2,1);z-index:0}
+.cnt{font-size:11px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:1px 7px}
+.tab.active .cnt{background:rgba(0,0,0,.2)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;min-height:200px}
+@media(max-width:768px){.grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.grid{grid-template-columns:1fr}.tab .cnt{display:none}}
+.home-frame{display:none;width:100%;height:calc(100vh - 300px);min-height:300px;border:none}
+.home-frame.on{display:block}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px 18px;cursor:pointer;backdrop-filter:blur(12px);transition:border-color .25s,background .25s,transform .25s;position:relative;opacity:0;animation:cardIn .4s ease forwards}
+.card:hover{border-color:var(--bh);background:var(--hover);transform:translateY(-3px)}
+@keyframes cardIn{to{opacity:1}}
+.ci{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:16px;font-weight:700;background:rgba(34,197,94,.12);color:#4ade80}
+.ci.blue{background:rgba(59,130,246,.12);color:#60a5fa}.ci.amber{background:rgba(245,158,11,.12);color:#fbbf24}.ci.rose{background:rgba(244,63,94,.12);color:#fb7185}.ci.violet{background:rgba(139,92,246,.12);color:#a78bfa}.ci.cyan{background:rgba(6,182,212,.12);color:#22d3ee}.ci.lime{background:rgba(132,204,22,.12);color:#a3e635}.ci.orange{background:rgba(249,115,22,.12);color:#fb923c}.ci.red{background:rgba(239,68,68,.12);color:#f87171}.ci.black{background:rgba(148,163,184,.12);color:#cbd5e1}.ci.white{background:rgba(241,245,249,.12);color:#f1f5f9}
+.ct{font-size:15px;font-weight:600;margin-bottom:6px;padding-right:26px}
+.cd{font-size:13px;color:var(--mut);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.src{margin-top:8px;font:500 11px var(--mono);color:var(--accent);text-transform:uppercase}
+.fav{position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:8px;border:none;background:transparent;color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.fav:hover{background:rgba(255,255,255,.06);color:#fbbf24}
+.fav svg{width:16px;height:16px}.fav.active{color:#fbbf24}.fav.active svg{fill:#fbbf24}
+body.compact .grid{grid-template-columns:repeat(4,1fr);gap:10px}
+body.compact .card{padding:12px}body.compact .cd{display:none}
+body.compact .ci{width:30px;height:30px;margin-bottom:8px;font-size:14px}
+@media(max-width:768px){body.compact .grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:480px){body.compact .grid{grid-template-columns:repeat(2,1fr)}}
+.skel{height:110px;border-radius:var(--r);border:1px solid var(--border);background:linear-gradient(90deg,var(--card) 25%,var(--hover) 50%,var(--card) 75%);background-size:200% 100%;animation:shim 1.4s linear infinite}
+@keyframes shim{to{background-position:-200% 0}}
+.empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--dim)}
+.empty b{display:block;font-size:15px;color:var(--mut);margin-bottom:6px}
+footer{margin-top:32px;padding-top:20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--dim)}
+footer a{color:var(--accent);text-decoration:none;font-weight:500;padding:8px 16px;border-radius:8px;background:var(--soft);border:1px solid rgba(34,197,94,.15)}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);z-index:150;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;padding:20px}
+.ov.open{opacity:1;pointer-events:auto}
+.modal{background:var(--el);border:1px solid var(--border);border-radius:16px;width:100%;max-width:640px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border)}
+.mh h2{font-size:20px}
+.x{width:32px;height:32px;border-radius:8px;background:var(--card);border:1px solid var(--border);color:var(--mut);cursor:pointer;font-size:18px}
+.mb{padding:16px 24px 24px;overflow-y:auto}
+.qa{padding:16px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;font-size:14px;line-height:1.6}
+.qa b{color:var(--accent);margin-right:8px;font-size:13px}.qa .a b{color:#60a5fa}.qa div+div{margin-top:10px}
+.sec{margin-bottom:22px}
+.lbl{font-size:13px;font-weight:600;display:block;margin-bottom:6px}
+.sub{font-size:12px;color:var(--dim);margin-bottom:10px}
+.inp{width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font:14px var(--font);color:var(--fg);outline:none}
+.inp:focus{border-color:var(--accent)}
+.og{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.opt,.btn{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font:500 13px var(--font);color:var(--mut);cursor:pointer}
+.opt:hover,.btn:hover{color:var(--fg);border-color:var(--bh)}
+.opt.active{border-color:var(--accent);background:var(--soft);color:var(--fg)}
+.btn{font-weight:600;padding:10px 20px}
+.btn.pri{background:linear-gradient(135deg,var(--accent),#10b981);border:none;color:#000}
+.btn.arm{background:rgba(239,68,68,.12);border-color:#ef4444;color:#fca5a5}
+.foot{display:flex;justify-content:flex-end;gap:10px;padding-top:18px;border-top:1px solid var(--border)}
+.toasts{position:fixed;top:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:var(--el);border:1px solid rgba(34,197,94,.4);border-radius:10px;padding:12px 18px;font-size:14px;max-width:360px}
+.toast.err{border-color:rgba(239,68,68,.4)}.toast.load{border-color:rgba(59,130,246,.4)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.search:focus-visible{outline:none}
+/* Low-motion mode: removes motion, blur and shadows */
+body.rm *,body.rm *::before,body.rm *::after{animation:none!important;transition:none!important;backdrop-filter:none!important;box-shadow:none!important}
+body.rm .card{opacity:1;transform:none}
+body.rm .card,body.rm .tabs,body.rm .search,body.rm .clock,body.rm .ibtn{background:var(--el)}
+</style>
+</head>
+<body>
+<div class="toasts" id="toasts"></div>
+
+<div class="ov" id="qaOv"><div class="modal"><div class="mh"><h2>Q / A</h2><button class="x" id="qaX" aria-label="Close Q/A panel">&times;</button></div><div class="mb" id="qaBody"></div></div></div>
+
+<div class="ov" id="setOv"><div class="modal"><div class="mh"><h2>Settings</h2><button class="x" id="setX" aria-label="Close Settings panel">&times;</button></div><div class="mb">
+  <div class="sec"><label class="lbl" for="sName">Site Name</label><input class="inp" id="sName" maxlength="40" autocomplete="off"></div>
+  <div class="sec"><label class="lbl">Default Tab</label><div class="og" id="sTab"></div></div>
+  <div class="sec"><label class="lbl">Background</label><div class="og" id="sBg"></div><div id="sColorWrap" style="margin-top:10px" hidden><input class="inp" id="sColor" type="color" style="height:44px;padding:4px"></div></div>
+  <div class="sec"><label class="lbl">Animations</label><div class="sub">Off removes motion, blur and shadows for smoother performance.</div><div class="og" id="sAnim"></div></div>
+  <div class="sec"><label class="lbl">Card Size</label><div class="sub">Compact hides descriptions and shrinks cards.</div><div class="og" id="sSize"></div></div>
+  <div class="sec"><button class="btn" id="devBtn" style="width:100%">📊 Dev Info</button></div>
+  <div class="foot"><button class="btn" id="sReset">Reset to Defaults</button><button class="btn pri" id="sSave">Save Changes</button></div>
+  <div class="sec" style="margin-top:20px"><label class="lbl" style="color:#f87171">Danger Zone</label><div class="sub">Erases Favorites, Recently Used, Settings and any data apps saved in this browser. Cannot be undone.</div><button class="btn" id="clearBtn" style="width:100%;border-color:#7f1d1d;color:#f87171">🗑️ Clear All Data</button></div>
+</div></div></div>
+
+<div class="shell">
+  <header>
+    <div class="logo">
+      <div class="mark"><img src="https://github.com/Cra-Z-Gaming/VUS/raw/refs/heads/main/logo" alt="VUS Hub logo" onerror="this.style.display='none';this.parentElement.textContent='V'"></div>
+      <span class="sname" id="siteName">VUS Hub</span>
+    </div>
+    <div class="hr">
+      <button class="ibtn" id="qaBtn" aria-label="Open Q/A panel">Q/A</button>
+      <button class="ibtn" id="settingsBtn" aria-label="Open Settings panel">⚙ Settings</button>
+      <div class="clock" id="clock"></div>
+    </div>
+  </header>
+
+  <div class="vus-message" id="vusMessage" hidden><span class="vm-label">VUS Message</span><span class="vm-text"></span></div>
+
+  <div class="sticky">
+    <input class="search" id="searchInput" type="text" placeholder="Search apps and tools..." autocomplete="off" aria-label="Search">
+    <nav class="tabs" id="tabs" role="tablist"><div class="ind" id="ind"></div></nav>
+  </div>
+
+  <main class="grid" id="grid"></main>
+  <iframe class="home-frame" id="homeFrame" title="Home"></iframe>
+
+  <footer>
+    <span>VUS Hub <span id="footerVersion"></span></span>
+    <a href="https://docs.google.com/forms/d/e/1FAIpQLSfO_dcIdueYBKYRj11jthkGrWO22ZLg3kQGr8dXYvrXne_wUA/viewform" target="_blank" rel="noopener">Rate / Suggest ↗</a>
+  </footer>
+</div>
+
+<script>
+const BASE = "https://raw.githubusercontent.com/Cra-Z-Gaming/VUS/refs/heads/main/";
+const HUB_URL = BASE + "index.html";   // confirm this is your hub's filename
+const APPS_URL = BASE + "apps.json", HOME_URL = BASE + "home.html", ANALYTICS_URL = BASE + "analytics.html";
+const REFRESH_GAP_MS = 5 * 60 * 1000;
+const FAV_KEY = "vus_favorites", RECENT_KEY = "vus_recent_apps", SKEY = "vus_settings", CACHE_KEY = "vus_apps_cache";
+const tabLabels = { home: "Home", apps: "Apps", hubs: "Hubs", tools: "Tools", links: "Links" };
+
+const $ = id => document.getElementById(id);
+const esc = s => (s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const bust = u => u + (u.includes("?") ? "&" : "?") + "v=" + Date.now();
+
+let apps = null, qaEntries = [], currentTab = "home", searchQuery = "";
+let appsLoaded = false, appsReady = false, loadedVersion = "", lastCheck = Date.now();
+const tabButtons = [];
+const searchInput = $("searchInput");
+
+function toast(msg, type) {
+  const t = document.createElement("div");
+  t.className = "toast " + (type || "ok");
+  t.textContent = msg;
+  $("toasts").appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+// ---------- Clock (minutes only) ----------
+function updateClock() { $("clock").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
+updateClock();
+const clockTimer = setInterval(updateClock, 15000);
+
+// ---------- Settings ----------
+const DEF = {
+  siteName: "VUS Hub", defaultTab: "home", backgroundMode: "default", backgroundColor: "#0a0e1a", compactView: false,
+  animationsEnabled: !(matchMedia("(prefers-reduced-motion: reduce)").matches ||
+    (navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2))
+};
+function loadSettings() { try { return { ...DEF, ...JSON.parse(localStorage.getItem(SKEY) || "{}") }; } catch (e) { return { ...DEF }; } }
+let cur = loadSettings(), draft = { ...cur };
+
+function applySettings(s) {
+  $("siteName").textContent = s.siteName || DEF.siteName;
+  document.title = s.siteName || DEF.siteName;
+  document.body.style.background = s.backgroundMode === "block" ? s.backgroundColor : "";
+  const rm = s.animationsEnabled === false;
+  document.body.classList.toggle("rm", rm);
+  document.body.classList.toggle("compact", s.compactView === true);
+  try { $("homeFrame").contentDocument.body.classList.toggle("rm", rm); } catch (e) {}
+}
+
+// ---------- Resume state (after an in-place refresh) ----------
+let resume = null;
+try { resume = JSON.parse(sessionStorage.getItem("vus_resume") || "null"); sessionStorage.removeItem("vus_resume"); } catch (e) {}
+currentTab = (resume && resume.tab) || cur.defaultTab || "home";
+applySettings(cur);
+
+// ---------- Favorites / Recent ----------
+const getFavs = () => { try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); } catch (e) { return []; } };
+const isFav = a => getFavs().some(f => f.name === a.name);
+function toggleFav(app) {
+  let exists = false;
+  try {
+    let favs = getFavs();
+    exists = favs.some(f => f.name === app.name);
+    favs = exists ? favs.filter(f => f.name !== app.name) : [...favs, { name: app.name, url: app.url || "", icon: app.icon || "", color: app.color || "" }];
+    localStorage.setItem(FAV_KEY, JSON.stringify(favs));
+    return !exists;
+  } catch (e) { toast("Couldn't save favorite. Storage full or unavailable", "err"); return exists; }
+}
+function trackRecent(app) {
+  try {
+    let r = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]").filter(x => x.name !== app.name);
+    r.unshift({ name: app.name, url: app.url || "", icon: app.icon || "", color: app.color || "", ts: Date.now() });
+    localStorage.setItem(RECENT_KEY, JSON.stringify(r.slice(0, 8)));
+  } catch (e) {}
+}
+
+// ---------- apps.json is the only source of truth ----------
+function findLatest(name) {
+  if (!apps) return null;
+  for (const k of Object.keys(apps)) { const hit = apps[k].find(a => a.name === name && a.url && a.url.trim()); if (hit) return hit; }
+  return null;
+}
+function syncList(key) {
+  if (!appsLoaded) return; // only prune off fresh network data, never cached
+  try {
+    const fresh = [];
+    JSON.parse(localStorage.getItem(key) || "[]").forEach(i => {
+      const l = findLatest(i.name);
+      if (l) fresh.push({ ...i, url: l.url, icon: l.icon || "", color: l.color || "" });
+    });
+    localStorage.setItem(key, JSON.stringify(fresh));
+  } catch (e) {}
+}
+const syncAll = () => { syncList(FAV_KEY); syncList(RECENT_KEY); };
+
+function openApp(requested) {
+  if (!requested || !requested.name) return;
+  if (!appsReady) { toast("App list not loaded. Refresh the page.", "err"); return; }
+  const app = findLatest(requested.name);
+  if (!app) { syncAll(); toast(requested.name + " is no longer available", "err"); return; }
+  trackRecent(app);
+  if (window.VUSAnalytics && typeof window.VUSAnalytics.trackAppClick === "function") window.VUSAnalytics.trackAppClick(app.name);
+  if (!app.url.includes("raw.githubusercontent.com")) { window.open(app.url, "_blank", "noopener"); return; }
+  const win = window.open("about:blank", "_blank"); // open first to keep the click gesture
+  if (!win) { toast("Popup blocked. Allow popups for this site", "err"); return; }
+  toast("Loading " + app.name + "...", "load");
+  fetch(bust(app.url), { cache: "no-store" })
+    .then(r => { if (!r.ok) throw 0; return r.text(); })
+    .then(t => { win.document.open(); win.document.write(t); win.document.close(); toast(app.name + " opened successfully"); })
+    .catch(() => { win.close(); toast("Failed to load " + app.name, "err"); });
+}
+
+// ---------- Message / version / data ----------
+function showMessage(text) {
+  const el = $("vusMessage"); text = (text || "").trim();
+  if (!text) { el.hidden = true; return; }
+  el.querySelector(".vm-text").textContent = text; el.hidden = false;
+}
+function setAppsData(d) {
+  apps = { home: [], apps: d.apps || [], hubs: d.hubs || [], tools: d.tools || [], links: d.links || [] };
+  qaEntries = d.qa || [];
+  loadedVersion = d.updated || "";
+  $("footerVersion").textContent = d.updated ? "· Updated " + d.updated : "";
+  showMessage(d.message);
+  appsReady = true;
+}
+function loadApps() {
+  return fetch(bust(APPS_URL), { cache: "no-store" })
+    .then(r => { if (!r.ok) throw 0; return r.json(); })
+    .then(d => { setAppsData(d); appsLoaded = true; try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch (e) {} })
+    .catch(() => {
+      try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); if (c) { setAppsData(c); toast("Offline: showing your last saved app list", "err"); return; } } catch (e) {}
+      toast("Failed to load app list", "err"); setAppsData({}); appsReady = false;
+    });
+}
+
+// ---------- Auto-refresh (same tab, never a reload) ----------
+function swapHub(html) {
+  clearInterval(clockTimer);
+  const own = window.frameElement;
+  if (own && own.dataset.vusShell) { own.srcdoc = html; return; }
+  document.body.innerHTML = "";
+  const f = document.createElement("iframe");
+  f.dataset.vusShell = "1";
+  f.style.cssText = "position:fixed;inset:0;width:100%;height:100%;border:0";
+  f.srcdoc = html;
+  document.body.appendChild(f);
+}
+const fetchAndSwap = () => fetch(bust(HUB_URL), { cache: "no-store" }).then(r => { if (!r.ok) throw 0; return r.text(); }).then(swapHub).catch(() => {});
+function reloadHubInPlace() {
+  try { sessionStorage.setItem("vus_resume", JSON.stringify({ tab: currentTab, q: searchInput.value, y: window.scrollY })); } catch (e) {}
+  fetchAndSwap();
+}
+function refreshHub() {
+  lastCheck = Date.now();
+  if ($("setOv").classList.contains("open")) return;
+  fetch(bust(APPS_URL), { cache: "no-store" }).then(r => { if (!r.ok) throw 0; return r.json(); }).then(d => {
+    if (loadedVersion && d.updated && d.updated !== loadedVersion) { reloadHubInPlace(); return; }
+    setAppsData(d); appsLoaded = true;
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch (e) {}
+    syncAll(); render();
+  }).catch(() => {});
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && Date.now() - lastCheck > REFRESH_GAP_MS) refreshHub();
+});
+
+// ---------- Tabs ----------
+function buildTabs() {
+  Object.keys(apps).forEach(key => {
+    const b = document.createElement("button");
+    b.className = "tab" + (key === currentTab ? " active" : "");
+    b.setAttribute("role", "tab");
+    const n = key === "home" ? "" : '<span class="cnt">' + apps[key].filter(a => a.name && a.name.trim()).length + "</span>";
+    b.innerHTML = tabLabels[key] + n;
+    b.onclick = () => switchTab(key);
+    $("tabs").appendChild(b); tabButtons.push({ key, el: b });
+  });
+}
+function switchTab(key) {
+  currentTab = key;
+  tabButtons.forEach(t => t.el.classList.toggle("active", t.key === key));
+  updateIndicator(); render();
+}
+function updateIndicator() {
+  const a = tabButtons.find(t => t.key === currentTab); if (!a) return;
+  $("ind").style.left = (a.el.getBoundingClientRect().left - $("tabs").getBoundingClientRect().left) + "px";
+  $("ind").style.width = a.el.getBoundingClientRect().width + "px";
+}
+addEventListener("resize", updateIndicator);
+
+// ---------- Home iframe ----------
+let homeLoaded = false, homeLoading = false;
+function loadHome() {
+  if (homeLoaded || homeLoading) return;
+  homeLoading = true;
+  fetch(bust(HOME_URL), { cache: "no-store" }).then(r => { if (!r.ok) throw 0; return r.text(); })
+    .then(h => { $("homeFrame").srcdoc = h; homeLoaded = true; })
+    .catch(() => toast("Failed to load Home dashboard", "err"))
+    .finally(() => { homeLoading = false; });
+}
+
+// ---------- Render ----------
+const valid = a => a.url && a.url.trim();
+const match = a => !searchQuery || a.name.toLowerCase().includes(searchQuery);
+function render() {
+  if (!apps) return;
+  const grid = $("grid"), hf = $("homeFrame");
+  searchInput.placeholder = currentTab === "home" ? "Search all apps..." : "Search apps and tools...";
+  if (currentTab === "home" && !searchQuery) { grid.style.display = "none"; hf.classList.add("on"); loadHome(); return; }
+  hf.classList.remove("on"); grid.style.display = "";
+  let items = [], fromSearch = false;
+  if (currentTab === "home") {
+    fromSearch = true;
+    Object.keys(apps).filter(k => k !== "home").forEach(k => apps[k].filter(valid).filter(match).forEach(a => items.push({ ...a, _tab: k })));
+  } else {
+    items = apps[currentTab].filter(valid).filter(match);
+    const fav = new Set(getFavs().map(f => f.name)); // favorites first
+    items = [...items.filter(a => fav.has(a.name)), ...items.filter(a => !fav.has(a.name))];
+  }
+  renderCards(grid, items, fromSearch);
+}
+function renderCards(grid, items, fromSearch) {
+  grid.innerHTML = "";
+  if (!items.length) {
+    grid.innerHTML = '<div class="empty"><b>' + (searchQuery ? "No results found" : "Nothing here yet") + "</b>" + (searchQuery ? "Try a different search term" : "Check back later for updates") + "</div>";
+    return;
+  }
+  items.forEach((app, i) => {
+    const c = document.createElement("article");
+    c.className = "card"; c.style.animationDelay = (i * 0.05) + "s";
+    c.tabIndex = 0; c.setAttribute("role", "button"); c.setAttribute("aria-label", "Open " + app.name);
+    const f = isFav(app);
+    c.innerHTML = '<div class="ci ' + esc(app.color || "") + '">' + esc(app.icon || app.name.substring(0, 2).toUpperCase()) + "</div>" +
+      '<button type="button" class="fav' + (f ? " active" : "") + '" aria-label="' + (f ? "Remove from favorites" : "Add to favorites") + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button>' +
+      '<div class="ct">' + esc(app.name) + '</div><div class="cd">' + esc(app.desc) + "</div>" +
+      (app._tab ? '<div class="src">' + tabLabels[app._tab] + "</div>" : "");
+    const go = () => { if (fromSearch && app._tab) { searchInput.value = ""; searchQuery = ""; switchTab(app._tab); } openApp(app); };
+    const fb = c.querySelector(".fav");
+    fb.onclick = e => { e.stopPropagation(); const on = toggleFav(app); fb.classList.toggle("active", on); fb.setAttribute("aria-label", on ? "Remove from favorites" : "Add to favorites"); };
+    c.onclick = go;
+    c.onkeydown = e => { if (e.target === c && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); go(); } };
+    grid.appendChild(c);
+  });
+}
+searchInput.addEventListener("input", e => { searchQuery = e.target.value.toLowerCase().trim(); render(); });
+
+// ---------- Q/A ----------
+function openQA() {
+  const rows = qaEntries.filter(i => (i.q && i.q.trim()) || (i.a && i.a.trim()));
+  $("qaBody").innerHTML = rows.length ? rows.map(i => '<div class="qa"><div><b>Q:</b>' + esc(i.q) + '</div><div class="a"><b>A:</b>' + esc(i.a) + "</div></div>").join("")
+    : '<div class="empty">Nothing here yet.</div>';
+  $("qaOv").classList.add("open"); $("qaX").focus();
+}
+const closeQA = () => { $("qaOv").classList.remove("open"); $("qaBtn").focus(); };
+$("qaBtn").onclick = openQA; $("qaX").onclick = closeQA;
+
+// ---------- Settings modal ----------
+function group(wrap, opts, get, set) {
+  wrap.innerHTML = "";
+  const paint = () => [...wrap.children].forEach(b => b.classList.toggle("active", b._v === get()));
+  opts.forEach(([v, l]) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "opt"; b.textContent = l; b._v = v;
+    b.onclick = () => { set(v); paint(); };
+    wrap.appendChild(b);
+  });
+  paint();
+}
+function buildSettingsUI() {
+  $("sName").value = draft.siteName; $("sColor").value = draft.backgroundColor;
+  $("sColorWrap").hidden = draft.backgroundMode !== "block";
+  group($("sTab"), Object.entries(tabLabels), () => draft.defaultTab, v => draft.defaultTab = v);
+  group($("sBg"), [["default", "Default"], ["block", "Solid Color"]], () => draft.backgroundMode, v => { draft.backgroundMode = v; $("sColorWrap").hidden = v !== "block"; });
+  group($("sAnim"), [[true, "On"], [false, "Off"]], () => draft.animationsEnabled !== false, v => draft.animationsEnabled = v);
+  group($("sSize"), [[false, "Normal"], [true, "Compact"]], () => draft.compactView === true, v => draft.compactView = v);
+}
+function openSettings() { draft = { ...cur }; buildSettingsUI(); $("setOv").classList.add("open"); $("setX").focus(); }
+function closeSettings() { disarmClear(); $("setOv").classList.remove("open"); $("settingsBtn").focus(); }
+$("settingsBtn").onclick = openSettings; $("setX").onclick = closeSettings;
+$("sColor").addEventListener("input", e => draft.backgroundColor = e.target.value);
+$("sReset").onclick = () => { draft = { ...DEF }; buildSettingsUI(); };
+$("sSave").onclick = () => {
+  draft.siteName = $("sName").value.trim() || DEF.siteName;
+  try { localStorage.setItem(SKEY, JSON.stringify(draft)); } catch (e) { toast("Failed to save settings", "err"); return; }
+  cur = { ...draft }; applySettings(cur); toast("Settings saved"); closeSettings();
+};
+
+// Dev info
+$("devBtn").onclick = () => {
+  const win = window.open("about:blank", "_blank");
+  if (!win) { toast("Popup blocked. Allow popups for this site", "err"); return; }
+  toast("Loading analytics...", "load");
+  fetch(bust(ANALYTICS_URL), { cache: "no-store" }).then(r => { if (!r.ok) throw 0; return r.text(); })
+    .then(t => { win.document.open(); win.document.write(t); win.document.close(); })
+    .catch(() => { win.close(); toast("Failed to load analytics", "err"); });
+};
+
+// Clear all data (two-click confirm)
+let clearArmed = false, clearTimer = null;
+function disarmClear() { clearArmed = false; $("clearBtn").classList.remove("arm"); $("clearBtn").textContent = "🗑️ Clear All Data"; clearTimeout(clearTimer); }
+$("clearBtn").onclick = () => {
+  if (!clearArmed) { clearArmed = true; $("clearBtn").classList.add("arm"); $("clearBtn").textContent = "⚠️ Click again to confirm"; clearTimer = setTimeout(disarmClear, 4000); return; }
+  disarmClear();
+  try { localStorage.clear(); } catch (e) { toast("Failed to clear data", "err"); return; }
+  try { sessionStorage.clear(); } catch (e) {}
+  const jobs = [];
+  if (indexedDB && indexedDB.databases) jobs.push(indexedDB.databases().then(dbs => Promise.all(dbs.map(d => new Promise(r => { const q = indexedDB.deleteDatabase(d.name); q.onsuccess = q.onerror = q.onblocked = r; })))).catch(() => {}));
+  if (window.caches) jobs.push(caches.keys().then(n => Promise.all(n.map(k => caches.delete(k)))).catch(() => {}));
+  toast("All data cleared. Restarting...");
+  Promise.all(jobs).finally(() => setTimeout(fetchAndSwap, 900)); // fresh start, same tab
+};
+
+// ---------- Keyboard ----------
+document.addEventListener("keydown", e => {
+  const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+  if (e.key === "/" && !typing) { e.preventDefault(); searchInput.focus(); }
+  if (e.key === "Escape") {
+    if ($("setOv").classList.contains("open")) closeSettings();
+    else if ($("qaOv").classList.contains("open")) closeQA();
+    else if (document.activeElement === searchInput) { searchInput.blur(); searchInput.value = ""; searchQuery = ""; render(); }
+  }
+  if (e.key === "Tab") { // keep focus inside an open modal
+    const m = document.querySelector(".ov.open .modal"); if (!m) return;
+    const f = [...m.querySelectorAll("button, input, a[href]")].filter(x => x.offsetParent !== null);
+    if (!f.length) return;
+    if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+  }
+});
+
+// ---------- Start ----------
+$("grid").innerHTML = '<div class="skel"></div>'.repeat(6);
+loadApps().then(() => {
+  syncAll();
+  buildTabs();
+  requestAnimationFrame(updateIndicator);
+  if (resume && resume.q) { searchInput.value = resume.q; searchQuery = resume.q.toLowerCase().trim(); }
+  render();
+  if (resume) scrollTo(0, resume.y || 0);
+});
+
+// Firebase presence/analytics (Blob module, since raw GitHub serves text/plain)
+fetch(bust(BASE + "firebase.js"), { cache: "no-store" }).then(r => { if (!r.ok) throw 0; return r.text(); })
+  .then(code => { const s = document.createElement("script"); s.type = "module"; s.src = URL.createObjectURL(new Blob([code], { type: "application/javascript" })); document.body.appendChild(s); })
+  .catch(() => console.warn("VUS Hub: presence tracking unavailable."));
+</script>
+</body>
+</html>
