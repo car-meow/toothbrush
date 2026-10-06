@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexus-cache-v20';
+const CACHE_NAME = 'nexus-cache-v21';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -57,7 +57,6 @@ const ASSETS_TO_CACHE = [
     './Assets/nexus-ai.svg',
     './Assets/nexus-chat.svg',
     './Assets/nexus-drag.svg',
-    './Assets/drag.svg',
     './Assets/nexus-game.svg',
     './Assets/nexus-media.svg',
     './Assets/nexus-proxy.svg',

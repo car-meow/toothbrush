@@ -1691,6 +1691,13 @@ function isTagC3Game(game) {
     return fileName === 'cltagc3.html' || fileName.endsWith('/cltagc3.html') || gameId.includes('cltagc3');
 }
 
+function isCrossyRoadGame(game) {
+    const sourceFile = String(game && (game.sourceFile || game.url) || '').replace(/\\/g, '/').toLowerCase();
+    const fileName = sourceFile.split(/[?#]/, 1)[0];
+    const gameId = String(game && game.id || '').toLowerCase();
+    return fileName === 'clcrossyroad.html' || fileName.endsWith('/clcrossyroad.html') || gameId.includes('crossyroad');
+}
+
 async function fetchExternalGameHtml(url, bootstrap = '', options = {}) {
     const requestUrl = new URL(url, window.location.href);
     requestUrl.searchParams.set('t', String(Date.now()));
@@ -1747,6 +1754,35 @@ async function fetchExternalGameHtml(url, bootstrap = '', options = {}) {
             /<script\b(?=[^>]*\bsrc\s*=\s*["'][^"']*poki-sdk\.js(?:[?#][^"']*)?["'])[^>]*>\s*<\/script\s*>/gi,
             ''
         );
+    }
+    if (options.adaptYouTubePlayable) {
+        // The YouTube Playables SDK expects a YouTube host frame and origin.
+        // This game only needs a small subset of its API to run outside YouTube.
+        documentHtml = documentHtml.replace(
+            /<script\b(?=[^>]*\bsrc\s*=\s*["'][^"']*ytgame\.js(?:[?#][^"']*)?["'])[^>]*>\s*<\/script\s*>/gi,
+            ''
+        );
+        // bootstrap.min.js loads this itself; the source HTML's copy causes a
+        // duplicate top-level isYouTubeAudioEnabled declaration.
+        documentHtml = documentHtml.replace(
+            /<script\b(?=[^>]*\bsrc\s*=\s*["'][^"']*game\.min\.js(?:[?#][^"']*)?["'])[^>]*>\s*<\/script\s*>/gi,
+            ''
+        );
+        const sdkShim = [
+            '<script>',
+            'window.ytgame = {',
+            'IN_PLAYABLES_ENV: false,',
+            'game: { firstFrameReady: function() {}, gameReady: function() {}, loadData: function() { return Promise.resolve(null); }, saveData: function() { return Promise.resolve(); } },',
+            'system: { isAudioEnabled: function() { return true; }, onAudioEnabledChange: function(callback) { if (typeof callback === "function") callback(true); return function() {}; } },',
+            'engagement: { sendScore: function() { return Promise.resolve(); } }',
+            '};',
+            '</script>'
+        ].join('');
+        if (/<head(?:\s[^>]*)?>/i.test(documentHtml)) {
+            documentHtml = documentHtml.replace(/<head(?:\s[^>]*)?>/i, head => head + sdkShim);
+        } else {
+            documentHtml = sdkShim + documentHtml;
+        }
     }
 
     return injectGameBootstrap(documentHtml, bootstrap);
@@ -1961,7 +1997,7 @@ function launchGameFullscreen(game) {
                 } catch (e) {}
                 if (resolved.usedFallback) resolvedUrl = resolved.url;
                 if (resolved.usedFallback) game = { ...game, nexusExternalSource: true };
-                if (game.nexusExternalSource || isTagC3Game(game)) {
+                if (game.nexusExternalSource || isTagC3Game(game) || isCrossyRoadGame(game)) {
                     const snapshot = await getGameSnapshot(game.id);
                     const savedLocalStorage = snapshot && snapshot.localStorage ? snapshot.localStorage : {};
                     const snapshotJson = JSON.stringify(savedLocalStorage).replace(/</g, '\\u003c');
@@ -1970,7 +2006,11 @@ function launchGameFullscreen(game) {
                     ifr.srcdoc = await fetchExternalGameHtml(
                         resolvedUrl,
                         restoreScript + popupBridge + titleEnforceScript,
-                        { disableServiceWorker: isTagC3Game(game), disableRemotePokiSdk: isTagC3Game(game) }
+                        {
+                            disableServiceWorker: isTagC3Game(game),
+                            disableRemotePokiSdk: isTagC3Game(game),
+                            adaptYouTubePlayable: isCrossyRoadGame(game)
+                        }
                     );
                 } else {
                     ifr.src = resolvedUrl;
@@ -2877,7 +2917,7 @@ async function loadGame(game, forceInternal = false) {
                     frame.src = game.content; 
                 }
             }
-        } else if (game.nexusExternalSource || isTagC3Game(game)) {
+        } else if (game.nexusExternalSource || isTagC3Game(game) || isCrossyRoadGame(game)) {
             try {
                 const snapshot = await getGameSnapshot(game.id);
                 if (requestedLoadToken !== gameLoadToken) return;
@@ -2890,7 +2930,11 @@ async function loadGame(game, forceInternal = false) {
                 const gameHtml = await fetchExternalGameHtml(
                     resolvedGameUrl,
                     restoreScript + persistenceScript + autosaveBridge,
-                    { disableServiceWorker: isTagC3Game(game), disableRemotePokiSdk: isTagC3Game(game) }
+                    {
+                        disableServiceWorker: isTagC3Game(game),
+                        disableRemotePokiSdk: isTagC3Game(game),
+                        adaptYouTubePlayable: isCrossyRoadGame(game)
+                    }
                 );
                 if (requestedLoadToken !== gameLoadToken) return;
 
