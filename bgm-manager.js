@@ -110,8 +110,21 @@ if ('serviceWorker' in navigator) {
     if (origLink) {
         originalFavicon = origLink.getAttribute('href');
     }
+    let temporaryGameCloak = false;
+
+    function removeFaviconLinks() {
+        document.querySelectorAll('link[rel]').forEach(link => {
+            const relTokens = (link.getAttribute('rel') || '').toLowerCase().split(/\s+/);
+            if (relTokens.includes('icon')) link.remove();
+        });
+    }
 
     function applyTabCloak() {
+        if (temporaryGameCloak) {
+            document.title = 'New Tab';
+            removeFaviconLinks();
+            return;
+        }
         const rawPreset = localStorage.getItem('tb_cloak_preset');
         const preset = (rawPreset === null || rawPreset === undefined || rawPreset === '' || rawPreset === 'default') ? 'canvas' : rawPreset;
 
@@ -141,6 +154,10 @@ if ('serviceWorker' in navigator) {
         const data = presets[preset] || presets.canvas;
 
         document.title = data.title;
+        if (preset === 'none' || preset === 'newtab') {
+            removeFaviconLinks();
+            return;
+        }
         let link = document.querySelector("link[rel*='icon']");
         if (!link) {
             link = document.createElement('link');
@@ -165,6 +182,10 @@ if ('serviceWorker' in navigator) {
     });
 
     window.applyTabCloak = applyTabCloak;
+    window.setTemporaryGameCloak = active => {
+        temporaryGameCloak = !!active;
+        applyTabCloak();
+    };
 })();
 
 // BGM Mock Interface for backward compatibility
