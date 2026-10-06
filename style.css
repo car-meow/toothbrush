@@ -1834,6 +1834,131 @@ html.light-mode .red-dialog-cancel-btn:hover {
     border-color: #140d24 !important;
 }
 
+#nexus-red-confirm-overlay .red-dialog-cancel-btn.green-game-cancel-btn {
+    background: #2e7d32 !important;
+    border: 2px solid #66bb6a !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(46, 125, 50, 0.4) !important;
+}
+
+#nexus-red-confirm-overlay .red-dialog-cancel-btn.green-game-cancel-btn:hover {
+    background: #388e3c !important;
+    border-color: #81c784 !important;
+}
+
+html.light-mode #nexus-red-confirm-overlay .red-dialog-cancel-btn.green-game-cancel-btn {
+    background: #2e7d32 !important;
+    border-color: #1b5e20 !important;
+    color: #ffffff !important;
+}
+
+/* Active-game state in the main Nexus tab. */
+.active-game-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+}
+
+.active-game-screen::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: #05030a url("Assets/loading_stash.png") center center / cover no-repeat;
+    opacity: 1;
+    transition: opacity 380ms ease;
+}
+
+.active-game-screen.is-visible {
+    opacity: 1;
+}
+
+.active-game-screen.is-exiting::before {
+    opacity: 0;
+}
+
+.active-game-card {
+    position: absolute;
+    left: 50%;
+    bottom: 25%;
+    width: min(620px, calc(100% - 48px));
+    min-height: 82px;
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2.5px solid #362854;
+    border-radius: 10px;
+    background: var(--zigzag-line);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    transform: translate(-50%, 0) scale(1);
+    opacity: 1;
+    transition: opacity 380ms ease, transform 380ms cubic-bezier(.22,.7,.2,1);
+}
+
+.active-game-screen.is-exiting .active-game-card {
+    transform: translate(calc(-50% - 32vw), 18px) scale(.55);
+    opacity: 0;
+}
+
+.active-game-label {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-align: center;
+    text-overflow: clip;
+    font-size: 18px;
+    line-height: 1.25;
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0,0,0,.7);
+}
+
+.active-game-caption {
+    position: absolute;
+    left: 50%;
+    bottom: clamp(16px, calc(25% - 44px), 180px);
+    width: calc(100% - 24px);
+    transform: translateX(-50%);
+    color: #ffffff;
+    text-align: center;
+    font-size: clamp(12px, 2.4vw, 16px);
+    font-weight: 700;
+    text-shadow: 0 2px 5px #000000, 0 0 12px rgba(0,0,0,.85);
+    transition: opacity 280ms ease;
+}
+
+.active-game-screen.is-exiting .active-game-caption {
+    opacity: 0;
+}
+
+html.performance-mode .active-game-screen {
+    transition-duration: 110ms !important;
+}
+
+html.performance-mode .active-game-screen::before {
+    transition-duration: 380ms !important;
+}
+
+html.performance-mode .active-game-screen .active-game-card {
+    transition-duration: 380ms, 380ms !important;
+}
+
+html.performance-mode .active-game-screen .active-game-caption {
+    transition-duration: 280ms !important;
+}
+
+@media (max-width: 520px) {
+    .active-game-card {
+        width: min(520px, calc(100% - 24px));
+        padding: 18px 16px;
+    }
+}
+
 /* =========================================
    IN-APP GENERAL DIALOG ENGINE (LIGHT MODE)
    ========================================= */
@@ -3322,6 +3447,3 @@ html.light-mode .dev-reported-textarea {
     background: #c62828;
     color: #ffffff;
 }
-
-
-

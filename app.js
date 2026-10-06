@@ -18,6 +18,18 @@ let gameAutosaveTimer = null;
 const loadedGameSnapshots = new WeakMap();
 const snapshotHashes = new Map();
 const popupGameWindows = new Map();
+const activeGameSessions = new Map();
+let gameSessionSequence = 0;
+let activeGameScreen = null;
+let activeGameScreenExitTimer = null;
+let activeGameScreenResizeObserver = null;
+let activeGameScreenResizeHandler = null;
+let mainGameFramesSuspended = false;
+let mainGameFrameReleaseTimer = null;
+let activeGameExitToken = 0;
+let stashRestoreCleanup = null;
+let stashPreloadTaskId = null;
+let stashPreloadTaskType = null;
 const sidebarOrderDbName = 'NexusSidebarSettings';
 let sidebarOrderDbPromise = null;
 let lastSidebarOrderSavedAt = 0;
@@ -139,6 +151,244 @@ function releaseIframe(frame) {
     } catch (e) {}
     frame.removeAttribute('srcdoc');
     frame.src = 'about:blank';
+}
+
+function updatePopupGameIndex(gameId) {
+    if (!gameId) return;
+    let latest = null;
+    Array.from(activeGameSessions.values()).reverse().some(session => {
+        if (session.gameId === gameId) {
+            latest = session.win;
+            return true;
+        }
+        return false;
+    });
+    if (latest) popupGameWindows.set(gameId, latest);
+    else popupGameWindows.delete(gameId);
+}
+
+function getLatestActiveGameSession() {
+    const sessions = Array.from(activeGameSessions.values());
+    return sessions.length ? sessions[sessions.length - 1] : null;
+}
+
+function resizeActiveGameLabel() {
+    if (!activeGameScreen) return;
+    const label = activeGameScreen.querySelector('.active-game-label');
+    if (!label) return;
+    label.style.fontSize = '18px';
+    const availableWidth = Math.max(0, label.clientWidth);
+    if (!availableWidth) return;
+    const measuredWidth = label.scrollWidth;
+    if (measuredWidth > availableWidth) {
+        label.style.fontSize = `${Math.max(9, 18 * availableWidth / measuredWidth)}px`;
+    }
+}
+
+function createActiveGameScreen() {
+    if (activeGameScreen) {
+        if (activeGameScreenExitTimer) clearTimeout(activeGameScreenExitTimer);
+        activeGameScreenExitTimer = null;
+        activeGameScreen.classList.remove('is-exiting');
+        activeGameScreen.classList.add('is-visible');
+        return activeGameScreen;
+    }
+
+    const container = document.querySelector('.game-container');
+    if (!container) return null;
+    const screen = document.createElement('section');
+    screen.className = 'active-game-screen';
+    screen.setAttribute('role', 'status');
+    screen.setAttribute('aria-live', 'polite');
+    screen.setAttribute('aria-label', 'A game is open in another tab');
+    screen.innerHTML = `
+        <div class="active-game-card">
+            <span class="active-game-label"></span>
+        </div>
+        <div class="active-game-caption">Game Loaded! Close the game's tab to reopen Nexus.</div>
+    `;
+    container.appendChild(screen);
+    activeGameScreen = screen;
+    activeGameScreenResizeHandler = resizeActiveGameLabel;
+    window.addEventListener('resize', activeGameScreenResizeHandler, { passive: true });
+    if (window.ResizeObserver) {
+        activeGameScreenResizeObserver = new ResizeObserver(resizeActiveGameLabel);
+        activeGameScreenResizeObserver.observe(screen);
+    }
+    requestAnimationFrame(() => screen.classList.add('is-visible'));
+    return screen;
+}
+
+function updateActiveGameScreen(session) {
+    const screen = createActiveGameScreen();
+    if (!screen || !session) return;
+
+    const label = screen.querySelector('.active-game-label');
+    const game = games.find(item => String(item.id) === String(session.gameId));
+    label.textContent = (game && getSidebarTitle(game)) || session.title || '';
+    const colorScheme = game && game.sidebarColor
+        ? SIDEBAR_COLOR_SCHEMES.find(scheme => scheme.id === game.sidebarColor)
+        : null;
+    const isLight = document.documentElement.classList.contains('light-mode');
+    const themeColors = colorScheme && (isLight ? colorScheme.light : colorScheme.dark);
+    const rootStyles = getComputedStyle(document.documentElement);
+    const card = screen.querySelector('.active-game-card');
+    card.style.backgroundColor = themeColors ? themeColors.fill : rootStyles.getPropertyValue('--zigzag-line').trim();
+    card.style.borderColor = themeColors ? themeColors.border : rootStyles.getPropertyValue('--card-border').trim();
+    card.style.color = themeColors ? themeColors.text : rootStyles.getPropertyValue('--text-color').trim();
+    resizeActiveGameLabel();
+}
+
+function removeActiveGameScreen(immediate = false, onRemoved = null) {
+    if (!activeGameScreen) return;
+    const screen = activeGameScreen;
+    if (activeGameScreenExitTimer) clearTimeout(activeGameScreenExitTimer);
+    activeGameScreenExitTimer = null;
+
+    const cleanup = () => {
+        activeGameScreenExitTimer = null;
+        if (screen.parentNode) screen.remove();
+        if (activeGameScreen === screen) activeGameScreen = null;
+        if (activeGameScreenResizeObserver) activeGameScreenResizeObserver.disconnect();
+        activeGameScreenResizeObserver = null;
+        if (activeGameScreenResizeHandler) {
+            window.removeEventListener('resize', activeGameScreenResizeHandler);
+        }
+        activeGameScreenResizeHandler = null;
+        if (typeof onRemoved === 'function') onRemoved();
+    };
+    if (immediate) {
+        cleanup();
+        return;
+    }
+
+    screen.classList.add('is-exiting');
+    activeGameScreenExitTimer = setTimeout(cleanup, 400);
+}
+
+function suspendMainGameFrames() {
+    if (!mainGameFramesSuspended) {
+        mainGameFramesSuspended = true;
+        requestCurrentGameAutosave();
+
+        if (gameAutosaveTimer) clearInterval(gameAutosaveTimer);
+        gameAutosaveTimer = null;
+        if (stashPreloadTaskId !== null) {
+            if (stashPreloadTaskType === 'idle' && window.cancelIdleCallback) window.cancelIdleCallback(stashPreloadTaskId);
+            else clearTimeout(stashPreloadTaskId);
+            stashPreloadTaskId = null;
+            stashPreloadTaskType = null;
+        }
+    }
+
+    if (mainGameFrameReleaseTimer) clearTimeout(mainGameFrameReleaseTimer);
+    mainGameFrameReleaseTimer = setTimeout(() => {
+        mainGameFrameReleaseTimer = null;
+        if (!activeGameSessions.size) return;
+        releaseIframe(document.getElementById('game-frame'));
+        releaseIframe(document.getElementById('stash-frame'));
+        currentGame = null;
+        isStashPreloaded = false;
+    }, 300);
+}
+
+function registerGameSession(game, win) {
+    activeGameExitToken++;
+    if (stashRestoreCleanup) {
+        stashRestoreCleanup();
+        stashRestoreCleanup = null;
+    }
+    const sessionId = `game-${Date.now()}-${++gameSessionSequence}`;
+    const session = {
+        sessionId,
+        gameId: String(game.id),
+        title: getSidebarTitle(game),
+        win
+    };
+    activeGameSessions.set(sessionId, session);
+    updatePopupGameIndex(session.gameId);
+    // This listener belongs to the popup's top-level browsing context, so it
+    // still runs when its game iframe navigates to a cross-origin host.
+    win.addEventListener('beforeunload', () => handleGamePopupClosed(sessionId), { once: true });
+    updateActiveGameScreen(session);
+    suspendMainGameFrames();
+    return session;
+}
+
+function restoreGameStashBeforeScreenExit(onReady) {
+    const stash = games.find(game => game && game.id === 'ugs-stash');
+    if (!stash) {
+        const emptyState = document.getElementById('empty-state');
+        if (emptyState) emptyState.style.display = 'flex';
+        onReady();
+        return;
+    }
+
+    const storage = window.nexusStorage || window.localStorage;
+    const stashFrame = document.getElementById('stash-frame');
+    const useStashFrame = storage.getItem('tb_preload_stash') !== 'false' && !!stashFrame;
+    const targetFrame = useStashFrame ? stashFrame : document.getElementById('game-frame');
+    if (!targetFrame) {
+        onReady();
+        return;
+    }
+
+    let completed = false;
+    let fallbackTimer = null;
+    const finish = loaded => {
+        if (completed) return;
+        completed = true;
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+        targetFrame.removeEventListener('load', onLoad);
+        targetFrame.removeEventListener('error', onError);
+        if (stashRestoreCleanup === cancelWait) stashRestoreCleanup = null;
+        const emptyState = document.getElementById('empty-state');
+        if (emptyState) emptyState.style.display = loaded ? 'none' : 'flex';
+        onReady();
+    };
+    const onLoad = () => finish(true);
+    const onError = () => finish(false);
+    const cancelWait = () => {
+        if (completed) return;
+        completed = true;
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+        targetFrame.removeEventListener('load', onLoad);
+        targetFrame.removeEventListener('error', onError);
+        if (stashRestoreCleanup === cancelWait) stashRestoreCleanup = null;
+    };
+
+    stashRestoreCleanup = cancelWait;
+    targetFrame.addEventListener('load', onLoad, { once: true });
+    targetFrame.addEventListener('error', onError, { once: true });
+    fallbackTimer = setTimeout(() => finish(false), 12000);
+
+    loadGame(stash, true, { suppressHostLoader: true }).then(() => {
+        if (completed) return;
+        if (useStashFrame && isStashPreloaded && stashFrame.src && !stashFrame.src.endsWith('about:blank')) {
+            finish(true);
+        }
+    }).catch(() => finish(false));
+}
+
+function handleGamePopupClosed(sessionId) {
+    const session = activeGameSessions.get(sessionId);
+    if (!session) return;
+    activeGameSessions.delete(sessionId);
+    updatePopupGameIndex(session.gameId);
+
+    if (activeGameSessions.size) {
+        updateActiveGameScreen(getLatestActiveGameSession());
+        return;
+    }
+
+    const exitToken = ++activeGameExitToken;
+    restoreGameStashBeforeScreenExit(() => {
+        if (activeGameSessions.size || exitToken !== activeGameExitToken) return;
+        removeActiveGameScreen(false, () => {
+            mainGameFramesSuspended = false;
+            startGameAutosave();
+        });
+    });
 }
 
 
@@ -617,8 +867,9 @@ function requestCurrentGameAutosave() {
     if (frame && frame.contentWindow) {
         try { frame.contentWindow.postMessage({ type: 'nexus-request-game-save' }, '*'); } catch (e) {}
     }
-    // Also message active popup windows
-    popupGameWindows.forEach((win) => {
+    // Also message every active popup, including duplicate launches of one game.
+    activeGameSessions.forEach(session => {
+        const win = session.win;
         if (win && !win.closed) {
             try { win.postMessage({ type: 'nexus-request-game-save' }, '*'); } catch (e) {}
         }
@@ -798,8 +1049,8 @@ window.addEventListener('message', event => {
     const message = event.data;
     if (!message) return;
 
-    if (message.type === 'nexus-popup-closed' && message.gameId) {
-        popupGameWindows.delete(message.gameId);
+    if (message.type === 'nexus-popup-closed' && message.sessionId) {
+        handleGamePopupClosed(message.sessionId);
         return;
     }
 
@@ -810,8 +1061,16 @@ window.addEventListener('message', event => {
         const win = popupGameWindows.get(message.gameId);
         if (win === event.source || (win && win.closed)) isKnownPopup = true;
     }
-    for (const [, win] of popupGameWindows.entries()) {
-        if (win === event.source) { isKnownPopup = true; break; }
+    for (const session of activeGameSessions.values()) {
+        if (session.win === event.source) { isKnownPopup = true; break; }
+    }
+    if (message.type === 'nexus-popup-closed' && message.gameId) {
+        for (const session of activeGameSessions.values()) {
+            if (session.gameId === String(message.gameId) && session.win === event.source) {
+                handleGamePopupClosed(session.sessionId);
+                return;
+            }
+        }
     }
 
     const originSafe = !event.origin || event.origin === 'null' || event.origin === window.location.origin || window.location.protocol === 'file:';
@@ -1852,29 +2111,27 @@ function launchGameFullscreen(game) {
     game = applyGameRunMode(game);
     if (!game || game.id === "ugs-stash") return;
 
-    // Open about:blank synchronously on the user click gesture to avoid browser popup blocking
-    const win = window.open('about:blank', '_blank');
-    if (!win) {
-        nexusAlert("Pop-up blocked! Please allow pop-ups to open games.");
-        return;
-    }
-    if (game && game.id) popupGameWindows.set(game.id, win);
-    try { win.focus(); } catch(e) {}
-    let popupLoader = null;
+    const startLaunch = win => {
+        if (win.closed) return;
+        registerGameSession(game, win);
+        try { win.focus(); } catch(e) {}
+        let popupLoader = null;
 
-    const cloak = getCloakData();
+        // The active game title is always cloaked as New Tab. Keep the user's
+        // selected favicon, and leave the saved cloak preference untouched.
+        const cloak = { ...getCloakData(), title: 'New Tab' };
 
-    // Apply Cloaking Preset
-    try {
-        win.document.title = cloak.title;
-        let link = win.document.querySelector("link[rel*='icon']");
-        if (!link) {
-            link = win.document.createElement('link');
-            link.rel = 'shortcut icon';
-            win.document.head.appendChild(link);
-        }
-        link.href = cloak.icon;
-    } catch(e) {}
+        // Apply the selected favicon to the popup shell.
+        try {
+            win.document.title = cloak.title;
+            let link = win.document.querySelector("link[rel*='icon']");
+            if (!link) {
+                link = win.document.createElement('link');
+                link.rel = 'shortcut icon';
+                win.document.head.appendChild(link);
+            }
+            link.href = cloak.icon;
+        } catch(e) {}
 
     const titleEnforceScript = `<script>
     (function() {
@@ -2270,7 +2527,34 @@ function launchGameFullscreen(game) {
             try { win.close(); } catch (e) {}
             nexusAlert('Could not launch this game. Please retry or return to Game Stash.');
         }
-    })();
+        })();
+    };
+
+    if (activeGameSessions.size) {
+        showRedConfirmDialog(
+            'Opening multiple games can cause low performance or bugs. Are you sure you want to continue?',
+            {
+                greenCancel: true,
+                onConfirm: () => window.open('about:blank', '_blank')
+            }
+        ).then(reservedWindow => {
+            if (reservedWindow === false) return;
+            if (!reservedWindow) {
+                nexusAlert("Pop-up blocked! Please allow pop-ups to open games.");
+                return;
+            }
+            startLaunch(reservedWindow);
+        });
+        return;
+    }
+
+    // Open about:blank synchronously on the user click gesture to avoid browser popup blocking.
+    const win = window.open('about:blank', '_blank');
+    if (!win) {
+        nexusAlert("Pop-up blocked! Please allow pop-ups to open games.");
+        return;
+    }
+    startLaunch(win);
 }
 
 function getAppBaseUrl() {
@@ -2725,6 +3009,8 @@ function ensureStashPreloaded() {
 
     if (isPreloadEnabled && stashFrame && !isStashPreloaded) {
         const loadFn = () => {
+            stashPreloadTaskId = null;
+            stashPreloadTaskType = null;
             if (isStashPreloaded || !stashFrame) return;
             stashFrame.src = 'clSINGLEFILE.html';
             stashFrame.onload = () => {
@@ -2733,14 +3019,16 @@ function ensureStashPreloaded() {
         };
 
         if ('requestIdleCallback' in window) {
-            requestIdleCallback(loadFn, { timeout: 2500 });
+            stashPreloadTaskType = 'idle';
+            stashPreloadTaskId = requestIdleCallback(loadFn, { timeout: 2500 });
         } else {
-            setTimeout(loadFn, 1500);
+            stashPreloadTaskType = 'timeout';
+            stashPreloadTaskId = setTimeout(loadFn, 1500);
         }
     }
 }
 
-async function loadGame(game, forceInternal = false) {
+async function loadGame(game, forceInternal = false, options = {}) {
     if (!game) return;
 
     if (game.isNew) {
@@ -2821,7 +3109,7 @@ async function loadGame(game, forceInternal = false) {
 
             if (!isStashPreloaded || !stashFrame.src || stashFrame.src.endsWith('about:blank')) {
                 updateGameStatusUI('loading');
-                beginHostLoader(document);
+                if (!options.suppressHostLoader) beginHostLoader(document);
                 stashFrame.src = 'clSINGLEFILE.html';
                 stashFrame.onload = () => {
                     isStashPreloaded = true;
@@ -2838,7 +3126,7 @@ async function loadGame(game, forceInternal = false) {
             frame.style.setProperty('visibility', 'visible', 'important');
             frame.style.opacity = '1';
             updateGameStatusUI('loading');
-            beginHostLoader(document);
+            if (!options.suppressHostLoader) beginHostLoader(document);
             frame.src = 'clSINGLEFILE.html';
             frame.onload = () => {
                 updateGameStatusUI('loaded');
@@ -3278,7 +3566,8 @@ async function clearGameSaves(gameIds) {
         } catch (e) {}
     }
 
-    popupGameWindows.forEach((win) => {
+    activeGameSessions.forEach(session => {
+        const win = session.win;
         if (win && !win.closed) {
             try {
                 win.postMessage(disarmMsg, '*');
@@ -3414,8 +3703,10 @@ async function clearGameSaves(gameIds) {
     }
 
     // 8. If any popup is open for a cleared game, reload it
-    popupGameWindows.forEach((win, gId) => {
-        if (win && !win.closed && (allAliases.has(String(gId)) || selectedGames.some(g => String(g.id) === String(gId)))) {
+    activeGameSessions.forEach(session => {
+        const win = session.win;
+        const gameId = session.gameId;
+        if (win && !win.closed && (allAliases.has(String(gameId)) || selectedGames.some(g => String(g.id) === String(gameId)))) {
             try {
                 if (win.localStorage) {
                     const subLs = win.localStorage;
@@ -3518,7 +3809,7 @@ function openSavesSelection(gameList) {
     });
 }
 
-function showRedConfirmDialog(message) {
+function showRedConfirmDialog(message, options = {}) {
     return new Promise((resolve) => {
         let overlay = document.getElementById('nexus-red-confirm-overlay');
         if (!overlay) {
@@ -3542,6 +3833,7 @@ function showRedConfirmDialog(message) {
         const cancelBtn = overlay.querySelector('#nexus-red-confirm-cancel');
 
         msgEl.textContent = message;
+        cancelBtn.classList.toggle('green-game-cancel-btn', options.greenCancel === true);
         overlay.style.display = 'flex';
         setTimeout(() => okBtn.focus(), 50);
 
@@ -3552,11 +3844,19 @@ function showRedConfirmDialog(message) {
             document.removeEventListener('keydown', keyHandler);
         };
 
+        const confirm = () => {
+            let result = true;
+            if (typeof options.onConfirm === 'function') {
+                try { result = options.onConfirm(); } catch (error) { result = null; }
+            }
+            cleanup();
+            resolve(result);
+        };
+
         const keyHandler = (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                cleanup();
-                resolve(true);
+                confirm();
             } else if (e.key === 'Escape') {
                 e.preventDefault();
                 cleanup();
@@ -3568,8 +3868,7 @@ function showRedConfirmDialog(message) {
 
         okBtn.onclick = (e) => {
             e.preventDefault();
-            cleanup();
-            resolve(true);
+            confirm();
         };
 
         cancelBtn.onclick = (e) => {
@@ -3852,10 +4151,16 @@ if (importBtn) {
         currentGame = null;
         gameLoadToken++;
         // Close all open popup game windows to release any held IndexedDB / localStorage connections
-        popupGameWindows.forEach(win => {
+        activeGameSessions.forEach(session => {
+            const win = session.win;
             try { if (win && !win.closed) win.close(); } catch (e) {}
         });
+        activeGameSessions.clear();
         popupGameWindows.clear();
+        if (mainGameFrameReleaseTimer) clearTimeout(mainGameFrameReleaseTimer);
+        mainGameFrameReleaseTimer = null;
+        removeActiveGameScreen(true);
+        mainGameFramesSuspended = false;
 
         [document.getElementById('game-frame'), document.getElementById('stash-frame')].forEach(releaseIframe);
         isStashPreloaded = false;
@@ -4271,5 +4576,7 @@ if (window.MutationObserver) {
             const game = games.find(g => String(g.id) === String(renameTargetId));
             if (game) buildRenameSwatches(game);
         }
+        const activeGame = getLatestActiveGameSession();
+        if (activeGame) updateActiveGameScreen(activeGame);
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 }
