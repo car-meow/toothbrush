@@ -4,15 +4,6 @@
 // ============================================================
 
 (function () {
-    const storage = window.nexusStorage || window.localStorage;
-    const isChromebook = /CrOS/i.test(navigator.userAgent);
-    const isLowTierHardware = isChromebook ||
-        (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
-        (navigator.deviceMemory && navigator.deviceMemory <= 4);
-    if (storage.getItem('tb_performance_mode') === null && isLowTierHardware) {
-        storage.setItem('tb_preload_stash', 'false');
-    }
-
     // --- Splashes ---
     const splashes = [
         "Assisted by Jayden!", "No, please don't close my ta-", "Y'all, Vivian says hi!", "are u srs rn vro", 
@@ -133,13 +124,8 @@
 
     function navigateWithFade(url) {
         pauseHomeVideo();
-        const overlay = document.getElementById('page-fade-overlay');
-        if (overlay) {
-            overlay.classList.remove('fade-out');
-            setTimeout(() => { location.href = url; }, 370);
-        } else {
-            location.href = url;
-        }
+        if (typeof window.nexusNavigateWithFade === 'function') window.nexusNavigateWithFade(url);
+        else location.href = url;
     }
 
     window.cycleSplash = cycleSplash;
@@ -154,12 +140,6 @@
             if (document.fullscreenElement) pauseHomeVideo();
             else resumeHomeVideo();
         }, { passive: true });
-
-        // Page Fade In
-        const overlay = document.getElementById('page-fade-overlay');
-        if (overlay) {
-            requestAnimationFrame(() => { overlay.classList.add('fade-out'); });
-        }
 
         // Splash Cycling
         const logo = document.getElementById('nexus-logo');

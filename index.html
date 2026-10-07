@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <title>New Tab</title>
-<link rel="stylesheet" href="style.css?v=20">
-    <script src="bgm-manager.js?v=55"></script>
+<link rel="stylesheet" href="style.css?v=56">
+    <script src="bgm-manager.js?v=57"></script>
+    <script src="nexus-transition.js?v=1"></script>
     <script>
         (function() {
             try {
@@ -366,6 +367,7 @@ html.performance-mode [class*="aura-"] {
 </script>
 </head>
 <body class="home-screen">
+<div id="page-fade-overlay" class="is-loading"><div class="nexus-transition-content"><img src="Assets/loadingRoll.gif" alt=""><span class="nexus-transition-label">loading Home...</span></div></div>
 
 <video class="home-bg-video" id="home-bg-video" autoplay muted loop playsinline preload="none" aria-hidden="true"></video>
 <script>
@@ -400,9 +402,6 @@ html.performance-mode [class*="aura-"] {
         }
     }, { passive: true });
 </script>
-
-<!-- Page exit fade overlay -->
-<div id="page-fade-overlay"></div>
 
 <!-- ========== SCREEN BORDER (Vignette Flash) ========== -->
 <div id="screen-border"></div>
@@ -597,7 +596,7 @@ Aaaaand that's all, folks. 4.0 is here, but that doesn't mean that we're done wi
 </div>
 
 <!-- ========== JAVASCRIPT ========== -->
-<script src="site-core.js?v=2"></script>
+<script src="site-core.js?v=4"></script>
 <script src="tutorial-engine.js?v=1"></script>
 <script>
     (function() {

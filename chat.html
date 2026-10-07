@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>Nexus Chat</title>
-    <link rel="stylesheet" href="style.css?v=55">
-    <script src="bgm-manager.js?v=55"></script>
+    <link rel="stylesheet" href="style.css?v=56">
+    <script src="bgm-manager.js?v=57"></script>
+    <script src="nexus-transition.js?v=1"></script>
     <script>
         (function() {
             try {
@@ -73,21 +74,12 @@
     <link rel="prefetch" href="index.html">
 </head>
 <body class="chat-bg">
-    <div id="page-fade-overlay"></div>
+    <div id="page-fade-overlay" class="is-loading"><div class="nexus-transition-content"><img src="Assets/loadingRoll.gif" alt=""><span class="nexus-transition-label">loading Chat...</span></div></div>
     <script>
         (function() {
-            const overlay = document.getElementById('page-fade-overlay');
             window.navigateWithFade = function(url) {
-                if (overlay) {
-                    overlay.classList.remove('fade-out');
-                    setTimeout(() => { location.href = url; }, 370);
-                } else {
-                    location.href = url;
-                }
+                window.nexusNavigateWithFade(url);
             };
-            document.addEventListener('DOMContentLoaded', function() {
-                if (overlay) overlay.classList.add('fade-out');
-            });
         })();
     </script>
 
@@ -816,9 +808,6 @@
             document.getElementById('pin-error').style.display = 'none';
         };
 
-        // Fade page in
-        const overlay = document.getElementById('page-fade-overlay');
-        if (overlay) overlay.classList.add('fade-out');
     });
     </script>
     <script src="tutorial-engine.js?v=1"></script>

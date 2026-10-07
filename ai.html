@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>New Tab</title>
-    <link rel="stylesheet" href="style.css?v=55">
-    <script src="bgm-manager.js?v=55"></script>
+    <link rel="stylesheet" href="style.css?v=56">
+    <script src="bgm-manager.js?v=57"></script>
+    <script src="nexus-transition.js?v=1"></script>
     <script>
         (function() {
             try {
@@ -185,17 +186,11 @@
     <link rel="prefetch" href="index.html">
 </head>
 <body class="chat-bg">
-    <div id="page-fade-overlay"></div>
+    <div id="page-fade-overlay" class="is-loading"><div class="nexus-transition-content"><img src="Assets/loadingRoll.gif" alt=""><span class="nexus-transition-label">loading AI...</span></div></div>
     <script>
         (function() {
-            const overlay = document.getElementById('page-fade-overlay');
             window.navigateWithFade = function(url) {
-                if (overlay) {
-                    overlay.classList.remove('fade-out');
-                    setTimeout(() => { location.href = url; }, 370);
-                } else {
-                    location.href = url;
-                }
+                window.nexusNavigateWithFade(url);
             };
         })();
     </script>
@@ -375,9 +370,6 @@
                 list.appendChild(li);
             });
 
-            // Fade page in once sidebar is rendered
-            const overlay = document.getElementById('page-fade-overlay');
-            if (overlay) overlay.classList.add('fade-out');
         }
 
         async function loadChat(id) {

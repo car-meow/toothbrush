@@ -1,11 +1,7 @@
-const isChromebook = /CrOS/i.test(navigator.userAgent);
-const isLowTierHardware = isChromebook ||
-    (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
-    (navigator.deviceMemory && navigator.deviceMemory <= 4);
 const appStorage = window.nexusStorage || window.localStorage;
-if (appStorage.getItem('tb_performance_mode') === null && isLowTierHardware) {
-    appStorage.setItem('tb_preload_stash', 'false');
-}
+// Game Stash is always available during a Games visit. Release its frame only
+// while the lightweight game standby screen is active.
+appStorage.setItem('tb_preload_stash', 'true');
 
 const dbName = "GameStorageDB";
 let db, games =[], currentGame = null;
@@ -20,16 +16,11 @@ const snapshotHashes = new Map();
 const popupGameWindows = new Map();
 const activeGameSessions = new Map();
 let gameSessionSequence = 0;
-let activeGameScreen = null;
-let activeGameScreenExitTimer = null;
-let activeGameScreenResizeObserver = null;
-let activeGameScreenResizeHandler = null;
 let mainGameFramesSuspended = false;
-let mainGameFrameReleaseTimer = null;
 let activeGameExitToken = 0;
-let stashRestoreCleanup = null;
-let stashPreloadTaskId = null;
-let stashPreloadTaskType = null;
+let stashLoadPromise = null;
+let suspendedGamesPage = null;
+let isGameStandbyView = false;
 const sidebarOrderDbName = 'NexusSidebarSettings';
 let sidebarOrderDbPromise = null;
 let lastSidebarOrderSavedAt = 0;
@@ -167,106 +158,102 @@ function updatePopupGameIndex(gameId) {
     else popupGameWindows.delete(gameId);
 }
 
-function getLatestActiveGameSession() {
-    const sessions = Array.from(activeGameSessions.values());
-    return sessions.length ? sessions[sessions.length - 1] : null;
+function ensureTransitionOverlay(parent = document.body) {
+    let overlay = document.getElementById('page-fade-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'page-fade-overlay';
+        parent.appendChild(overlay);
+    }
+    if (!overlay.querySelector('.nexus-transition-content')) {
+        overlay.innerHTML = '<div class="nexus-transition-content"><img src="Assets/loadingRoll.gif" alt=""><span class="nexus-transition-label"></span></div>';
+    }
+    return overlay;
 }
 
-function resizeActiveGameLabel() {
-    if (!activeGameScreen) return;
-    const label = activeGameScreen.querySelector('.active-game-label');
-    if (!label) return;
-    label.style.fontSize = '18px';
-    const availableWidth = Math.max(0, label.clientWidth);
-    if (!availableWidth) return;
-    const measuredWidth = label.scrollWidth;
-    if (measuredWidth > availableWidth) {
-        label.style.fontSize = `${Math.max(9, 18 * availableWidth / measuredWidth)}px`;
-    }
+function showTransitionOverlay(message, parent = document.body) {
+    const overlay = ensureTransitionOverlay(parent);
+    const label = overlay.querySelector('.nexus-transition-label');
+    if (label) label.textContent = message;
+    overlay.classList.remove('fade-out');
+    overlay.classList.add('is-loading');
+    return overlay;
 }
 
-function createActiveGameScreen() {
-    if (activeGameScreen) {
-        if (activeGameScreenExitTimer) clearTimeout(activeGameScreenExitTimer);
-        activeGameScreenExitTimer = null;
-        activeGameScreen.classList.remove('is-exiting');
-        activeGameScreen.classList.add('is-visible');
-        return activeGameScreen;
-    }
+function hideTransitionOverlay(overlay = document.getElementById('page-fade-overlay')) {
+    if (!overlay) return;
+    overlay.classList.remove('is-loading');
+    overlay.classList.add('fade-out');
+}
 
-    const container = document.querySelector('.game-container');
-    if (!container) return null;
-    const screen = document.createElement('section');
-    screen.className = 'active-game-screen';
-    screen.setAttribute('role', 'status');
-    screen.setAttribute('aria-live', 'polite');
-    screen.setAttribute('aria-label', 'A game is open in another tab');
-    screen.innerHTML = `
-        <div class="active-game-card">
-            <span class="active-game-label"></span>
+function enterGameStandbyScreen() {
+    if (isGameStandbyView) return;
+    if (gameAutosaveTimer) clearInterval(gameAutosaveTimer);
+    gameAutosaveTimer = null;
+    try {
+        if (typeof window.stopCookieGame === 'function') window.stopCookieGame();
+        const video = document.querySelector('.home-bg-video, #bg-video');
+        if (video && !video.paused) video.pause();
+    } catch (error) {}
+
+    suspendedGamesPage = document.createDocumentFragment();
+    while (document.body.firstChild) suspendedGamesPage.appendChild(document.body.firstChild);
+
+    const shell = document.createElement('main');
+    shell.className = 'game-standby-screen';
+    shell.innerHTML = `
+        <img class="game-standby-background" src="Assets/loading_stash.png" alt="">
+        <button type="button" class="game-standby-back">Back to Games</button>
+        <div id="page-fade-overlay" class="fade-out">
+            <div class="nexus-transition-content"><img src="Assets/loadingRoll.gif" alt=""><span class="nexus-transition-label"></span></div>
         </div>
-        <div class="active-game-caption">Game Loaded! Close the game's tab to reopen Nexus.</div>
     `;
-    container.appendChild(screen);
-    activeGameScreen = screen;
-    activeGameScreenResizeHandler = resizeActiveGameLabel;
-    window.addEventListener('resize', activeGameScreenResizeHandler, { passive: true });
-    if (window.ResizeObserver) {
-        activeGameScreenResizeObserver = new ResizeObserver(resizeActiveGameLabel);
-        activeGameScreenResizeObserver.observe(screen);
-    }
-    requestAnimationFrame(() => screen.classList.add('is-visible'));
-    return screen;
+    shell.querySelector('.game-standby-back').addEventListener('click', confirmReturnToGames);
+    document.body.classList.add('game-standby-active');
+    document.body.appendChild(shell);
+    isGameStandbyView = true;
 }
 
-function updateActiveGameScreen(session) {
-    const screen = createActiveGameScreen();
-    if (!screen || !session) return;
-
-    const label = screen.querySelector('.active-game-label');
-    const game = games.find(item => String(item.id) === String(session.gameId));
-    label.textContent = (game && getSidebarTitle(game)) || session.title || '';
-    const colorScheme = game && game.sidebarColor
-        ? SIDEBAR_COLOR_SCHEMES.find(scheme => scheme.id === game.sidebarColor)
-        : null;
-    const isLight = document.documentElement.classList.contains('light-mode');
-    const themeColors = colorScheme && (isLight ? colorScheme.light : colorScheme.dark);
-    const rootStyles = getComputedStyle(document.documentElement);
-    const card = screen.querySelector('.active-game-card');
-    card.style.backgroundColor = themeColors ? themeColors.fill : rootStyles.getPropertyValue('--zigzag-line').trim();
-    card.style.borderColor = themeColors ? themeColors.border : rootStyles.getPropertyValue('--card-border').trim();
-    card.style.color = themeColors ? themeColors.text : rootStyles.getPropertyValue('--text-color').trim();
-    resizeActiveGameLabel();
+async function restoreGamesPageForTransition(message) {
+    let overlay;
+    if (isGameStandbyView && suspendedGamesPage) {
+        const shell = document.querySelector('.game-standby-screen');
+        overlay = showTransitionOverlay(message, shell || document.body);
+        if (shell) shell.classList.add('is-returning');
+        await new Promise(resolve => setTimeout(resolve, 360));
+        if (shell) shell.remove();
+        document.body.classList.remove('game-standby-active');
+        while (suspendedGamesPage.firstChild) document.body.appendChild(suspendedGamesPage.firstChild);
+        suspendedGamesPage = null;
+        isGameStandbyView = false;
+        if (overlay && overlay.parentNode !== document.body) document.body.appendChild(overlay);
+    }
+    if (!overlay) overlay = showTransitionOverlay(message);
+    return overlay;
 }
 
-function removeActiveGameScreen(immediate = false, onRemoved = null) {
-    if (!activeGameScreen) {
-        if (typeof onRemoved === 'function') onRemoved();
-        return;
+async function returnToGamesFromStandby(message = 'loading Games...') {
+    if (!isGameStandbyView) return;
+    const overlay = await restoreGamesPageForTransition(message);
+    const stash = games.find(game => game && game.id === 'ugs-stash');
+    if (stash) {
+        await loadGame(stash, true, { suppressHostLoader: true });
     }
-    const screen = activeGameScreen;
-    if (activeGameScreenExitTimer) clearTimeout(activeGameScreenExitTimer);
-    activeGameScreenExitTimer = null;
-
-    const cleanup = () => {
-        activeGameScreenExitTimer = null;
-        if (screen.parentNode) screen.remove();
-        if (activeGameScreen === screen) activeGameScreen = null;
-        if (activeGameScreenResizeObserver) activeGameScreenResizeObserver.disconnect();
-        activeGameScreenResizeObserver = null;
-        if (activeGameScreenResizeHandler) {
-            window.removeEventListener('resize', activeGameScreenResizeHandler);
-        }
-        activeGameScreenResizeHandler = null;
-        if (typeof onRemoved === 'function') onRemoved();
-    };
-    if (immediate) {
-        cleanup();
-        return;
+    mainGameFramesSuspended = false;
+    if (typeof window.setTemporaryGameCloak === 'function') window.setTemporaryGameCloak(false);
+    if (!activeGameSessions.size) {
+        startGameAutosave();
     }
+    hideTransitionOverlay(overlay);
+}
 
-    screen.classList.add('is-exiting');
-    activeGameScreenExitTimer = setTimeout(cleanup, 400);
+function confirmReturnToGames() {
+    showRedConfirmDialog(
+        'Opening multiple games can cause low performance or bugs. Are you sure you want to continue?',
+        { greenCancel: true }
+    ).then(confirmed => {
+        if (confirmed) returnToGamesFromStandby('loading Games...');
+    });
 }
 
 function suspendMainGameFrames() {
@@ -276,33 +263,18 @@ function suspendMainGameFrames() {
 
         if (gameAutosaveTimer) clearInterval(gameAutosaveTimer);
         gameAutosaveTimer = null;
-        if (stashPreloadTaskId !== null) {
-            if (stashPreloadTaskType === 'idle' && window.cancelIdleCallback) window.cancelIdleCallback(stashPreloadTaskId);
-            else clearTimeout(stashPreloadTaskId);
-            stashPreloadTaskId = null;
-            stashPreloadTaskType = null;
-        }
     }
-
-    if (mainGameFrameReleaseTimer) clearTimeout(mainGameFrameReleaseTimer);
-    mainGameFrameReleaseTimer = setTimeout(() => {
-        mainGameFrameReleaseTimer = null;
-        if (!activeGameSessions.size) return;
-        releaseIframe(document.getElementById('game-frame'));
-        releaseIframe(document.getElementById('stash-frame'));
-        currentGame = null;
-        isStashPreloaded = false;
-    }, 300);
+    releaseIframe(document.getElementById('game-frame'));
+    releaseIframe(document.getElementById('stash-frame'));
+    currentGame = null;
+    isStashPreloaded = false;
+    stashLoadPromise = null;
 }
 
 function registerGameSession(game, win) {
     activeGameExitToken++;
-    if (stashRestoreCleanup) {
-        stashRestoreCleanup();
-        stashRestoreCleanup = null;
-    }
     const sessionId = `game-${Date.now()}-${++gameSessionSequence}`;
-    if (!activeGameSessions.size && typeof window.setTemporaryGameCloak === 'function') {
+    if (!isGameStandbyView && typeof window.setTemporaryGameCloak === 'function') {
         window.setTemporaryGameCloak(true);
     }
     const session = {
@@ -316,64 +288,9 @@ function registerGameSession(game, win) {
     // This listener belongs to the popup's top-level browsing context, so it
     // still runs when its game iframe navigates to a cross-origin host.
     win.addEventListener('beforeunload', () => handleGamePopupClosed(sessionId), { once: true });
-    updateActiveGameScreen(session);
     suspendMainGameFrames();
+    enterGameStandbyScreen();
     return session;
-}
-
-function restoreGameStashBeforeScreenExit(onReady) {
-    const stash = games.find(game => game && game.id === 'ugs-stash');
-    if (!stash) {
-        const emptyState = document.getElementById('empty-state');
-        if (emptyState) emptyState.style.display = 'flex';
-        onReady();
-        return;
-    }
-
-    const storage = window.nexusStorage || window.localStorage;
-    const stashFrame = document.getElementById('stash-frame');
-    const useStashFrame = storage.getItem('tb_preload_stash') !== 'false' && !!stashFrame;
-    const targetFrame = useStashFrame ? stashFrame : document.getElementById('game-frame');
-    if (!targetFrame) {
-        onReady();
-        return;
-    }
-
-    let completed = false;
-    let fallbackTimer = null;
-    const finish = loaded => {
-        if (completed) return;
-        completed = true;
-        if (fallbackTimer) clearTimeout(fallbackTimer);
-        targetFrame.removeEventListener('load', onLoad);
-        targetFrame.removeEventListener('error', onError);
-        if (stashRestoreCleanup === cancelWait) stashRestoreCleanup = null;
-        const emptyState = document.getElementById('empty-state');
-        if (emptyState) emptyState.style.display = loaded ? 'none' : 'flex';
-        onReady();
-    };
-    const onLoad = () => finish(true);
-    const onError = () => finish(false);
-    const cancelWait = () => {
-        if (completed) return;
-        completed = true;
-        if (fallbackTimer) clearTimeout(fallbackTimer);
-        targetFrame.removeEventListener('load', onLoad);
-        targetFrame.removeEventListener('error', onError);
-        if (stashRestoreCleanup === cancelWait) stashRestoreCleanup = null;
-    };
-
-    stashRestoreCleanup = cancelWait;
-    targetFrame.addEventListener('load', onLoad, { once: true });
-    targetFrame.addEventListener('error', onError, { once: true });
-    fallbackTimer = setTimeout(() => finish(false), 12000);
-
-    loadGame(stash, true, { suppressHostLoader: true }).then(() => {
-        if (completed) return;
-        if (useStashFrame && isStashPreloaded && stashFrame.src && !stashFrame.src.endsWith('about:blank')) {
-            finish(true);
-        }
-    }).catch(() => finish(false));
 }
 
 function handleGamePopupClosed(sessionId) {
@@ -382,22 +299,27 @@ function handleGamePopupClosed(sessionId) {
     activeGameSessions.delete(sessionId);
     updatePopupGameIndex(session.gameId);
 
-    if (activeGameSessions.size) {
-        updateActiveGameScreen(getLatestActiveGameSession());
+    if (activeGameSessions.size) return;
+    activeGameExitToken++;
+
+    if (isGameStandbyView) {
+        returnToGamesFromStandby('Going back to Games...').catch(() => {});
         return;
     }
 
-    const exitToken = ++activeGameExitToken;
-    restoreGameStashBeforeScreenExit(() => {
-        if (activeGameSessions.size || exitToken !== activeGameExitToken) return;
-        removeActiveGameScreen(false, () => {
-            mainGameFramesSuspended = false;
-            if (typeof window.setTemporaryGameCloak === 'function') {
-                window.setTemporaryGameCloak(false);
-            }
-            startGameAutosave();
-        });
-    });
+    mainGameFramesSuspended = false;
+    if (typeof window.setTemporaryGameCloak === 'function') window.setTemporaryGameCloak(false);
+    if (isStashPreloaded) startGameAutosave();
+    else {
+        const overlay = showTransitionOverlay('Going back to Games...');
+        const stash = games.find(game => game && game.id === 'ugs-stash');
+        if (stash) {
+            loadGame(stash, true, { suppressHostLoader: true }).finally(() => {
+                startGameAutosave();
+                hideTransitionOverlay(overlay);
+            });
+        } else hideTransitionOverlay(overlay);
+    }
 }
 
 
@@ -434,6 +356,7 @@ async function initDB() {
 
 async function loadGames() {
     const localStorage = window.nexusStorage || window.localStorage;
+    const stashPreloadOnEntry = ensureStashPreloaded();
     await initDB();
     const savedOrder = await readSavedSidebarOrder(localStorage);
     const tx = db.transaction("customGames", "readonly");
@@ -487,19 +410,20 @@ async function loadGames() {
     pinMasterStash();
     saveGameOrder();
     renderGameList();
-    openDefaultGame();
-
-    // Fade page in once list is loaded and rendered
-    const overlay = document.getElementById('page-fade-overlay');
-    if (overlay) overlay.classList.add('fade-out');
+    const initialGameLoad = openDefaultGame();
+    Promise.all([stashPreloadOnEntry, initialGameLoad]).catch(() => {}).finally(() => {
+        if (typeof window.nexusFinishPageTransition === 'function') window.nexusFinishPageTransition();
+        else hideTransitionOverlay();
+    });
 
     initCarmeowTutorial();
 }
 
 function openDefaultGame() {
-    if (currentGame || !document.getElementById('game-frame')) return;
+    if (currentGame || !document.getElementById('game-frame')) return Promise.resolve();
     const preferredGame = games.find(g => g.id === "ugs-stash") || games[0];
-    if (preferredGame) loadGame(preferredGame);
+    if (preferredGame) return loadGame(preferredGame, true, { suppressHostLoader: true });
+    return Promise.resolve();
 }
 
 function releaseInactiveGameContent(activeGame) {
@@ -2164,7 +2088,12 @@ function launchGameFullscreen(game) {
     (function() {
         var ct = ${JSON.stringify(cloak.title)};
         var ci = ${JSON.stringify(cloak.icon)};
-        document.title = ct;
+        function syncTitle() {
+            var titleEl = document.querySelector('title');
+            if (!titleEl) { titleEl = document.createElement('title'); document.head.appendChild(titleEl); }
+            titleEl.textContent = ct;
+        }
+        syncTitle();
         function syncFavicon() {
             var links = Array.prototype.slice.call(document.querySelectorAll('link[rel]'));
             var icons = links.filter(function(link) {
@@ -2180,6 +2109,36 @@ function launchGameFullscreen(game) {
             icons.slice(1).forEach(function(link) { link.remove(); });
         }
         syncFavicon();
+        function updatePreset(preset) {
+            var presets = {
+                canvas: { title: 'Dashboard', icon: 'https://du11hjcvx0uqb.cloudfront.net/dist/images/favicon-e10d657a73.ico' },
+                classroom: { title: 'Home', icon: 'https://ssl.gstatic.com/classroom/favicon.png' },
+                wikipedia: { title: 'Wikipedia, the free encyclopedia', icon: 'https://en.wikipedia.org/favicon.ico' },
+                desmos: { title: 'Desmos | Graphing Calculator', icon: 'https://www.desmos.com/favicon.ico' },
+                drive: { title: 'My Drive - Google Drive', icon: 'https://ssl.gstatic.com/docs/doclist/images/drive_2022q3_32dp.png' },
+                docs: { title: 'Google Docs', icon: 'https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico' },
+                bing: { title: 'Bing', icon: 'https://www.bing.com/favicon.ico' },
+                khan: { title: 'Dashboard | Khan Academy', icon: 'https://www.khanacademy.org/favicon.ico' },
+                none: { title: 'New Tab', icon: '' },
+                newtab: { title: 'New Tab', icon: '' }
+            };
+            var next = presets[preset] || presets.canvas;
+            ct = next.title;
+            ci = next.icon;
+            syncTitle();
+            syncFavicon();
+        }
+        window.addEventListener('storage', function(event) {
+            if (event.key === 'tb_cloak_preset') updatePreset(event.newValue || 'canvas');
+        });
+        if (typeof BroadcastChannel === 'function') {
+            try {
+                var cloakChannel = new BroadcastChannel('nexus-cloak-preset');
+                cloakChannel.addEventListener('message', function(event) {
+                    if (event.data && event.data.type === 'nexus-cloak-preset') updatePreset(event.data.preset);
+                });
+            } catch(e) {}
+        }
         try {
             Object.defineProperty(document, 'title', {
                 get: function() { return ct; },
@@ -2190,12 +2149,12 @@ function launchGameFullscreen(game) {
             var titleEl = document.querySelector('title');
             if (titleEl) {
                 new MutationObserver(function() {
-                    if (document.title !== ct) document.title = ct;
+                    if (titleEl.textContent !== ct) syncTitle();
                 }).observe(titleEl, { childList: true, characterData: true, subtree: true });
             }
         }
         setInterval(function() {
-            if (document.title !== ct) document.title = ct;
+            if (document.title !== ct) syncTitle();
             syncFavicon();
         }, 3000);
     })();
@@ -3041,31 +3000,39 @@ function showGameLoadError(game, frame) {
 }
 
 function ensureStashPreloaded() {
-    const localStorage = window.nexusStorage || window.localStorage;
-    const isPerfMode = localStorage.getItem('tb_performance_mode') === 'true' || localStorage.getItem('tb_performance_mode_lite') === 'true';
-    if (isPerfMode) return;
-    const isPreloadEnabled = localStorage.getItem('tb_preload_stash') !== 'false';
     const stashFrame = document.getElementById('stash-frame');
+    if (!stashFrame) return Promise.resolve(false);
+    if (isStashPreloaded && stashFrame.src && !stashFrame.src.endsWith('about:blank')) return Promise.resolve(true);
+    if (stashLoadPromise) return stashLoadPromise;
 
-    if (isPreloadEnabled && stashFrame && !isStashPreloaded) {
-        const loadFn = () => {
-            stashPreloadTaskId = null;
-            stashPreloadTaskType = null;
-            if (isStashPreloaded || !stashFrame) return;
-            stashFrame.src = 'clSINGLEFILE.html';
-            stashFrame.onload = () => {
-                isStashPreloaded = true;
-            };
+    stashFrame.style.setProperty('display', 'none', 'important');
+    stashLoadPromise = new Promise(resolve => {
+        let complete = false;
+        const timeout = setTimeout(() => finish(false), 30000);
+        const finish = loaded => {
+            if (complete) return;
+            complete = true;
+            clearTimeout(timeout);
+            stashFrame.removeEventListener('load', onLoad);
+            stashFrame.removeEventListener('error', onError);
+            isStashPreloaded = loaded;
+            stashLoadPromise = null;
+            resolve(loaded);
         };
+        const onLoad = () => finish(true);
+        const onError = () => finish(false);
+        stashFrame.addEventListener('load', onLoad, { once: true });
+        stashFrame.addEventListener('error', onError, { once: true });
 
-        if ('requestIdleCallback' in window) {
-            stashPreloadTaskType = 'idle';
-            stashPreloadTaskId = requestIdleCallback(loadFn, { timeout: 2500 });
+        if (!stashFrame.src || stashFrame.src.endsWith('about:blank')) {
+            stashFrame.src = 'clSINGLEFILE.html';
         } else {
-            stashPreloadTaskType = 'timeout';
-            stashPreloadTaskId = setTimeout(loadFn, 1500);
+            try {
+                if (stashFrame.contentDocument && stashFrame.contentDocument.readyState === 'complete') finish(true);
+            } catch (error) {}
         }
-    }
+    });
+    return stashLoadPromise;
 }
 
 async function loadGame(game, forceInternal = false, options = {}) {
@@ -3081,7 +3048,6 @@ async function loadGame(game, forceInternal = false, options = {}) {
     game = applyGameRunMode(game);
 
     const localStorage = window.nexusStorage || window.localStorage;
-    const isPreloadEnabled = localStorage.getItem('tb_preload_stash') !== 'false';
 
     // Launch non-stash game from sidebar straight to new tab in fullscreen
     if (!forceInternal && game && game.id !== "ugs-stash") {
@@ -3141,51 +3107,24 @@ async function loadGame(game, forceInternal = false, options = {}) {
 
     // Handle Game Stash loading with Preload support
     if (game && game.id === "ugs-stash") {
-        if (isPreloadEnabled && stashFrame) {
-            if (frame) frame.style.setProperty('display', 'none', 'important');
-            stashFrame.style.setProperty('display', 'block', 'important');
-            stashFrame.style.setProperty('visibility', 'visible', 'important');
-            stashFrame.style.opacity = '1';
-
-            if (!isStashPreloaded || !stashFrame.src || stashFrame.src.endsWith('about:blank')) {
-                updateGameStatusUI('loading');
-                if (!options.suppressHostLoader) beginHostLoader(document);
-                stashFrame.src = 'clSINGLEFILE.html';
-                stashFrame.onload = () => {
-                    isStashPreloaded = true;
-                    updateGameStatusUI('loaded');
-                    completeHostLoader();
-                };
-                stashFrame.onerror = () => { completeHostLoader(); showGameLoadError(game, stashFrame); };
-            } else {
-                updateGameStatusUI('loaded');
-            }
-        } else if (frame) {
-            if (stashFrame) stashFrame.style.setProperty('display', 'none', 'important');
-            frame.style.setProperty('display', 'block', 'important');
-            frame.style.setProperty('visibility', 'visible', 'important');
-            frame.style.opacity = '1';
-            updateGameStatusUI('loading');
-            if (!options.suppressHostLoader) beginHostLoader(document);
-            frame.src = 'clSINGLEFILE.html';
-            frame.onload = () => {
-                updateGameStatusUI('loaded');
-                completeHostLoader();
-            };
-            frame.onerror = () => { completeHostLoader(); showGameLoadError(game, frame); };
+        if (frame) frame.style.setProperty('display', 'none', 'important');
+        updateGameStatusUI('loading');
+        if (!options.suppressHostLoader) beginHostLoader(document);
+        const stashLoaded = await ensureStashPreloaded();
+        completeHostLoader();
+        if (!stashLoaded) {
+            if (stashFrame) showGameLoadError(game, stashFrame);
+            return;
         }
+        stashFrame.style.setProperty('display', 'block', 'important');
+        stashFrame.style.setProperty('visibility', 'visible', 'important');
+        stashFrame.style.opacity = '1';
+        updateGameStatusUI('loaded');
         return;
     }
 
-    // Standard Game Loading
-    if (stashFrame) {
-        stashFrame.style.setProperty('display', 'none', 'important');
-        const isPerfMode = localStorage.getItem('tb_performance_mode') === 'true' || localStorage.getItem('tb_performance_mode_lite') === 'true';
-        if (isPerfMode && stashFrame.src && !stashFrame.src.endsWith('about:blank')) {
-            releaseIframe(stashFrame);
-            isStashPreloaded = false;
-        }
-    }
+    // Keep the preloaded Stash available while other games use the main frame.
+    if (stashFrame) stashFrame.style.setProperty('display', 'none', 'important');
     if (frame) {
         requestCurrentGameAutosave();
         releaseIframe(frame);
@@ -3284,9 +3223,6 @@ async function loadGame(game, forceInternal = false, options = {}) {
         }
     }
 
-    if (isPreloadEnabled) {
-        ensureStashPreloaded();
-    }
 }
 
 const emgBtn = document.getElementById('emergency-open-btn');
@@ -4197,9 +4133,7 @@ if (importBtn) {
         });
         activeGameSessions.clear();
         popupGameWindows.clear();
-        if (mainGameFrameReleaseTimer) clearTimeout(mainGameFrameReleaseTimer);
-        mainGameFrameReleaseTimer = null;
-        removeActiveGameScreen(true);
+        if (isGameStandbyView) await restoreGamesPageForTransition('loading Games...');
         mainGameFramesSuspended = false;
 
         [document.getElementById('game-frame'), document.getElementById('stash-frame')].forEach(releaseIframe);
@@ -4616,7 +4550,5 @@ if (window.MutationObserver) {
             const game = games.find(g => String(g.id) === String(renameTargetId));
             if (game) buildRenameSwatches(game);
         }
-        const activeGame = getLatestActiveGameSession();
-        if (activeGame) updateActiveGameScreen(activeGame);
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 }

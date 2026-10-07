@@ -111,6 +111,7 @@ if ('serviceWorker' in navigator) {
         originalFavicon = origLink.getAttribute('href');
     }
     let temporaryGameCloak = false;
+    const cloakChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('nexus-cloak-preset') : null;
 
     function removeFaviconLinks() {
         document.querySelectorAll('link[rel]').forEach(link => {
@@ -152,6 +153,9 @@ if ('serviceWorker' in navigator) {
         };
 
         const data = presets[preset] || presets.canvas;
+        if (cloakChannel) {
+            try { cloakChannel.postMessage({ type: 'nexus-cloak-preset', preset }); } catch (error) {}
+        }
 
         document.title = data.title;
         if (preset === 'none' || preset === 'newtab') {
@@ -182,6 +186,10 @@ if ('serviceWorker' in navigator) {
     });
 
     window.applyTabCloak = applyTabCloak;
+    window.setCloakPreset = preset => {
+        localStorage.setItem('tb_cloak_preset', preset);
+        applyTabCloak();
+    };
     window.setTemporaryGameCloak = active => {
         temporaryGameCloak = !!active;
         applyTabCloak();
