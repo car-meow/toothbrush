@@ -2088,19 +2088,15 @@ function launchGameFullscreen(game) {
         // Apply the selected title and favicon to the popup shell.
         try {
             win.document.title = cloak.title;
-            if (!cloak.icon) {
-                win.document.querySelectorAll('link[rel]').forEach(link => {
-                    if ((link.getAttribute('rel') || '').toLowerCase().split(/\s+/).includes('icon')) link.remove();
-                });
-            } else {
-                let link = win.document.querySelector("link[rel*='icon']");
-                if (!link) {
-                    link = win.document.createElement('link');
-                    link.rel = 'shortcut icon';
-                    win.document.head.appendChild(link);
-                }
-                link.href = cloak.icon;
+            let link = win.document.querySelector("link[rel*='icon']");
+            if (!link) {
+                link = win.document.createElement('link');
+                win.document.head.appendChild(link);
             }
+            link.rel = 'icon';
+            if (cloak.icon) link.removeAttribute('type');
+            else link.type = 'image/svg+xml';
+            link.href = cloak.icon || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E";
         } catch(e) {}
 
     const titleEnforceScript = `<script>
@@ -2118,13 +2114,12 @@ function launchGameFullscreen(game) {
             var icons = links.filter(function(link) {
                 return (link.getAttribute('rel') || '').toLowerCase().split(/\s+/).indexOf('icon') !== -1;
             });
-            if (!ci) {
-                icons.forEach(function(link) { link.remove(); });
-                return;
-            }
             var fl = icons[0];
-            if (!fl) { fl = document.createElement('link'); fl.rel = 'shortcut icon'; document.head.appendChild(fl); }
-            fl.href = ci;
+            if (!fl) { fl = document.createElement('link'); document.head.appendChild(fl); }
+            fl.rel = 'icon';
+            if (ci) fl.removeAttribute('type');
+            else fl.type = 'image/svg+xml';
+            fl.href = ci || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E";
             icons.slice(1).forEach(function(link) { link.remove(); });
         }
         syncFavicon();
@@ -2332,10 +2327,57 @@ function launchGameFullscreen(game) {
                     var ci = ${JSON.stringify(cloak.icon)};
                     var gameAliases = ${JSON.stringify(targetGameAliases)};
                     var primaryGameId = ${JSON.stringify(game.id)};
-                    document.title = ct;
-                    var fl = document.querySelector("link[rel*='icon']");
-                    if (!fl) { fl = document.createElement('link'); fl.rel = 'shortcut icon'; document.head.appendChild(fl); }
-                    fl.href = ci;
+                    var blankFavicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E";
+                    function syncTitle() {
+                        var titleEl = document.querySelector('title');
+                        if (!titleEl) { titleEl = document.createElement('title'); document.head.appendChild(titleEl); }
+                        titleEl.textContent = ct;
+                    }
+                    function syncFavicon() {
+                        var links = Array.prototype.slice.call(document.querySelectorAll('link[rel]'));
+                        var icons = links.filter(function(link) {
+                            return (link.getAttribute('rel') || '').toLowerCase().split(/\\s+/).indexOf('icon') !== -1;
+                        });
+                        var fl = icons[0];
+                        if (!fl) { fl = document.createElement('link'); document.head.appendChild(fl); }
+                        fl.rel = 'icon';
+                        if (ci) fl.removeAttribute('type');
+                        else fl.type = 'image/svg+xml';
+                        fl.href = ci || blankFavicon;
+                        icons.slice(1).forEach(function(link) { link.remove(); });
+                    }
+                    function updatePreset(preset) {
+                        var presets = {
+                            canvas: { title: 'Dashboard', icon: 'https://du11hjcvx0uqb.cloudfront.net/dist/images/favicon-e10d657a73.ico' },
+                            classroom: { title: 'Home', icon: 'https://ssl.gstatic.com/classroom/favicon.png' },
+                            wikipedia: { title: 'Wikipedia, the free encyclopedia', icon: 'https://en.wikipedia.org/favicon.ico' },
+                            desmos: { title: 'Desmos | Graphing Calculator', icon: 'https://www.desmos.com/favicon.ico' },
+                            drive: { title: 'My Drive - Google Drive', icon: 'https://ssl.gstatic.com/docs/doclist/images/drive_2022q3_32dp.png' },
+                            docs: { title: 'Google Docs', icon: 'https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico' },
+                            bing: { title: 'Bing', icon: 'https://www.bing.com/favicon.ico' },
+                            khan: { title: 'Dashboard | Khan Academy', icon: 'https://www.khanacademy.org/favicon.ico' },
+                            none: { title: 'New Tab', icon: '' },
+                            newtab: { title: 'New Tab', icon: '' }
+                        };
+                        var next = presets[preset] || presets.canvas;
+                        ct = next.title;
+                        ci = next.icon;
+                        syncTitle();
+                        syncFavicon();
+                    }
+                    syncTitle();
+                    syncFavicon();
+                    window.addEventListener('storage', function(event) {
+                        if (event.key === 'tb_cloak_preset') updatePreset(event.newValue || 'canvas');
+                    });
+                    if (typeof BroadcastChannel === 'function') {
+                        try {
+                            var cloakChannel = new BroadcastChannel('nexus-cloak-preset');
+                            cloakChannel.addEventListener('message', function(event) {
+                                if (event.data && event.data.type === 'nexus-cloak-preset') updatePreset(event.data.preset);
+                            });
+                        } catch(e) {}
+                    }
                     try {
                         Object.defineProperty(document, 'title', {
                             get: function() { return ct; },
@@ -2343,7 +2385,7 @@ function launchGameFullscreen(game) {
                         });
                     } catch(e) {}
                     var titleTimer = setInterval(function() {
-                        if (document.title !== ct) document.title = ct;
+                        if (document.title !== ct) syncTitle();
                     }, 2000);
                     window.addEventListener('beforeunload', function() {
                         clearInterval(titleTimer);

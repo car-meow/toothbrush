@@ -112,22 +112,33 @@ if ('serviceWorker' in navigator) {
     }
     let temporaryGameCloak = false;
     const cloakChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('nexus-cloak-preset') : null;
+    const blankFavicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E";
 
-    function removeFaviconLinks() {
-        document.querySelectorAll('link[rel]').forEach(link => {
-            const relTokens = (link.getAttribute('rel') || '').toLowerCase().split(/\s+/);
-            if (relTokens.includes('icon')) link.remove();
+    function setFavicon(icon) {
+        const links = Array.from(document.querySelectorAll('link[rel]')).filter(link => {
+            return (link.getAttribute('rel') || '').toLowerCase().split(/\s+/).includes('icon');
         });
+        const link = links.shift() || document.createElement('link');
+        link.rel = 'icon';
+        if (icon) link.removeAttribute('type');
+        else link.type = 'image/svg+xml';
+        link.href = icon || blankFavicon;
+        if (!link.isConnected) document.head.appendChild(link);
+        links.forEach(extra => extra.remove());
     }
 
-    function applyTabCloak() {
-        if (temporaryGameCloak) {
-            document.title = 'New Tab';
-            removeFaviconLinks();
-            return;
-        }
+    function applyTabCloak(shouldBroadcast = true) {
         const rawPreset = localStorage.getItem('tb_cloak_preset');
         const preset = (rawPreset === null || rawPreset === undefined || rawPreset === '' || rawPreset === 'default') ? 'canvas' : rawPreset;
+        if (shouldBroadcast && cloakChannel) {
+            try { cloakChannel.postMessage({ type: 'nexus-cloak-preset', preset }); } catch (error) {}
+        }
+
+        if (temporaryGameCloak) {
+            document.title = 'New Tab';
+            setFavicon('');
+            return;
+        }
 
         const presets = {
             canvas: {
@@ -153,24 +164,18 @@ if ('serviceWorker' in navigator) {
         };
 
         const data = presets[preset] || presets.canvas;
-        if (cloakChannel) {
-            try { cloakChannel.postMessage({ type: 'nexus-cloak-preset', preset }); } catch (error) {}
-        }
-
         document.title = data.title;
-        if (preset === 'none' || preset === 'newtab') {
-            removeFaviconLinks();
-            return;
-        }
-        let link = document.querySelector("link[rel*='icon']");
-        if (!link) {
-            link = document.createElement('link');
-            link.type = 'image/x-icon';
-            link.rel = 'shortcut icon';
-            document.head.appendChild(link);
-        }
-        link.href = data.icon;
+        setFavicon(preset === 'none' || preset === 'newtab' ? '' : data.icon);
     }
+
+    if (cloakChannel) {
+        cloakChannel.addEventListener('message', event => {
+            if (event.data && event.data.type === 'nexus-cloak-preset') applyTabCloak(false);
+        });
+    }
+    window.addEventListener('storage', event => {
+        if (event.key === 'tb_cloak_preset') applyTabCloak(false);
+    });
 
     applyTabCloak();
 
