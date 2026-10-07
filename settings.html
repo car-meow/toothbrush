@@ -135,6 +135,17 @@
 
             <div class="setting-row">
                 <div class="setting-label-group">
+                    <span class="setting-label">Show Active Users Count</span>
+                    <span class="setting-hint">Shows the live count on Home. Uses one shared connection per browser.</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-online-users-count">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label-group">
                     <span class="setting-label">Performance Mode</span>
                     <span class="setting-hint">Cuts all animations and some backend stuff to massively increase performance.</span>
                 </div>
@@ -362,6 +373,15 @@
         const togglePerf = document.getElementById('toggle-performance-mode');
         const togglePerfLite = document.getElementById('toggle-performance-mode-lite');
         const storage = window.nexusStorage || window.localStorage;
+
+        const toggleOnlineUsersCount = document.getElementById('toggle-online-users-count');
+        if (toggleOnlineUsersCount) {
+            toggleOnlineUsersCount.checked = storage.getItem('tb_online_count_enabled') !== 'false';
+            toggleOnlineUsersCount.addEventListener('change', (event) => {
+                storage.setItem('tb_online_count_enabled', event.target.checked ? 'true' : 'false');
+                window.dispatchEvent(new Event('nexus-online-count-preference-change'));
+            });
+        }
 
         // Local file-based Game Stash launching remains the default.
         const toggleLocalGameFiles = document.getElementById('toggle-local-game-files');
@@ -620,5 +640,6 @@
 
     </script>
     <script src="tutorial-engine.js?v=1"></script>
+    <script src="online-presence.js?v=2" defer></script>
 </body>
 </html>
