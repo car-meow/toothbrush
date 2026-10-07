@@ -219,6 +219,13 @@ window.BGMManager = {
                 <div style="background:var(--modal-bg, #18102b); padding:28px; border-radius:20px; width:460px; max-width:92vw; max-height:85vh; border:2px solid #2196F3; text-align:center; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 0 50px rgba(0,0,0,0.9); color:var(--text-color, #fff); font-family:'Space Grotesk', sans-serif;">
                     <div id="nexus-dialog-title" style="color:#2196F3; font-size:22px; font-weight:bold; margin-bottom:14px;">Nexus</div>
                     <div id="nexus-dialog-msg" style="font-size:15px; line-height:1.5; color:var(--text-color, #e2dcf0); margin-bottom:18px; white-space:pre-wrap; max-height:50vh; overflow-y:auto; word-break:break-word;"></div>
+                    <div id="nexus-dialog-error-details" style="display:none; text-align:left; margin:-6px 0 14px;">
+                        <button id="nexus-dialog-error-toggle" type="button" aria-expanded="false" style="display:flex; align-items:center; gap:8px; padding:4px 0; border:0; background:transparent; color:var(--text-color, #e2dcf0); font:inherit; cursor:pointer;">
+                            <span id="nexus-dialog-error-label">Show raw error</span>
+                            <span id="nexus-dialog-error-arrow" aria-hidden="true" style="font-size:20px; line-height:1;">›</span>
+                        </button>
+                        <pre id="nexus-dialog-error-raw" style="display:none; max-height:28vh; overflow:auto; margin:8px 0 0; padding:10px; border-radius:8px; background:rgba(0,0,0,.28); color:var(--muted-text, #aaa); font:12px/1.45 monospace; white-space:pre-wrap; overflow-wrap:anywhere;"></pre>
+                    </div>
                     <input type="text" id="nexus-dialog-input" style="display:none; width:100%; padding:12px; margin-bottom:18px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color, #362854); background:var(--input-bg, #0d0818); color:var(--text-color, #fff); font-size:15px; outline:none;">
                     <div style="display:flex; gap:12px; justify-content:center; margin-top:8px;">
                         <button id="nexus-dialog-ok" class="save-btn" style="background:#2196F3 !important; border:2.5px solid #ffffff !important; padding:10px 24px; border-radius:999px; font-weight:bold; color:white; cursor:pointer; flex:1; min-width:90px; text-shadow:none;">OK</button>
@@ -236,6 +243,11 @@ window.BGMManager = {
             overlay: overlay,
             title: overlay.querySelector('#nexus-dialog-title'),
             msg: overlay.querySelector('#nexus-dialog-msg'),
+            errorDetails: overlay.querySelector('#nexus-dialog-error-details'),
+            errorToggle: overlay.querySelector('#nexus-dialog-error-toggle'),
+            errorLabel: overlay.querySelector('#nexus-dialog-error-label'),
+            errorArrow: overlay.querySelector('#nexus-dialog-error-arrow'),
+            errorRaw: overlay.querySelector('#nexus-dialog-error-raw'),
             input: overlay.querySelector('#nexus-dialog-input'),
             okBtn: overlay.querySelector('#nexus-dialog-ok'),
             cancelBtn: overlay.querySelector('#nexus-dialog-cancel')
@@ -252,6 +264,21 @@ window.BGMManager = {
             
             els.title.textContent = options.title || 'Nexus';
             els.msg.textContent = options.message || '';
+
+            const hasRawError = options.rawError !== undefined && options.rawError !== null && String(options.rawError).length > 0;
+            els.errorDetails.style.display = hasRawError ? 'block' : 'none';
+            els.errorRaw.textContent = hasRawError ? String(options.rawError) : '';
+            els.errorRaw.style.display = 'none';
+            els.errorLabel.textContent = 'Show raw error';
+            els.errorArrow.textContent = '›';
+            els.errorToggle.setAttribute('aria-expanded', 'false');
+            els.errorToggle.onclick = () => {
+                const expanded = els.errorRaw.style.display === 'none';
+                els.errorRaw.style.display = expanded ? 'block' : 'none';
+                els.errorLabel.textContent = expanded ? 'Hide raw error' : 'Show raw error';
+                els.errorArrow.textContent = expanded ? '⌄' : '›';
+                els.errorToggle.setAttribute('aria-expanded', String(expanded));
+            };
             
             if (isPrompt) {
                 els.input.style.display = 'block';
@@ -274,6 +301,7 @@ window.BGMManager = {
                 els.overlay.style.display = 'none';
                 els.okBtn.onclick = null;
                 els.cancelBtn.onclick = null;
+                els.errorToggle.onclick = null;
                 document.removeEventListener('keydown', keyHandler);
                 if (restoreTarget && typeof restoreTarget.focus === 'function') {
                     setTimeout(() => restoreTarget.focus(), 0);
@@ -310,6 +338,15 @@ window.BGMManager = {
 
     window.nexusAlert = function(msg, title) {
         return showDialog({ message: String(msg), title: title || 'Nexus', isConfirm: false });
+    };
+    window.nexusError = function(message, error, title) {
+        let rawError = '';
+        if (error instanceof Error) rawError = error.stack || `${error.name}: ${error.message}`;
+        else if (typeof error === 'string') rawError = error;
+        else if (error !== undefined && error !== null) {
+            try { rawError = JSON.stringify(error, null, 2); } catch (e) { rawError = String(error); }
+        }
+        return showDialog({ message: String(message), title: title || 'Nexus', isConfirm: false, rawError });
     };
     window.nexusConfirm = function(msg, title) {
         return showDialog({ message: String(msg), title: title || 'Nexus', isConfirm: true });

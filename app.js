@@ -1906,7 +1906,17 @@ async function fetchExternalGameHtml(url, bootstrap = '', options = {}) {
     const requestUrl = new URL(url, window.location.href);
     requestUrl.searchParams.set('t', String(Date.now()));
 
-    const response = await fetch(requestUrl.href, { cache: 'no-store' });
+    const controller = options.timeoutMs > 0 ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), options.timeoutMs) : null;
+    let response;
+    try {
+        response = await fetch(requestUrl.href, {
+            cache: 'no-store',
+            ...(controller ? { signal: controller.signal } : {})
+        });
+    } finally {
+        if (timeout) clearTimeout(timeout);
+    }
     if (!response.ok) {
         throw new Error('External game request failed (' + response.status + ')');
     }
@@ -2051,6 +2061,16 @@ function applyGameRunMode(game) {
     };
 }
 
+async function getLaunchSnapshot(gameId) {
+    try {
+        return await getGameSnapshot(gameId) || {};
+    } catch (error) {
+        // Save restoration is best-effort; storage errors should not block launch.
+        console.warn(`Could not load saved state for ${gameId}; launching without restore data.`, error);
+        return {};
+    }
+}
+
 function launchGameFullscreen(game) {
     game = applyGameRunMode(game);
     if (!game || game.id === "ugs-stash") return;
@@ -2177,7 +2197,7 @@ function launchGameFullscreen(game) {
                         return;
                     }
                 }
-                const latestSnapshot = await getGameSnapshot(game.id);
+                const latestSnapshot = await getLaunchSnapshot(game.id);
                 loadedGameSnapshots.set(game, latestSnapshot || {});
 
                 let rawHtml = atob(game.content.split(',')[1]);
@@ -2257,20 +2277,28 @@ function launchGameFullscreen(game) {
                 if (resolved.usedFallback) resolvedUrl = resolved.url;
                 if (resolved.usedFallback) game = { ...game, nexusExternalSource: true };
                 if (game.nexusExternalSource || isTagC3Game(game) || isCrossyRoadGame(game)) {
-                    const snapshot = await getGameSnapshot(game.id);
+                    const snapshot = await getLaunchSnapshot(game.id);
                     const savedLocalStorage = snapshot && snapshot.localStorage ? snapshot.localStorage : {};
                     const snapshotJson = JSON.stringify(savedLocalStorage).replace(/</g, '\\u003c');
                     const restoreScript = '<script>(function(){try{var s=' + snapshotJson + ';Object.keys(s).forEach(function(k){if(k.indexOf("tb_")!==0&&k!=="sidebar-game-order"&&k!=="sidebar-game-order-updated-at")localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>';
                     const popupBridge = getUniversalAutosaveBridge(game.id);
-                    ifr.srcdoc = await fetchExternalGameHtml(
-                        resolvedUrl,
-                        restoreScript + popupBridge + titleEnforceScript,
-                        {
-                            disableServiceWorker: isTagC3Game(game),
-                            disableRemotePokiSdk: isTagC3Game(game),
-                            adaptYouTubePlayable: isCrossyRoadGame(game)
-                        }
-                    );
+                    try {
+                        ifr.srcdoc = await fetchExternalGameHtml(
+                            resolvedUrl,
+                            restoreScript + popupBridge + titleEnforceScript,
+                            {
+                                disableServiceWorker: isTagC3Game(game),
+                                disableRemotePokiSdk: isTagC3Game(game),
+                                adaptYouTubePlayable: isCrossyRoadGame(game),
+                                timeoutMs: 15000
+                            }
+                        );
+                    } catch (bootstrapError) {
+                        // The source page may still load in a frame when a fetch for
+                        // save/compatibility injection is blocked or times out.
+                        console.warn('External game bootstrap failed; trying direct load.', bootstrapError);
+                        ifr.src = resolvedUrl;
+                    }
                 } else {
                     ifr.src = resolvedUrl;
                 }
@@ -2523,7 +2551,9 @@ function launchGameFullscreen(game) {
         } catch(err) {
             console.error("Error launching game in fullscreen window:", err);
             try { win.close(); } catch (e) {}
-            nexusAlert('Could not launch this game. Please retry or return to Game Stash.');
+            const message = 'Nexus could not start this game. Check your connection and try again. The raw error is available below if needed.';
+            if (typeof window.nexusError === 'function') window.nexusError(message, err, 'Game launch failed');
+            else nexusAlert('Nexus could not start this game. Check your connection and try again.');
         }
         })();
     };
@@ -4088,7 +4118,8 @@ if (exportBtn) {
 
         } catch (e) {
             console.error("Backup failed:", e);
-            nexusAlert("Backup failed: " + e.message);
+            if (typeof window.nexusError === 'function') window.nexusError('Nexus could not create the backup. Try again, and use the raw error details if the problem continues.', e, 'Backup failed');
+            else nexusAlert('Nexus could not create the backup. Try again.');
             exportBtn.innerHTML = defaultBackupHTML;
             exportBtn.disabled = false;
         }
@@ -4151,7 +4182,8 @@ if (importBtn) {
             try {
                 data = JSON.parse(ev.target.result);
             } catch (err) {
-                nexusAlert("Invalid backup file: " + err.message);
+                if (typeof window.nexusError === 'function') window.nexusError('This file could not be read as a Nexus backup. Choose a valid backup file and try again.', err, 'Backup could not be read');
+                else nexusAlert('This file could not be read as a Nexus backup. Choose a valid backup file and try again.');
                 return;
             }
 
@@ -4370,7 +4402,8 @@ if (importBtn) {
                 location.reload();
             } catch (err) {
                 console.error("Restoration failed:", err);
-                nexusAlert("Restoration failed: " + err.message);
+                if (typeof window.nexusError === 'function') window.nexusError('Nexus could not finish restoring the backup. Check the file and try again.', err, 'Restore failed');
+                else nexusAlert('Nexus could not finish restoring the backup. Check the file and try again.');
             }
         };
         reader.readAsText(file);
