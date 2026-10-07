@@ -160,10 +160,7 @@ h1 {
 body:not(.media-bg) button:not(.color-swatch-btn),
 body:not(.media-bg) .save-btn,
 body:not(.media-bg) .nav-btn,
-body:not(.media-bg) .hud-btn,
 body:not(.media-bg) .action-btn,
-body:not(.media-bg) .buy-btn,
-body:not(.media-bg) .incinerate-btn,
 body:not(.media-bg) .rename-done-btn {
     background: var(--accent-btn-bg) !important;
     border: 2.5px solid var(--accent-btn-border) !important;
@@ -176,10 +173,7 @@ body:not(.media-bg) .rename-done-btn {
 body:not(.media-bg) button:not(.color-swatch-btn):hover,
 body:not(.media-bg) .save-btn:hover,
 body:not(.media-bg) .nav-btn:hover,
-body:not(.media-bg) .hud-btn:hover,
 body:not(.media-bg) .action-btn:hover,
-body:not(.media-bg) .buy-btn:hover,
-body:not(.media-bg) .incinerate-btn:hover,
 body:not(.media-bg) .rename-done-btn:hover {
     background: var(--accent-btn-bg-hover) !important;
     border: 2.5px solid var(--accent-btn-border-hover) !important;
@@ -2008,258 +2002,6 @@ html.light-mode #nexus-dialog-cancel {
     color: #140d24 !important;
 }
 
-/* =========================================
-   8. SHOP UI
-========================================= */
-#shop-list,
-#stats-list {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    overflow-y: auto;
-    padding: 10px;
-    margin: 15px 0;
-    text-align: left;
-}
-
-.shop-cat {
-    grid-column: span 2;
-    color: #888;
-    font-size: 11px;
-    font-weight: bold;
-    text-transform: uppercase;
-    border-bottom: 1px solid #333;
-    padding: 10px 0 5px 0;
-}
-
-/* Shop category and status SVG alignment and colors */
-.shop-cat img,
-.item-owned img {
-    vertical-align: middle;
-}
-.shop-cat img {
-    width: 16px;
-    height: 16px;
-    margin-right: 8px;
-}
-.item-owned img {
-    width: 12px;
-    height: 12px;
-    margin-right: 4px;
-}
-html.light-mode .shop-cat img {
-    filter: brightness(0.2);
-}
-html:not(.light-mode) .shop-cat img {
-    filter: brightness(0) invert(0.6);
-}
-html.light-mode .item-owned img {
-    filter: brightness(0.2);
-}
-html:not(.light-mode) .item-owned img {
-    filter: brightness(0) invert(1);
-}
-
-.shop-item {
-    background: var(--panel-bg);
-    padding: 12px;
-    border-radius: 12px;
-    border: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-.swag-upgrade-box {
-    background: rgba(139, 0, 0, 0.2) !important;
-    border: 1px solid #b71c1c !important;
-}
-
-.item-name {
-    color: #2196F3;
-    font-weight: bold;
-    font-size: 14px;
-}
-
-.item-desc {
-    color: #aaa;
-    font-size: 11px;
-    margin: 6px 0;
-    line-height: 1.3;
-    height: auto;
-    overflow: visible;
-}
-
-.item-cost {
-    color: #FFEB3B;
-    font-weight: bold;
-    font-size: 12px;
-}
-
-.buy-btn.disabled {
-    background: #444 !important;
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.incinerate-btn {
-    background-color: #B71C1C !important;
-    color: white !important;
-    grid-column: span 2;
-    margin-top: 10px;
-    border: 2px solid #ef5350 !important;
-    font-size: 14px !important;
-}
-
-.cps-display {
-    font-size: 16px;
-    color: #FFF59D;
-    margin-left: 10px;
-    font-weight: bold;
-    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
-}
-
-/* =========================================
-   9. COOKIE ENTITIES & AURAS
-========================================= */
-.golden-cookie {
-    position: fixed;
-    object-fit: contain;
-    z-index: 999;
-    cursor: pointer;
-}
-
-.aura-basic {
-    filter: drop-shadow(0 0 15px rgba(139, 69, 19, 0.8)) !important;
-}
-
-.aura-cashew {
-    filter: drop-shadow(0 0 15px rgba(210, 180, 140, 0.8)) !important;
-}
-
-.aura-oatmeal {
-    filter: drop-shadow(0 0 15px rgba(139, 69, 19, 0.8)) drop-shadow(0 0 20px rgba(128, 0, 128, 0.6)) !important;
-}
-
-.aura-peanut {
-    filter: drop-shadow(0 0 15px rgba(205, 133, 63, 0.8)) !important;
-}
-
-.aura-sugar {
-    filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 5px rgba(255, 0, 255, 0.6)) drop-shadow(0 0 5px rgba(0, 255, 255, 0.6)) !important;
-}
-
-.aura-chocolate {
-    filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.5)) drop-shadow(0 0 20px rgba(101, 67, 33, 0.8)) !important;
-}
-
-.aura-snickerdoodle {
-    filter: drop-shadow(0 0 15px rgba(160, 82, 45, 0.8)) !important;
-}
-
-.aura-smore {
-    filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 20px rgba(139, 69, 19, 0.8)) drop-shadow(0 0 25px rgba(210, 180, 140, 0.8)) !important;
-}
-
-.aura-golden {
-    filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.9)) drop-shadow(0 0 30px rgba(255, 215, 0, 0.6)) !important;
-}
-
-.aura-nebula {
-    animation: nebula-flicker 1.5s alternate infinite !important;
-}
-
-@keyframes nebula-flicker {
-    0% {
-        filter: drop-shadow(0 0 15px #00BCD4) drop-shadow(0 0 20px #9C27B0) drop-shadow(0 0 15px #FFEB3B);
-    }
-
-    100% {
-        filter: drop-shadow(0 0 25px #4CAF50) drop-shadow(0 0 30px #E91E63) drop-shadow(0 0 25px #FFEB3B);
-    }
-}
-
-/* =========================================
-   10. RARITY SYSTEM (Flat Colors + Outline)
-========================================= */
-.rarity-common {
-    color: #CFCFCF;
-}
-
-.rarity-uncommon {
-    color: #6CDB66;
-}
-
-.rarity-rare {
-    color: #566FEB;
-}
-
-.rarity-epic {
-    color: #AD0FEB;
-}
-
-.rarity-divine {
-    color: #EDD11D;
-}
-
-.floating-rarity {
-    position: fixed;
-    font-weight: 900;
-    font-size: 28px;
-    z-index: 10001;
-    pointer-events: none;
-    animation: rarity-float 2.5s ease-out forwards;
-    text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0px 4px 8px rgba(0, 0, 0, 0.8);
-}
-
-@keyframes rarity-float {
-    0% {
-        transform: translate(-50%, -50%) scale(0.5);
-        opacity: 0;
-    }
-
-    15% {
-        transform: translate(-50%, -50%) scale(1.2);
-        opacity: 1;
-    }
-
-    30% {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 1;
-    }
-
-    100% {
-        transform: translate(-50%, -120px);
-        opacity: 0;
-    }
-}
-
-/* =========================================
-   11. ANIMATIONS & FLOATING UI
-========================================= */
-.floating-bucks {
-    position: fixed;
-    color: #4CAF50;
-    font-weight: bold;
-    font-size: 28px;
-    z-index: 1001;
-    pointer-events: none;
-    animation: float-up 1.5s ease-out forwards;
-    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8), -1px -1px 3px rgba(0, 0, 0, 0.8);
-}
-
-@keyframes float-up {
-    0% {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 1;
-    }
-
-    100% {
-        transform: translate(-50%, -120px) scale(1.5);
-        opacity: 0;
-    }
-}
-
 #splash-text {
     font-size: 18px;
     font-style: italic;
@@ -2283,162 +2025,9 @@ html:not(.light-mode) .item-owned img {
     }
 }
 
-.discovery-popup {
-    position: fixed;
-    top: -150px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(25, 25, 25, 0.95);
-    border: 4px solid #FFD700;
-    border-radius: 15px;
-    padding: 20px 40px;
-    text-align: center;
-    z-index: 10000;
-    transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    pointer-events: none;
-}
-
-.discovery-popup.show {
-    top: 20px;
-}
-
-#effects-container {
-    position: fixed;
-    top: 20px;
-    right: 25px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    align-items: flex-end;
-    z-index: 1000;
-    pointer-events: none;
-}
-
-.effect-item {
-    background: rgba(31, 31, 31, 0.9);
-    border: 2px solid #2196F3;
-    padding: 8px 12px;
-    border-radius: 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-}
-
-.effect-name {
-    font-size: 10px;
-    font-weight: bold;
-    color: #2196F3;
-    text-transform: uppercase;
-}
-
-.effect-timer {
-    font-size: 16px;
-    font-weight: bold;
-    color: white;
-}
-
-/* =========================================
-   12. DIVINE EVENT
-========================================= */
-#screen-border {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    pointer-events: none;
-    z-index: 9998;
-    box-shadow: inset 0 0 100px rgba(0, 0, 0, 0);
-    transition: opacity 0.5s, box-shadow 0.5s;
-    opacity: 0;
-}
-
-#divine-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0);
-    z-index: 15000;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-    gap: clamp(10px, 2.5vw, 34px);
-    transition: background 0.5s;
-    overflow: hidden;
-}
-
-.divine-letter {
-    font-size: clamp(48px, 10vw, 150px);
-    font-weight: 900;
-    position: relative;
-    line-height: 0.9;
-    background: linear-gradient(to bottom, #FAA00F, #EDD11D);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: #FFD700;
-    -webkit-text-stroke: clamp(3px, 0.6vw, 10px) #bf360c;
-    filter: drop-shadow(0 0 20px black);
-    transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-    white-space: nowrap;
-}
-
-#div-part {
-    transform: translateX(-150vw);
-}
-
-#ine-part {
-    transform: translateX(150vw);
-}
-
-#div-part.slam,
-#ine-part.slam {
-    transform: translateX(0);
-}
-
-@media (max-width: 560px) {
-    #divine-overlay {
-        gap: clamp(8px, 2vw, 20px);
-    }
-}
-
-@keyframes shake {
-
-    0%,
-    100% {
-        transform: translate(0, 0)
-    }
-
-    25% {
-        transform: translate(-5px, 5px)
-    }
-
-    50% {
-        transform: translate(5px, -5px)
-    }
-
-    75% {
-        transform: translate(-5px, -5px)
-    }
-}
-
-.camera-shake {
-    animation: shake 0.1s infinite;
-}
-
 /* =========================================
    13. HUD & STATUS LIGHTS
 ========================================= */
-.hud-bottom-right {
-    position: fixed;
-    bottom: 20px;
-    right: 25px;
-    display: flex;
-    gap: 10px;
-    z-index: 11000;
-}
-
 .status-header {
     display: flex;
     align-items: center;
@@ -2462,17 +2051,6 @@ html:not(.light-mode) .item-owned img {
     z-index: 10002 !important;
 }
 
-.hud-top-left {
-    pointer-events: none;
-    /* Allows clicks to pass through the empty space between buttons */
-}
-
-.hud-top-left button {
-    pointer-events: auto;
-    /* Re-enables clicking for the buttons themselves */
-}
-
-/* =========================================
    14. TUTORIAL SYSTEM
    ========================================= */
 .tutorial-overlay {
@@ -2630,72 +2208,6 @@ html.light-mode .tutorial-popup strong {
 }
 
 /* =========================================
-   6. STEALTH COOKIE GAME TOGGLE BUTTON
-========================================= */
-#cookie-btn-trigger {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 160px;
-    height: 160px;
-    z-index: 11999;
-    pointer-events: auto;
-}
-
-#cookie-btn {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    width: 52px;
-    height: 52px;
-    z-index: 12000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50% !important;
-    cursor: pointer;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.25s ease, visibility 0.25s ease, color 0.3s ease, border-color 0.3s ease, background-color 0.3s ease, transform 0.2s ease;
-    
-    /* Default Red state (Inactive) */
-    color: #ef5350 !important;
-    border: 2.5px solid #ef5350 !important;
-    background-color: rgba(239, 83, 80, 0.2) !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    pointer-events: auto !important;
-}
-
-#cookie-btn:hover {
-    transform: scale(1.1);
-}
-
-/* Green state (Active) */
-#cookie-btn.active {
-    color: #4CAF50 !important;
-    border: 2.5px solid #4CAF50 !important;
-    background-color: rgba(76, 175, 80, 0.25) !important;
-}
-
-#cookie-btn svg {
-    width: 24px;
-    height: 24px;
-    transition: transform 0.2s ease;
-}
-
-#cookie-btn:active svg {
-    transform: scale(0.9);
-}
-
-#cookie-btn-trigger:hover ~ #cookie-btn,
-#cookie-btn-trigger:hover #cookie-btn,
-#cookie-btn:hover,
-#cookie-btn.visible {
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-/* =========================================
    PERFORMANCE MODE OPTIMIZATIONS
 ========================================= */
 html.performance-mode,
@@ -2769,7 +2281,6 @@ html.light-mode.performance-mode .btn-backup img,
 html.light-mode.performance-mode .btn-restore img,
 html.light-mode.performance-mode #cloak-btn img,
 html.light-mode.performance-mode #custom-app-btn img,
-html.light-mode.performance-mode .hud-btn img,
 html.light-mode.performance-mode #chat-back-btn img {
     filter: brightness(0) invert(0.08) !important;
 }
@@ -2811,10 +2322,6 @@ html.performance-mode-lite body.media-bg,
 html.performance-mode-lite body.chat-bg {
     animation: none !important;
     background-position: 0 0 !important;
-}
-
-html.performance-mode-lite #magnet-visual {
-    animation: none !important;
 }
 
 html.performance-mode .material-nav-btn {
@@ -2955,20 +2462,6 @@ html.light-mode #backup-select-all {
     color: #ffffff !important;
 }
 
-html.light-mode .currency-display,
-html.light-mode .swag-display {
-    background: var(--hud-bg) !important;
-    border-color: #2e7d32 !important;
-    box-shadow: 0 4px 16px rgba(20, 13, 36, 0.12) !important;
-}
-
-html.light-mode .currency-amount {
-    color: var(--text-color) !important;
-}
-
-html.light-mode .cps-display {
-    color: #795548 !important;
-}
 
 html.light-mode #game-list li {
     background-color: var(--zigzag-bg);

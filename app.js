@@ -191,7 +191,6 @@ function enterGameStandbyScreen() {
     if (gameAutosaveTimer) clearInterval(gameAutosaveTimer);
     gameAutosaveTimer = null;
     try {
-        if (typeof window.stopCookieGame === 'function') window.stopCookieGame();
         const video = document.querySelector('.home-bg-video, #bg-video');
         if (video && !video.paused) video.pause();
     } catch (error) {}
@@ -3087,7 +3086,6 @@ async function loadGame(game, forceInternal = false, options = {}) {
 
     // Stop background tasks and pause video to free CPU/GPU for Chromebooks
     try {
-        if (typeof window.stopCookieGame === 'function') window.stopCookieGame();
         const bgVid = document.querySelector('.home-bg-video') || document.getElementById('bg-video');
         if (bgVid && !bgVid.paused) bgVid.pause();
     } catch (e) {}

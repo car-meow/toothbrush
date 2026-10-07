@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Settings - Nexus</title>
-    <link rel="stylesheet" href="style.css?v=56">
+    <link rel="stylesheet" href="style.css?v=57">
     <script src="bgm-manager.js?v=57"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
@@ -211,13 +211,6 @@
             </div>
 
             <div class="setting-row">
-                <span class="setting-label">Reset Progress</span>
-                <button class="material-nav-btn" style="--expanded-width: 190px;" id="btn-reset-stats">
-                    <img src="Assets/Delete.svg" alt=""><span>Reset Progress</span>
-                </button>
-            </div>
-
-            <div class="setting-row">
                 <span class="setting-label">Reset Tutorial</span>
                 <button class="material-nav-btn" style="--expanded-width: 190px;" id="btn-reset-tutorial">
                     <img src="Assets/Active Timer.svg" alt=""><span>Reset Tutorial</span>
@@ -414,16 +407,6 @@
                 }
             });
         }
-
-        // Reset Stats
-        document.getElementById('btn-reset-stats').onclick = async () => {
-            const ok = await nexusConfirm('This will erase ALL cookie game data (money, upgrades, stats, discoveries). Are you sure?');
-            if (ok) {
-                const keys = ['tb_cookie_save', 'tb_cookie_stats', 'tb_cookie_discoveries'];
-                keys.forEach(k => localStorage.removeItem(k));
-                await nexusAlert('All cookie data has been reset!');
-            }
-        };
 
         // Reset Tutorial
         document.getElementById('btn-reset-tutorial').onclick = async () => {

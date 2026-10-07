@@ -1,6 +1,6 @@
 // ============================================================
 // SITE CORE: Navigation, Splash System, Proxy Launcher, Keybinds
-// (Independent of Cookie Clicker Game)
+// (Independent of game frames)
 // ============================================================
 
 (function () {

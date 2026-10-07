@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexus-cache-v21';
+const CACHE_NAME = 'nexus-cache-v22';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -21,8 +21,6 @@ const ASSETS_TO_CACHE = [
     './SpaceflightSimulator/TemplateData/favicon.ico',
     './style.css',
     './app.js',
-    './cookie-engine.js',
-    './cookie-core.js',
     './bgm-manager.js',
     './game-title-utils.js',
     './tutorial-engine.js',
@@ -36,9 +34,7 @@ const ASSETS_TO_CACHE = [
     './Assets/Active%20Timer.svg',
     './Assets/Backup.svg',
     './Assets/Bolt.svg',
-    './Assets/Chart.svg',
     './Assets/Chat.svg',
-    './Assets/Cookie.svg',
     './Assets/Cooldown.svg',
     './Assets/Custom.svg',
     './Assets/Delete.svg',
@@ -67,7 +63,6 @@ const ASSETS_TO_CACHE = [
     './Assets/cursor.png',
     './Assets/drive_cloak.png',
     './Assets/loadingRoll.gif',
-    './Assets/magnet.png',
     './Assets/mediaP.png',
     './Assets/nexusLogo.png',
     './Assets/photoIcon.png',
