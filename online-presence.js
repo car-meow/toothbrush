@@ -1,14 +1,34 @@
-// nexus-version: 4.28.2
+// nexus-version: 4.28.4
 (function () {
     'use strict';
 
     const PREFERENCE_KEY = 'tb_online_count_enabled';
-    const WORKER_URL = 'online-presence-worker.js?v=2';
-    const WORKER_NAME = 'nexus-online-presence-v2';
+    const WORKER_URL = 'online-presence-worker.js?v=4';
+    const WORKER_NAME = 'nexus-online-presence-v4';
     let worker = null;
     let port = null;
     let enabled = true;
-    let gameStandby = false;
+    let gameActive = false;
+
+    function keepCountedWhilePlayingPreference() {
+        try {
+            const storage = window.nexusStorage || window.localStorage;
+            return storage.getItem('tb_presence_keep_counted_while_playing') !== 'false';
+        } catch (_) {
+            return true;
+        }
+    }
+
+    function syncGameState() {
+        if (!port) return;
+        try {
+            port.postMessage({
+                type: 'set-game-state',
+                active: gameActive,
+                keepCounted: keepCountedWhilePlayingPreference()
+            });
+        } catch (_) {}
+    }
 
     function preferenceEnabled() {
         try {
@@ -68,6 +88,7 @@
             port.onmessage = event => updateHomeBubble(event.data || {});
             port.start();
             port.postMessage({ type: 'set-enabled', enabled: true });
+            syncGameState();
         } catch (_) {
             updateHomeBubble({ type: 'unavailable' });
             worker = null;
@@ -77,19 +98,23 @@
 
     function applyPreference() {
         const nextEnabled = preferenceEnabled();
-        if (enabled === nextEnabled) return;
+        const wasEnabled = enabled;
         enabled = nextEnabled;
-        updateHomeBubble(enabled ? null : { type: 'disabled' });
+        if (wasEnabled !== enabled) updateHomeBubble(enabled ? null : { type: 'disabled' });
         if (enabled) {
-            if (gameStandby) stopWorkerPort(false);
-            else startWorkerPort();
-        } else stopWorkerPort(true);
+            startWorkerPort();
+            syncGameState();
+        } else if (wasEnabled || port) stopWorkerPort(true);
     }
 
     window.addEventListener('nexus-game-standby-change', event => {
-        gameStandby = !!(event.detail && event.detail.active);
-        if (gameStandby) stopWorkerPort(false);
-        else if (enabled) startWorkerPort();
+        gameActive = !!(event.detail && event.detail.active);
+        syncGameState();
+    });
+
+    window.addEventListener('nexus-active-game-change', event => {
+        gameActive = !!(event.detail && event.detail.active);
+        syncGameState();
     });
 
     enabled = preferenceEnabled();
@@ -97,7 +122,7 @@
     else updateHomeBubble({ type: 'disabled' });
 
     window.addEventListener('storage', event => {
-        if (event.key === PREFERENCE_KEY) applyPreference();
+        if (event.key === PREFERENCE_KEY || event.key === 'tb_presence_keep_counted_while_playing') applyPreference();
     });
     window.addEventListener('nexus-online-count-preference-change', applyPreference);
     window.addEventListener('pagehide', () => stopWorkerPort(false), { once: true });

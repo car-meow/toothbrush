@@ -1,4 +1,4 @@
-// nexus-version: 4.28.2
+// nexus-version: 4.28.4
 (function () {
     const sectionNames = {
         'index.html': 'Home',

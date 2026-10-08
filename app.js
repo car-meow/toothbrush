@@ -1,4 +1,4 @@
-// nexus-version: 4.28.2
+// nexus-version: 4.28.4
 const appStorage = window.nexusStorage || window.localStorage;
 // Game Stash is always available during a Games visit. Release its frame only
 // while the lightweight game standby screen is active.
@@ -3161,6 +3161,9 @@ async function loadGame(game, forceInternal = false, options = {}) {
 
     releaseInactiveGameContent(game);
     currentGame = game;
+    window.dispatchEvent(new CustomEvent('nexus-active-game-change', {
+        detail: { active: game.id !== 'ugs-stash' }
+    }));
 
     // Stop background tasks and pause video to free CPU/GPU for Chromebooks
     try {

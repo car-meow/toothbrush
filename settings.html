@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.28.2 -->
+<!-- nexus-version: 4.28.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,25 +32,39 @@
 
         .modal-box {
             background: var(--modal-bg); padding: 24px; border-radius: 18px;
-            width: 560px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+            width: min(1440px, 94vw); max-width: 94vw; max-height: 84vh; overflow-y: auto;
             border: 2px solid var(--white-outline); text-align: center;
             box-shadow: 0 0 60px rgba(0,0,0,0.9);
             position: relative;
         }
 
-        .modal-box h2 { color: var(--title-color); margin: 0 0 20px 0; font-size: 24px; }
+        .modal-box h2 { color: var(--title-color); margin: 0 0 18px 0; font-size: 24px; }
+        .settings-core-row {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px; margin-bottom: 16px;
+        }
+        .settings-columns {
+            display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+            align-items: start; gap: 14px;
+        }
+        .settings-column {
+            min-width: 0; padding: 12px; border: 1px solid var(--border-color);
+            border-radius: 14px; background: rgba(0, 0, 0, 0.12);
+        }
+        .settings-column .setting-section-title { margin: 2px 0 12px; }
         .setting-row {
             display: flex; justify-content: space-between; align-items: center;
             background: var(--settings-row-bg); padding: 12px 18px; border-radius: 12px; border: 1px solid var(--border-color);
-            margin-bottom: 12px; gap: 16px; text-align: left; flex-wrap: wrap;
+            margin-bottom: 10px; gap: 12px; text-align: left; flex-wrap: nowrap;
         }
+        .setting-row:last-child { margin-bottom: 0; }
         .setting-label { color: var(--settings-label-color); font-size: 16px; font-weight: bold; }
         .setting-section-title {
             color: var(--settings-label-color); font-size: 19px; font-weight: 800;
             margin: 18px 0 10px; text-align: left;
         }
-        .setting-label-group { display: flex; flex-direction: column; gap: 3px; }
-        .setting-hint { color: var(--muted-text, #8f8f8f); font-size: 12px; font-weight: 600; }
+        .setting-label-group { display: flex; flex: 1 1 auto; min-width: 0; flex-direction: column; gap: 3px; }
+        .setting-hint { color: var(--muted-text, #8f8f8f); font-size: 12px; font-weight: 600; line-height: 1.35; padding-right: 8px; }
         
         /* Toggle Switch */
         .toggle-switch {
@@ -81,6 +95,23 @@
             min-width: 180px; max-width: 240px;
         }
         .custom-select:disabled { opacity: 0.65; cursor: not-allowed; }
+
+        .settings-core-row .setting-row { margin: 0; padding: 10px 16px; }
+        .settings-column .setting-row { padding: 11px 12px; gap: 10px; }
+        .settings-column .setting-label { font-size: 14px; }
+        .settings-column .custom-select { min-width: 0; width: min(132px, 42%); padding: 6px 8px; }
+        .settings-column .toggle-switch { flex: 0 0 50px; }
+        .settings-column .material-nav-btn { flex: 0 0 auto; }
+        .settings-core-row .custom-select { min-width: 160px; }
+        @media (max-width: 1120px) {
+            .settings-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .modal-box { max-height: 82vh; }
+        }
+        @media (max-width: 640px) {
+            .modal-box { padding: 16px; width: 94vw; max-width: 94vw; max-height: 80vh; }
+            .settings-core-row, .settings-columns { grid-template-columns: minmax(0, 1fr); }
+            .settings-core-row .custom-select { min-width: 0; width: min(180px, 48%); }
+        }
     </style>
     <link rel="prefetch" href="site-core.js?v=4">
 </head>
@@ -112,121 +143,138 @@
             </button>
         </div>
     </header>
-    <main style="display:flex; align-items:center; justify-content:center; flex:1; overflow:hidden; width:100%;">
+    <main style="display:flex; align-items:center; justify-content:center; flex:1; overflow:auto; width:100%; padding: 16px 0; box-sizing:border-box;">
         <div class="modal-box">
             <h2><img src="Assets/Settings.svg" alt="" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px; filter: brightness(0) invert(1);">Settings</h2>
-            
-            <div class="setting-row">
-                <span class="setting-label">Theme</span>
-                <select id="select-theme" class="custom-select">
-                    <option value="dark">Dark</option>
-                    <option value="light">Light</option>
-                </select>
-            </div>
-
-            <div class="setting-row">
-                <span class="setting-label">App Cloaking</span>
-                <select id="select-cloak" class="custom-select">
-                    <option value="canvas">Canvas (Default)</option>
-                    <option value="wikipedia">Wikipedia</option>
-                    <option value="drive">Google Drive</option>
-                    <option value="none">New Tab</option>
-                </select>
-            </div>
-
-            <div class="setting-row">
-                <div class="setting-label-group">
-                    <span class="setting-label">Show Active Users Count</span>
-                    <span class="setting-hint">Shows the live count on Home. Uses one shared connection per browser.</span>
+            <div class="settings-core-row">
+                <div class="setting-row">
+                    <span class="setting-label">App Cloaking</span>
+                    <select id="select-cloak" class="custom-select">
+                        <option value="canvas">Canvas (Default)</option>
+                        <option value="wikipedia">Wikipedia</option>
+                        <option value="drive">Google Drive</option>
+                        <option value="none">New Tab</option>
+                    </select>
                 </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggle-online-users-count">
-                    <span class="slider"></span>
-                </label>
+                <div class="setting-row">
+                    <span class="setting-label">Theme</span>
+                    <select id="select-theme" class="custom-select">
+                        <option value="dark">Dark</option>
+                        <option value="light">Light</option>
+                    </select>
+                </div>
             </div>
 
-            <div class="setting-row">
-                <div class="setting-label-group">
-                    <span class="setting-label">Performance Mode</span>
-                    <span class="setting-hint">Cuts all animations and some backend stuff to massively increase performance.</span>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggle-performance-mode">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <div class="setting-row">
-                <div class="setting-label-group">
-                    <span class="setting-label">Performance Mode Lite</span>
-                    <span class="setting-hint">Increases performance with less visual sacrifices.</span>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggle-performance-mode-lite">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <div class="setting-row">
-                <div class="setting-label-group">
-                    <span class="setting-label">Run Game Stash Games Locally</span>
-                    <span class="setting-hint">On: use the bundled file-based system. Off: use the legacy external game source. Applies to the next game you launch.</span>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggle-local-game-files">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <!-- Developer Mode / To Be Removed Section (Only visible when Dev Mode is ON) -->
-            <div id="dev-mode-settings-section" style="display: none;">
-                <div class="setting-section-title" style="color: #ff5252; display: flex; align-items: center; gap: 8px;">
-                    <img src="Assets/report.svg" alt="" style="width: 20px; height: 20px; filter: invert(30%) sepia(90%) saturate(2000%) hue-rotate(345deg) brightness(95%) contrast(100%);">
-                    Developer Mode
-                </div>
-                <div id="dev-to-be-removed-row" class="setting-row" style="border-color: rgba(239, 83, 80, 0.4); background: rgba(239, 83, 80, 0.08);">
-                    <div class="setting-label-group">
-                        <span class="setting-label" style="color: #ff5252;">To Be Removed Games (<span id="dev-reported-count">0</span>)</span>
-                        <span class="setting-hint">Games reported in Game Stash for deletion by unique ID</span>
+            <div class="settings-columns">
+                <section class="settings-column">
+                    <div class="setting-section-title">Live User Tracking</div>
+                    <div class="setting-row">
+                        <div class="setting-label-group">
+                            <span class="setting-label">Enable Active Users Count</span>
+                            <span class="setting-hint">If having performance issues, turn OFF. Shows the count on Home and refreshes about once a minute.</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-online-users-count">
+                            <span class="slider"></span>
+                        </label>
                     </div>
-                    <button id="btn-view-reported-games" class="action-btn dev-action-btn-primary" type="button">View List</button>
-                </div>
-            </div>
+                    <div class="setting-row">
+                        <div class="setting-label-group">
+                            <span class="setting-label">Keep me Counted while Playing</span>
+                            <span class="setting-hint">Enabled by default, leave on if unsure. Disabling allows for more precise user tracking.</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-presence-while-playing">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </section>
 
-            <div class="setting-section-title">Media Settings</div>
+                <section class="settings-column">
+                    <div class="setting-section-title">Performance</div>
+                    <div class="setting-row">
+                        <div class="setting-label-group">
+                            <span class="setting-label">Performance Mode</span>
+                            <span class="setting-hint">Cuts animations and some background activity to improve performance.</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-performance-mode">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-label-group">
+                            <span class="setting-label">Performance Mode Lite</span>
+                            <span class="setting-hint">Improves performance with fewer visual changes.</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-performance-mode-lite">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-label-group">
+                            <span class="setting-label">Run Game Stash Games Locally</span>
+                            <span class="setting-hint">Leave ON if unsure. Uses bundled files to get a faster loading and playing experience than external sources.</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-local-game-files">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </section>
 
-            <div class="setting-row">
-                <div class="setting-label-group">
-                    <span class="setting-label">Provider</span>
-                    <span class="setting-hint">Used when Auto-Select is off.</span>
-                </div>
-                <select id="select-media-source" class="custom-select"></select>
-            </div>
+                <section class="settings-column">
+                    <div class="setting-section-title">Media Settings</div>
+                    <div class="setting-row">
+                        <div class="setting-label-group">
+                            <span class="setting-label">Provider</span>
+                            <span class="setting-hint">Used when Auto-Select is off.</span>
+                        </div>
+                        <select id="select-media-source" class="custom-select"></select>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Auto-Select</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-media-auto">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-label-group">
+                            <span class="setting-label">Shield</span>
+                            <span class="setting-hint">Leave ON if unsure. Blocks provider popups and redirects.</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-media-shield">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </section>
 
-            <div class="setting-row">
-                <span class="setting-label">Auto-Select</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggle-media-auto">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <div class="setting-row">
-                <div class="setting-label-group">
-                    <span class="setting-label">Shield</span>
-                    <span class="setting-hint">Blocks provider popups and redirects.</span>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggle-media-shield">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <div class="setting-row">
-                <span class="setting-label">Reset Tutorial</span>
-                <button class="material-nav-btn" style="--expanded-width: 190px;" id="btn-reset-tutorial">
-                    <img src="Assets/Active Timer.svg" alt=""><span>Reset Tutorial</span>
-                </button>
+                <section class="settings-column">
+                    <div class="setting-section-title">Miscellaneous</div>
+                    <div class="setting-row">
+                        <span class="setting-label">Reset Tutorial</span>
+                        <button class="material-nav-btn" style="--expanded-width: 190px;" id="btn-reset-tutorial">
+                            <img src="Assets/Active Timer.svg" alt=""><span>Reset Tutorial</span>
+                        </button>
+                    </div>
+                    <!-- Developer Mode / To Be Removed Section (Only visible when Dev Mode is ON) -->
+                    <div id="dev-mode-settings-section" style="display: none;">
+                        <div class="setting-section-title" style="color: #ff5252; display: flex; align-items: center; gap: 8px;">
+                            <img src="Assets/report.svg" alt="" style="width: 20px; height: 20px; filter: invert(30%) sepia(90%) saturate(2000%) hue-rotate(345deg) brightness(95%) contrast(100%);">
+                            Developer Mode
+                        </div>
+                        <div id="dev-to-be-removed-row" class="setting-row" style="border-color: rgba(239, 83, 80, 0.4); background: rgba(239, 83, 80, 0.08);">
+                            <div class="setting-label-group">
+                                <span class="setting-label" style="color: #ff5252;">To Be Removed Games (<span id="dev-reported-count">0</span>)</span>
+                                <span class="setting-hint">Games reported in Game Stash for deletion by unique ID</span>
+                            </div>
+                            <button id="btn-view-reported-games" class="action-btn dev-action-btn-primary" type="button">View List</button>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
     </main>
@@ -380,6 +428,15 @@
             toggleOnlineUsersCount.checked = storage.getItem('tb_online_count_enabled') !== 'false';
             toggleOnlineUsersCount.addEventListener('change', (event) => {
                 storage.setItem('tb_online_count_enabled', event.target.checked ? 'true' : 'false');
+                window.dispatchEvent(new Event('nexus-online-count-preference-change'));
+            });
+        }
+
+        const togglePresenceWhilePlaying = document.getElementById('toggle-presence-while-playing');
+        if (togglePresenceWhilePlaying) {
+            togglePresenceWhilePlaying.checked = storage.getItem('tb_presence_keep_counted_while_playing') !== 'false';
+            togglePresenceWhilePlaying.addEventListener('change', (event) => {
+                storage.setItem('tb_presence_keep_counted_while_playing', event.target.checked ? 'true' : 'false');
                 window.dispatchEvent(new Event('nexus-online-count-preference-change'));
             });
         }
@@ -641,6 +698,6 @@
 
     </script>
     <script src="tutorial-engine.js?v=1"></script>
-    <script src="online-presence.js?v=2" defer></script>
+    <script src="online-presence.js?v=4" defer></script>
 </body>
 </html>

@@ -1,15 +1,21 @@
-// nexus-version: 4.28.2
+// nexus-version: 4.28.4
 /* One SharedWorker instance owns presence for all Nexus tabs in this browser. */
 'use strict';
 
 const TOPIC_ROOT = 'nexus-presence-v1/online/';
-const HEARTBEAT_MS = 20000;
-const STALE_AFTER_MS = 90000;
+// Presence changes slowly, so one minute is enough for fresh counts and avoids
+// unnecessary background publishes while a game is running.
+const HEARTBEAT_MS = 60000;
+const STALE_AFTER_MS = 180000;
+const PEER_SWEEP_MS = 30000;
 const browserSessionId = 'nx-' + randomId();
 const presenceTopic = TOPIC_ROOT + browserSessionId;
 const ports = new Set();
+const portGameStates = new Map();
 const peers = new Map();
 let enabled = false;
+let activeGame = false;
+let keepCountedWhilePlaying = true;
 let mqttLibraryLoading = false;
 let mqttUnavailable = false;
 let mqttClient = null;
@@ -68,7 +74,7 @@ function connect() {
     try {
         mqttClient = self.mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
             clientId: browserSessionId,
-            keepalive: 30,
+            keepalive: 90,
             connectTimeout: 10000,
             reconnectPeriod: 5000,
             clean: true,
@@ -89,11 +95,9 @@ function connect() {
         if (!enabled || !mqttClient) return;
         mqttClient.subscribe(TOPIC_ROOT + '+', { qos: 1 }, error => {
             if (error || !enabled || !mqttClient) return;
-            publishPresence();
-            clearInterval(heartbeatTimer);
-            heartbeatTimer = setInterval(publishPresence, HEARTBEAT_MS);
+            updatePresenceMode();
             clearInterval(sweepTimer);
-            sweepTimer = setInterval(removeStalePeers, 15000);
+            sweepTimer = setInterval(removeStalePeers, PEER_SWEEP_MS);
         });
     });
 
@@ -108,11 +112,12 @@ function connect() {
         }
         const lastSeen = Number(presence.lastSeen);
         if (!Number.isFinite(lastSeen)) return;
-        if (Date.now() - lastSeen > STALE_AFTER_MS) {
+        const keepAlive = presence.keepAlive === true;
+        if (!keepAlive && Date.now() - lastSeen > STALE_AFTER_MS) {
             peers.delete(messageTopic);
             clearRetained(messageTopic);
         } else {
-            peers.set(messageTopic, lastSeen);
+            peers.set(messageTopic, { lastSeen, keepAlive });
         }
         broadcastCount();
     });
@@ -126,9 +131,30 @@ function connect() {
 function publishPresence() {
     if (!enabled || !mqttClient || !mqttClient.connected) return;
     const lastSeen = Date.now();
-    peers.set(presenceTopic, lastSeen);
-    mqttClient.publish(presenceTopic, JSON.stringify({ online: true, lastSeen }), { qos: 1, retain: true });
+    const keepAlive = activeGame && keepCountedWhilePlaying;
+    peers.set(presenceTopic, { lastSeen, keepAlive });
+    mqttClient.publish(presenceTopic, JSON.stringify({ online: true, lastSeen, keepAlive }), { qos: 1, retain: true });
     broadcastCount();
+}
+
+function updatePresenceMode() {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+    if (!enabled || !mqttClient || !mqttClient.connected) return;
+    publishPresence();
+    if (!(activeGame && keepCountedWhilePlaying)) {
+        heartbeatTimer = setInterval(publishPresence, HEARTBEAT_MS);
+    }
+}
+
+function updateGameStateForPort(port, gameState) {
+    portGameStates.set(port, {
+        active: !!gameState.active,
+        keepCounted: gameState.keepCounted !== false
+    });
+    activeGame = Array.from(portGameStates.values()).some(state => state.active);
+    keepCountedWhilePlaying = Array.from(portGameStates.values()).every(state => state.keepCounted);
+    updatePresenceMode();
 }
 
 function clearRetained(topic) {
@@ -138,8 +164,8 @@ function clearRetained(topic) {
 function removeStalePeers() {
     const now = Date.now();
     let changed = false;
-    for (const [topic, lastSeen] of peers) {
-        if (now - lastSeen > STALE_AFTER_MS) {
+    for (const [topic, peer] of peers) {
+        if (!peer.keepAlive && now - peer.lastSeen > STALE_AFTER_MS) {
             peers.delete(topic);
             clearRetained(topic);
             changed = true;
@@ -189,11 +215,17 @@ self.onconnect = event => {
     clearTimeout(idleStopTimer);
     idleStopTimer = null;
     ports.add(port);
+    portGameStates.set(port, { active: false, keepCounted: true });
     port.onmessage = messageEvent => {
         const message = messageEvent.data || {};
         if (message.type === 'set-enabled') setEnabled(message.enabled);
+        if (message.type === 'set-game-state') updateGameStateForPort(port, message);
         if (message.type === 'release') {
             ports.delete(port);
+            portGameStates.delete(port);
+            activeGame = Array.from(portGameStates.values()).some(state => state.active);
+            keepCountedWhilePlaying = Array.from(portGameStates.values()).every(state => state.keepCounted);
+            updatePresenceMode();
             if (ports.size === 0 && enabled) {
                 idleStopTimer = setTimeout(() => {
                     if (ports.size === 0) setEnabled(false);
