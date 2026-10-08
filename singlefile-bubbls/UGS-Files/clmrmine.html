@@ -10,6 +10,46 @@
 <html>
 
 <head>
+<script>
+// Mr. Mine's boot screen waits for every document image request to finish.
+// On slow or filtered networks a single image can remain pending forever,
+// leaving both its percentage and the window load event stuck. Let those
+// stalled decorative/UI images fail open so the game can finish starting.
+(function () {
+	var fallbackImage = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+	var maxImageWaitMs = 25000;
+	var imageTimers = new WeakMap();
+	function watchImage(image) {
+		var requestUrl = image.src;
+		if (!requestUrl || requestUrl.indexOf('data:') === 0 || requestUrl.indexOf('blob:') === 0) return;
+		var existing = imageTimers.get(image);
+		if (existing && existing.url === requestUrl) return;
+		if (existing) clearTimeout(existing.timer);
+		var timer = setTimeout(function () {
+			if (!image.complete && image.src === requestUrl) image.src = fallbackImage;
+		}, maxImageWaitMs);
+		imageTimers.set(image, { url: requestUrl, timer: timer });
+		var clearTimer = function () {
+			clearTimeout(timer);
+			if (imageTimers.get(image) && imageTimers.get(image).timer === timer) imageTimers.delete(image);
+		};
+		image.addEventListener('load', clearTimer, { once: true });
+		image.addEventListener('error', clearTimer, { once: true });
+	}
+	function scanImages() {
+		Array.prototype.forEach.call(document.images, watchImage);
+	}
+	scanImages();
+	if (window.MutationObserver) {
+		new MutationObserver(scanImages).observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['src'],
+			childList: true,
+			subtree: true
+		});
+	}
+})();
+</script>
 <script src="https://payments.playsaurus.com/v1/main.js" data-src="Mr.Mine Web"></script>
   <base href="https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/mr-mine/">
 	<link rel="shortcut icon" href="icon.png">

@@ -1827,6 +1827,7 @@ function getCloakData() {
         const localStorage = window.nexusStorage || window.localStorage;
         const rawPreset = localStorage.getItem('tb_cloak_preset');
         const preset = (rawPreset === null || rawPreset === undefined || rawPreset === '' || rawPreset === 'default') ? 'canvas' : rawPreset;
+        const newTabIcon = new URL('Assets/newtab.png', window.location.href).href;
 
         const cloaks = {
             canvas: {
@@ -1863,11 +1864,11 @@ function getCloakData() {
             },
             none: {
                 title: 'New Tab',
-                icon: ''
+                icon: newTabIcon
             },
             newtab: {
                 title: 'New Tab',
-                icon: ''
+                icon: newTabIcon
             }
         };
 
@@ -2074,6 +2075,10 @@ async function getLaunchSnapshot(gameId) {
 function launchGameFullscreen(game) {
     game = applyGameRunMode(game);
     if (!game || game.id === "ugs-stash") return;
+    // Fullscreen launches bypass loadGame's normal inactive-content cleanup.
+    // Release cached file payloads from earlier game visits before opening
+    // another game window.
+    releaseInactiveGameContent(game);
 
     const startLaunch = win => {
         if (win.closed) return;
@@ -2084,6 +2089,7 @@ function launchGameFullscreen(game) {
         // Keep the selected cloak on the game tab while the Nexus tab is
         // temporarily hidden as New Tab for the duration of the game session.
         const cloak = getCloakData();
+        const newTabIcon = new URL('Assets/newtab.png', window.location.href).href;
 
         // Apply the selected title and favicon to the popup shell.
         try {
@@ -2133,8 +2139,8 @@ function launchGameFullscreen(game) {
                 docs: { title: 'Google Docs', icon: 'https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico' },
                 bing: { title: 'Bing', icon: 'https://www.bing.com/favicon.ico' },
                 khan: { title: 'Dashboard | Khan Academy', icon: 'https://www.khanacademy.org/favicon.ico' },
-                none: { title: 'New Tab', icon: '' },
-                newtab: { title: 'New Tab', icon: '' }
+                none: { title: 'New Tab', icon: ${JSON.stringify(newTabIcon)} },
+                newtab: { title: 'New Tab', icon: ${JSON.stringify(newTabIcon)} }
             };
             var next = presets[preset] || presets.canvas;
             ct = next.title;
@@ -2196,6 +2202,9 @@ function launchGameFullscreen(game) {
                 loadedGameSnapshots.set(game, latestSnapshot || {});
 
                 let rawHtml = atob(game.content.split(',')[1]);
+                // The file is persisted in IndexedDB; do not retain its base64
+                // copy on the parent page after decoding it for this launch.
+                game.content = null;
                 rawHtml = rawHtml.replace(/<title>[\s\S]*?<\/title>/gi, `<title>${cloak.title}</title>`);
                 const isUnityRuntime = /(?:createUnityInstance|UnityLoader|unity-container|unity-canvas)/i.test(rawHtml);
                 const unityCompatibility = isUnityRuntime
@@ -2356,8 +2365,8 @@ function launchGameFullscreen(game) {
                             docs: { title: 'Google Docs', icon: 'https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico' },
                             bing: { title: 'Bing', icon: 'https://www.bing.com/favicon.ico' },
                             khan: { title: 'Dashboard | Khan Academy', icon: 'https://www.khanacademy.org/favicon.ico' },
-                            none: { title: 'New Tab', icon: '' },
-                            newtab: { title: 'New Tab', icon: '' }
+                            none: { title: 'New Tab', icon: ${JSON.stringify(newTabIcon)} },
+                            newtab: { title: 'New Tab', icon: ${JSON.stringify(newTabIcon)} }
                         };
                         var next = presets[preset] || presets.canvas;
                         ct = next.title;
