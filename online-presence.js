@@ -7,6 +7,7 @@
     let worker = null;
     let port = null;
     let enabled = true;
+    let gameStandby = false;
 
     function preferenceEnabled() {
         try {
@@ -78,9 +79,17 @@
         if (enabled === nextEnabled) return;
         enabled = nextEnabled;
         updateHomeBubble(enabled ? null : { type: 'disabled' });
-        if (enabled) startWorkerPort();
-        else stopWorkerPort(true);
+        if (enabled) {
+            if (gameStandby) stopWorkerPort(false);
+            else startWorkerPort();
+        } else stopWorkerPort(true);
     }
+
+    window.addEventListener('nexus-game-standby-change', event => {
+        gameStandby = !!(event.detail && event.detail.active);
+        if (gameStandby) stopWorkerPort(false);
+        else if (enabled) startWorkerPort();
+    });
 
     enabled = preferenceEnabled();
     if (enabled) startWorkerPort();

@@ -11,7 +11,6 @@ let defaultGamesPromise = null;
 let dbReadyPromise = null;
 let gameLoadToken = 0;
 let gameAutosaveTimer = null;
-const loadedGameSnapshots = new WeakMap();
 const snapshotHashes = new Map();
 const popupGameWindows = new Map();
 const activeGameSessions = new Map();
@@ -211,6 +210,7 @@ function enterGameStandbyScreen() {
     document.body.classList.add('game-standby-active');
     document.body.appendChild(shell);
     isGameStandbyView = true;
+    window.dispatchEvent(new CustomEvent('nexus-game-standby-change', { detail: { active: true } }));
 }
 
 async function restoreGamesPageForTransition(message) {
@@ -225,6 +225,7 @@ async function restoreGamesPageForTransition(message) {
         while (suspendedGamesPage.firstChild) document.body.appendChild(suspendedGamesPage.firstChild);
         suspendedGamesPage = null;
         isGameStandbyView = false;
+        window.dispatchEvent(new CustomEvent('nexus-game-standby-change', { detail: { active: false } }));
         if (overlay && overlay.parentNode !== document.body) document.body.appendChild(overlay);
     }
     if (!overlay) overlay = showTransitionOverlay(message);
@@ -769,21 +770,17 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
     store.put(snapshotRecord);
     snapshotHashes.set(gameId, sig);
 
-    const memorySnapshot = { localStorage: lsToSave, fsData: fsToSave, idbData: idbToSave };
-    // Immediately synchronize in-memory caches across all references
-    games.forEach(g => {
-        if (g && (g.id === gameId || (g.sourceFile && g.sourceFile === gameId))) {
-            loadedGameSnapshots.set(g, memorySnapshot);
-        }
-    });
-    if (currentGame && (currentGame.id === gameId || (currentGame.sourceFile && currentGame.sourceFile === gameId))) {
-        loadedGameSnapshots.set(currentGame, memorySnapshot);
-    }
-
+    // IndexedDB is the durable source of truth. Avoid retaining these full
+    // filesystem/IndexedDB snapshots in a page-level cache after the write;
+    // some game saves contain large binary payloads.
     if (!skipMirror) {
         const matched = findGameByIdOrSource(gameId);
         if (matched && matched.id && matched.id !== gameId) {
-            saveGameSnapshot(matched.id, memorySnapshot, true).catch(() => {});
+            saveGameSnapshot(matched.id, {
+                localStorage: lsToSave,
+                fsData: fsToSave,
+                idbData: idbToSave
+            }, true).catch(() => {});
         }
     }
 
@@ -2199,8 +2196,6 @@ function launchGameFullscreen(game) {
                     }
                 }
                 const latestSnapshot = await getLaunchSnapshot(game.id);
-                loadedGameSnapshots.set(game, latestSnapshot || {});
-
                 let rawHtml = atob(game.content.split(',')[1]);
                 // The file is persisted in IndexedDB; do not retain its base64
                 // copy on the parent page after decoding it for this launch.
@@ -2210,7 +2205,7 @@ function launchGameFullscreen(game) {
                 const unityCompatibility = isUnityRuntime
                     ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
                     : '';
-                const snapshot = loadedGameSnapshots.get(game) || {};
+                const snapshot = latestSnapshot || {};
                 const lsData = (snapshot && snapshot.localStorage && typeof snapshot.localStorage === 'object') ? snapshot.localStorage : snapshot;
                 const snapshotJson = JSON.stringify(lsData).replace(/</g, '\\u003c');
                 const popupBridge = getUniversalAutosaveBridge(game.id);
@@ -3138,6 +3133,7 @@ async function loadGame(game, forceInternal = false, options = {}) {
     const requestedLoadToken = ++gameLoadToken;
     let resolvedGameUrl = game.url;
 
+    let fileSnapshot = {};
     if (game.type === 'file') {
         if (!game.content) {
             await initDB();
@@ -3152,7 +3148,7 @@ async function loadGame(game, forceInternal = false, options = {}) {
 
         // Always fetch freshest snapshot directly from IndexedDB
         const latestSnapshot = await getGameSnapshot(game.id);
-        loadedGameSnapshots.set(game, latestSnapshot || {});
+        fileSnapshot = latestSnapshot || {};
 
         if (requestedLoadToken !== gameLoadToken) return;
     } else if (game.type === 'url') {
@@ -3245,7 +3241,7 @@ async function loadGame(game, forceInternal = false, options = {}) {
             try { htmlContent = atob(base64Data); } catch(e) { nexusAlert("File corrupted."); return; }
 
             const isUnityRuntime = /(?:createUnityInstance|UnityLoader|unity-container|unity-canvas)/i.test(htmlContent);
-            const snapshot = loadedGameSnapshots.get(game) || {};
+            const snapshot = fileSnapshot;
             const lsData = (snapshot && snapshot.localStorage && typeof snapshot.localStorage === 'object') ? snapshot.localStorage : snapshot;
             const snapshotJson = JSON.stringify(lsData).replace(/</g, '\\u003c');
             const unityCompatibility = isUnityRuntime
@@ -3705,15 +3701,6 @@ async function clearGameSaves(gameIds) {
     allAliases.forEach(alias => {
         snapshotHashes.delete(alias);
     });
-    games.forEach(g => {
-        if (g && (allAliases.has(String(g.id)) || (g.sourceKey && allAliases.has(String(g.sourceKey))) || (g.sourceFile && allAliases.has(String(g.sourceFile))))) {
-            loadedGameSnapshots.delete(g);
-        }
-    });
-    if (currentGame && (allAliases.has(String(currentGame.id)) || (currentGame.sourceKey && allAliases.has(String(currentGame.sourceKey))) || (currentGame.sourceFile && allAliases.has(String(currentGame.sourceFile))))) {
-        loadedGameSnapshots.delete(currentGame);
-    }
-
     // 5. Clean localStorage
     try {
         const ls = window.nexusStorage || window.localStorage;
