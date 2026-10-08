@@ -1,4 +1,5 @@
 {
+  "_version": "4.28.2",
   "hosting": {
     "public": ".",
     "ignore": [

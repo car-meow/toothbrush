@@ -1,3 +1,4 @@
+// nexus-version: 4.28.2
 const CACHE_NAME = 'nexus-cache-v22';
 const ASSETS_TO_CACHE = [
     './',

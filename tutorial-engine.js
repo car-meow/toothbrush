@@ -1,3 +1,4 @@
+// nexus-version: 4.28.2
 // ==================== TUTORIAL ENGINE ====================
 // Cross-page tutorial state machine for Nexus
 // Loaded on every page. Each page calls its own init function.

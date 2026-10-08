@@ -1,3 +1,4 @@
+// nexus-version: 4.28.2
 (function () {
     const DICTIONARY = new Set([
         "snow", "rider", "riders", "big", "flappy", "tower", "tiny", "square", "super", "mario",
