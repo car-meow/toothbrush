@@ -113,7 +113,16 @@ if ('serviceWorker' in navigator) {
     }
     let temporaryGameCloak = false;
     const cloakChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('nexus-cloak-preset') : null;
-    const newTabFavicon = 'Assets/newtab.png';
+    const newTabLightFavicon = 'Assets/newtab.png';
+    const newTabDarkFavicon = 'Assets/newtabLight.png';
+    const browserDarkPreference = typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-color-scheme: dark)')
+        : null;
+    function getNewTabFavicon() {
+        return browserDarkPreference && browserDarkPreference.matches
+            ? newTabDarkFavicon
+            : newTabLightFavicon;
+    }
     function setFavicon(icon) {
         const links = Array.from(document.querySelectorAll('link[rel]')).filter(link => {
             return (link.getAttribute('rel') || '').toLowerCase().split(/\s+/).includes('icon');
@@ -135,7 +144,7 @@ if ('serviceWorker' in navigator) {
 
         if (temporaryGameCloak) {
             document.title = 'New Tab';
-            setFavicon(newTabFavicon);
+            setFavicon(getNewTabFavicon());
             return;
         }
 
@@ -162,8 +171,22 @@ if ('serviceWorker' in navigator) {
 
         const data = presets[preset] || presets.canvas;
         document.title = data.title;
-        if (preset === 'none' || preset === 'newtab') setFavicon(newTabFavicon);
+        if (preset === 'none' || preset === 'newtab') setFavicon(getNewTabFavicon());
         else setFavicon(data.icon);
+    }
+
+    if (browserDarkPreference) {
+        const updateNewTabFavicon = () => {
+            const rawPreset = localStorage.getItem('tb_cloak_preset');
+            if (temporaryGameCloak || rawPreset === 'none' || rawPreset === 'newtab') {
+                setFavicon(getNewTabFavicon());
+            }
+        };
+        if (typeof browserDarkPreference.addEventListener === 'function') {
+            browserDarkPreference.addEventListener('change', updateNewTabFavicon);
+        } else if (typeof browserDarkPreference.addListener === 'function') {
+            browserDarkPreference.addListener(updateNewTabFavicon);
+        }
     }
 
     if (cloakChannel) {
