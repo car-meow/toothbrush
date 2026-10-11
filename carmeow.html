@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>New Tab</title>
-    <link rel="stylesheet" href="style.css?v=57">
+    <link rel="stylesheet" href="style.css?v=58">
     <script src="bgm-manager.js?v=59"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
@@ -16,7 +16,7 @@
             else if (localStorage.getItem('tb_performance_mode_lite') === 'true') document.documentElement.classList.add('performance-mode-lite');
         })();
     </script>
-    <link rel="prefetch" href="site-core.js?v=4">
+    <link rel="prefetch" href="site-core.js?v=5">
 </head>
 <body>
     <div id="page-fade-overlay" class="is-loading"><div class="nexus-transition-content"><img src="Assets/loadingRoll.gif" alt=""><span class="nexus-transition-label">loading Games...</span></div></div>
@@ -36,13 +36,6 @@
             <button id="saves-btn" class="material-nav-btn" style="--expanded-width: 125px;">
                 <img src="Assets/Saves.svg" alt=""><span>Saves</span>
             </button>
-            <button id="export-btn" class="material-nav-btn btn-backup" style="--expanded-width: 140px;">
-                <img src="Assets/Backup.svg" alt=""><span>Backup</span>
-            </button>
-            <button id="restore-btn" onclick="document.getElementById('import-btn').click()" class="material-nav-btn btn-restore" style="--expanded-width: 140px;">
-                <span>Restore</span><img src="Assets/Restore.svg" alt="">
-            </button>
-            <input type="file" id="import-btn" accept=".json" style="display:none">
             <button id="custom-app-btn" class="material-nav-btn" style="--expanded-width: 140px;">
                 <img src="Assets/Custom.svg" alt=""><span>Custom</span>
             </button>
@@ -116,25 +109,6 @@
         </div>
     </div>
 
-    <div id="backup-select-overlay" class="overlay" style="display:none; z-index:32000;">
-        <div class="modal-box" style="width: 520px; max-width: 92vw; text-align: left; border: 2px solid #ffffff;">
-            <h2 id="backup-select-title" style="color: #ffffff; margin-top: 0; margin-bottom: 6px; font-size: 22px; font-weight: 700;">Select Games</h2>
-            <p id="backup-select-hint" style="color: var(--muted-text, #9e93b8); font-size: 13px; margin-bottom: 14px;">Choose which games to include.</p>
-            <div style="display:flex; gap:8px; margin-bottom:12px;">
-                <button id="backup-select-all" class="backup-modal-btn" style="background:#ffffff; color:#0b0713;">Select All</button>
-                <button id="backup-select-none" class="backup-modal-btn" style="background:#4a3b68; color:#ffffff;">Select None</button>
-            </div>
-            <div id="backup-game-list" style="max-height: 38vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
-            <label style="display:flex; gap:10px; align-items:center; margin: 12px 0 16px 0; font-size: 13px; cursor: pointer; color: var(--text-color); user-select: none;">
-                <input type="checkbox" id="backup-include-settings" style="cursor: pointer; width: 16px; height: 16px; accent-color: #ffffff;"> Include global settings (Leave unchecked if unsure)
-            </label>
-            <div style="display:flex; justify-content:flex-end; gap:10px;">
-                <button id="backup-select-cancel" class="backup-modal-btn" style="background:#4a3b68; color:#ffffff;">Cancel</button>
-                <button id="backup-select-confirm" class="backup-modal-btn" style="background:#4CAF50; color:#ffffff;">Continue</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Saves Selection Overlay -->
     <div id="saves-select-overlay" class="overlay" style="display:none; z-index:32000;">
         <div class="modal-box saves-modal-box" style="width: 520px; max-width: 92vw; text-align: left;">
@@ -152,9 +126,9 @@
         </div>
     </div>
 
-    <script src="tutorial-engine.js?v=1"></script>
+    <script src="tutorial-engine.js?v=2"></script>
     <script src="game-title-utils.js?v=48"></script>
-    <script src="app.js?v=64"></script>
+    <script src="app.js?v=65"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (window.TutorialEngine) TutorialEngine.initGames();

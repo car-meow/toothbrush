@@ -324,12 +324,85 @@ body:not(.media-bg) .rename-done-btn:hover {
     z-index: 10000;
 }
 
+/* Home utilities stay in the screen corners at every viewport size. */
+body.home-screen .nexus-version-container {
+    position: fixed !important;
+    right: max(18px, env(safe-area-inset-right)) !important;
+    bottom: max(14px, env(safe-area-inset-bottom)) !important;
+    left: auto !important;
+    top: auto !important;
+    z-index: 10000 !important;
+}
+body.home-screen .nexus-update-card {
+    top: auto !important;
+    left: auto !important;
+    right: 0 !important;
+    bottom: calc(100% + 12px) !important;
+    transform: translateY(6px) !important;
+}
+body.home-screen .nexus-version-container:hover .nexus-update-card,
+body.home-screen .nexus-update-card:hover {
+    transform: translateY(0) !important;
+}
+.nexus-greeting {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    max-width: calc(100vw - 32px);
+    color: var(--title-color);
+    text-shadow: 2px 2px 8px #000;
+    text-align: center;
+    margin: 0 auto;
+}
+.nexus-greeting-opening,
+.nexus-greeting-name {
+    display: block;
+    width: 100%;
+    overflow-wrap: anywhere;
+    line-height: 1.15;
+    color: var(--title-color);
+}
+.nexus-greeting-opening { font-size: clamp(18px, 2.6vw, 34px); font-weight: 500; margin-bottom: 18px; }
+.nexus-greeting-name { font-size: clamp(19px, 2.8vw, 36px); font-weight: 700; margin-top: 28px; }
+.nexus-greeting-logo-row { position: relative; display: flex; align-items: flex-end; justify-content: center; width: 100%; }
+.nexus-greeting-logo-row img { display: block; width: auto; max-width: 100%; height: auto; max-height: 140px; object-fit: contain; }
+.nexus-greeting-comma { position: absolute; left: calc(100% + 2px); bottom: 1px; color: var(--title-color); font-family: 'Space Grotesk', sans-serif; font-size: clamp(30px, 4vw, 54px); font-weight: 500; line-height: 1; }
+.nexus-home-clock {
+    position: fixed;
+    z-index: 20;
+    top: clamp(10px, 2.2vw, 30px);
+    right: clamp(12px, 2.2vw, 30px);
+    color: #fff;
+    text-align: right;
+    text-shadow: 0 2px 6px #000;
+    font-weight: 700;
+    pointer-events: none;
+}
+#nexus-local-time { font-size: clamp(18px, 2.4vw, 30px); }
+#nexus-local-date { font-size: clamp(11px, 1.2vw, 15px); opacity: .88; }
+html.light-mode .nexus-home-clock { color: #171717; text-shadow: 0 1px 5px rgba(255,255,255,.9); }
+@media (max-width: 520px) {
+    .nexus-greeting-opening { font-size: clamp(16px, 5vw, 22px); }
+    .nexus-greeting-name { font-size: clamp(17px, 5vw, 24px); }
+    .nexus-greeting-logo-row img { max-height: 100px; }
+    .nexus-greeting-comma { font-size: clamp(26px, 8vw, 40px); }
+    body.home-screen .nexus-update-card { width: min(280px, calc(100vw - 40px)); }
+}
+
 .nexus-version-container:hover .nexus-update-card,
 .nexus-update-card:hover {
     opacity: 1 !important;
     visibility: visible !important;
     transform: translateY(-50%) translateX(0) !important;
     pointer-events: auto !important;
+}
+
+/* Keep the home update card above-left of the viewport-corner version label. */
+body.home-screen .nexus-version-container:hover .nexus-update-card,
+body.home-screen .nexus-update-card:hover {
+    transform: translateY(0) !important;
 }
 
 .nexus-update-title {

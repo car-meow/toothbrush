@@ -156,7 +156,7 @@
 
     // Disable all home nav buttons except the given one
     function lockHomeNav(allowId) {
-        const ids = ['btn-nav-games', 'btn-nav-ai', 'proxy-btn', 'btn-nav-chat', 'btn-nav-media', 'btn-nav-settings'];
+        const ids = ['btn-nav-games', 'btn-nav-ai', 'proxy-btn', 'btn-nav-chat', 'btn-nav-media', 'btn-nav-help', 'btn-nav-settings'];
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -171,7 +171,7 @@
     }
 
     function unlockHomeNav() {
-        const ids = ['btn-nav-games', 'btn-nav-ai', 'proxy-btn', 'btn-nav-chat', 'btn-nav-media', 'btn-nav-settings'];
+        const ids = ['btn-nav-games', 'btn-nav-ai', 'proxy-btn', 'btn-nav-chat', 'btn-nav-media', 'btn-nav-help', 'btn-nav-settings'];
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -187,13 +187,13 @@
     function initHome() {
         if (!shouldRun()) return;
 
+        // The versioned Welcome flow owns first-run onboarding for every browser.
+        if (localStorage.getItem('tb_welcome_v2_complete') !== 'true') return;
+
         const step = getStep();
 
         // First ever visit — no step set yet
-        if (step === '' || step === 'home_welcome') {
-            showHomeWelcome();
-            return;
-        }
+        if (step === '' || step === 'home_welcome') return;
 
         if (step === 'home_opening') {
             showHomeOpening();
@@ -460,16 +460,12 @@
     function showGamesUtilities() {
         ensureOverlay();
 
-        const defaultText = '<strong>In the top right are your utilities. Hover over each button to learn about it.</strong>';
+        const defaultText = '<strong>Use Saves to manage game-specific save files. System backups are now in Settings.</strong>';
 
         const hoverTexts = {
             'cloak-btn': '<strong>Fullscreen opens a sidebar game in a full about:blank window. You can\'t do this for the Stash though.</strong>',
-            'export-btn': '<strong>Don\'t worry, your progress auto-saves. These are if you want to backup your progress in the form of one file to restore on other devices.</strong>',
             'custom-app-btn': '<strong>This is for adding any HTML file you have to the sidebar as an app.</strong>'
         };
-
-        // The Restore button doesn't have a unique id — it's the button wrapping #import-btn
-        // The Home button is the last .material-nav-btn in .controls
 
         createPopup(defaultText, {
             btn: { label: "I've learned enough", cb: () => {
@@ -505,8 +501,6 @@
             let hoverHTML = null;
             if (hoverTexts[id]) {
                 hoverHTML = hoverTexts[id];
-            } else if (spanText === 'restore') {
-                hoverHTML = hoverTexts['export-btn']; // same text as backup
             } else if (spanText === 'home') {
                 hoverHTML = '<strong>Go back to the home screen.</strong>';
             }
@@ -654,6 +648,7 @@
     // ===========================
     window.TutorialEngine = {
         initHome:  initHome,
+        start:     showHomeOpening,
         initGames: initGames,
         initAI:    initAI,
         initChat:  initChat,

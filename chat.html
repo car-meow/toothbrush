@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Nexus Chat</title>
-    <link rel="stylesheet" href="style.css?v=57">
+    <link rel="stylesheet" href="style.css?v=58">
     <script src="bgm-manager.js?v=59"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
@@ -141,6 +141,7 @@
             <h3 style="margin-top:0; margin-bottom:20px; color:var(--title-color);">Host Room</h3>
             <input type="text" id="host-name-input" placeholder="Room Name" class="pin-input-large" style="width:100%; margin-top:15px; font-size:18px; letter-spacing:0;">
             <input type="text" id="host-pin-input" placeholder="6-Digit PIN" maxlength="6" class="pin-input-large" style="width:100%; margin-top:10px;">
+            <label style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;color:var(--text-color);font-weight:700"><input type="checkbox" id="host-anonymous-mode" checked> Anonymous mode</label>
             
             <button id="start-host-btn" class="save-btn" style="background:#2E7D32; width:100%; height:50px; margin-top:15px;">Go Live</button>
             <button onclick="document.getElementById('host-modal').style.display='none'" class="save-btn cancel-modal-btn" style="width:100%; margin-top:10px;">Cancel</button>
@@ -165,6 +166,7 @@
         <button onclick="this.parentElement.style.display='none'" class="save-btn" style="width:100%; margin-top:15px; background:#444;">Close</button>
     </div>
 
+    <script src="nexus-profile.js?v=1"></script>
     <script>
         const localStorage = window.nexusStorage || window.localStorage;
         document.addEventListener('DOMContentLoaded', async () => {
@@ -268,6 +270,8 @@
         const myUuid = Math.random().toString(36).substr(2, 9);
         let myName  = null;   // assigned after host acknowledges
         let myColor = null;
+        let roomAnonymous = true;
+        let localProfile = window.NexusProfile ? NexusProfile.get() : null;
 
         // Host bookkeeping
         let registry  = {};          // peerId → { name, color, ip, peerId }
@@ -397,6 +401,15 @@
             const nameInput = document.getElementById('host-name-input');
             const pinInput = document.getElementById('host-pin-input');
             const name = (nameInput && nameInput.value ? nameInput.value.trim() : '') || 'Nexus Room';
+            roomAnonymous = document.getElementById('host-anonymous-mode').checked;
+            if (!roomAnonymous) {
+                localProfile = NexusProfile.get();
+                if (!localProfile) {
+                    const username = prompt('Choose your username for this named room:');
+                    if (username === null) return;
+                    try { localProfile = NexusProfile.save(username); } catch (error) { alert(error.message); return; }
+                }
+            }
             let pin = (pinInput && pinInput.value ? pinInput.value.trim() : '');
             if (!pin || pin.length !== 6 || isNaN(pin)) {
                 pin = Math.floor(100000 + Math.random() * 900000).toString();
@@ -464,8 +477,8 @@
 
                     if (isHost) {
                         // ── Host: assign self a name from the pool ──
-                        myName  = pickFreeName();
-                        myColor = colorForName(myName);
+                        myName  = roomAnonymous ? pickFreeName() : localProfile.username;
+                        myColor = roomAnonymous ? colorForName(myName) : '#AB47BC';
                         usedNames.add(myName);
 
                         registry[myUuid] = { name: myName, color: myColor, ip: myIP, peerId: myUuid };
@@ -478,7 +491,7 @@
                         // ── Guest: ask to join ──
                         showWaiting(true);
                         setStatus('loading', 'Locating Host…');
-                        publish({ type: 'join', peerId: myUuid, ip: myIP });
+                        publish({ type: 'join', peerId: myUuid, ip: myIP, username: localProfile && localProfile.username || '' });
 
                         hostWaitTimeout = setTimeout(() => {
                             if (!myName) {
@@ -509,13 +522,22 @@
                 if (registry[data.peerId]) {
                     // Already in room — re-send state in case they missed it
                     publish({ type: 'name-assign', targetPeerId: data.peerId, name: registry[data.peerId].name, color: registry[data.peerId].color });
-                    publish({ type: 'room-info', name: document.getElementById('display-room-name').textContent, pin: document.getElementById('display-pin').textContent });
+                    publish({ type: 'room-info', name: document.getElementById('display-room-name').textContent, pin: document.getElementById('display-pin').textContent, anonymous: roomAnonymous });
                     broadcastRegistry();
                     return;
                 }
 
-                const assignedName  = pickFreeName();
-                const assignedColor = colorForName(assignedName);
+                const requestedUsername = NexusProfile.clean(data.username || '');
+                if (!roomAnonymous && !requestedUsername) {
+                    publish({ type: 'profile-required', targetPeerId: data.peerId });
+                    return;
+                }
+                if (!roomAnonymous && Object.values(registry).some(entry => entry.name.toLowerCase() === requestedUsername.toLowerCase())) {
+                    publish({ type: 'join-rejected', targetPeerId: data.peerId, reason: 'That username is already being used in this room.' });
+                    return;
+                }
+                const assignedName  = roomAnonymous ? pickFreeName() : requestedUsername;
+                const assignedColor = roomAnonymous ? colorForName(assignedName) : '#AB47BC';
                 usedNames.add(assignedName);
                 registry[data.peerId] = { name: assignedName, color: assignedColor, ip: data.ip, peerId: data.peerId };
                 globalUserList = Object.values(registry);
@@ -525,7 +547,7 @@
 
                 // Small delay to help ordering on the broker
                 setTimeout(() => {
-                    publish({ type: 'room-info', name: document.getElementById('display-room-name').textContent, pin: document.getElementById('display-pin').textContent });
+                    publish({ type: 'room-info', name: document.getElementById('display-room-name').textContent, pin: document.getElementById('display-pin').textContent, anonymous: roomAnonymous });
                     broadcastRegistry();
                     appendSystemMessage(`${assignedName} joined.`);
                     publish({ type: 'msg', name: 'System', color: '#777', text: `${assignedName} joined.` });
@@ -548,12 +570,34 @@
 
             // ─── GUEST: room-info ────────────────────────────
             if (!isHost && data.type === 'room-info') {
+                roomAnonymous = data.anonymous !== false;
+                if (!roomAnonymous && !localProfile) {
+                    const username = prompt('This room uses usernames. Create a local profile username to join:');
+                    if (username === null) { if (mqttClient) mqttClient.end(true); showWaiting(false); return; }
+                    try { localProfile = NexusProfile.save(username); } catch (error) { alert(error.message); if (mqttClient) mqttClient.end(true); showWaiting(false); return; }
+                    publish({ type: 'join', peerId: myUuid, ip: myIP, username: localProfile.username });
+                }
                 if (myName && !uiReady) {
                     setupUI(data.name, data.pin);
                 } else if (!myName) {
                     // Buffer until we have a name
                     pendingRoomInfo = { name: data.name, pin: data.pin };
                 }
+            }
+
+            if (!isHost && data.type === 'profile-required' && data.targetPeerId === myUuid) {
+                roomAnonymous = false;
+                if (!localProfile) {
+                    const username = prompt('This room uses usernames. Create a local profile username to join:');
+                    if (username === null) { if (mqttClient) mqttClient.end(true); showWaiting(false); return; }
+                    try { localProfile = NexusProfile.save(username); } catch (error) { alert(error.message); if (mqttClient) mqttClient.end(true); showWaiting(false); return; }
+                }
+                publish({ type: 'join', peerId: myUuid, ip: myIP, username: localProfile.username });
+            }
+            if (!isHost && data.type === 'join-rejected' && data.targetPeerId === myUuid) {
+                showWaiting(false); if (hostWaitTimeout) clearTimeout(hostWaitTimeout);
+                if (mqttClient) mqttClient.end(true);
+                await nexusAlert(data.reason || 'You could not join this room.');
             }
 
             // ─── Everyone: registry sync ─────────────────────
@@ -636,7 +680,7 @@
             document.getElementById('chat-room').style.display  = 'flex';
             document.getElementById('room-header-info').style.display = 'block';
             document.getElementById('stats-area').style.display = 'flex';
-            document.getElementById('reroll-btn').style.display = 'inline-flex';
+            document.getElementById('reroll-btn').style.display = roomAnonymous ? 'inline-flex' : 'none';
             document.getElementById('display-room-name').textContent = name;
             document.getElementById('display-pin').textContent = pin;
             document.getElementById('pin-wrapper').classList.remove('revealed');
@@ -811,7 +855,7 @@
 
     });
     </script>
-    <script src="tutorial-engine.js?v=1"></script>
+    <script src="tutorial-engine.js?v=2"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (window.TutorialEngine) TutorialEngine.initChat();

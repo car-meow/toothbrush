@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <title>New Tab</title>
-<link rel="stylesheet" href="style.css?v=57">
+<link rel="stylesheet" href="style.css?v=64">
     <script src="bgm-manager.js?v=59"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
@@ -87,7 +87,7 @@ body {
 .online-users-bubble {
     position: fixed;
     top: clamp(12px, 2.2vw, 30px);
-    right: clamp(12px, 2.2vw, 30px);
+    left: clamp(12px, 2.2vw, 30px);
     z-index: 20;
     display: inline-flex;
     align-items: center;
@@ -114,7 +114,7 @@ html.light-mode .online-users-bubble {
     box-shadow: 0 4px 18px rgba(0,0,0,0.12);
 }
 @media (max-width: 480px) {
-    .online-users-bubble { top: 10px; right: 10px; }
+    .online-users-bubble { top: 10px; left: 10px; right: auto; }
 }
 </style>
 
@@ -172,19 +172,6 @@ html.light-mode .online-users-bubble {
     <div class="title-area">
         <div class="logo-wrapper" style="pointer-events: auto !important;">
             <img src="Assets/nexusLogo.png" id="nexus-logo" class="home-title-img" alt="Nexus" style="cursor: pointer; pointer-events: auto !important;">
-            <div class="nexus-version-container" style="pointer-events: auto !important;">
-                <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v4.28.4 beta</span>
-                <div class="nexus-update-card" style="pointer-events: auto !important;">
-                    <div class="nexus-update-title">Autumn update is OUT!</div>
-                    <div class="nexus-update-body">
-                        Oh yeah, there's so much to get into. Optimizations, to new settings, to fixed games, to new features. Read all about it by pressing the (aptly named) button below!
-                    </div>
-                    <div class="nexus-update-footer">
-                        <button id="nexus-read-more-btn" class="nexus-read-more-btn">Read More</button>
-                        <a href="https://docs.google.com/forms/d/e/1FAIpQLSdcKa51l2lPC8BYXKA164MJe2ilxPSmkIT_C87REfbhtdri3g/viewform?usp=dialog" target="_blank" class="nexus-request-btn" style="pointer-events: auto !important;">Requests/Concerns</a>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
     <span class="home-splash" id="splash-text"></span>
@@ -209,10 +196,28 @@ html.light-mode .online-users-bubble {
             <img src="Assets/nexus-media.svg" alt="">
             <span>Media</span>
         </button>
+        <button id="btn-nav-help" class="home-btn material-nav-btn" aria-label="Help" style="--expanded-width: 140px;">
+            <img src="Assets/help.svg" alt="">
+            <span>Help</span>
+        </button>
         <button id="btn-nav-settings" class="home-btn material-nav-btn" aria-label="Settings" style="--expanded-width: 185px;">
             <img src="Assets/nexus-settings.svg" alt="">
             <span>Settings</span>
         </button>
+    </div>
+</div>
+
+<div class="nexus-version-container" style="pointer-events: auto !important;">
+    <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v4.28.4 beta</span>
+    <div class="nexus-update-card" style="pointer-events: auto !important;">
+        <div class="nexus-update-title">Autumn update is OUT!</div>
+        <div class="nexus-update-body">
+            Oh yeah, there's so much to get into. Optimizations, to new settings, to fixed games, to new features. Read all about it by pressing the (aptly named) button below!
+        </div>
+        <div class="nexus-update-footer">
+            <button id="nexus-read-more-btn" class="nexus-read-more-btn">Read More</button>
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLSdcKa51l2lPC8BYXKA164MJe2ilxPSmkIT_C87REfbhtdri3g/viewform?usp=dialog" target="_blank" class="nexus-request-btn" style="pointer-events: auto !important;">Requests/Concerns</a>
+        </div>
     </div>
 </div>
 
@@ -276,8 +281,10 @@ Aaaaand that's all, folks. 4.0 is here, but that doesn't mean that we're done wi
 </div>
 
 <!-- ========== JAVASCRIPT ========== -->
-<script src="site-core.js?v=4"></script>
-<script src="tutorial-engine.js?v=1"></script>
+<script src="site-core.js?v=5"></script>
+<script src="tutorial-engine.js?v=2"></script>
+<script src="nexus-profile.js?v=2"></script>
+<script src="nexus-welcome.js?v=4"></script>
 <script src="online-presence.js?v=4" defer></script>
 </body>
 </html>

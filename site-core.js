@@ -165,6 +165,9 @@
         const btnNavSettings = document.getElementById('btn-nav-settings');
         if (btnNavSettings) btnNavSettings.onclick = () => navigateWithFade('settings.html');
 
+        const btnNavHelp = document.getElementById('btn-nav-help');
+        if (btnNavHelp) btnNavHelp.onclick = () => navigateWithFade('help.html');
+
         const proxyBtn = document.getElementById('proxy-btn');
         if (proxyBtn) {
             proxyBtn.onclick = () => {
@@ -199,14 +202,14 @@
                 clearTimeout(hideTimer);
                 updateCard.style.opacity = '1';
                 updateCard.style.visibility = 'visible';
-                updateCard.style.transform = 'translateY(-50%) translateX(0)';
+                updateCard.style.transform = 'translateY(0) translateX(0)';
                 updateCard.style.pointerEvents = 'auto';
             }
             function hideCard() {
                 hideTimer = setTimeout(() => {
                     updateCard.style.opacity = '0';
                     updateCard.style.visibility = 'hidden';
-                    updateCard.style.transform = 'translateY(-50%) translateX(6px)';
+                    updateCard.style.transform = 'translateY(6px) translateX(6px)';
                     updateCard.style.pointerEvents = 'none';
                 }, 200);
             }
