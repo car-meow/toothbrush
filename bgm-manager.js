@@ -113,6 +113,7 @@ if ('serviceWorker' in navigator) {
     }
     let temporaryGameCloak = false;
     const cloakChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('nexus-cloak-preset') : null;
+    const genericFavicon = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="#827a90"/><g fill="none" stroke="#e8e4ee" stroke-width="1.5"><path d="M3 16h26M16 3c4 4 6 8 6 13s-2 9-6 13c-4-4-6-8-6-13s2-9 6-13Z"/><path d="M6 9h20M6 23h20"/></g></svg>');
     function setFavicon(icon) {
         const links = Array.from(document.querySelectorAll('link[rel]')).filter(link => {
             return (link.getAttribute('rel') || '').toLowerCase().split(/\s+/).includes('icon');
@@ -125,12 +126,6 @@ if ('serviceWorker' in navigator) {
         links.forEach(extra => extra.remove());
     }
 
-    function clearFavicon() {
-        document.querySelectorAll('link[rel]').forEach(link => {
-            if ((link.getAttribute('rel') || '').toLowerCase().split(/\s+/).includes('icon')) link.remove();
-        });
-    }
-
     function applyTabCloak(shouldBroadcast = true) {
         const rawPreset = localStorage.getItem('tb_cloak_preset');
         const preset = (rawPreset === null || rawPreset === undefined || rawPreset === '' || rawPreset === 'default') ? 'canvas' : rawPreset;
@@ -140,7 +135,7 @@ if ('serviceWorker' in navigator) {
 
         if (temporaryGameCloak) {
             document.title = 'New Tab';
-            clearFavicon();
+            setFavicon(genericFavicon);
             return;
         }
 
@@ -158,17 +153,18 @@ if ('serviceWorker' in navigator) {
                 icon: 'Assets/drive_cloak.png'
             },
             none: {
-                title: 'New Tab'
+                title: 'New Tab',
+                icon: genericFavicon
             },
             newtab: {
-                title: 'New Tab'
+                title: 'New Tab',
+                icon: genericFavicon
             }
         };
 
         const data = presets[preset] || presets.canvas;
         document.title = data.title;
-        if (preset === 'none' || preset === 'newtab') clearFavicon();
-        else setFavicon(data.icon);
+        setFavicon(data.icon);
     }
 
     if (cloakChannel) {
