@@ -113,7 +113,7 @@ if ('serviceWorker' in navigator) {
     }
     let temporaryGameCloak = false;
     const cloakChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('nexus-cloak-preset') : null;
-    const genericFavicon = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="#827a90"/><g fill="none" stroke="#e8e4ee" stroke-width="1.5"><path d="M3 16h26M16 3c4 4 6 8 6 13s-2 9-6 13c-4-4-6-8-6-13s2-9 6-13Z"/><path d="M6 9h20M6 23h20"/></g></svg>');
+    const newTabFavicon = 'Assets/newtab.png';
     function setFavicon(icon) {
         const links = Array.from(document.querySelectorAll('link[rel]')).filter(link => {
             return (link.getAttribute('rel') || '').toLowerCase().split(/\s+/).includes('icon');
@@ -135,7 +135,7 @@ if ('serviceWorker' in navigator) {
 
         if (temporaryGameCloak) {
             document.title = 'New Tab';
-            setFavicon(genericFavicon);
+            setFavicon(newTabFavicon);
             return;
         }
 
@@ -153,18 +153,17 @@ if ('serviceWorker' in navigator) {
                 icon: 'Assets/drive_cloak.png'
             },
             none: {
-                title: 'New Tab',
-                icon: genericFavicon
+                title: 'New Tab'
             },
             newtab: {
-                title: 'New Tab',
-                icon: genericFavicon
+                title: 'New Tab'
             }
         };
 
         const data = presets[preset] || presets.canvas;
         document.title = data.title;
-        setFavicon(data.icon);
+        if (preset === 'none' || preset === 'newtab') setFavicon(newTabFavicon);
+        else setFavicon(data.icon);
     }
 
     if (cloakChannel) {
