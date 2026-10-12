@@ -49,6 +49,62 @@
         }
         @media(max-width:520px) { #nexus-welcome-overlay .nw-progress { font-size:clamp(30px,6vw,52px); } }
     `;
+    style.textContent += `
+        #nw-birthday-overlay { position:fixed; inset:0; z-index:50010; display:flex; align-items:center; justify-content:center; padding:20px; box-sizing:border-box; overflow:hidden; color:var(--text-color,#fff); background:rgba(7,5,14,.76); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); font-family:inherit; }
+        #nw-birthday-overlay .nw-mail-shell { width:min(600px,94vw); text-align:center; }
+        #nw-birthday-overlay .nw-mail-title { margin:0; color:var(--title-color,#fff); font-size:clamp(30px,5vw,46px); font-weight:900; text-shadow:0 4px 24px #0008; animation:nw-mail-title-in .65s ease both; }
+        #nw-birthday-overlay .nw-mail-prompt { margin:10px 0 0; color:rgba(238,231,248,.72); font-size:14px; animation:nw-mail-title-in .65s .15s ease both; }
+        #nw-birthday-overlay .nw-mail-scene { position:relative; width:min(720px,94vw); height:min(78vh,760px); min-height:260px; margin:4px auto 0; perspective:1000px; }
+        #nw-birthday-overlay .nw-envelope { position:absolute; left:50%; bottom:24px; width:min(620px,86vw,56vh); height:auto; aspect-ratio:1.72/1; transform:translateX(-50%); border:1px solid #806044; border-radius:11px; background-color:#c99a67; background-image:radial-gradient(ellipse at 20% 13%,#ffe5b966,transparent 43%),radial-gradient(ellipse at 83% 88%,#68411f38,transparent 53%),repeating-linear-gradient(7deg,#fff0 0 3px,#68482a0b 4px 5px),linear-gradient(145deg,#e4bd8e 0%,#d2a16e 38%,#bd8957 76%,#d1a071 100%); box-shadow:0 24px 42px #0009,inset 0 2px 5px #fff8,inset 0 -10px 18px #71452066; animation:nw-mail-in .95s cubic-bezier(.18,.76,.25,1) both; transform-origin:center; }
+        #nw-birthday-overlay .nw-envelope-flap { position:absolute; z-index:2; left:0; right:0; top:0; height:58%; clip-path:polygon(0 0,100% 0,50% 100%); border-radius:10px 10px 0 0; background:linear-gradient(165deg,#f5d8a9 0%,#dfb682 48%,#bf8c5c 100%); filter:drop-shadow(0 7px 5px #613b2455); transform-origin:50% 0; transition:transform .95s cubic-bezier(.2,.72,.22,1),z-index .1s .42s; backface-visibility:visible; }
+        #nw-birthday-overlay .nw-envelope-front { position:absolute; z-index:3; inset:31% 0 0; clip-path:polygon(0 0,50% 58%,100% 0,100% 100%,0 100%); border-radius:0 0 10px 10px; background:radial-gradient(ellipse at 50% 0%,#f1d0a366,transparent 50%),repeating-linear-gradient(171deg,#fff0 0 4px,#74482010 5px 6px),linear-gradient(135deg,#e0b382 0%,#c49362 54%,#d7a876 100%); filter:drop-shadow(0 -3px 4px #70452166); }
+        #nw-birthday-overlay .nw-letter { position:absolute; z-index:1; left:8%; bottom:0; width:84%; height:auto; aspect-ratio:3/4; box-sizing:border-box; overflow:hidden; clip-path:inset(0 0 50% 0); padding:clamp(16px,2.2vw,28px); border:1px solid #d7c7a3; color:#46382d; text-align:left; background-color:#fbf4df; background-image:radial-gradient(ellipse at 17% 12%,#d0b88620,transparent 38%),radial-gradient(ellipse at 85% 78%,#b98e4a18,transparent 40%),repeating-linear-gradient(0deg,#fff0 0 5px,#9f7a4010 6px 7px),linear-gradient(110deg,#fff9e9,#f4e9ca 58%,#fff7e4); box-shadow:0 6px 20px #0004,inset 0 0 20px #ad8c4b22; transform:translateY(41.9%); transform-origin:center center; opacity:0; cursor:default; font-size:clamp(9px,.9vw,12px); line-height:1.35; scrollbar-width:thin; scrollbar-color:#b39a6b #f6efd9; }
+        #nw-birthday-overlay .nw-mail-title.nw-mail-instruction { font-size:clamp(18px,3vw,28px); }
+        #nw-birthday-overlay .nw-letter:focus { outline:none; }
+        #nw-birthday-overlay .nw-letter:focus-visible { outline:2px solid #a88b58; outline-offset:3px; }
+        #nw-birthday-overlay .nw-letter::-webkit-scrollbar { width:8px; }
+        #nw-birthday-overlay .nw-letter::-webkit-scrollbar-track { background:#f6efd9; }
+        #nw-birthday-overlay .nw-letter::-webkit-scrollbar-thumb { border:2px solid #f6efd9; border-radius:8px; background:#b39a6b; }
+        #nw-birthday-overlay .nw-letter-content { font:inherit; }
+        #nw-birthday-overlay .nw-letter-content p { margin:0 0 .8em; }
+        #nw-birthday-overlay .nw-letter-content .nw-letter-signoff { margin-top:1.15em; }
+        #nw-birthday-overlay .nw-letter-content .nw-letter-ps { margin-top:.8em; }
+        #nw-birthday-overlay button.nw-birthday-close { position:fixed; z-index:2; left:50%; bottom:22px; transform:translateX(-50%); white-space:nowrap; border:0!important; border-radius:999px!important; padding:12px 22px; color:#fff!important; background:#6840ad!important; box-shadow:0 8px 28px #0007!important; font:inherit; font-size:15px; font-weight:800; cursor:pointer; opacity:0; visibility:hidden; transition:opacity .2s ease,transform .2s ease,background .2s ease; }
+        #nw-birthday-overlay button.nw-birthday-close:hover { border:0!important; color:#fff!important; background:#7950bd!important; transform:translateX(-50%) translateY(-2px); }
+        #nw-birthday-overlay button.nw-stamp { position:absolute; z-index:5; left:50%; top:50%; width:clamp(82px,12vw,110px); aspect-ratio:1; display:block; overflow:hidden; padding:0!important; border:0!important; border-radius:50%!important; background:transparent!important; box-shadow:none!important; color:transparent!important; text-shadow:none!important; filter:drop-shadow(0 5px 7px #48231e8c); cursor:pointer; transform:translate(-50%,-50%); }
+        #nw-birthday-overlay .nw-stamp img { display:block; width:100%; height:100%; object-fit:cover; transform:translateY(4%); }
+        #nw-birthday-overlay button.nw-stamp:hover { border:0!important; background:transparent!important; color:transparent!important; filter:brightness(1.08) drop-shadow(0 7px 9px #48231e99); }
+        #nw-birthday-overlay .nw-envelope.nw-stamp-dropping .nw-stamp { animation:nw-stamp-drop 1.05s cubic-bezier(.55,0,1,.45) forwards; pointer-events:none; }
+        #nw-birthday-overlay .nw-envelope.nw-flap-opening .nw-envelope-flap { transform:rotateX(180deg); z-index:0; }
+        #nw-birthday-overlay .nw-envelope.nw-opening .nw-letter { z-index:1; animation:nw-letter-rise 1.6s .08s cubic-bezier(.12,.82,.18,1) forwards; }
+        #nw-birthday-overlay .nw-letter.nw-letter-ready { z-index:1!important; opacity:1; cursor:pointer; animation:nw-paper-glow 2.4s ease-in-out infinite alternate; }
+        #nw-birthday-overlay .nw-envelope.nw-opening .nw-letter.nw-letter-ready { animation:nw-paper-glow 2.4s ease-in-out infinite alternate; }
+        #nw-birthday-overlay .nw-envelope.nw-opening .nw-letter.nw-letter-leaving { opacity:1; animation:nw-letter-lift .34s cubic-bezier(.18,.78,.2,1) forwards; }
+        #nw-birthday-overlay .nw-letter.nw-letter-ready:hover { filter:brightness(1.025); }
+        #nw-birthday-overlay.nw-paper-open .nw-mail-title,
+        #nw-birthday-overlay.nw-paper-open .nw-mail-prompt,
+        #nw-birthday-overlay.nw-paper-open .nw-mail-scene { visibility:hidden; }
+        #nw-birthday-overlay.nw-paper-open .nw-letter { position:fixed; z-index:1!important; left:50%; top:clamp(42%,calc(50% - 3vh),48%); bottom:auto; width:min(720px,61.5vh,92vw); height:auto; max-height:82vh; aspect-ratio:3/4; padding:clamp(20px,4vh,34px) clamp(20px,5vw,42px); border-radius:3px; overflow:hidden; clip-path:none; transform:translate(-50%,-50%); opacity:1; cursor:auto; font-size:clamp(13px,1.45vw,16px); line-height:1.48; box-shadow:0 18px 75px #000a,inset 0 0 32px #ad8c4b26; }
+        #nw-birthday-overlay.nw-paper-open .nw-letter.nw-letter-scrollable { overflow-y:auto; }
+        #nw-birthday-overlay.nw-paper-open .nw-letter-content p { margin-bottom:1em; }
+        #nw-birthday-overlay.nw-paper-open.nw-paper-ready .nw-birthday-close { opacity:1; visibility:visible; }
+        @keyframes nw-mail-in { from { opacity:0; transform:translateX(calc(-50% - 65vw)) rotate(-9deg); } to { opacity:1; transform:translateX(-50%) rotate(0); } }
+        @keyframes nw-mail-title-in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes nw-stamp-drop { from { opacity:1; transform:translate(-50%,-50%) rotate(0); } to { opacity:0; transform:translate(-50%,calc(-50% + 115vh)) rotate(180deg); } }
+        @keyframes nw-letter-rise { 0% { opacity:0; transform:translateY(43.1%); } 18% { opacity:1; } 100% { opacity:1; transform:translateY(41.9%); } }
+        @keyframes nw-letter-lift { from { transform:translateY(41.9%) scale(1); } to { transform:translateY(0) scale(1.025); } }
+        @keyframes nw-paper-glow { from { box-shadow:0 6px 20px #0004,0 0 14px 3px #f6dc9d77,inset 0 0 20px #ad8c4b22; } to { box-shadow:0 10px 28px #0006,0 0 30px 10px #ffe9aeaa,inset 0 0 24px #ad8c4b33; } }
+        @media(max-width:560px) { #nw-birthday-overlay .nw-mail-scene { height:min(78vh,680px); } #nw-birthday-overlay .nw-mail-title { font-size:clamp(28px,8vw,38px); } #nw-birthday-overlay.nw-paper-open .nw-letter { font-size:13px; } #nw-birthday-overlay button.nw-birthday-close { bottom:14px; max-width:94vw; padding:11px 14px; font-size:13px; } }
+        @media(max-height:600px) { #nw-birthday-overlay.nw-paper-open .nw-letter { top:42%; } }
+        html.performance-mode #nw-birthday-overlay .nw-envelope { animation-duration:.95s!important; }
+        html.performance-mode #nw-birthday-overlay .nw-mail-title,
+        html.performance-mode #nw-birthday-overlay .nw-mail-prompt { animation-duration:.65s!important; }
+        html.performance-mode #nw-birthday-overlay .nw-envelope.nw-stamp-dropping .nw-stamp { animation-duration:1.05s!important; }
+        html.performance-mode #nw-birthday-overlay .nw-envelope-flap { transition-duration:.95s!important; }
+        html.performance-mode #nw-birthday-overlay .nw-envelope.nw-opening .nw-letter { animation-duration:1.6s!important; }
+        html.performance-mode #nw-birthday-overlay .nw-letter.nw-letter-ready { animation-duration:2.4s!important; }
+        html.performance-mode #nw-birthday-overlay .nw-envelope.nw-opening .nw-letter.nw-letter-leaving { animation-duration:.34s!important; }
+    `;
     document.head.appendChild(style);
     let overlay, step = 1, enterFromDirection = null;
     function apply(key, value) {
@@ -75,6 +131,98 @@
         }
     }
     function make() { if (overlay) return overlay; overlay = document.createElement('div'); overlay.id = 'nexus-welcome-overlay'; document.body.appendChild(overlay); return overlay; }
+    function showBirthdayMail(onClose) {
+        const mail = document.createElement('div');
+        mail.id = 'nw-birthday-overlay';
+        mail.setAttribute('role', 'dialog');
+        mail.setAttribute('aria-modal', 'true');
+        mail.setAttribute('aria-labelledby', 'nw-mail-title');
+        mail.innerHTML = `<div class="nw-mail-shell"><h2 class="nw-mail-title" id="nw-mail-title">You've got mail!</h2><p class="nw-mail-prompt">Click the stamp to open your letter.</p><div class="nw-mail-scene"><div class="nw-envelope" id="nw-mail-envelope"><article class="nw-letter" id="nw-birthday-letter" tabindex="0" role="button" aria-label="Open birthday letter"><div class="nw-letter-content"><p>Dear Prajun,</p><p>I want to preface this letter by saying that I'm really sorry I couldn't get you a birthday gift on time. I feel terrible about it even though you asked me not to get you a gift. So I coded this silly thing into my website to hopefully make up for a bit of it. You know who this is... Also, AI did not write this message, I just write like that. Deal wid it. :P</p><p>With that out of the way, have I mentioned how awesome of a dude you are? You may be less unc than the rest of us (as Praneetha said, you're "finally catching up") but in my eyes, you're the big bro of the friend group. You have the corn-o-meter that I always manage to raise to the top and anyone near you (oh darn, this is gonna sound even cornier) can just tell you're an honest, upstanding dude. It's kind of insane that the first time I met you in-person was literally a few months ago, but you've quickly grown to be one of my best friends and you always have my back. I can only hope I do the same for you. You curate your friends wisely and don't let random people in the group (ahem, Vihan) but you still manage to have a friend group large enough that it feels full. I grew so much as a person literally all thanks to you, both socially and mentally. You give me thousand-yard-stares that would genuinely OBLITERATE a Victorian child when I say something about... uhh... y'know what? I'mma just stop there. You're probably in school right now, so I don't want this letter to waste too much of your time. But yeah, that's it! I have no idea how to end letters properly, so I'mma just leave it at that.</p><p class="nw-letter-signoff">Thank you for reading and HAPPY BELATED BIRTHDAY!!!,<br>[redacted for privacy]</p><p class="nw-letter-ps">P. S.<br>After lunch, check your backpack :3</p></div></article><div class="nw-envelope-flap"></div><div class="nw-envelope-front"></div><button class="nw-stamp" id="nw-mail-stamp" type="button" aria-label="Open the birthday letter"><img src="Assets/pStamp.png" alt=""></button></div></div><button class="nw-birthday-close" id="nw-birthday-close" type="button">Close paper. Happy birthday! &lt;3</button></div>`;
+        document.body.appendChild(mail);
+
+        const envelope = mail.querySelector('#nw-mail-envelope');
+        const stamp = mail.querySelector('#nw-mail-stamp');
+        const letter = mail.querySelector('#nw-birthday-letter');
+        let opened = false;
+        let completed = false;
+        const openLetter = () => {
+            if (opened || !letter.classList.contains('nw-letter-ready')) return;
+            opened = true;
+            letter.classList.remove('nw-letter-ready');
+            letter.classList.add('nw-letter-leaving');
+            letter.addEventListener('animationend', event => {
+                if (event.animationName !== 'nw-letter-lift') return;
+                const startRect = letter.getBoundingClientRect();
+                mail.classList.add('nw-paper-open');
+                mail.appendChild(letter);
+                letter.removeAttribute('role');
+                letter.removeAttribute('aria-label');
+                letter.tabIndex = -1;
+                const endRect = letter.getBoundingClientRect();
+                const dx = startRect.left + startRect.width / 2 - endRect.left - endRect.width / 2;
+                const dy = startRect.top + startRect.height / 2 - endRect.top - endRect.height / 2;
+                const zoom = letter.animate([
+                    { transform: `translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px)) scale(${startRect.width / endRect.width},${startRect.height / endRect.height})` },
+                    { transform: 'translate(-50%,-50%)' }
+                ], { duration: 850, easing: 'cubic-bezier(.18,.78,.2,1)' });
+                zoom.addEventListener('finish', () => {
+                    letter.classList.add('nw-letter-scrollable');
+                    mail.classList.add('nw-paper-ready');
+                }, { once: true });
+            }, { once: true });
+        };
+        const finish = () => {
+            if (completed) return;
+            completed = true;
+            mail.remove();
+            onClose();
+        };
+        stamp.addEventListener('click', () => {
+            if (envelope.classList.contains('nw-stamp-dropping') || envelope.classList.contains('nw-opening')) return;
+            const title = mail.querySelector('#nw-mail-title');
+            title.textContent = 'Click paper to open the letter.';
+            title.classList.add('nw-mail-instruction');
+            mail.querySelector('.nw-mail-prompt').hidden = true;
+            envelope.classList.add('nw-stamp-dropping');
+            stamp.addEventListener('animationend', event => {
+                if (event.animationName !== 'nw-stamp-drop') return;
+                stamp.remove();
+                envelope.classList.remove('nw-stamp-dropping');
+                envelope.classList.add('nw-flap-opening');
+                window.setTimeout(() => {
+                    if (!mail.isConnected) return;
+                    letter.addEventListener('animationend', event => {
+                        if (event.animationName !== 'nw-letter-rise') return;
+                        letter.classList.add('nw-letter-ready');
+                        letter.setAttribute('aria-label', 'Open the birthday letter');
+                    }, { once: true });
+                    envelope.classList.add('nw-opening');
+                }, 1000);
+            }, { once: true });
+        });
+        letter.addEventListener('click', openLetter);
+        letter.addEventListener('keydown', event => {
+            if ((event.key === 'Enter' || event.key === ' ') && !opened) {
+                event.preventDefault();
+                openLetter();
+            }
+        });
+        mail.querySelector('#nw-birthday-close').addEventListener('click', finish);
+    }
+    function finishWelcome(startTutorial) {
+        storage.setItem(KEY, 'true');
+        const profile = window.NexusProfile && NexusProfile.get();
+        const isPrajun = profile && typeof profile.username === 'string' && profile.username.trim().toLowerCase() === 'prajuntheflash';
+        const complete = () => {
+            if (overlay) overlay.remove();
+            if (startTutorial && window.TutorialEngine) {
+                TutorialEngine.setStep('home_opening');
+                TutorialEngine.start();
+            }
+        };
+        if (isPrajun) showBirthdayMail(complete);
+        else complete();
+    }
     let greetingProfileId = null;
     function updateGreeting() {
         const profile = window.NexusProfile && NexusProfile.get();
@@ -168,13 +316,13 @@
             el.querySelector('#nw-confirm').onclick = () => goTo(3);
         } else {
             el.innerHTML = `<div class="nw-wrap"><div class="nw-title">Welcome to Nexus!</div><div class="${cardClass}"><h2>Would you like to start the interactive tutorial?</h2><div class="nw-actions"><button class="nw-button" id="nw-sure">Sure!</button><button class="nw-button secondary" id="nw-skip">Skip</button></div><div class="nw-skip-copy" id="nw-skip-copy"></div></div></div>`;
-            el.querySelector('#nw-sure').onclick = () => { storage.setItem(KEY, 'true'); el.remove(); if (window.TutorialEngine) { TutorialEngine.setStep('home_opening'); TutorialEngine.start(); } };
+            el.querySelector('#nw-sure').onclick = () => finishWelcome(true);
             el.querySelector('#nw-skip').onclick = () => {
                 const actions = el.querySelector('.nw-actions');
                 if (actions) actions.remove();
                 const copy = el.querySelector('#nw-skip-copy');
                 copy.innerHTML = `<p>You can start the interactive tutorial anytime in Settings. Check the Help tab if you have questions.</p><button class="nw-button" id="nw-done">Alright!</button>`;
-                el.querySelector('#nw-done').onclick = () => { storage.setItem(KEY, 'true'); el.remove(); };
+                el.querySelector('#nw-done').onclick = () => finishWelcome(false);
             };
         }
         el.querySelectorAll('.nw-tooltip-wrap').forEach(wrap => {
