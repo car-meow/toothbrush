@@ -4,44 +4,69 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>New Tab</title>
-    <style>
-        :root { color-scheme: dark; }
-        * { box-sizing: border-box; }
-        html, body { width: 100%; height: 100%; margin: 0; }
-        body {
-            display: grid;
-            place-items: center;
-            background: #080808;
-            color: #d7d7d7;
-            font: 500 15px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
-        main { width: min(92vw, 380px); text-align: center; }
-        p { margin: 0; line-height: 1.5; }
-        button {
-            margin-top: 22px;
-            padding: 10px 18px;
-            border: 1px solid #737373;
-            border-radius: 999px;
-            background: transparent;
-            color: inherit;
-            font: inherit;
-            cursor: pointer;
-        }
-        button:hover, button:focus-visible { background: #202020; }
-    </style>
-</head>
-<body>
-    <main>
-        <p>Your game is open in another tab.</p>
-        <p>Closing that tab will return you to Games.</p>
-        <button type="button" id="return-to-games">Return to Games</button>
-    </main>
+    <link rel="stylesheet" href="style.css?v=65">
     <script>
         (function () {
+            try {
+                var storage = window.nexusStorage || window.localStorage;
+                if (storage.getItem('tb_theme') === 'light') document.documentElement.classList.add('light-mode');
+            } catch (error) {}
+        })();
+    </script>
+</head>
+<body class="game-standby-active">
+    <main class="game-standby-screen">
+        <img class="game-standby-background" src="Assets/loading_stash.png" alt="">
+        <button type="button" class="game-standby-back">Back to Games</button>
+        <div id="page-fade-overlay" class="fade-out">
+            <div class="nexus-transition-content"><img src="Assets/loadingRoll.gif" alt=""><span class="nexus-transition-label"></span></div>
+        </div>
+    </main>
+    <div id="nexus-red-confirm-overlay">
+        <div class="red-confirm-box">
+            <div id="nexus-red-confirm-title">Warning</div>
+            <div id="nexus-red-confirm-msg">Opening multiple games can cause low performance or bugs. Are you sure you want to continue?</div>
+            <div style="display:flex; gap:14px; justify-content:center; margin-top:8px;">
+                <button id="nexus-red-confirm-ok" class="red-dialog-ok-btn">OK</button>
+                <button id="nexus-red-confirm-cancel" class="red-dialog-cancel-btn green-game-cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var screen = document.querySelector('.game-standby-screen');
+            var overlay = document.getElementById('page-fade-overlay');
+            var confirmOverlay = document.getElementById('nexus-red-confirm-overlay');
+            var returning = false;
+
             function returnToGames() {
-                window.location.replace('carmeow.html');
+                if (returning) return;
+                returning = true;
+                screen.classList.add('is-returning');
+                overlay.classList.add('is-loading');
+                window.setTimeout(function () {
+                    window.location.replace('carmeow.html');
+                }, 360);
             }
-            document.getElementById('return-to-games').addEventListener('click', returnToGames);
+
+            document.querySelector('.game-standby-back').addEventListener('click', function () {
+                confirmOverlay.style.display = 'flex';
+                document.getElementById('nexus-red-confirm-ok').focus();
+            });
+            document.getElementById('nexus-red-confirm-ok').addEventListener('click', returnToGames);
+            document.getElementById('nexus-red-confirm-cancel').addEventListener('click', function () {
+                confirmOverlay.style.display = 'none';
+            });
+            document.addEventListener('keydown', function (event) {
+                if (confirmOverlay.style.display !== 'flex') return;
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    returnToGames();
+                } else if (event.key === 'Escape') {
+                    event.preventDefault();
+                    confirmOverlay.style.display = 'none';
+                }
+            });
             window.addEventListener('message', function (event) {
                 if (event.data && event.data.type === 'nexus-popup-closed') returnToGames();
             });
