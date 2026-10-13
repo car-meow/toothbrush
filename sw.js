@@ -1,9 +1,10 @@
 // nexus-version: 4.34.1
-const CACHE_NAME = 'nexus-cache-v23';
+const CACHE_NAME = 'nexus-cache-v24';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
     './carmeow.html',
+    './game-standby.html',
     './ai.html',
     './chat.html',
     './media.html',

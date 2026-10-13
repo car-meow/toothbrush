@@ -17,10 +17,7 @@ const popupGameWindows = new Map();
 const activeGameSessions = new Map();
 let gameSessionSequence = 0;
 let mainGameFramesSuspended = false;
-let activeGameExitToken = 0;
 let stashLoadPromise = null;
-let suspendedGamesPage = null;
-let isGameStandbyView = false;
 const sidebarOrderDbName = 'NexusSidebarSettings';
 let sidebarOrderDbPromise = null;
 let lastSidebarOrderSavedAt = 0;
@@ -187,74 +184,14 @@ function hideTransitionOverlay(overlay = document.getElementById('page-fade-over
 }
 
 function enterGameStandbyScreen() {
-    if (isGameStandbyView) return;
     if (gameAutosaveTimer) clearInterval(gameAutosaveTimer);
     gameAutosaveTimer = null;
-    try {
-        const video = document.querySelector('.home-bg-video, #bg-video');
-        if (video && !video.paused) video.pause();
-    } catch (error) {}
-
-    suspendedGamesPage = document.createDocumentFragment();
-    while (document.body.firstChild) suspendedGamesPage.appendChild(document.body.firstChild);
-
-    const shell = document.createElement('main');
-    shell.className = 'game-standby-screen';
-    shell.innerHTML = `
-        <img class="game-standby-background" src="Assets/loading_stash.png" alt="">
-        <button type="button" class="game-standby-back">Back to Games</button>
-        <div id="page-fade-overlay" class="fade-out">
-            <div class="nexus-transition-content"><img src="Assets/loadingRoll.gif" alt=""><span class="nexus-transition-label"></span></div>
-        </div>
-    `;
-    shell.querySelector('.game-standby-back').addEventListener('click', confirmReturnToGames);
-    document.body.classList.add('game-standby-active');
-    document.body.appendChild(shell);
-    isGameStandbyView = true;
     window.dispatchEvent(new CustomEvent('nexus-game-standby-change', { detail: { active: true } }));
-}
 
-async function restoreGamesPageForTransition(message) {
-    let overlay;
-    if (isGameStandbyView && suspendedGamesPage) {
-        const shell = document.querySelector('.game-standby-screen');
-        overlay = showTransitionOverlay(message, shell || document.body);
-        if (shell) shell.classList.add('is-returning');
-        await new Promise(resolve => setTimeout(resolve, 360));
-        if (shell) shell.remove();
-        document.body.classList.remove('game-standby-active');
-        while (suspendedGamesPage.firstChild) document.body.appendChild(suspendedGamesPage.firstChild);
-        suspendedGamesPage = null;
-        isGameStandbyView = false;
-        window.dispatchEvent(new CustomEvent('nexus-game-standby-change', { detail: { active: false } }));
-        if (overlay && overlay.parentNode !== document.body) document.body.appendChild(overlay);
-    }
-    if (!overlay) overlay = showTransitionOverlay(message);
-    return overlay;
-}
-
-async function returnToGamesFromStandby(message = 'loading Games...') {
-    if (!isGameStandbyView) return;
-    const overlay = await restoreGamesPageForTransition(message);
-    const stash = games.find(game => game && game.id === 'ugs-stash');
-    if (stash) {
-        await loadGame(stash, true, { suppressHostLoader: true });
-    }
-    mainGameFramesSuspended = false;
-    if (typeof window.setTemporaryGameCloak === 'function') window.setTemporaryGameCloak(false);
-    if (!activeGameSessions.size) {
-        startGameAutosave();
-    }
-    hideTransitionOverlay(overlay);
-}
-
-function confirmReturnToGames() {
-    showRedConfirmDialog(
-        'Opening multiple games can cause low performance or bugs. Are you sure you want to continue?',
-        { greenCancel: true }
-    ).then(confirmed => {
-        if (confirmed) returnToGamesFromStandby('loading Games...');
-    });
+    // Keeping the Games document in a DocumentFragment still retains its full
+    // DOM, event listeners, preloaded Stash, and JS heap. Replace it with a
+    // minimal document instead, so the game receives the available RAM/CPU.
+    window.location.replace('game-standby.html');
 }
 
 function suspendMainGameFrames() {
@@ -273,9 +210,8 @@ function suspendMainGameFrames() {
 }
 
 function registerGameSession(game, win) {
-    activeGameExitToken++;
     const sessionId = `game-${Date.now()}-${++gameSessionSequence}`;
-    if (!isGameStandbyView && typeof window.setTemporaryGameCloak === 'function') {
+    if (typeof window.setTemporaryGameCloak === 'function') {
         window.setTemporaryGameCloak(true);
     }
     const session = {
@@ -286,12 +222,16 @@ function registerGameSession(game, win) {
     };
     activeGameSessions.set(sessionId, session);
     updatePopupGameIndex(session.gameId);
-    // This listener belongs to the popup's top-level browsing context, so it
-    // still runs when its game iframe navigates to a cross-origin host.
-    win.addEventListener('beforeunload', () => handleGamePopupClosed(sessionId), { once: true });
     suspendMainGameFrames();
-    enterGameStandbyScreen();
+    // Covers the short setup window before the main tab is replaced by the
+    // minimal standby document. After that handoff, the popup itself notifies
+    // game-standby.html when it closes.
+    win.addEventListener('beforeunload', () => handleGamePopupClosed(sessionId), { once: true });
     return session;
+}
+
+function hibernateMainTabForGame() {
+    if (activeGameSessions.size) enterGameStandbyScreen();
 }
 
 function handleGamePopupClosed(sessionId) {
@@ -301,12 +241,6 @@ function handleGamePopupClosed(sessionId) {
     updatePopupGameIndex(session.gameId);
 
     if (activeGameSessions.size) return;
-    activeGameExitToken++;
-
-    if (isGameStandbyView) {
-        returnToGamesFromStandby('Going back to Games...').catch(() => {});
-        return;
-    }
 
     mainGameFramesSuspended = false;
     if (typeof window.setTemporaryGameCloak === 'function') window.setTemporaryGameCloak(false);
@@ -642,18 +576,29 @@ async function getGameSnapshot(gameId) {
             const tx = db.transaction('gameSnapshots', 'readonly');
             const store = tx.objectStore('gameSnapshots');
             let found = null;
+            let foundSavedAt = -1;
+            let foundRank = Infinity;
             let checksLeft = idsToCheck.length;
-            idsToCheck.forEach(id => {
+            idsToCheck.forEach((id, rank) => {
                 const req = store.get(id);
                 req.onsuccess = () => {
-                    if (req.result && !found) {
+                    if (req.result) {
                         const res = req.result;
                         if (res.localStorage || res.fsData || res.idbData) {
-                            found = {
-                                localStorage: (res.localStorage && typeof res.localStorage === 'object') ? res.localStorage : {},
-                                fsData: (res.fsData && typeof res.fsData === 'object') ? res.fsData : null,
-                                idbData: (res.idbData && typeof res.idbData === 'object') ? res.idbData : null
-                            };
+                            const savedAt = Number(res.savedAt) || 0;
+                            // Alias records can complete in any order. Select
+                            // the newest one rather than whichever IndexedDB
+                            // callback happens to win the race.
+                            if (!found || savedAt > foundSavedAt || (savedAt === foundSavedAt && rank < foundRank)) {
+                                found = {
+                                    localStorage: (res.localStorage && typeof res.localStorage === 'object') ? res.localStorage : {},
+                                    fsData: (res.fsData && typeof res.fsData === 'object') ? res.fsData : null,
+                                    idbData: (res.idbData && typeof res.idbData === 'object') ? res.idbData : null,
+                                    savedAt
+                                };
+                                foundSavedAt = savedAt;
+                                foundRank = rank;
+                            }
                         }
                     }
                     checksLeft--;
@@ -673,6 +618,14 @@ async function getGameSnapshot(gameId) {
 async function saveGameSnapshot(gameId, payload, skipMirror = false) {
     if (!gameId || !payload || typeof payload !== 'object') return;
     await initDB();
+
+    // A popup can still deliver a save after a newer one has already been
+    // committed. Keep the time assigned by the game document so an older
+    // asynchronous IndexedDB request can never roll progress back.
+    const payloadSavedAt = Number(payload.savedAt);
+    const incomingSavedAt = Number.isFinite(payloadSavedAt) && payloadSavedAt > 0
+        ? payloadSavedAt
+        : Date.now();
 
     let incomingLs = {};
     let incomingFs = null;
@@ -695,6 +648,8 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
             resolve(null);
         }
     });
+
+    if (existing && Number(existing.savedAt) > incomingSavedAt) return;
 
     const incomingKeys = Object.keys(incomingLs);
     const existingData = (existing && existing.localStorage && typeof existing.localStorage === 'object') ? existing.localStorage : {};
@@ -720,14 +675,25 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
         idbToSave = { ...(idbToSave || {}), ...incomingIdb };
     }
 
-    // Lightweight signature to check for modifications without multi-megabyte JSON stringification
+    // Keep a real content signature. The previous length-only signature treated
+    // equally-sized progress values as unchanged, which silently skipped saves.
+    const signatureForValue = value => {
+        const encoded = typeof value === 'string' ? value : JSON.stringify(value);
+        const text = typeof encoded === 'string' ? encoded : String(value ?? '');
+        let hash = 2166136261;
+        for (let index = 0; index < text.length; index++) {
+            hash ^= text.charCodeAt(index);
+            hash = Math.imul(hash, 16777619);
+        }
+        return `${text.length}:${hash >>> 0}`;
+    };
     let sig = '';
     if (lsToSave) {
         const lsKeys = Object.keys(lsToSave);
         sig += 'L' + lsKeys.length;
         for (let i = 0; i < lsKeys.length; i++) {
-            const v = String(lsToSave[lsKeys[i]]);
-            sig += ':' + lsKeys[i] + '=' + v.length;
+            const key = lsKeys[i];
+            sig += ':' + key + '=' + signatureForValue(lsToSave[key]);
         }
     }
     if (fsToSave) {
@@ -735,7 +701,7 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
         sig += '|F' + fsKeys.length;
         for (let i = 0; i < fsKeys.length; i++) {
             const f = fsToSave[fsKeys[i]];
-            sig += ':' + fsKeys[i] + '=' + (f && f.data ? f.data.length : 0);
+            sig += ':' + fsKeys[i] + '=' + signatureForValue(f && f.data ? f.data : '');
         }
     }
     if (idbToSave) {
@@ -743,12 +709,12 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
         sig += '|I' + idbKeys.length;
         for (let i = 0; i < idbKeys.length; i++) {
             const ent = idbToSave[idbKeys[i]];
-            sig += ':' + idbKeys[i] + '=' + (ent && ent.contents ? ent.contents.length : 0);
+            sig += ':' + idbKeys[i] + '=' + signatureForValue(ent && ent.contents ? ent.contents : '');
         }
     }
-    if (snapshotHashes.get(gameId) === sig && existing) return;
+    if (snapshotHashes.get(gameId) === sig && existing && Number(existing.savedAt) >= incomingSavedAt) return;
 
-    const savedAt = Date.now();
+    const savedAt = incomingSavedAt;
     const history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
     if (existing && existing.localStorage) {
         history.push({
@@ -780,7 +746,8 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
             saveGameSnapshot(matched.id, {
                 localStorage: lsToSave,
                 fsData: fsToSave,
-                idbData: idbToSave
+                idbData: idbToSave,
+                savedAt
             }, true).catch(() => {});
         }
     }
@@ -851,7 +818,8 @@ window.addEventListener('message', event => {
             saveGameSnapshot(gameId, {
                 localStorage: message.localStorage,
                 fsData: message.fsData,
-                idbData: message.idbData
+                idbData: message.idbData,
+                savedAt: message.savedAt
             }).catch(() => {});
         }
     } else if (message.type === 'nexus-request-game-restore') {
@@ -1435,20 +1403,49 @@ function createNexusLoadingOverlay(parentDoc = document, customBgUrl = 'Assets/l
     }
 }
 
+function getGameRestoreScript(gameId, snapshot = {}) {
+    const savedStorage = snapshot && snapshot.localStorage && typeof snapshot.localStorage === 'object'
+        ? snapshot.localStorage
+        : snapshot;
+    const snapshotJson = JSON.stringify(savedStorage || {}).replace(/</g, '\\u003c');
+    const journalKey = `tb_nexus_game_autosave:${encodeURIComponent(String(gameId))}`;
+    const snapshotSavedAt = Number(snapshot && snapshot.savedAt) || 0;
+    return `<script>(function(){try{
+        var saved=${snapshotJson};
+        var snapshotSavedAt=${snapshotSavedAt};
+        var journal=null;
+        try{journal=JSON.parse(localStorage.getItem(${JSON.stringify(journalKey)})||'null');}catch(e){}
+        if(journal&&Number(journal.savedAt)>=snapshotSavedAt&&journal.localStorage&&typeof journal.localStorage==='object'){
+            // The journal is written synchronously by the game itself, so it
+            // always wins over an older asynchronous IndexedDB snapshot.
+            saved=Object.assign({},saved,journal.localStorage);
+        }
+        Object.keys(saved).forEach(function(k){
+            if(k.indexOf('tb_')!==0&&k!=='sidebar-game-order'&&k!=='sidebar-game-order-updated-at')localStorage.setItem(k,saved[k]);
+        });
+    }catch(e){}})();<\/script>`;
+}
+
 function getUniversalAutosaveBridge(gameId) {
     return `<script>
 (function() {
     var gameId = ${JSON.stringify(gameId)};
     var syncing = false;
+    var syncQueued = false;
+    var queuedImmediate = false;
     var syncTimer = null;
     var lastSavedHash = '';
+    var lastSavedAt = 0;
     var autosaveDisarmed = false;
+    var journalKey = 'tb_nexus_game_autosave:' + encodeURIComponent(String(gameId));
 
     function saveSnapshotDirectToDB(targetId, snapshotData) {
         if (autosaveDisarmed || !snapshotData || !targetId) return;
         var incomingLs = snapshotData.localStorage || {};
         var incomingFs = snapshotData.fsData || null;
         var incomingIdb = snapshotData.idbData || null;
+        var payloadSavedAt = Number(snapshotData.savedAt);
+        var incomingSavedAt = isFinite(payloadSavedAt) && payloadSavedAt > 0 ? payloadSavedAt : Date.now();
         try {
             var req = indexedDB.open("GameStorageDB", 3);
             req.onupgradeneeded = function(e) {
@@ -1467,6 +1464,7 @@ function getUniversalAutosaveBridge(gameId) {
                     getReq.onsuccess = function() {
                         if (autosaveDisarmed) return;
                         var existing = getReq.result || null;
+                        if (existing && Number(existing.savedAt) > incomingSavedAt) return;
                         var existingData = (existing && existing.localStorage && typeof existing.localStorage === 'object') ? existing.localStorage : {};
                         var incomingKeys = Object.keys(incomingLs);
                         var existingKeys = Object.keys(existingData);
@@ -1488,7 +1486,7 @@ function getUniversalAutosaveBridge(gameId) {
                             idbToSave = Object.assign({}, idbToSave || {}, incomingIdb);
                         }
 
-                        var savedAt = Date.now();
+                        var savedAt = incomingSavedAt;
                         var history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
                         if (existing && existing.localStorage) {
                             history.push({
@@ -1525,6 +1523,14 @@ function getUniversalAutosaveBridge(gameId) {
         return s;
     }
 
+    function writeJournal(data, savedAt) {
+        // localStorage is synchronous. This tiny write-ahead record survives
+        // tab shutdown, including when the Nexus tab is no longer open.
+        try {
+            localStorage.setItem(journalKey, JSON.stringify({ version: 1, savedAt: savedAt, localStorage: data }));
+        } catch(e) {}
+    }
+
     function sendSave(immediate) {
         if (autosaveDisarmed) return;
         try {
@@ -1532,8 +1538,11 @@ function getUniversalAutosaveBridge(gameId) {
             var currentHash = JSON.stringify(data);
             if (!immediate && currentHash === lastSavedHash) return;
             lastSavedHash = currentHash;
+            var savedAt = Math.max(Date.now(), lastSavedAt + 1);
+            lastSavedAt = savedAt;
+            writeJournal(data, savedAt);
 
-            var msg = { type: 'nexus-game-save', gameId: gameId, localStorage: data };
+            var msg = { type: 'nexus-game-save', gameId: gameId, localStorage: data, savedAt: savedAt };
             saveSnapshotDirectToDB(gameId, msg);
             if (window.parent && window.parent !== window) {
                 try { window.parent.postMessage(msg, '*'); } catch(e) {}
@@ -1546,20 +1555,33 @@ function getUniversalAutosaveBridge(gameId) {
     }
 
     function syncAndSend(immediate) {
-        if (autosaveDisarmed || syncing) return;
+        if (autosaveDisarmed) return;
+        if (syncing) {
+            syncQueued = true;
+            queuedImmediate = queuedImmediate || !!immediate;
+            return;
+        }
         syncing = true;
+        function finishSync() {
+            syncing = false;
+            sendSave(immediate);
+            if (syncQueued) {
+                var nextImmediate = queuedImmediate;
+                syncQueued = false;
+                queuedImmediate = false;
+                syncAndSend(nextImmediate);
+            }
+        }
         try {
             var fs = window.FS || (window.Module && window.Module.FS);
             if (fs && typeof fs.syncfs === 'function') {
                 fs.syncfs(false, function() {
-                    syncing = false;
-                    sendSave(immediate);
+                    finishSync();
                 });
                 return;
             }
         } catch(e) {}
-        syncing = false;
-        sendSave(immediate);
+        finishSync();
     }
 
     function debounceSync(delay) {
@@ -1645,6 +1667,14 @@ function getUniversalAutosaveBridge(gameId) {
                 }
                 toDel.forEach(function(k) { localStorage.removeItem(k); });
             } catch(err) {}
+            try { localStorage.removeItem(journalKey); } catch(err) {}
+        }
+        if (e.data.type === 'nexus-apply-game-restore' && e.data.localStorage) {
+            // A late parent restore should only fill absent values; replacing
+            // existing values here can undo progress made while a tab loads.
+            try { Object.keys(e.data.localStorage).forEach(function(k) {
+                if (k.indexOf('tb_') !== 0 && localStorage.getItem(k) === null) localStorage.setItem(k, e.data.localStorage[k]);
+            }); } catch(err) {}
         }
         if (e.data.type === 'nexus-request-game-save') {
             if (!autosaveDisarmed) syncAndSend(true);
@@ -1743,16 +1773,32 @@ function isCrossyRoadGame(game) {
     return fileName === 'clcrossyroad.html' || fileName.endsWith('/clcrossyroad.html') || gameId.includes('crossyroad');
 }
 
+function shouldInjectGamePersistence(game, url) {
+    if (!game || !url) return false;
+    if (game.nexusExternalSource || isTagC3Game(game) || isCrossyRoadGame(game)) return true;
+    try {
+        // Every local Stash page can be fetched into srcdoc before it starts.
+        // That lets the save bridge run before a game writes its first save.
+        return new URL(url, window.location.href).origin === window.location.origin;
+    } catch (error) {
+        return false;
+    }
+}
+
+function getGamePersistenceBootstrap(gameId, snapshot = {}) {
+    return getGameRestoreScript(gameId, snapshot) + getUniversalAutosaveBridge(gameId);
+}
+
 async function fetchExternalGameHtml(url, bootstrap = '', options = {}) {
     const requestUrl = new URL(url, window.location.href);
-    requestUrl.searchParams.set('t', String(Date.now()));
+    if (!options.preferLocalCache) requestUrl.searchParams.set('t', String(Date.now()));
 
     const controller = options.timeoutMs > 0 ? new AbortController() : null;
     const timeout = controller ? setTimeout(() => controller.abort(), options.timeoutMs) : null;
     let response;
     try {
         response = await fetch(requestUrl.href, {
-            cache: 'no-store',
+            cache: options.preferLocalCache ? 'default' : 'no-store',
             ...(controller ? { signal: controller.signal } : {})
         });
     } finally {
@@ -1922,9 +1968,8 @@ function launchGameFullscreen(game) {
 
     const startLaunch = win => {
         if (win.closed) return;
-        registerGameSession(game, win);
+        const gameSession = registerGameSession(game, win);
         try { win.focus(); } catch(e) {}
-        let popupLoader = null;
 
         // Keep the selected cloak on the game tab while the Nexus tab is
         // temporarily hidden as New Tab for the duration of the game session.
@@ -2048,11 +2093,8 @@ function launchGameFullscreen(game) {
                 const unityCompatibility = isUnityRuntime
                     ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
                     : '';
-                const snapshot = latestSnapshot || {};
-                const lsData = (snapshot && snapshot.localStorage && typeof snapshot.localStorage === 'object') ? snapshot.localStorage : snapshot;
-                const snapshotJson = JSON.stringify(lsData).replace(/</g, '\\u003c');
                 const popupBridge = getUniversalAutosaveBridge(game.id);
-                const popupRestore = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0&&k!=='sidebar-game-order'&&k!=='sidebar-game-order-updated-at')localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
+                const popupRestore = getGameRestoreScript(game.id, latestSnapshot);
                 const autoFocusScript = `<script>
                 (function(){
                     function triggerClickFocus() {
@@ -2080,12 +2122,9 @@ function launchGameFullscreen(game) {
                 win.document.body.style.margin = '0';
                 win.document.body.style.padding = '0';
                 win.document.body.style.overflow = 'hidden';
-                if (!game.nexusSkipLoadingScreen) popupLoader = createNexusLoadingOverlay(win.document, getLoadingScreenBgUrl());
                 const ifr = win.document.createElement('iframe');
                 Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
                 ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
-                ifr.onload = () => popupLoader.complete();
-                ifr.onerror = () => popupLoader.complete();
                 ifr.srcdoc = gameSrcDoc;
                 win.document.body.appendChild(ifr);
                 setTimeout(() => { try { win.focus(); } catch (e) {} }, 100);
@@ -2093,24 +2132,6 @@ function launchGameFullscreen(game) {
                 const ifr = win.document.createElement('iframe');
                 Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
                 ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
-                if (!game.nexusSkipLoadingScreen) popupLoader = createNexusLoadingOverlay(win.document, getLoadingScreenBgUrl());
-                ifr.onload = () => {
-                    if (popupLoader) popupLoader.complete();
-                    getGameSnapshot(game.id).then(snap => {
-                        if (snap && ifr.contentWindow) {
-                            try {
-                                ifr.contentWindow.postMessage({
-                                    type: 'nexus-apply-game-restore',
-                                    gameId: game.id,
-                                    localStorage: snap.localStorage || {},
-                                    fsData: snap.fsData || null,
-                                    idbData: snap.idbData || null
-                                }, '*');
-                            } catch (e) {}
-                        }
-                    });
-                };
-                ifr.onerror = () => { if (popupLoader) popupLoader.complete(); };
                 const resolved = await resolveGameUrl(game);
                 let resolvedUrl = resolved.url || game.url;
                 try {
@@ -2118,20 +2139,18 @@ function launchGameFullscreen(game) {
                 } catch (e) {}
                 if (resolved.usedFallback) resolvedUrl = resolved.url;
                 if (resolved.usedFallback) game = { ...game, nexusExternalSource: true };
-                if (game.nexusExternalSource || isTagC3Game(game) || isCrossyRoadGame(game)) {
+                if (shouldInjectGamePersistence(game, resolvedUrl)) {
                     const snapshot = await getLaunchSnapshot(game.id);
-                    const savedLocalStorage = snapshot && snapshot.localStorage ? snapshot.localStorage : {};
-                    const snapshotJson = JSON.stringify(savedLocalStorage).replace(/</g, '\\u003c');
-                    const restoreScript = '<script>(function(){try{var s=' + snapshotJson + ';Object.keys(s).forEach(function(k){if(k.indexOf("tb_")!==0&&k!=="sidebar-game-order"&&k!=="sidebar-game-order-updated-at")localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>';
-                    const popupBridge = getUniversalAutosaveBridge(game.id);
+                    const persistenceBootstrap = getGamePersistenceBootstrap(game.id, snapshot);
                     try {
                         ifr.srcdoc = await fetchExternalGameHtml(
                             resolvedUrl,
-                            restoreScript + popupBridge + titleEnforceScript,
+                            persistenceBootstrap + titleEnforceScript,
                             {
                                 disableServiceWorker: isTagC3Game(game),
                                 disableRemotePokiSdk: isTagC3Game(game),
                                 adaptYouTubePlayable: isCrossyRoadGame(game),
+                                preferLocalCache: new URL(resolvedUrl, window.location.href).origin === window.location.origin,
                                 timeoutMs: 15000
                             }
                         );
@@ -2253,6 +2272,8 @@ function launchGameFullscreen(game) {
                         var incomingLs = incomingData.localStorage || {};
                         var incomingFs = incomingData.fsData || null;
                         var incomingIdb = incomingData.idbData || null;
+                        var payloadSavedAt = Number(incomingData.savedAt);
+                        var incomingSavedAt = isFinite(payloadSavedAt) && payloadSavedAt > 0 ? payloadSavedAt : Date.now();
                         try {
                             var req = indexedDB.open("GameStorageDB", 3);
                             req.onupgradeneeded = function(e) {
@@ -2270,6 +2291,7 @@ function launchGameFullscreen(game) {
                                     var getReq = store.get(ids[0]);
                                     getReq.onsuccess = function() {
                                         var existing = getReq.result || null;
+                                        if (existing && Number(existing.savedAt) > incomingSavedAt) return;
                                         var existingData = (existing && existing.localStorage && typeof existing.localStorage === 'object') ? existing.localStorage : {};
                                         var incomingKeys = Object.keys(incomingLs);
                                         var existingKeys = Object.keys(existingData);
@@ -2291,7 +2313,7 @@ function launchGameFullscreen(game) {
                                             idbToSave = Object.assign({}, idbToSave || {}, incomingIdb);
                                         }
 
-                                        var savedAt = Date.now();
+                                        var savedAt = incomingSavedAt;
                                         var history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
                                         if (existing && existing.localStorage) {
                                             history.push({
@@ -2411,10 +2433,10 @@ function launchGameFullscreen(game) {
                     document.addEventListener('visibilitychange', function() {
                         if (document.hidden) triggerAutosaveFlush();
                     }, { passive: true });
-                    setInterval(triggerAutosaveFlush, 15000);
                 })();
                 `;
                 win.document.head.appendChild(controllerScriptEl);
+                hibernateMainTabForGame();
 
                 function doFocusAndClick() {
                     try {
@@ -2440,6 +2462,7 @@ function launchGameFullscreen(game) {
         } catch(err) {
             console.error("Error launching game in fullscreen window:", err);
             try { win.close(); } catch (e) {}
+            handleGamePopupClosed(gameSession.sessionId);
             const message = 'Nexus could not start this game. Check your connection and try again. The raw error is available below if needed.';
             if (typeof window.nexusError === 'function') window.nexusError(message, err, 'Game launch failed');
             else nexusAlert('Nexus could not start this game. Check your connection and try again.');
@@ -3088,12 +3111,10 @@ async function loadGame(game, forceInternal = false, options = {}) {
 
             const isUnityRuntime = /(?:createUnityInstance|UnityLoader|unity-container|unity-canvas)/i.test(htmlContent);
             const snapshot = fileSnapshot;
-            const lsData = (snapshot && snapshot.localStorage && typeof snapshot.localStorage === 'object') ? snapshot.localStorage : snapshot;
-            const snapshotJson = JSON.stringify(lsData).replace(/</g, '\\u003c');
             const unityCompatibility = isUnityRuntime
                 ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
                 : '';
-            const restoreScript = `<script>(function(){try{var s=${snapshotJson};Object.keys(s).forEach(function(k){if(k.indexOf('tb_')!==0&&k!=='sidebar-game-order'&&k!=='sidebar-game-order-updated-at')localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>`;
+            const restoreScript = getGameRestoreScript(game.id, snapshot);
             const autosaveBridge = getUniversalAutosaveBridge(game.id);
             const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
             const finalHTML = injectGameBootstrap(htmlContent, unityCompatibility + restoreScript + persistenceScript + autosaveBridge);
@@ -3109,23 +3130,20 @@ async function loadGame(game, forceInternal = false, options = {}) {
                     frame.src = game.content; 
                 }
             }
-        } else if (game.nexusExternalSource || isTagC3Game(game) || isCrossyRoadGame(game)) {
+        } else if (shouldInjectGamePersistence(game, resolvedGameUrl)) {
             try {
                 const snapshot = await getGameSnapshot(game.id);
                 if (requestedLoadToken !== gameLoadToken) return;
 
-                const savedLocalStorage = snapshot && snapshot.localStorage ? snapshot.localStorage : {};
-                const snapshotJson = JSON.stringify(savedLocalStorage).replace(/</g, '\\u003c');
-                const restoreScript = '<script>(function(){try{var s=' + snapshotJson + ';Object.keys(s).forEach(function(k){if(k.indexOf("tb_")!==0&&k!=="sidebar-game-order"&&k!=="sidebar-game-order-updated-at")localStorage.setItem(k,s[k]);});}catch(e){}})();<\/script>';
-                const persistenceScript = '<script>try{window.localStorage.setItem("p","1");}catch(e){}<\/script>';
-                const autosaveBridge = getUniversalAutosaveBridge(game.id);
+                const persistenceBootstrap = getGamePersistenceBootstrap(game.id, snapshot);
                 const gameHtml = await fetchExternalGameHtml(
                     resolvedGameUrl,
-                    restoreScript + persistenceScript + autosaveBridge,
+                    persistenceBootstrap,
                     {
                         disableServiceWorker: isTagC3Game(game),
                         disableRemotePokiSdk: isTagC3Game(game),
-                        adaptYouTubePlayable: isCrossyRoadGame(game)
+                        adaptYouTubePlayable: isCrossyRoadGame(game),
+                        preferLocalCache: new URL(resolvedGameUrl, window.location.href).origin === window.location.origin
                     }
                 );
                 if (requestedLoadToken !== gameLoadToken) return;
@@ -3133,9 +3151,13 @@ async function loadGame(game, forceInternal = false, options = {}) {
                 frame.removeAttribute('src');
                 frame.srcdoc = gameHtml;
             } catch (error) {
-                console.error('Failed to load external Game Stash source:', error);
-                completeHostLoader();
-                showGameLoadError(game, frame);
+                // Save injection is best-effort for a source that cannot be
+                // fetched (for example, an offline uncached custom URL).
+                // Preserve the old direct launch path rather than preventing
+                // the game from opening.
+                console.warn('Game persistence bootstrap failed; trying direct load.', error);
+                frame.removeAttribute('srcdoc');
+                frame.src = resolvedGameUrl;
             }
         } else {
             frame.removeAttribute('srcdoc');
