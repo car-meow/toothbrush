@@ -1,4 +1,4 @@
-// nexus-version: 4.35.1
+// nexus-version: 4.45.2
 const appStorage = window.nexusStorage || window.localStorage;
 // Game Stash is always available during a Games visit. Release its frame only
 // while the lightweight game standby screen is active.
@@ -2889,10 +2889,10 @@ function injectGameBootstrap(html, bootstrap) {
             overlay.style.gap = '14px';
             var notice = document.createElement('div');
             notice.textContent = 'This game is taking longer than expected.';
-            notice.style.cssText = 'color:#fff;font:600 15px Space Grotesk,sans-serif;text-align:center;padding:0 20px;';
+            notice.style.cssText = 'color:#fff;font-size:15px;font-weight:600;font-family:var(--app-font, sans-serif);text-align:center;padding:0 20px;';
             var retry = document.createElement('button');
             retry.textContent = 'Retry';
-            retry.style.cssText = 'padding:9px 20px;border:2px solid #fff;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;font:700 14px Space Grotesk,sans-serif;cursor:pointer;';
+            retry.style.cssText = 'padding:9px 20px;border:2px solid #fff;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;font-size:14px;font-weight:700;font-family:var(--app-font, sans-serif);cursor:pointer;';
             retry.onclick = function() { location.reload(); };
             overlay.appendChild(notice);
             overlay.appendChild(retry);

@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.35.1 -->
+<!-- nexus-version: 4.45.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,6 +11,8 @@
         (function() {
             try {
                 const storage = window.nexusStorage || window.localStorage;
+                const font = storage.getItem('tb_font_choice') || 'google-sans-flex';
+                if (font === 'space-grotesk') document.documentElement.setAttribute('data-font', 'space-grotesk');
                 const theme = storage.getItem('tb_theme') || 'dark';
                 if (theme === 'light') document.documentElement.classList.add('light-mode');
                 if (storage.getItem('tb_performance_mode') === 'true') {
@@ -151,7 +153,7 @@
     </header>
     <main style="display:flex; align-items:center; justify-content:center; flex:1; overflow:auto; width:100%; padding: 16px 0; box-sizing:border-box;">
         <div class="modal-box">
-            <h2><img src="Assets/Settings.svg" alt="" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px; filter: brightness(0) invert(1);">Settings</h2>
+            <h2><img src="Assets/Settings.svg" alt="" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px; filter: var(--icon-filter);">Settings</h2>
             <div class="settings-core-row">
                 <div class="setting-row">
                     <span class="setting-label">App Cloaking</span>
@@ -265,6 +267,26 @@
 
                 <section class="settings-column">
                     <div class="setting-section-title">Miscellaneous</div>
+                    <div class="setting-row">
+                        <div class="setting-label-group">
+                            <span class="setting-label">Font Family</span>
+                            <span class="setting-hint">Change the font across the entire website</span>
+                        </div>
+                        <select id="select-font-family" class="custom-select" style="min-width: 170px;">
+                            <option value="google-sans-flex">Google Sans Flex</option>
+                            <option value="space-grotesk">Space Grotesk</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-label-group">
+                            <span class="setting-label">Chat Notifications</span>
+                            <span class="setting-hint">Show unread message badges on chat groups (default ON)</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-chat-notifications">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
                     <div class="setting-row">
                         <span class="setting-label">Reset Welcome</span>
                         <button class="material-nav-btn" style="--expanded-width: 190px;" id="btn-reset-welcome">
@@ -555,6 +577,31 @@
                 confirmOverlay.style.display = 'flex';
             } catch (error) { backupFile.value = ''; await nexusAlert('This file is not a valid Nexus backup. ' + error.message); }
         };
+
+        // Font Family preference
+        const selectFont = document.getElementById('select-font-family');
+        if (selectFont) {
+            const savedFont = localStorage.getItem('tb_font_choice') || 'google-sans-flex';
+            selectFont.value = savedFont;
+            selectFont.addEventListener('change', (e) => {
+                const val = e.target.value;
+                localStorage.setItem('tb_font_choice', val);
+                if (val === 'space-grotesk') {
+                    document.documentElement.setAttribute('data-font', 'space-grotesk');
+                } else {
+                    document.documentElement.removeAttribute('data-font');
+                }
+            });
+        }
+
+        // Chat Notifications preference (default ON)
+        const toggleChatNotifications = document.getElementById('toggle-chat-notifications');
+        if (toggleChatNotifications) {
+            toggleChatNotifications.checked = localStorage.getItem('tb_chat_notifications_enabled') !== 'false';
+            toggleChatNotifications.addEventListener('change', (e) => {
+                localStorage.setItem('tb_chat_notifications_enabled', e.target.checked ? 'true' : 'false');
+            });
+        }
 
         // Reset Welcome and return to Home, where the new flow starts.
         document.getElementById('btn-reset-welcome').onclick = () => {

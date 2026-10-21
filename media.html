@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.35.1 -->
+<!-- nexus-version: 4.45.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,6 +12,8 @@
         (function() {
             try {
                 const storage = window.nexusStorage || window.localStorage;
+                const font = storage.getItem('tb_font_choice');
+                if (font === 'space-grotesk') document.documentElement.setAttribute('data-font', 'space-grotesk');
                 const theme = storage.getItem('tb_theme') || 'dark';
                 if (theme === 'light') document.documentElement.classList.add('light-mode');
                 if (storage.getItem('tb_performance_mode') === 'true') {

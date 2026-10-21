@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.35.1 -->
+<!-- nexus-version: 4.45.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,6 +11,8 @@
         (function() {
             try {
                 const storage = window.nexusStorage || window.localStorage;
+                const font = storage.getItem('tb_font_choice') || 'google-sans-flex';
+                if (font === 'space-grotesk') document.documentElement.setAttribute('data-font', 'space-grotesk');
                 const theme = storage.getItem('tb_theme') || 'dark';
                 if (theme === 'light') document.documentElement.classList.add('light-mode');
                 if (storage.getItem('tb_performance_mode') === 'true') {
@@ -207,13 +209,19 @@
                 <main id="chat-room" style="display:none; flex-direction:column; flex:1; height: 100%; position:relative;">
                     <div id="messages" style="flex:1; overflow-y:auto; padding:30px; display:flex; flex-direction:column;"></div>
                     <button id="anon-jump-btn" class="jump-to-bottom-btn" title="Jump to bottom">↓</button>
-                    <div style="padding:20px; background: var(--panel-bg-alt); display:flex; gap:12px; border-top:1px solid var(--border-color); align-items:center;">
-                        <label for="img-upload" class="save-btn" style="background:#1e3a8a; padding:0; width:50px; height:50px; border-radius:12px; flex-shrink:0;" title="Upload Photo">
-                            <img src="Assets/photoIcon.png" alt="Photos" style="width:24px; height:24px; object-fit:contain;">
-                        </label>
-                        <input type="file" id="img-upload" accept="image/*" style="display:none;">
-                        <textarea id="msg-input" placeholder="Type a message..." rows="1" class="auto-expand-textarea"></textarea>
-                        <button id="send-btn" class="save-btn" style="background:#2E7D32; padding: 12px 30px; border-radius: 12px; height: 50px;">Send</button>
+                    <div style="padding:15px 20px 20px 20px; background: var(--panel-bg-alt); display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--border-color);">
+                        <div id="anon-staging-area" style="display:flex; flex-direction:column; gap:6px;">
+                            <div id="anon-reply-bar" class="chat-reply-bar" style="display:none;"></div>
+                            <div id="anon-image-preview-tray" class="chat-image-preview-tray" style="display:none;"></div>
+                        </div>
+                        <div style="display:flex; gap:12px; align-items:center;">
+                            <label for="img-upload" class="save-btn chat-photo-btn" title="Upload Photo">
+                                <img src="Assets/photoIcon.png" alt="Photos">
+                            </label>
+                            <input type="file" id="img-upload" accept="image/*" multiple style="display:none;">
+                            <textarea id="msg-input" placeholder="Type a message..." rows="1" class="auto-expand-textarea"></textarea>
+                            <button id="send-btn" class="save-btn" style="background:#2E7D32; padding: 12px 30px; border-radius: 12px; height: 50px;">Send</button>
+                        </div>
                     </div>
                 </main>
             </div>
@@ -246,13 +254,19 @@
 
                         <button id="group-jump-btn" class="jump-to-bottom-btn" title="Jump to bottom">↓</button>
 
-                        <div style="padding:20px; background: var(--panel-bg-alt); display:flex; gap:12px; border-top:1px solid var(--border-color); align-items:center;">
-                            <label for="group-img-upload" class="save-btn" style="background:#1e3a8a; padding:0; width:50px; height:50px; border-radius:12px; flex-shrink:0;" title="Upload Photo">
-                                <img src="Assets/photoIcon.png" alt="Photos" style="width:24px; height:24px; object-fit:contain;">
-                            </label>
-                            <input type="file" id="group-img-upload" accept="image/*" style="display:none;">
-                            <textarea id="group-msg-input" placeholder="Type a message..." rows="1" class="auto-expand-textarea"></textarea>
-                            <button id="group-send-btn" class="save-btn" style="background:#2E7D32; padding: 12px 30px; border-radius: 12px; height: 50px;">Send</button>
+                        <div style="padding:15px 20px 20px 20px; background: var(--panel-bg-alt); display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--border-color);">
+                            <div id="group-staging-area" style="display:flex; flex-direction:column; gap:6px;">
+                                <div id="group-reply-bar" class="chat-reply-bar" style="display:none;"></div>
+                                <div id="group-image-preview-tray" class="chat-image-preview-tray" style="display:none;"></div>
+                            </div>
+                            <div style="display:flex; gap:12px; align-items:center;">
+                                <label for="group-img-upload" class="save-btn chat-photo-btn" title="Upload Photo">
+                                    <img src="Assets/photoIcon.png" alt="Photos">
+                                </label>
+                                <input type="file" id="group-img-upload" accept="image/*" multiple style="display:none;">
+                                <textarea id="group-msg-input" placeholder="Type a message..." rows="1" class="auto-expand-textarea"></textarea>
+                                <button id="group-send-btn" class="save-btn" style="background:#2E7D32; padding: 12px 30px; border-radius: 12px; height: 50px;">Send</button>
+                            </div>
                         </div>
                     </div>
                 </main>
@@ -323,6 +337,34 @@
         <h3 id="modal-title">Active Users</h3>
         <div id="list-content" style="margin-top:15px; max-height:300px; overflow-y:auto;"></div>
         <button onclick="this.parentElement.style.display='none'" class="save-btn" style="width:100%; margin-top:15px; background:#444;">Close</button>
+    </div>
+
+    <!-- Edit Message Modal -->
+    <div id="edit-message-modal" class="overlay" style="z-index: 31000;">
+        <div class="modal-box" style="padding:28px 30px; border-radius:20px; width:400px; max-width:92vw; border:2px solid var(--white-outline); text-align:left; background:var(--modal-bg); color:var(--text-color);">
+            <h3 style="margin-top:0; margin-bottom:14px; color:var(--title-color); font-size:18px;">Edit Message</h3>
+            <textarea id="edit-message-textarea" class="pin-input-large" style="width:100%; font-size:14px; letter-spacing:0; height:100px; text-align:left; padding:12px; border-radius:10px; resize:vertical;"></textarea>
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:15px;">
+                <button id="edit-message-cancel-btn" class="save-btn cancel-modal-btn" style="padding:10px 16px; font-size:13px; border-radius:10px;" title="Cancel">Cancel</button>
+                <button id="edit-message-save-btn" class="save-btn" style="background:#2E7D32; padding:10px 20px; font-size:13px; border-radius:10px;" title="Save Changes">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client-Side Display Name Modal -->
+    <div id="display-name-modal" class="overlay" style="z-index: 31000;">
+        <div class="modal-box" style="padding:28px 30px; border-radius:20px; width:390px; max-width:92vw; border:2px solid var(--white-outline); text-align:left; background:var(--modal-bg); color:var(--text-color);">
+            <h3 id="display-name-modal-title" style="margin-top:0; margin-bottom:12px; color:var(--title-color); font-size:18px;">Change Display Name</h3>
+            <input type="text" id="display-name-input" class="pin-input-large" placeholder="Enter nickname..." style="width:100%; font-size:14px; letter-spacing:0; padding:12px; text-align:left; border-radius:10px; margin-bottom:6px;">
+            <p style="font-size:12.5px; color:var(--muted-text, #888); margin-top:4px; margin-bottom:18px; line-height:1.4;">
+                Display name change. This changes others' usernames on your screen.
+            </p>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button id="display-name-reset-btn" class="save-btn" style="background:#555; padding:10px 14px; font-size:13px; border-radius:10px;" title="Reset to original username">Reset</button>
+                <button id="display-name-cancel-btn" class="save-btn cancel-modal-btn" style="padding:10px 14px; font-size:13px; border-radius:10px;" title="Cancel">Cancel</button>
+                <button id="display-name-save-btn" class="save-btn" style="background:#2E7D32; padding:10px 18px; font-size:13px; border-radius:10px;" title="Save new display name">Save</button>
+            </div>
+        </div>
     </div>
 
     <script src="nexus-profile.js?v=1"></script>
@@ -541,7 +583,9 @@
         function selectEmoji(emoji) {
             const clean = extractSingleEmoji(emoji);
             if (activeEmojiTargetBtn) {
-                activeEmojiTargetBtn.textContent = clean;
+                if (activeEmojiTargetBtn.classList.contains('group-emoji-btn')) {
+                    activeEmojiTargetBtn.textContent = clean;
+                }
             }
             if (typeof activeEmojiCallback === 'function') {
                 activeEmojiCallback(clean);
@@ -551,6 +595,617 @@
         }
 
         setupEmojiPicker();
+
+        // ═══════════════════════════════════════════════════
+        //  CHAT ACTIONS, REPLIES, REACTIONS, DISPLAY NAMES
+        // ═══════════════════════════════════════════════════
+
+        // --- Custom Display Names (Client-side only) ---
+        function getCustomDisplayNames() {
+            try { return JSON.parse(localStorage.getItem('tb_custom_display_names') || '{}'); }
+            catch(e) { return {}; }
+        }
+
+        function saveCustomDisplayNames(map) {
+            localStorage.setItem('tb_custom_display_names', JSON.stringify(map));
+        }
+
+        function getEffectiveDisplayName(origName) {
+            if (!origName) return '';
+            const map = getCustomDisplayNames();
+            return map[origName] || origName;
+        }
+
+        function setCustomDisplayName(origName, newName) {
+            if (!origName) return;
+            const map = getCustomDisplayNames();
+            const clean = (newName || '').trim();
+            if (clean && clean !== origName) {
+                map[origName] = clean;
+            } else {
+                delete map[origName];
+            }
+            saveCustomDisplayNames(map);
+
+            const effective = getEffectiveDisplayName(origName);
+            document.querySelectorAll(`[data-original-username="${CSS.escape(origName)}"]`).forEach(el => {
+                el.textContent = effective;
+            });
+        }
+
+        // Display Name Modal
+        const displayNameModal = document.getElementById('display-name-modal');
+        const displayNameInput = document.getElementById('display-name-input');
+        const displayNameTitle = document.getElementById('display-name-modal-title');
+        const displayNameSaveBtn = document.getElementById('display-name-save-btn');
+        const displayNameResetBtn = document.getElementById('display-name-reset-btn');
+        const displayNameCancelBtn = document.getElementById('display-name-cancel-btn');
+        let activeTargetUsernameForRename = null;
+
+        function openDisplayNameModal(origUsername) {
+            activeTargetUsernameForRename = origUsername;
+            if (displayNameTitle) displayNameTitle.textContent = `Change Display Name for ${origUsername}`;
+            const map = getCustomDisplayNames();
+            if (displayNameInput) {
+                displayNameInput.value = map[origUsername] || '';
+                displayNameInput.placeholder = `Nickname for ${origUsername}...`;
+            }
+            if (displayNameModal) displayNameModal.style.display = 'flex';
+            if (displayNameInput) setTimeout(() => displayNameInput.focus(), 50);
+        }
+
+        if (displayNameCancelBtn) {
+            displayNameCancelBtn.onclick = () => {
+                if (displayNameModal) displayNameModal.style.display = 'none';
+                activeTargetUsernameForRename = null;
+            };
+        }
+
+        if (displayNameResetBtn) {
+            displayNameResetBtn.onclick = () => {
+                if (activeTargetUsernameForRename) {
+                    setCustomDisplayName(activeTargetUsernameForRename, '');
+                }
+                if (displayNameModal) displayNameModal.style.display = 'none';
+                activeTargetUsernameForRename = null;
+            };
+        }
+
+        if (displayNameSaveBtn) {
+            displayNameSaveBtn.onclick = () => {
+                if (activeTargetUsernameForRename && displayNameInput) {
+                    setCustomDisplayName(activeTargetUsernameForRename, displayNameInput.value);
+                }
+                if (displayNameModal) displayNameModal.style.display = 'none';
+                activeTargetUsernameForRename = null;
+            };
+        }
+
+        // --- Reply State & Helpers ---
+        let activeReplyAnon = null;
+        let activeReplyGroup = null;
+
+        function makeMessageSnippet(htmlOrText) {
+            const temp = document.createElement('div');
+            temp.innerHTML = htmlOrText || '';
+            const existingQuote = temp.querySelector('.chat-reply-quote');
+            if (existingQuote) existingQuote.remove();
+            const hasImg = temp.querySelector('img');
+            const clean = temp.textContent.trim();
+            if (!clean && hasImg) return '📷 Photo';
+            return (clean.length > 55 ? clean.slice(0, 55) + '…' : clean) || 'Message';
+        }
+
+        function setReplyTarget(type, username, fullText) {
+            const snippet = makeMessageSnippet(fullText);
+            const target = { username, snippet };
+            if (type === 'anon') {
+                activeReplyAnon = target;
+                renderReplyBar('anon');
+                const inp = document.getElementById('msg-input');
+                if (inp) inp.focus();
+            } else {
+                activeReplyGroup = target;
+                renderReplyBar('group');
+                const inp = document.getElementById('group-msg-input');
+                if (inp) inp.focus();
+            }
+        }
+
+        function clearReplyTarget(type) {
+            if (type === 'anon') {
+                activeReplyAnon = null;
+                renderReplyBar('anon');
+            } else {
+                activeReplyGroup = null;
+                renderReplyBar('group');
+            }
+        }
+
+        function renderReplyBar(type) {
+            const bar = document.getElementById(`${type}-reply-bar`);
+            const target = (type === 'anon') ? activeReplyAnon : activeReplyGroup;
+            if (!bar) return;
+            if (!target) {
+                bar.style.display = 'none';
+                bar.innerHTML = '';
+                return;
+            }
+            bar.style.display = 'flex';
+            bar.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
+                    <img src="Assets/Reply.svg" class="reply-quote-icon" style="width:14px; height:14px; filter:var(--icon-filter);" alt="">
+                    <span style="font-weight:700; color:var(--text-color); flex-shrink:0;">Replying to ${escapeHTML(target.username)}:</span>
+                    <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:0.75;">"${escapeHTML(target.snippet)}"</span>
+                </div>
+                <button type="button" class="reply-cancel-btn" title="Cancel Reply">&times;</button>
+            `;
+            const cancelBtn = bar.querySelector('.reply-cancel-btn');
+            if (cancelBtn) cancelBtn.onclick = () => clearReplyTarget(type);
+        }
+
+        function buildMessageWithReply(type, contentHtml, isAlreadyHtml) {
+            const target = (type === 'anon') ? activeReplyAnon : activeReplyGroup;
+            const body = isAlreadyHtml ? contentHtml : escapeHTML(contentHtml);
+            if (!target) return body;
+            const quote = `<div class="chat-reply-quote"><img src="Assets/Reply.svg" class="reply-quote-icon" alt=""><span class="reply-quote-user">${escapeHTML(target.username)}:</span> <span class="reply-quote-text">${escapeHTML(target.snippet)}</span></div>`;
+            return quote + body;
+        }
+
+        // ═══════════════════════════════════════════════════
+        //  IMAGE VIEWER & STAGING HELPERS
+        // ═══════════════════════════════════════════════════
+        function openImageInNewTab(src) {
+            if (!src) return;
+            try {
+                const w = window.open('', '_blank');
+                if (w) {
+                    w.document.open();
+                    w.document.write(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Nexus - View Image</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #0f0b1e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+        }
+        img {
+            max-width: 96vw;
+            max-height: 96vh;
+            object-fit: contain;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+            border-radius: 8px;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <img src="${src}" alt="Full Image">
+</body>
+</html>`);
+                    w.document.close();
+                    return;
+                }
+            } catch (err) {
+                console.warn('Failed to open popup doc, falling back:', err);
+            }
+            const a = document.createElement('a');
+            a.href = src;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+        window.openImageInNewTab = openImageInNewTab;
+
+        // Delegated click handler on document to open any chat message image in new tab safely
+        document.addEventListener('click', (e) => {
+            const target = e.target;
+            if (target && target.tagName === 'IMG') {
+                if (target.classList.contains('chat-msg-img') || 
+                    (target.closest('.msg-content') && !target.classList.contains('reply-quote-icon'))) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.openImageInNewTab(target.src);
+                }
+            }
+        }, true);
+
+        let pendingImagesAnon = [];
+        let pendingImagesGroup = [];
+
+        function renderImagePreviewTray(type) {
+            const isAnon = (type === 'anon');
+            const tray = document.getElementById(isAnon ? 'anon-image-preview-tray' : 'group-image-preview-tray');
+            const list = isAnon ? pendingImagesAnon : pendingImagesGroup;
+            if (!tray) return;
+
+            if (!list || list.length === 0) {
+                tray.style.display = 'none';
+                tray.innerHTML = '';
+                return;
+            }
+
+            tray.style.display = 'flex';
+            tray.innerHTML = list.map(item => `
+                <div class="chat-image-preview-item" data-id="${item.id}">
+                    <img src="${item.dataUrl}" class="chat-image-preview-thumb" alt="Preview">
+                    <button type="button" class="chat-image-remove-btn" data-id="${item.id}" title="Remove image">&times;</button>
+                </div>
+            `).join('');
+
+            tray.querySelectorAll('.chat-image-remove-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    const id = btn.getAttribute('data-id');
+                    if (isAnon) {
+                        pendingImagesAnon = pendingImagesAnon.filter(img => img.id !== id);
+                        renderImagePreviewTray('anon');
+                    } else {
+                        pendingImagesGroup = pendingImagesGroup.filter(img => img.id !== id);
+                        renderImagePreviewTray('group');
+                    }
+                };
+            });
+        }
+
+        function clearPendingImages(type) {
+            if (type === 'anon') {
+                pendingImagesAnon = [];
+                renderImagePreviewTray('anon');
+            } else {
+                pendingImagesGroup = [];
+                renderImagePreviewTray('group');
+            }
+        }
+
+        function buildImagesGridHtml(images) {
+            if (!images || !images.length) return '';
+            const imgs = images.map(item => 
+                `<img src="${item.dataUrl}" class="chat-msg-img" onclick="window.openImageInNewTab(this.src)" onerror="this.onerror=null; this.alt='Photo could not load';">`
+            ).join('');
+            return `<div class="chat-images-grid">${imgs}</div>`;
+        }
+
+        function handleImageFilesSelected(files, type) {
+            if (!files || !files.length) return;
+            const fileList = Array.from(files);
+            fileList.forEach(file => {
+                if (!file.type || !file.type.startsWith('image/')) return;
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        let w = img.width, h = img.height;
+                        const MAX = 400;
+                        if (w > h && w > MAX) { h *= MAX / w; w = MAX; }
+                        else if (h > MAX) { w *= MAX / h; h = MAX; }
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        const b64 = canvas.toDataURL('image/jpeg', 0.6);
+                        const item = {
+                            id: 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+                            dataUrl: b64
+                        };
+                        if (type === 'anon') {
+                            pendingImagesAnon.push(item);
+                            renderImagePreviewTray('anon');
+                        } else {
+                            pendingImagesGroup.push(item);
+                            renderImagePreviewTray('group');
+                        }
+                    };
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // --- Edit Message Modal ---
+        const editMessageModal = document.getElementById('edit-message-modal');
+        const editMessageTextarea = document.getElementById('edit-message-textarea');
+        const editMessageSaveBtn = document.getElementById('edit-message-save-btn');
+        const editMessageCancelBtn = document.getElementById('edit-message-cancel-btn');
+        let activeEditState = null; // { msgId, type, quoteHtml }
+
+        function openEditModal(msgId, type, fullHtml) {
+            const temp = document.createElement('div');
+            temp.innerHTML = fullHtml;
+            const quote = temp.querySelector('.chat-reply-quote');
+            let quoteHtml = '';
+            if (quote) {
+                quoteHtml = quote.outerHTML;
+                quote.remove();
+            }
+            if (temp.querySelector('img:not(.reply-quote-icon)')) {
+                nexusAlert('Images cannot be edited textually.');
+                return;
+            }
+            const rawText = temp.textContent.trim();
+            activeEditState = { msgId, type, quoteHtml };
+            if (editMessageTextarea) editMessageTextarea.value = rawText;
+            if (editMessageModal) editMessageModal.style.display = 'flex';
+            if (editMessageTextarea) setTimeout(() => editMessageTextarea.focus(), 50);
+        }
+
+        if (editMessageCancelBtn) {
+            editMessageCancelBtn.onclick = () => {
+                if (editMessageModal) editMessageModal.style.display = 'none';
+                activeEditState = null;
+            };
+        }
+
+        if (editMessageSaveBtn) {
+            editMessageSaveBtn.onclick = async () => {
+                if (!activeEditState || !editMessageTextarea) return;
+                const newBody = editMessageTextarea.value.trim();
+                if (!newBody) return;
+                const newFullHtml = (activeEditState.quoteHtml || '') + escapeHTML(newBody);
+                const { msgId, type } = activeEditState;
+                if (editMessageModal) editMessageModal.style.display = 'none';
+                activeEditState = null;
+
+                if (type === 'anon') {
+                    handleAnonMsgEdit(msgId, newFullHtml);
+                    publish({ type: 'msg-edit', msgId, text: newFullHtml });
+                } else if (type === 'group') {
+                    handleGroupMessageUpdate({ id: msgId, text: newFullHtml });
+                    if (sbClient) {
+                        try {
+                            await sbClient.from('group_messages').update({ text: newFullHtml }).eq('id', msgId);
+                        } catch(e) {
+                            console.error("Failed to update message:", e);
+                        }
+                    }
+                }
+            };
+        }
+
+        // --- Reactions (Local Storage & Realtime sync) ---
+        function getStoredReactions(msgId) {
+            try { return JSON.parse(localStorage.getItem(`tb_msg_reactions_${msgId}`) || '{}'); }
+            catch(e) { return {}; }
+        }
+
+        function saveStoredReactions(msgId, reactions) {
+            localStorage.setItem(`tb_msg_reactions_${msgId}`, JSON.stringify(reactions));
+        }
+
+        function renderReactionsForMessage(msgId, rowEl) {
+            if (!rowEl) return;
+            const reactions = getStoredReactions(msgId);
+            const emojis = Object.keys(reactions);
+            rowEl.innerHTML = '';
+            if (emojis.length === 0) {
+                rowEl.style.display = 'none';
+                return;
+            }
+            rowEl.style.display = 'flex';
+            emojis.forEach(em => {
+                const count = reactions[em] || 0;
+                if (count <= 0) return;
+                const pill = document.createElement('span');
+                pill.className = 'chat-reaction-pill';
+                pill.textContent = `${em} ${count}`;
+                pill.title = `${count} reaction${count === 1 ? '' : 's'}`;
+                pill.onclick = (e) => {
+                    e.stopPropagation();
+                    const container = rowEl.closest('.chat-msg-container');
+                    const isGroup = container && container.dataset.groupMsg === 'true';
+                    addReactionToMessage(msgId, em, isGroup ? 'group' : 'anon');
+                };
+                rowEl.appendChild(pill);
+            });
+        }
+
+        function addReactionToMessage(msgId, emoji, type) {
+            const reactions = getStoredReactions(msgId);
+            reactions[emoji] = (reactions[emoji] || 0) + 1;
+            saveStoredReactions(msgId, reactions);
+
+            const container = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
+            if (container) {
+                const row = container.querySelector('.chat-reactions-row');
+                renderReactionsForMessage(msgId, row);
+            }
+
+            if (type === 'anon') {
+                publish({ type: 'reaction', msgId, emoji, user: myName });
+            } else if (type === 'group') {
+                if (groupRealtimeChannel) {
+                    try {
+                        groupRealtimeChannel.send({
+                            type: 'broadcast',
+                            event: 'reaction',
+                            payload: { msgId, emoji, username: NexusProfile.get()?.username }
+                        });
+                    } catch(e) {}
+                }
+            }
+        }
+
+        function handleGroupReactionBroadcast(payload) {
+            if (!payload || !payload.msgId || !payload.emoji) return;
+            const reactions = getStoredReactions(payload.msgId);
+            reactions[payload.emoji] = (reactions[payload.emoji] || 0) + 1;
+            saveStoredReactions(payload.msgId, reactions);
+            const container = document.querySelector(`[data-msg-id="${CSS.escape(payload.msgId)}"]`);
+            if (container) {
+                const row = container.querySelector('.chat-reactions-row');
+                renderReactionsForMessage(payload.msgId, row);
+            }
+        }
+
+        function handleAnonReaction(msgId, emoji, user) {
+            if (!msgId || !emoji) return;
+            const reactions = getStoredReactions(msgId);
+            reactions[emoji] = (reactions[emoji] || 0) + 1;
+            saveStoredReactions(msgId, reactions);
+            const container = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
+            if (container) {
+                const row = container.querySelector('.chat-reactions-row');
+                renderReactionsForMessage(msgId, row);
+            }
+        }
+
+        function handleAnonMsgEdit(msgId, newHtml) {
+            const container = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
+            if (container) {
+                const content = container.querySelector('.msg-content');
+                if (content) content.innerHTML = newHtml;
+            }
+        }
+
+        function handleAnonMsgDelete(msgId) {
+            const container = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
+            if (container) container.remove();
+        }
+
+        function handleGroupMessageUpdate(newMsg) {
+            if (!newMsg || !newMsg.id) return;
+            const container = document.querySelector(`[data-msg-id="${CSS.escape(newMsg.id)}"]`);
+            if (container) {
+                const content = container.querySelector('.msg-content');
+                if (content) content.innerHTML = newMsg.text;
+            }
+        }
+
+        function handleGroupMessageDelete(msgId) {
+            if (!msgId) return;
+            const container = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
+            if (container) container.remove();
+        }
+
+        // --- Action Listeners for Message Hover Bar ---
+        function attachActionListeners(actionsEl, containerEl, type) {
+            const msgId = containerEl.dataset.msgId;
+            const sender = containerEl.dataset.sender;
+
+            actionsEl.querySelectorAll('.msg-action-btn').forEach(btn => {
+                const action = btn.dataset.action;
+                btn.onclick = async (e) => {
+                    e.stopPropagation();
+                    const contentEl = containerEl.querySelector('.msg-content');
+                    const currentHtml = contentEl ? contentEl.innerHTML : '';
+
+                    if (action === 'edit') {
+                        openEditModal(msgId, type, currentHtml);
+                    } else if (action === 'delete') {
+                        const ok = await nexusConfirm('Delete this message?');
+                        if (ok) {
+                            if (type === 'anon') {
+                                handleAnonMsgDelete(msgId);
+                                publish({ type: 'msg-delete', msgId });
+                            } else {
+                                handleGroupMessageDelete(msgId);
+                                if (sbClient) {
+                                    try {
+                                        await sbClient.from('group_messages').delete().eq('id', msgId);
+                                    } catch(err) {
+                                        console.error("Delete group msg failed:", err);
+                                    }
+                                }
+                            }
+                        }
+                    } else if (action === 'reply') {
+                        const displaySender = (type === 'group') ? getEffectiveDisplayName(sender) : sender;
+                        setReplyTarget(type, displaySender, currentHtml);
+                    } else if (action === 'react') {
+                        openEmojiPicker(btn, (chosenEmoji) => {
+                            addReactionToMessage(msgId, chosenEmoji, type);
+                        });
+                    } else if (action === 'rename') {
+                        openDisplayNameModal(sender);
+                    }
+                };
+            });
+        }
+
+        // --- Unread Notifications System ---
+        function isChatNotificationsEnabled() {
+            return (window.nexusStorage || window.localStorage).getItem('tb_chat_notifications_enabled') !== 'false';
+        }
+
+        function getStoredUnreadCounts() {
+            try { return JSON.parse(localStorage.getItem('tb_group_unread_counts') || '{}'); }
+            catch(e) { return {}; }
+        }
+
+        function saveStoredUnreadCounts(counts) {
+            localStorage.setItem('tb_group_unread_counts', JSON.stringify(counts));
+        }
+
+        const unreadGroupCounts = getStoredUnreadCounts();
+
+        function checkActiveGroupScrolledToBottom() {
+            if (!currentActiveGroupCode) return;
+            const messagesArea = document.getElementById('group-messages');
+            if (!messagesArea) return;
+            const isBottom = messagesArea.scrollHeight - messagesArea.scrollTop - messagesArea.clientHeight <= 35;
+            if (isBottom) {
+                if (unreadGroupCounts[currentActiveGroupCode]) {
+                    unreadGroupCounts[currentActiveGroupCode] = 0;
+                    saveStoredUnreadCounts(unreadGroupCounts);
+                    renderGroupSidebar();
+                }
+            }
+        }
+
+        const groupMessagesArea = document.getElementById('group-messages');
+        if (groupMessagesArea) {
+            groupMessagesArea.addEventListener('scroll', checkActiveGroupScrolledToBottom);
+        }
+
+        // --- Code Normalization & Filtering Helpers ---
+        function normalizeGroupCode(raw) {
+            let code = (raw || '').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+            if (!code.startsWith('NX-')) {
+                if (code.startsWith('NX') && code.length > 2) {
+                    code = 'NX-' + code.slice(2).replace(/-/g, '');
+                } else {
+                    code = 'NX-' + code.replace(/-/g, '');
+                }
+            }
+            return code;
+        }
+
+        const groupCodeInputEl = document.getElementById('join-group-code-input');
+        if (groupCodeInputEl) {
+            groupCodeInputEl.addEventListener('input', (e) => {
+                let val = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+                if (val.startsWith('NX') && val.length > 2 && val[2] !== '-') {
+                    val = 'NX-' + val.slice(2).replace(/-/g, '');
+                }
+                e.target.value = val.slice(0, 7);
+            });
+        }
+
+        const pinEntryEl = document.getElementById('pin-entry');
+        if (pinEntryEl) {
+            pinEntryEl.addEventListener('input', (e) => {
+                e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+            });
+        }
+        const hostPinEl = document.getElementById('host-pin-input');
+        if (hostPinEl) {
+            hostPinEl.addEventListener('input', (e) => {
+                e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+            });
+        }
 
         // ═══════════════════════════════════════════════════
         //  0.  BAN CHECK
@@ -768,7 +1423,7 @@
                 let html = `<div class="user-pill" style="background:${user.color}">${user.name}</div>`;
                 if (isAdmin) html += `<span class="ip-text">${user.ip}</span>`;
                 if (isHost && user.peerId !== myUuid) {
-                    html += `<span onclick="kickById('${user.peerId}','${user.name}')" style="cursor:pointer"><img src="Assets/Delete.svg" alt="Kick" style="width:18px;height:18px;filter:brightness(0) invert(1);vertical-align:middle;"></span>`;
+                    html += `<span onclick="kickById('${user.peerId}','${user.name}')" style="cursor:pointer"><img src="Assets/Delete.svg" alt="Kick" style="width:18px;height:18px;filter:var(--icon-filter);vertical-align:middle;"></span>`;
                 }
                 row.innerHTML = html;
                 list.appendChild(row);
@@ -797,34 +1452,39 @@
         };
 
         document.getElementById('start-host-btn').onclick = () => {
-            const nameInput = document.getElementById('host-name-input');
-            const pinInput = document.getElementById('host-pin-input');
-            const name = (nameInput && nameInput.value ? nameInput.value.trim() : '') || 'Nexus Room';
-            roomAnonymous = document.getElementById('host-anonymous-mode').checked;
-            if (!roomAnonymous) {
-                localProfile = NexusProfile.get();
-                if (!localProfile) {
-                    const username = prompt('Choose your username for this named room:');
-                    if (username === null) return;
-                    try { localProfile = NexusProfile.save(username); } catch (error) { alert(error.message); return; }
+            try {
+                const nameInput = document.getElementById('host-name-input');
+                const pinInput = document.getElementById('host-pin-input');
+                const name = (nameInput && nameInput.value ? nameInput.value.trim() : '') || 'Nexus Room';
+                const anonCheck = document.getElementById('host-anonymous-mode');
+                roomAnonymous = anonCheck ? anonCheck.checked : true;
+                if (!roomAnonymous) {
+                    localProfile = NexusProfile.get();
+                    if (!localProfile) {
+                        const username = prompt('Choose your username for this named room:');
+                        if (username === null) return;
+                        try { localProfile = NexusProfile.save(username); } catch (error) { alert(error.message); return; }
+                    }
                 }
+                let pin = (pinInput && pinInput.value ? pinInput.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : '');
+                if (!pin || pin.length !== 6) {
+                    pin = Math.floor(100000 + Math.random() * 900000).toString();
+                    if (pinInput) pinInput.value = pin;
+                }
+                isHost = true;
+                startNetwork(pin, name);
+            } catch(e) {
+                console.error("Error in start-host-btn:", e);
             }
-            let pin = (pinInput && pinInput.value ? pinInput.value.trim() : '');
-            if (!pin || pin.length !== 6 || isNaN(pin)) {
-                pin = Math.floor(100000 + Math.random() * 900000).toString();
-                if (pinInput) pinInput.value = pin;
-            }
-            isHost = true;
-            startNetwork(pin, name);
         };
 
         document.getElementById('join-btn').onclick = () => {
             const pinEntry = document.getElementById('pin-entry');
-            const pin = (pinEntry && pinEntry.value ? pinEntry.value.trim() : '');
+            const pin = (pinEntry && pinEntry.value ? pinEntry.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : '');
             const pinErr = document.getElementById('pin-error');
-            if (!pin || pin.length !== 6 || isNaN(pin)) {
+            if (!pin || pin.length !== 6) {
                 if (pinErr) {
-                    pinErr.textContent = 'Please enter a valid 6-digit PIN.';
+                    pinErr.textContent = 'Please enter a valid 6-character PIN.';
                     pinErr.style.display = 'block';
                 }
                 return;
@@ -1025,10 +1685,22 @@
             // ─── Regular chat message ────────────────────────
             if (data.type === 'msg') {
                 if (data.name === 'System') {
-                    appendMessage('System', '#888', data.text, 'system');
+                    appendMessage('System', '#888', data.text, 'system', data.msgId);
                 } else if (data.name !== myName) {
-                    appendMessage(data.name, data.color, data.text, data.uuid || data.name);
+                    appendMessage(data.name, data.color, data.text, data.uuid || data.name, data.msgId);
                 }
+            }
+
+            if (data.type === 'msg-edit') {
+                handleAnonMsgEdit(data.msgId, data.text);
+            }
+
+            if (data.type === 'msg-delete') {
+                handleAnonMsgDelete(data.msgId);
+            }
+
+            if (data.type === 'reaction') {
+                handleAnonReaction(data.msgId, data.emoji, data.user);
             }
 
             // ─── Disband ─────────────────────────────────────
@@ -1200,10 +1872,10 @@
             });
         }
 
-        function appendMessage(name, color, text, uuid) {
+        function appendMessage(name, color, text, uuid, incomingMsgId) {
             const area = document.getElementById('messages');
-            const div  = document.createElement('div');
             if (name === 'System') {
+                const div = document.createElement('div');
                 div.className = 'chat-msg system-msg';
                 div.innerHTML = `<span class="system-text">[${escapeHTML(text)}]</span>`;
                 area.appendChild(div);
@@ -1212,12 +1884,47 @@
                 if (jumpBtn) updateJumpButton(area, jumpBtn);
                 return;
             }
+
+            const msgId = incomingMsgId || ('anon-msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7));
+            const isSelf = (name === myName);
+            const container = document.createElement('div');
+            container.className = `chat-msg-container ${isSelf ? 'is-self' : 'is-other'}`;
+            container.dataset.msgId = msgId;
+            container.dataset.sender = name;
+            container.dataset.groupMsg = 'false';
+
             const safe = (uuid || name || '').replace(/[^a-zA-Z0-9_-]/g, '_');
-            div.className   = `chat-msg msg-uuid-${safe}`;
+            const div = document.createElement('div');
+            div.className = `chat-msg msg-uuid-${safe}`;
             div.style.borderColor = color;
-            div.style.alignSelf   = (name === myName) ? 'flex-end' : 'flex-start';
-            div.innerHTML = `<div class="name-tag" style="font-size:10px;font-weight:bold;color:${color};margin-bottom:4px;">${escapeHTML(name)}</div><div>${text}</div>`;
-            area.appendChild(div);
+            div.innerHTML = `
+                <div class="name-tag" style="font-size:10px;font-weight:bold;color:${color};margin-bottom:4px;">${escapeHTML(name)}</div>
+                <div class="msg-content">${text}</div>
+                <div class="chat-reactions-row" style="display:none;"></div>
+            `;
+
+            const actions = document.createElement('div');
+            actions.className = 'chat-msg-actions';
+            if (isSelf) {
+                actions.innerHTML = `
+                    <button type="button" class="msg-action-btn" data-action="edit" title="Edit message"><img src="Assets/Edit.svg" alt="Edit"></button>
+                    <button type="button" class="msg-action-btn" data-action="delete" title="Delete message"><img src="Assets/Delete.svg" alt="Delete"></button>
+                    <button type="button" class="msg-action-btn" data-action="react" title="React with emoji"><img src="Assets/Emoji.svg" alt="React"></button>
+                    <button type="button" class="msg-action-btn" data-action="reply" title="Reply"><img src="Assets/Reply.svg" alt="Reply"></button>
+                `;
+            } else {
+                actions.innerHTML = `
+                    <button type="button" class="msg-action-btn" data-action="react" title="React with emoji"><img src="Assets/Emoji.svg" alt="React"></button>
+                    <button type="button" class="msg-action-btn" data-action="reply" title="Reply"><img src="Assets/Reply.svg" alt="Reply"></button>
+                `;
+            }
+
+            attachActionListeners(actions, container, 'anon');
+            container.appendChild(div);
+            container.appendChild(actions);
+            area.appendChild(container);
+            renderReactionsForMessage(msgId, div.querySelector('.chat-reactions-row'));
+
             area.scrollTop = area.scrollHeight;
             const jumpBtn = document.getElementById('anon-jump-btn');
             if (jumpBtn) updateJumpButton(area, jumpBtn);
@@ -1229,9 +1936,27 @@
         document.getElementById('send-btn').onclick = () => {
             const inputEl = document.getElementById('msg-input');
             const val = inputEl.value.trim();
-            if (!val || !myName) return;
-            appendMessage(myName, myColor, val, myUuid);
-            publish({ type: 'msg', name: myName, color: myColor, text: val, uuid: myUuid });
+            if ((!val && pendingImagesAnon.length === 0) || !myName) return;
+
+            let messageBody = '';
+            if (pendingImagesAnon.length > 0) {
+                messageBody += buildImagesGridHtml(pendingImagesAnon);
+            }
+            if (val) {
+                if (messageBody) {
+                    messageBody += `<div style="margin-top:6px;">${escapeHTML(val)}</div>`;
+                } else {
+                    messageBody = escapeHTML(val);
+                }
+            }
+
+            const fullTextToSend = buildMessageWithReply('anon', messageBody, true);
+            clearReplyTarget('anon');
+            clearPendingImages('anon');
+
+            const msgId = 'anon-msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+            appendMessage(myName, myColor, fullTextToSend, myUuid, msgId);
+            publish({ type: 'msg', name: myName, color: myColor, text: fullTextToSend, uuid: myUuid, msgId: msgId });
             inputEl.value = '';
             inputEl.style.height = 'auto';
             inputEl.style.overflowY = 'hidden';
@@ -1245,27 +1970,7 @@
         //  10. IMAGE UPLOAD (ANONYMOUS CHAT)
         // ═══════════════════════════════════════════════════
         document.getElementById('img-upload').onchange = function(e) {
-            const file = e.target.files[0];
-            if (!file || !myName) return;
-            const reader = new FileReader();
-            reader.onload = function(ev) {
-                const img = new Image();
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    let w = img.width, h = img.height;
-                    const MAX = 400;
-                    if (w > h && w > MAX) { h *= MAX / w; w = MAX; }
-                    else if (h > MAX) { w *= MAX / h; h = MAX; }
-                    canvas.width = w; canvas.height = h;
-                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                    const b64 = canvas.toDataURL('image/jpeg', 0.6);
-                    const tag = `<img src="${b64}" style="max-width:100%;border-radius:8px;margin-top:5px;cursor:pointer;" onclick="window.open(this.src)">`;
-                    appendMessage(myName, myColor, tag, myUuid);
-                    publish({ type: 'msg', name: myName, color: myColor, text: tag, uuid: myUuid });
-                };
-                img.src = ev.target.result;
-            };
-            reader.readAsDataURL(file);
+            handleImageFilesSelected(e.target.files, 'anon');
             this.value = '';
         };
 
@@ -1402,9 +2107,54 @@
         try {
             if (window.supabase && window.supabase.createClient) {
                 sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                initGlobalGroupSubscriptions();
             }
         } catch(e) {
             console.error("Supabase init error:", e);
+        }
+
+        function handleIncomingGroupMessage(msg) {
+            if (!msg || !msg.group_code) return;
+            const groups = getEnrolledGroups();
+            const grp = groups.find(g => g.code === msg.group_code);
+            if (!grp) return;
+
+            const profile = NexusProfile.get();
+            const isOwn = profile && (profile.id === msg.user_id || (profile.username && profile.username === msg.username));
+
+            if (msg.group_code === currentActiveGroupCode) {
+                appendGroupMessage(msg);
+                const area = document.getElementById('group-messages');
+                const isBottom = area.scrollHeight - area.scrollTop - area.clientHeight <= 40;
+                if (isBottom || isOwn) {
+                    area.scrollTop = area.scrollHeight;
+                    unreadGroupCounts[msg.group_code] = 0;
+                } else {
+                    if (!isOwn && isChatNotificationsEnabled()) {
+                        unreadGroupCounts[msg.group_code] = (unreadGroupCounts[msg.group_code] || 0) + 1;
+                    }
+                }
+            } else {
+                if (!isOwn && isChatNotificationsEnabled()) {
+                    unreadGroupCounts[msg.group_code] = (unreadGroupCounts[msg.group_code] || 0) + 1;
+                }
+            }
+            saveStoredUnreadCounts(unreadGroupCounts);
+            renderGroupSidebar();
+        }
+
+        let globalGroupChannel = null;
+        function initGlobalGroupSubscriptions() {
+            if (!sbClient || globalGroupChannel) return;
+            try {
+                globalGroupChannel = sbClient.channel('global-group-messages-channel')
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, payload => {
+                        handleIncomingGroupMessage(payload.new);
+                    })
+                    .subscribe();
+            } catch(e) {
+                console.warn('Global group channel subscription error:', e);
+            }
         }
 
         let currentActiveGroupCode = null;
@@ -1569,13 +2319,24 @@
             }
             emptyHint.style.display = 'none';
 
+            const notifEnabled = isChatNotificationsEnabled();
+
             groups.forEach(grp => {
                 const li = document.createElement('li');
                 li.className = 'group-list-item' + (grp.code === currentActiveGroupCode ? ' active' : '');
                 
                 const isPending = grp.status === 'pending';
                 const parsed = parseGroupEmojiAndTitle(grp.name);
+
+                const unread = notifEnabled ? (unreadGroupCounts[grp.code] || 0) : 0;
+                let badgeHtml = '';
+                if (unread > 0) {
+                    const badgeText = unread > 99 ? '99+' : unread;
+                    badgeHtml = `<span class="group-unread-badge" title="${unread} unread message${unread === 1 ? '' : 's'}">${badgeText}</span>`;
+                }
+
                 li.innerHTML = `
+                    ${badgeHtml}
                     <div class="group-item-emoji">${escapeHTML(parsed.emoji)}</div>
                     <div class="group-item-info">
                         <div class="group-item-title">${escapeHTML(parsed.title)}</div>
@@ -1990,9 +2751,8 @@
             }
             const input = document.getElementById('join-group-code-input');
             const feedback = document.getElementById('join-code-feedback');
-            let rawCode = (input.value || '').trim().toUpperCase();
-            if (!rawCode) return;
-            if (!rawCode.startsWith('NX-') && rawCode.length === 4) rawCode = 'NX-' + rawCode;
+            let rawCode = normalizeGroupCode(input.value);
+            if (!rawCode || rawCode === 'NX-') return;
 
             feedback.style.display = 'block';
             feedback.style.color = '#FFA726';
@@ -2103,7 +2863,12 @@
             updateNavBackButton();
 
             const messagesArea = document.getElementById('group-messages');
-            messagesArea.innerHTML = '<div style="color:#777; text-align:center; padding:20px;">Loading messages…</div>';
+            messagesArea.innerHTML = `
+                <div class="group-messages-loading">
+                    <img src="Assets/loadingRoll.gif" alt="Loading">
+                    <span>Loading messages...</span>
+                </div>
+            `;
 
             refreshGroupMemberCount(code);
             if (effectiveIsAdmin) refreshAdminBadge(code);
@@ -2140,21 +2905,37 @@
                     }
                 }
 
-                const { data: msgs } = await sbClient.from('group_messages').select('*').eq('group_code', code).order('created_at', { ascending: true }).limit(100);
+                // Query newest messages up to 200 and reverse so recent messages/photos always load
+                const { data: msgs } = await sbClient.from('group_messages')
+                    .select('*')
+                    .eq('group_code', code)
+                    .order('created_at', { ascending: false })
+                    .limit(200);
+
                 messagesArea.innerHTML = '';
                 if (msgs && msgs.length) {
-                    msgs.forEach(m => appendGroupMessage(m));
+                    msgs.reverse().forEach(m => appendGroupMessage(m));
                 } else {
                     messagesArea.innerHTML = '<div style="color:#666; text-align:center; padding:30px; font-style:italic;">No messages yet. Say hello!</div>';
                 }
                 messagesArea.scrollTop = messagesArea.scrollHeight;
                 updateJumpButton(messagesArea, document.getElementById('group-jump-btn'));
+                checkActiveGroupScrolledToBottom();
 
                 // Subscribe to Realtime changes
                 if (groupRealtimeChannel) sbClient.removeChannel(groupRealtimeChannel);
                 groupRealtimeChannel = sbClient.channel(`room-${code}`)
                     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_code=eq.${code}` }, payload => {
-                        appendGroupMessage(payload.new);
+                        handleIncomingGroupMessage(payload.new);
+                    })
+                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'group_messages', filter: `group_code=eq.${code}` }, payload => {
+                        handleGroupMessageUpdate(payload.new);
+                    })
+                    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'group_messages' }, payload => {
+                        handleGroupMessageDelete(payload.old?.id);
+                    })
+                    .on('broadcast', { event: 'reaction' }, payload => {
+                        handleGroupReactionBroadcast(payload.payload);
                     })
                     .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `group_code=eq.${code}` }, () => {
                         refreshGroupMemberCount(code);
@@ -2206,21 +2987,65 @@
             const placeholder = area.querySelector('div[style*="font-style:italic"]');
             if (placeholder) placeholder.remove();
 
-            const profile = NexusProfile.get();
-            const isSelf = profile && profile.id === msg.user_id;
+            if (msg.id && area.querySelector(`[data-msg-id="${CSS.escape(msg.id)}"]`)) {
+                return;
+            }
 
-            const div = document.createElement('div');
+            const profile = NexusProfile.get();
+            const isSelf = profile && (profile.id === msg.user_id || (profile.username && profile.username === msg.username));
+
             if (msg.username === 'System') {
+                const div = document.createElement('div');
                 div.className = 'chat-msg system-msg';
                 div.innerHTML = `<span class="system-text">[${escapeHTML(msg.text)}]</span>`;
-            } else {
-                div.className = 'chat-msg';
-                const msgColor = msg.user_color || colorForName(msg.username);
-                div.style.borderColor = msgColor;
-                div.style.alignSelf   = isSelf ? 'flex-end' : 'flex-start';
-                div.innerHTML = `<div class="name-tag" style="font-size:10px;font-weight:bold;color:${msgColor};margin-bottom:4px;">${escapeHTML(msg.username)}</div><div>${msg.text}</div>`;
+                area.appendChild(div);
+                area.scrollTop = area.scrollHeight;
+                updateJumpButton(area, document.getElementById('group-jump-btn'));
+                return;
             }
-            area.appendChild(div);
+
+            const container = document.createElement('div');
+            container.className = `chat-msg-container ${isSelf ? 'is-self' : 'is-other'}`;
+            container.dataset.msgId = msg.id || ('grp-msg-' + Date.now());
+            container.dataset.sender = msg.username;
+            container.dataset.groupMsg = 'true';
+
+            const div = document.createElement('div');
+            div.className = 'chat-msg';
+            const msgColor = msg.user_color || colorForName(msg.username);
+            div.style.borderColor = msgColor;
+
+            const displayUser = isSelf ? msg.username : getEffectiveDisplayName(msg.username);
+
+            div.innerHTML = `
+                <div class="name-tag" data-original-username="${escapeHTML(msg.username)}" style="font-size:10px;font-weight:bold;color:${msgColor};margin-bottom:4px;">${escapeHTML(displayUser)}</div>
+                <div class="msg-content">${msg.text}</div>
+                <div class="chat-reactions-row" style="display:none;"></div>
+            `;
+
+            const actions = document.createElement('div');
+            actions.className = 'chat-msg-actions';
+            if (isSelf) {
+                actions.innerHTML = `
+                    <button type="button" class="msg-action-btn" data-action="edit" title="Edit message"><img src="Assets/Edit.svg" alt="Edit"></button>
+                    <button type="button" class="msg-action-btn" data-action="delete" title="Delete message"><img src="Assets/Delete.svg" alt="Delete"></button>
+                    <button type="button" class="msg-action-btn" data-action="react" title="React with emoji"><img src="Assets/Emoji.svg" alt="React"></button>
+                    <button type="button" class="msg-action-btn" data-action="reply" title="Reply"><img src="Assets/Reply.svg" alt="Reply"></button>
+                `;
+            } else {
+                actions.innerHTML = `
+                    <button type="button" class="msg-action-btn" data-action="react" title="React with emoji"><img src="Assets/Emoji.svg" alt="React"></button>
+                    <button type="button" class="msg-action-btn" data-action="reply" title="Reply"><img src="Assets/Reply.svg" alt="Reply"></button>
+                    <button type="button" class="msg-action-btn" data-action="rename" title="Change display name"><img src="Assets/Name.svg" alt="Change Name"></button>
+                `;
+            }
+
+            attachActionListeners(actions, container, 'group');
+            container.appendChild(div);
+            container.appendChild(actions);
+            area.appendChild(container);
+            renderReactionsForMessage(container.dataset.msgId, div.querySelector('.chat-reactions-row'));
+
             area.scrollTop = area.scrollHeight;
             updateJumpButton(area, document.getElementById('group-jump-btn'));
         }
@@ -2231,20 +3056,36 @@
             if (!profile || !profile.username || !currentActiveGroupCode || !sbClient) return;
             const input = document.getElementById('group-msg-input');
             const text = input.value.trim();
-            if (!text) return;
+            if (!text && pendingImagesGroup.length === 0) return;
 
             input.value = '';
             input.style.height = 'auto';
             input.style.overflowY = 'hidden';
 
+            let messageBody = '';
+            if (pendingImagesGroup.length > 0) {
+                messageBody += buildImagesGridHtml(pendingImagesGroup);
+            }
+            if (text) {
+                if (messageBody) {
+                    messageBody += `<div style="margin-top:6px;">${escapeHTML(text)}</div>`;
+                } else {
+                    messageBody = escapeHTML(text);
+                }
+            }
+
             const userColor = colorForName(profile.username);
+            const fullTextToSend = buildMessageWithReply('group', messageBody, true);
+            clearReplyTarget('group');
+            clearPendingImages('group');
+
             try {
                 await sbClient.from('group_messages').insert([{
                     group_code: currentActiveGroupCode,
                     user_id: profile.id,
                     username: profile.username,
                     user_color: userColor,
-                    text: text
+                    text: fullTextToSend
                 }]);
             } catch(e) {
                 console.error("Error sending group message:", e);
@@ -2256,36 +3097,7 @@
 
         // Group Photo Upload
         document.getElementById('group-img-upload').onchange = function(e) {
-            const profile = NexusProfile.get();
-            if (!profile || !profile.username || !currentActiveGroupCode || !sbClient) return;
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(ev) {
-                const img = new Image();
-                img.onload = async function() {
-                    const canvas = document.createElement('canvas');
-                    let w = img.width, h = img.height;
-                    const MAX = 450;
-                    if (w > h && w > MAX) { h *= MAX / w; w = MAX; }
-                    else if (h > MAX) { w *= MAX / h; h = MAX; }
-                    canvas.width = w; canvas.height = h;
-                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                    const b64 = canvas.toDataURL('image/jpeg', 0.65);
-                    const tag = `<img src="${b64}" style="max-width:100%;border-radius:8px;margin-top:5px;cursor:pointer;" onclick="window.open(this.src)">`;
-
-                    await sbClient.from('group_messages').insert([{
-                        group_code: currentActiveGroupCode,
-                        user_id: profile.id,
-                        username: profile.username,
-                        user_color: colorForName(profile.username),
-                        text: tag
-                    }]);
-                };
-                img.src = ev.target.result;
-            };
-            reader.readAsDataURL(file);
+            handleImageFilesSelected(e.target.files, 'group');
             this.value = '';
         };
 

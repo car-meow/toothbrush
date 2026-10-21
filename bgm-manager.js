@@ -1,4 +1,4 @@
-// nexus-version: 4.35.1
+// nexus-version: 4.45.2
 // Register Service Worker for offline support
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -242,7 +242,7 @@ window.BGMManager = {
             overlay.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.94); z-index:999999; align-items:center; justify-content:center; -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);';
             
             overlay.innerHTML = `
-                <div style="background:var(--modal-bg, #18102b); padding:28px; border-radius:20px; width:460px; max-width:92vw; max-height:85vh; border:2px solid #2196F3; text-align:center; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 0 50px rgba(0,0,0,0.9); color:var(--text-color, #fff); font-family:'Space Grotesk', sans-serif;">
+                <div style="background:var(--modal-bg, #18102b); padding:28px; border-radius:20px; width:460px; max-width:92vw; max-height:85vh; border:2px solid #2196F3; text-align:center; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 0 50px rgba(0,0,0,0.9); color:var(--text-color, #fff); font-family:var(--app-font, inherit);">
                     <div id="nexus-dialog-title" style="color:#2196F3; font-size:22px; font-weight:bold; margin-bottom:14px;">Nexus</div>
                     <div id="nexus-dialog-msg" style="font-size:15px; line-height:1.5; color:var(--text-color, #e2dcf0); margin-bottom:18px; white-space:pre-wrap; max-height:50vh; overflow-y:auto; word-break:break-word;"></div>
                     <div id="nexus-dialog-error-details" style="display:none; text-align:left; margin:-6px 0 14px;">

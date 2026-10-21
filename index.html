@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.35.1 -->
+<!-- nexus-version: 4.45.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,6 +11,8 @@
         (function() {
             try {
                 const storage = window.nexusStorage || window.localStorage;
+                const font = storage.getItem('tb_font_choice') || 'google-sans-flex';
+                if (font === 'space-grotesk') document.documentElement.setAttribute('data-font', 'space-grotesk');
                 const theme = storage.getItem('tb_theme') || 'dark';
                 if (theme === 'light') document.write('<style>body { background-color: #bbbbbb; }</style>');
                 if (storage.getItem('tb_performance_mode') === 'true') {
@@ -208,7 +210,7 @@ html.light-mode .online-users-bubble {
 </div>
 
 <div class="nexus-version-container" style="pointer-events: auto !important;">
-    <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v4.41.6 beta</span>
+    <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v4.45.2</span>
     <div class="nexus-update-card" style="pointer-events: auto !important;">
         <div class="nexus-update-title">GROUP CHAT UPDATE!</div>
         <div class="nexus-update-body">

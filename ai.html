@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.35.1 -->
+<!-- nexus-version: 4.45.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -363,7 +363,7 @@
                 li.onclick = () => loadChat(chat.id);
                 
                 const del = document.createElement('span'); 
-                del.innerHTML = '<img src="Assets/Delete.svg" alt="Delete" style="width:16px;height:16px;filter:brightness(0) invert(1);vertical-align:middle;">'; 
+                del.innerHTML = '<img src="Assets/Delete.svg" alt="Delete" style="width:16px;height:16px;filter:var(--icon-filter);vertical-align:middle;">'; 
                 del.className = "trash-btn";
                 del.onclick = (e) => { e.stopPropagation(); deleteChat(chat.id); };
                 
