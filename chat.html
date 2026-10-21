@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.34.1 -->
+<!-- nexus-version: 4.35.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -165,9 +165,9 @@
             <button id="disband-btn" class="material-nav-btn" style="--expanded-width: 145px; display:none;">
                 <img src="Assets/Delete.svg" alt=""><span>Disband</span>
             </button>
-            <button id="group-admin-btn" class="material-nav-btn" style="--expanded-width: 175px; display:none;">
+            <button id="group-admin-btn" class="material-nav-btn" style="--expanded-width: 220px; display:none;">
                 <img src="Assets/Settings.svg" alt=""><span>Admin Settings</span>
-                <span id="group-admin-badge" class="admin-badge">0</span>
+                <div id="group-admin-badge" class="admin-badge">0</div>
             </button>
             <button id="chat-back-btn" class="material-nav-btn" style="--expanded-width: 125px;">
                 <img id="chat-back-icon" src="Assets/media-back-arrow.svg" alt=""><span id="chat-back-text">Home</span>
@@ -1529,7 +1529,7 @@
                     try {
                         const newColor = colorForName(name);
                         await sbClient.from('group_members').update({ username: name, user_color: newColor }).eq('user_id', savedProf.id);
-                        await sbClient.from('group_requests').update({ username: name, user_color: newColor }).eq('user_id', savedProf.id);
+                        await sbClient.from('group_requests').update({ username: name }).eq('user_id', savedProf.id);
                         await sbClient.from('groups').update({ admin_name: name }).eq('admin_id', savedProf.id);
                     } catch (e) {}
                 }
@@ -1550,6 +1550,11 @@
             document.getElementById('profile-prompt-modal').style.display = 'none';
             onUsernameSavedCallback = null;
         };
+
+        function isGroupAdmin(adminIdField, userId) {
+            if (!adminIdField || !userId) return false;
+            return adminIdField.split(',').map(s => s.trim()).includes(userId);
+        }
 
         // Render Group Sidebar with Games Tab Hold-to-Delete Style
         function renderGroupSidebar() {
@@ -1649,7 +1654,12 @@
             const openBtn = document.getElementById('group-approval-open-btn');
             if (!toast || !msg) return;
 
+            const iconEl = toast.querySelector('span');
+            if (iconEl) iconEl.textContent = '🎉';
+            const titleEl = toast.querySelector('strong') || toast.querySelector('div > div:first-child');
+            if (titleEl) titleEl.textContent = 'Request Approved!';
             msg.textContent = `You were approved to join ${grp.name || grp.code}!`;
+            openBtn.textContent = 'Open Chat';
             toast.style.display = 'flex';
             requestAnimationFrame(() => toast.classList.add('show'));
 
@@ -1663,6 +1673,33 @@
                 toast.classList.remove('show');
                 setTimeout(() => toast.style.display = 'none', 350);
             }, 7000);
+        }
+
+        function showAdminGrantedNotification(grp) {
+            const toast = document.getElementById('group-approval-toast');
+            const msg = document.getElementById('group-approval-toast-msg');
+            const openBtn = document.getElementById('group-approval-open-btn');
+            if (!toast || !msg) return;
+
+            const iconEl = toast.querySelector('span');
+            if (iconEl) iconEl.textContent = '👑';
+            const titleEl = toast.querySelector('strong') || toast.querySelector('div > div:first-child');
+            if (titleEl) titleEl.textContent = 'Admin Access Granted!';
+            msg.textContent = `You were promoted to Admin for ${grp.name || grp.code}!`;
+            openBtn.textContent = 'Open Chat';
+            toast.style.display = 'flex';
+            requestAnimationFrame(() => toast.classList.add('show'));
+
+            openBtn.onclick = () => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.style.display = 'none', 350);
+                openGroup(grp.code, grp.name, true);
+            };
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.style.display = 'none', 350);
+            }, 8000);
         }
 
         async function checkAllPendingApprovalsFast() {
@@ -1689,6 +1726,20 @@
                         changed = true;
                         nexusAlert(`Your request to join "${grp.name || grp.code}" was denied by the admin.`);
                     }
+                } else if (grp.status === 'approved') {
+                    // Check if member was granted admin access on relaunch
+                    if (!grp.isAdmin) {
+                        const { data: grpData } = await sbClient.from('groups')
+                            .select('admin_id')
+                            .eq('code', grp.code)
+                            .maybeSingle();
+
+                        if (grpData && isGroupAdmin(grpData.admin_id, profile.id)) {
+                            grp.isAdmin = true;
+                            changed = true;
+                            showAdminGrantedNotification(grp);
+                        }
+                    }
                 }
             }
             if (changed) {
@@ -1701,6 +1752,9 @@
             if (!sbClient) return;
             const profile = NexusProfile.get();
             if (!profile || !profile.id) return;
+
+            // Fast startup check to apply approvals or admin promotions on relaunch
+            checkAllPendingApprovalsFast();
 
             if (userApprovalsChannel) {
                 try { sbClient.removeChannel(userApprovalsChannel); } catch (e) {}
@@ -1746,6 +1800,27 @@
                             addEnrolledGroup(grp);
                             renderGroupSidebar();
                             showApprovalNotification(grp);
+                        }
+                    }
+                })
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'groups'
+                }, payload => {
+                    if (payload && payload.new) {
+                        const groups = getEnrolledGroups();
+                        const grp = groups.find(g => g.code === payload.new.code);
+                        if (grp && isGroupAdmin(payload.new.admin_id, profile.id) && !grp.isAdmin) {
+                            grp.isAdmin = true;
+                            saveEnrolledGroups(groups);
+                            renderGroupSidebar();
+                            showAdminGrantedNotification(grp);
+                            if (currentActiveGroupCode === grp.code) {
+                                const adminBtn = document.getElementById('group-admin-btn');
+                                if (adminBtn) adminBtn.style.display = 'inline-flex';
+                                refreshAdminBadge(grp.code);
+                            }
                         }
                     }
                 })
@@ -1959,13 +2034,14 @@
                 }
 
                 // Check duplicate username in group (First-come, first-served; favors admins and existing members)
-                const { data: groupMembers } = await sbClient.from('group_members').select('id, user_id, username, is_admin').eq('group_code', rawCode);
+                const { data: groupMembers } = await sbClient.from('group_members').select('id, user_id, username').eq('group_code', rawCode);
                 const existingMembers = groupMembers || [];
                 const duplicateMember = existingMembers.find(m => m.user_id !== profile.id && (m.username || '').trim().toLowerCase() === profile.username.trim().toLowerCase());
-                const isAdminConflict = (grp.admin_id !== profile.id && (grp.admin_name || '').trim().toLowerCase() === profile.username.trim().toLowerCase());
+                const isDupAdmin = duplicateMember && isGroupAdmin(grp.admin_id, duplicateMember.user_id);
+                const isAdminConflict = (!isGroupAdmin(grp.admin_id, profile.id) && (grp.admin_name || '').toLowerCase().includes(profile.username.trim().toLowerCase()));
 
                 if (duplicateMember || isAdminConflict) {
-                    const holder = isAdminConflict ? 'the group admin' : (duplicateMember.is_admin ? 'the group admin' : 'another member');
+                    const holder = isAdminConflict ? 'the group admin' : (isDupAdmin ? 'the group admin' : 'another member');
                     feedback.style.color = '#f44336';
                     feedback.textContent = `The username "${profile.username}" is already in use by ${holder}.`;
                     await nexusAlert(`Duplicate Username: The username "${profile.username}" is already taken in this group by ${holder} (first-come, first-served). You must choose a different username to join.`);
@@ -1985,7 +2061,6 @@
                     group_code: grp.code,
                     user_id: profile.id,
                     username: profile.username,
-                    user_color: colorForName(profile.username),
                     status: 'pending'
                 }]);
                 if (rErr) throw rErr;
@@ -2020,8 +2095,9 @@
                 codeWrapper.onclick = () => codeWrapper.classList.toggle('revealed');
             }
 
+            let effectiveIsAdmin = !!isAdmin;
             const adminBtn = document.getElementById('group-admin-btn');
-            if (adminBtn) adminBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+            if (adminBtn) adminBtn.style.display = effectiveIsAdmin ? 'inline-flex' : 'none';
 
             renderGroupSidebar();
             updateNavBackButton();
@@ -2030,10 +2106,40 @@
             messagesArea.innerHTML = '<div style="color:#777; text-align:center; padding:20px;">Loading messages…</div>';
 
             refreshGroupMemberCount(code);
-            if (isAdmin) refreshAdminBadge(code);
+            if (effectiveIsAdmin) refreshAdminBadge(code);
 
-            // Fetch past messages
+            // Fetch past messages & authoritative admin status
             if (sbClient) {
+                const profile = NexusProfile.get();
+                if (profile && profile.id) {
+                    try {
+                        const { data: grpData } = await sbClient.from('groups')
+                            .select('admin_id')
+                            .eq('code', code)
+                            .maybeSingle();
+
+                        if (grpData && isGroupAdmin(grpData.admin_id, profile.id)) {
+                            const wasNotAdmin = !effectiveIsAdmin;
+                            effectiveIsAdmin = true;
+                            if (adminBtn) adminBtn.style.display = 'inline-flex';
+                            refreshAdminBadge(code);
+
+                            const groups = getEnrolledGroups();
+                            const enrolled = groups.find(g => g.code === code);
+                            if (enrolled && !enrolled.isAdmin) {
+                                enrolled.isAdmin = true;
+                                saveEnrolledGroups(groups);
+                                renderGroupSidebar();
+                                if (wasNotAdmin) {
+                                    showAdminGrantedNotification(enrolled);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Error checking member admin status on open:', e);
+                    }
+                }
+
                 const { data: msgs } = await sbClient.from('group_messages').select('*').eq('group_code', code).order('created_at', { ascending: true }).limit(100);
                 messagesArea.innerHTML = '';
                 if (msgs && msgs.length) {
@@ -2053,8 +2159,24 @@
                     .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `group_code=eq.${code}` }, () => {
                         refreshGroupMemberCount(code);
                     })
+                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'groups', filter: `code=eq.${code}` }, payload => {
+                        const prof = NexusProfile.get();
+                        if (payload && payload.new && prof && isGroupAdmin(payload.new.admin_id, prof.id)) {
+                            effectiveIsAdmin = true;
+                            if (adminBtn) adminBtn.style.display = 'inline-flex';
+                            refreshAdminBadge(code);
+                            const groups = getEnrolledGroups();
+                            const enrolled = groups.find(g => g.code === code);
+                            if (enrolled && !enrolled.isAdmin) {
+                                enrolled.isAdmin = true;
+                                saveEnrolledGroups(groups);
+                                renderGroupSidebar();
+                                showAdminGrantedNotification(enrolled);
+                            }
+                        }
+                    })
                     .on('postgres_changes', { event: '*', schema: 'public', table: 'group_requests', filter: `group_code=eq.${code}` }, () => {
-                        if (isAdmin) refreshAdminBadge(code);
+                        if (effectiveIsAdmin) refreshAdminBadge(code);
                     })
                     .subscribe();
             }
@@ -2281,8 +2403,7 @@
                             group_code: code,
                             user_id: req.user_id,
                             username: req.username,
-                            user_color: colorForName(req.username),
-                            is_admin: false
+                            user_color: colorForName(req.username)
                         }]);
                         await sbClient.from('group_messages').insert([{
                             group_code: code,
@@ -2310,34 +2431,91 @@
 
             // 2. Active Members
             const { data: members } = await sbClient.from('group_members').select('*').eq('group_code', code);
+            const { data: grpRow } = await sbClient.from('groups').select('admin_id, admin_name').eq('code', code).maybeSingle();
             membersList.innerHTML = '';
             if (members && members.length) {
                 members.forEach(mem => {
                     const row = document.createElement('div');
                     row.className = 'user-row';
                     const isSelf = profile && profile.id === mem.user_id;
+                    const memColor = mem.user_color || colorForName(mem.username);
+                    const isMemAdmin = isGroupAdmin(grpRow ? grpRow.admin_id : '', mem.user_id);
                     row.innerHTML = `
-                        <div class="user-pill" style="background:${mem.user_color || colorForName(mem.username)};">${escapeHTML(mem.username)} ${isSelf ? '(Admin)' : ''}</div>
-                        ${!isSelf ? `<button class="save-btn cancel-modal-btn" style="padding:5px 12px; font-size:12px; background:#c62828;">Remove</button>` : ''}
+                        <div class="user-pill" style="background:${memColor};">${escapeHTML(mem.username)} ${isMemAdmin ? '(Admin)' : ''}</div>
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            ${!isSelf && !isMemAdmin ? `<button class="save-btn make-admin-btn" style="padding:5px 10px; font-size:11px; background:#1976D2;">Make Admin</button>` : ''}
+                            ${!isSelf ? `<button class="save-btn cancel-modal-btn remove-mem-btn" style="padding:5px 10px; font-size:11px; background:#c62828;">Remove</button>` : ''}
+                        </div>
                     `;
+
+                    if (!isSelf && !isMemAdmin) {
+                        const makeAdminBtn = row.querySelector('.make-admin-btn');
+                        if (makeAdminBtn) {
+                            makeAdminBtn.onclick = async () => {
+                                const ok = await nexusConfirm(`Give ${mem.username} admin access to this group? They will have full admin permissions on relaunch.`);
+                                if (!ok) return;
+                                makeAdminBtn.disabled = true;
+                                try {
+                                    const { data: latestGrp } = await sbClient.from('groups').select('admin_id, admin_name').eq('code', code).single();
+                                    if (latestGrp) {
+                                        const curIds = (latestGrp.admin_id || '').split(',').map(s => s.trim()).filter(Boolean);
+                                        if (!curIds.includes(mem.user_id)) curIds.push(mem.user_id);
+                                        const curNames = (latestGrp.admin_name || '').split(',').map(s => s.trim()).filter(Boolean);
+                                        if (!curNames.includes(mem.username)) curNames.push(mem.username);
+
+                                        await sbClient.from('groups').update({
+                                            admin_id: curIds.join(','),
+                                            admin_name: curNames.join(', ')
+                                        }).eq('code', code);
+                                    }
+                                    await sbClient.from('group_messages').insert([{
+                                        group_code: code,
+                                        user_id: 'system',
+                                        username: 'System',
+                                        user_color: '#1976D2',
+                                        text: `👑 ${mem.username} was granted Admin access by ${profile ? profile.username : 'Admin'}.`
+                                    }]);
+                                    await nexusAlert(`${mem.username} has been granted Admin access! It will apply when they next launch or refresh this group.`);
+                                    loadAdminModalData();
+                                } catch (err) {
+                                    alert('Failed to grant admin access: ' + err.message);
+                                    makeAdminBtn.disabled = false;
+                                }
+                            };
+                        }
+                    }
+
                     if (!isSelf) {
-                        const remBtn = row.querySelector('button');
-                        remBtn.onclick = async () => {
-                            const ok = await nexusConfirm(`Remove ${mem.username} permanently from this group?`);
-                            if (!ok) return;
-                            remBtn.disabled = true;
-                            await sbClient.from('group_members').delete().eq('id', mem.id);
-                            await sbClient.from('group_requests').delete().eq('group_code', code).eq('user_id', mem.user_id);
-                            await sbClient.from('group_messages').insert([{
-                                group_code: code,
-                                user_id: 'system',
-                                username: 'System',
-                                user_color: '#777',
-                                text: `${mem.username} was removed from the group.`
-                            }]);
-                            loadAdminModalData();
-                            refreshGroupMemberCount(code);
-                        };
+                        const remBtn = row.querySelector('.remove-mem-btn');
+                        if (remBtn) {
+                            remBtn.onclick = async () => {
+                                const ok = await nexusConfirm(`Remove ${mem.username} permanently from this group?`);
+                                if (!ok) return;
+                                remBtn.disabled = true;
+                                await sbClient.from('group_members').delete().eq('id', mem.id);
+                                await sbClient.from('group_requests').delete().eq('group_code', code).eq('user_id', mem.user_id);
+                                try {
+                                    const { data: latestGrp } = await sbClient.from('groups').select('admin_id, admin_name').eq('code', code).single();
+                                    if (latestGrp && isGroupAdmin(latestGrp.admin_id, mem.user_id)) {
+                                        const curIds = (latestGrp.admin_id || '').split(',').map(s => s.trim()).filter(id => id && id !== mem.user_id);
+                                        const curNames = (latestGrp.admin_name || '').split(',').map(s => s.trim()).filter(n => n && n !== mem.username);
+                                        await sbClient.from('groups').update({
+                                            admin_id: curIds.join(','),
+                                            admin_name: curNames.join(', ')
+                                        }).eq('code', code);
+                                    }
+                                } catch (e) {}
+                                await sbClient.from('group_messages').insert([{
+                                    group_code: code,
+                                    user_id: 'system',
+                                    username: 'System',
+                                    user_color: '#777',
+                                    text: `${mem.username} was removed from the group.`
+                                }]);
+                                loadAdminModalData();
+                                refreshGroupMemberCount(code);
+                            };
+                        }
                     }
                     membersList.appendChild(row);
                 });

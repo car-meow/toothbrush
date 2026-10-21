@@ -1,4 +1,4 @@
-// nexus-version: 4.34.1
+// nexus-version: 4.35.1
 /* One SharedWorker instance owns presence for all Nexus tabs in this browser. */
 'use strict';
 

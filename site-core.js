@@ -1,4 +1,4 @@
-// nexus-version: 4.34.1
+// nexus-version: 4.35.1
 // ============================================================
 // SITE CORE: Navigation, Splash System, Proxy Launcher, Keybinds
 // (Independent of game frames)
