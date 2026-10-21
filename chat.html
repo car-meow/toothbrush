@@ -300,10 +300,19 @@
         </div>
     </div>
 
+    <div id="group-approval-toast" class="approval-toast" style="display:none;">
+        <span style="font-size: 20px;">🎉</span>
+        <div style="flex:1;">
+            <div style="font-weight:bold; font-size:13px; color:#ffffff;">Request Approved!</div>
+            <div id="group-approval-toast-msg" style="font-size:12px; color:#ccc;">You were approved to join the group.</div>
+        </div>
+        <button id="group-approval-open-btn" class="save-btn" style="background:#2E7D32; padding:6px 14px; font-size:12px; white-space:nowrap;">Open Chat</button>
+    </div>
+
     <div id="profile-prompt-modal" class="overlay" style="z-index: 30000;">
         <div class="modal-box" style="padding:35px; border-radius:20px; width:360px; border:2px solid var(--white-outline); text-align:center;">
-            <h3 style="margin-top:0; margin-bottom:12px; color:var(--title-color);">Username Required</h3>
-            <p style="font-size:13px; color:var(--muted-text,#888); margin-bottom:18px;">You must set a username to enter Group Chats.</p>
+            <h3 id="profile-prompt-title" style="margin-top:0; margin-bottom:12px; color:var(--title-color);">Username Required</h3>
+            <p id="profile-prompt-desc" style="font-size:13px; color:var(--muted-text,#888); margin-bottom:18px;">You must set a username to enter Group Chats.</p>
             <input type="text" id="prompt-username-input" placeholder="Choose a username..." class="pin-input-large" style="width:100%; font-size:16px; letter-spacing:0; margin-bottom:15px;">
             <button id="save-prompt-username-btn" class="save-btn" style="background:#2E7D32; width:100%; height:48px;">Set Username & Continue</button>
             <button id="cancel-prompt-username-btn" class="save-btn cancel-modal-btn" style="width:100%; margin-top:10px;">Cancel</button>
@@ -624,9 +633,27 @@
             "Purple":    "#AB47BC"
         };
 
+        const VIBRANT_PALETTE = [
+            "#FF5722", "#4CAF50", "#00BCD4", "#E91E63", "#9C27B0",
+            "#3F51B5", "#2196F3", "#009688", "#FF9800", "#FFB300",
+            "#8BC34A", "#03A9F4", "#F06292", "#AB47BC", "#26A69A",
+            "#7E57C2", "#FF7043", "#66BB6A", "#26C6DA", "#42A5F5",
+            "#EC407A", "#2E7D32", "#D81B60", "#00ACC1", "#FB8C00"
+        ];
+        function getVibrantColor(str) {
+            if (!str) return '#4CAF50';
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return VIBRANT_PALETTE[Math.abs(hash) % VIBRANT_PALETTE.length];
+        }
+
         function colorForName(username) {
+            if (!username) return '#4CAF50';
             const prefix = username.split(' ')[0];
-            return COLOR_PREFIX_MAP[prefix] || '#FFFFFF';
+            if (COLOR_PREFIX_MAP && COLOR_PREFIX_MAP[prefix]) return COLOR_PREFIX_MAP[prefix];
+            return getVibrantColor(username);
         }
 
         // ═══════════════════════════════════════════════════
@@ -850,7 +877,7 @@
                     if (isHost) {
                         // ── Host: assign self a name from the pool ──
                         myName  = roomAnonymous ? pickFreeName() : localProfile.username;
-                        myColor = roomAnonymous ? colorForName(myName) : '#AB47BC';
+                        myColor = colorForName(myName);
                         usedNames.add(myName);
 
                         registry[myUuid] = { name: myName, color: myColor, ip: myIP, peerId: myUuid };
@@ -909,7 +936,7 @@
                     return;
                 }
                 const assignedName  = roomAnonymous ? pickFreeName() : requestedUsername;
-                const assignedColor = roomAnonymous ? colorForName(assignedName) : '#AB47BC';
+                const assignedColor = colorForName(assignedName);
                 usedNames.add(assignedName);
                 registry[data.peerId] = { name: assignedName, color: assignedColor, ip: data.ip, peerId: data.peerId };
                 globalUserList = Object.values(registry);
@@ -968,7 +995,23 @@
             if (!isHost && data.type === 'join-rejected' && data.targetPeerId === myUuid) {
                 showWaiting(false); if (hostWaitTimeout) clearTimeout(hostWaitTimeout);
                 if (mqttClient) mqttClient.end(true);
-                await nexusAlert(data.reason || 'You could not join this room.');
+                const reason = data.reason || 'You could not join this room.';
+                if (reason.toLowerCase().includes('already being used')) {
+                    await nexusAlert(`Duplicate Username: "${localProfile ? localProfile.username : 'Your username'}" is already in use in this room (first-come, first-served). Please change your username.`);
+                    promptUsernameModal({
+                        title: 'Change Username to Join',
+                        desc: `"${localProfile ? localProfile.username : 'Your username'}" is already in use in this room. Choose a new username:`,
+                        placeholder: 'Enter new username...',
+                        onSave: () => {
+                            localProfile = NexusProfile.get();
+                            if (pendingRoomInfo) {
+                                connectToPin(pendingRoomInfo.pin, pendingRoomInfo.name);
+                            }
+                        }
+                    });
+                } else {
+                    await nexusAlert(reason);
+                }
             }
 
             // ─── Everyone: registry sync ─────────────────────
@@ -1364,21 +1407,10 @@
             console.error("Supabase init error:", e);
         }
 
-        const VIBRANT_PALETTE = [
-            "#FF5722", "#4CAF50", "#00BCD4", "#E91E63", "#9C27B0",
-            "#3F51B5", "#2196F3", "#009688", "#FF9800", "#FFC107",
-            "#8BC34A", "#03A9F4", "#F06292", "#BA68C8", "#4DD0E1"
-        ];
-        function getVibrantColor(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = str.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            return VIBRANT_PALETTE[Math.abs(hash) % VIBRANT_PALETTE.length];
-        }
-
         let currentActiveGroupCode = null;
         let groupRealtimeChannel   = null;
+        let userApprovalsChannel   = null;
+        let approvalPollingTimer   = null;
 
         function getEnrolledGroups() {
             try {
@@ -1415,15 +1447,35 @@
         const modeSwitch    = document.getElementById('chat-mode-switch');
         const sliderTrack   = document.getElementById('chat-slider-track');
 
+        let onUsernameSavedCallback = null;
+
+        function promptUsernameModal({ title = 'Username Required', desc = 'You must set a username to enter Group Chats.', placeholder = 'Choose a username...', onSave = null } = {}) {
+            const modal = document.getElementById('profile-prompt-modal');
+            const titleEl = document.getElementById('profile-prompt-title');
+            const descEl = document.getElementById('profile-prompt-desc');
+            const input = document.getElementById('prompt-username-input');
+            if (titleEl) titleEl.textContent = title;
+            if (descEl) descEl.textContent = desc;
+            if (input) {
+                input.placeholder = placeholder;
+                const prof = NexusProfile.get();
+                input.value = (title.includes('Change') || title.includes('Duplicate')) ? '' : (prof ? prof.username : '');
+            }
+            onUsernameSavedCallback = onSave;
+            modal.style.display = 'flex';
+            if (input) setTimeout(() => input.focus(), 60);
+        }
+
         function setMode(mode, save = true) {
             const isGroup = (mode === 'group');
             if (isGroup) {
                 const profile = window.NexusProfile ? NexusProfile.get() : null;
                 if (!profile || !profile.username) {
-                    document.getElementById('profile-prompt-modal').style.display = 'flex';
-                    const input = document.getElementById('prompt-username-input');
-                    input.value = '';
-                    input.focus();
+                    promptUsernameModal({
+                        title: 'Username Required',
+                        desc: 'You must set a username to enter Group Chats.',
+                        onSave: () => setMode('group', true)
+                    });
                     return;
                 }
                 modeBtnGroup.classList.add('active');
@@ -1434,6 +1486,7 @@
                 if (save) localStorage.setItem('tb_chat_last_mode', 'group');
                 renderGroupSidebar();
                 syncEnrolledStatuses();
+                initUserApprovalsWatcher();
                 closeCurrentGroup(); // always stay on main menu when switching
             } else {
                 modeBtnAnon.classList.add('active');
@@ -1461,15 +1514,33 @@
         } else {
             setMode('anon', false);
         }
+        if (window.NexusProfile && NexusProfile.get()) {
+            initUserApprovalsWatcher();
+        }
 
-        document.getElementById('save-prompt-username-btn').onclick = () => {
+        document.getElementById('save-prompt-username-btn').onclick = async () => {
             const nameInput = document.getElementById('prompt-username-input');
             const name = (nameInput.value || '').trim();
             if (!name) return alert('Please enter a username.');
             try {
-                NexusProfile.save(name);
+                const savedProf = NexusProfile.save(name, { force: true });
+                localProfile = savedProf;
+                if (sbClient && savedProf && savedProf.id) {
+                    try {
+                        const newColor = colorForName(name);
+                        await sbClient.from('group_members').update({ username: name, user_color: newColor }).eq('user_id', savedProf.id);
+                        await sbClient.from('group_requests').update({ username: name, user_color: newColor }).eq('user_id', savedProf.id);
+                        await sbClient.from('groups').update({ admin_name: name }).eq('admin_id', savedProf.id);
+                    } catch (e) {}
+                }
                 document.getElementById('profile-prompt-modal').style.display = 'none';
-                setMode('group', true);
+                if (onUsernameSavedCallback) {
+                    const cb = onUsernameSavedCallback;
+                    onUsernameSavedCallback = null;
+                    cb(name);
+                } else {
+                    setMode('group', true);
+                }
             } catch (err) {
                 alert(err.message);
             }
@@ -1477,6 +1548,7 @@
 
         document.getElementById('cancel-prompt-username-btn').onclick = () => {
             document.getElementById('profile-prompt-modal').style.display = 'none';
+            onUsernameSavedCallback = null;
         };
 
         // Render Group Sidebar with Games Tab Hold-to-Delete Style
@@ -1571,14 +1643,133 @@
             });
         }
 
+        function showApprovalNotification(grp) {
+            const toast = document.getElementById('group-approval-toast');
+            const msg = document.getElementById('group-approval-toast-msg');
+            const openBtn = document.getElementById('group-approval-open-btn');
+            if (!toast || !msg) return;
+
+            msg.textContent = `You were approved to join ${grp.name || grp.code}!`;
+            toast.style.display = 'flex';
+            requestAnimationFrame(() => toast.classList.add('show'));
+
+            openBtn.onclick = () => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.style.display = 'none', 350);
+                openGroup(grp.code, grp.name, grp.isAdmin);
+            };
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.style.display = 'none', 350);
+            }, 7000);
+        }
+
+        async function checkAllPendingApprovalsFast() {
+            if (!sbClient) return;
+            const profile = NexusProfile.get();
+            if (!profile) return;
+            const groups = getEnrolledGroups();
+            let changed = false;
+
+            for (const grp of groups) {
+                if (grp.status === 'pending') {
+                    const { data } = await sbClient.from('group_requests')
+                        .select('status')
+                        .eq('group_code', grp.code)
+                        .eq('user_id', profile.id)
+                        .maybeSingle();
+
+                    if (data && data.status === 'approved') {
+                        grp.status = 'approved';
+                        changed = true;
+                        showApprovalNotification(grp);
+                    } else if (data && data.status === 'rejected') {
+                        removeEnrolledGroup(grp.code);
+                        changed = true;
+                        nexusAlert(`Your request to join "${grp.name || grp.code}" was denied by the admin.`);
+                    }
+                }
+            }
+            if (changed) {
+                saveEnrolledGroups(groups);
+                renderGroupSidebar();
+            }
+        }
+
+        function initUserApprovalsWatcher() {
+            if (!sbClient) return;
+            const profile = NexusProfile.get();
+            if (!profile || !profile.id) return;
+
+            if (userApprovalsChannel) {
+                try { sbClient.removeChannel(userApprovalsChannel); } catch (e) {}
+            }
+
+            // 1. Supabase Realtime push notification on request update or member insert
+            userApprovalsChannel = sbClient
+                .channel(`user-approvals-${profile.id}`)
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'group_requests',
+                    filter: `user_id=eq.${profile.id}`
+                }, payload => {
+                    if (payload && payload.new) {
+                        const groups = getEnrolledGroups();
+                        const grp = groups.find(g => g.code === payload.new.group_code);
+                        if (payload.new.status === 'approved') {
+                            if (grp && grp.status !== 'approved') {
+                                grp.status = 'approved';
+                                addEnrolledGroup(grp);
+                                renderGroupSidebar();
+                                showApprovalNotification(grp);
+                            }
+                        } else if (payload.new.status === 'rejected') {
+                            if (grp) removeEnrolledGroup(grp.code);
+                            renderGroupSidebar();
+                            nexusAlert(`Your request to join "${grp ? grp.name : payload.new.group_code}" was denied by the admin.`);
+                        }
+                    }
+                })
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'group_members',
+                    filter: `user_id=eq.${profile.id}`
+                }, payload => {
+                    if (payload && payload.new) {
+                        const groups = getEnrolledGroups();
+                        const grp = groups.find(g => g.code === payload.new.group_code);
+                        if (grp && grp.status !== 'approved') {
+                            grp.status = 'approved';
+                            addEnrolledGroup(grp);
+                            renderGroupSidebar();
+                            showApprovalNotification(grp);
+                        }
+                    }
+                })
+                .subscribe();
+
+            // 2. High-speed 2.5s polling heartbeat while user has any pending groups
+            if (approvalPollingTimer) clearInterval(approvalPollingTimer);
+            approvalPollingTimer = setInterval(() => {
+                const groups = getEnrolledGroups();
+                if (groups.some(g => g.status === 'pending')) {
+                    checkAllPendingApprovalsFast();
+                }
+            }, 2500);
+        }
+
         async function checkPendingApproval(grp) {
             if (!sbClient) return;
             const profile = NexusProfile.get();
             if (!profile) return;
-            const { data } = await sbClient.from('group_requests').select('status').eq('group_code', grp.code).eq('user_id', profile.id).single();
+            const { data } = await sbClient.from('group_requests').select('status').eq('group_code', grp.code).eq('user_id', profile.id).maybeSingle();
             if (data && data.status === 'approved') {
                 grp.status = 'approved';
                 addEnrolledGroup(grp);
+                showApprovalNotification(grp);
                 openGroup(grp.code, grp.name, grp.isAdmin);
             } else if (data && data.status === 'rejected') {
                 await nexusAlert('Your request to join this group was denied by the admin.');
@@ -1589,25 +1780,7 @@
         }
 
         async function syncEnrolledStatuses() {
-            if (!sbClient) return;
-            const profile = NexusProfile.get();
-            if (!profile) return;
-            const groups = getEnrolledGroups();
-            let changed = false;
-
-            for (const grp of groups) {
-                if (grp.status === 'pending') {
-                    const { data } = await sbClient.from('group_requests').select('status').eq('group_code', grp.code).eq('user_id', profile.id).single();
-                    if (data && data.status === 'approved') {
-                        grp.status = 'approved';
-                        changed = true;
-                    }
-                }
-            }
-            if (changed) {
-                saveEnrolledGroups(groups);
-                renderGroupSidebar();
-            }
+            await checkAllPendingApprovalsFast();
         }
 
         async function leaveGroup(code, name) {
@@ -1709,7 +1882,7 @@
                     group_code: code,
                     user_id: profile.id,
                     username: profile.username,
-                    user_color: getVibrantColor(profile.id)
+                    user_color: colorForName(profile.username)
                 }]);
                 if (mErr) throw mErr;
 
@@ -1785,11 +1958,34 @@
                     }
                 }
 
+                // Check duplicate username in group (First-come, first-served; favors admins and existing members)
+                const { data: groupMembers } = await sbClient.from('group_members').select('id, user_id, username, is_admin').eq('group_code', rawCode);
+                const existingMembers = groupMembers || [];
+                const duplicateMember = existingMembers.find(m => m.user_id !== profile.id && (m.username || '').trim().toLowerCase() === profile.username.trim().toLowerCase());
+                const isAdminConflict = (grp.admin_id !== profile.id && (grp.admin_name || '').trim().toLowerCase() === profile.username.trim().toLowerCase());
+
+                if (duplicateMember || isAdminConflict) {
+                    const holder = isAdminConflict ? 'the group admin' : (duplicateMember.is_admin ? 'the group admin' : 'another member');
+                    feedback.style.color = '#f44336';
+                    feedback.textContent = `The username "${profile.username}" is already in use by ${holder}.`;
+                    await nexusAlert(`Duplicate Username: The username "${profile.username}" is already taken in this group by ${holder} (first-come, first-served). You must choose a different username to join.`);
+                    promptUsernameModal({
+                        title: 'Change Username to Join',
+                        desc: `"${profile.username}" is already taken in this group. Choose a new unique username:`,
+                        placeholder: 'Enter new username...',
+                        onSave: () => {
+                            document.getElementById('submit-join-code-btn').click();
+                        }
+                    });
+                    return;
+                }
+
                 // Submit request
                 const { error: rErr } = await sbClient.from('group_requests').insert([{
                     group_code: grp.code,
                     user_id: profile.id,
                     username: profile.username,
+                    user_color: colorForName(profile.username),
                     status: 'pending'
                 }]);
                 if (rErr) throw rErr;
@@ -1797,6 +1993,7 @@
                 feedback.style.color = '#4CAF50';
                 feedback.textContent = 'Request sent! Awaiting admin approval.';
                 addEnrolledGroup({ code: grp.code, name: grp.name, isAdmin: false, status: 'pending' });
+                initUserApprovalsWatcher();
                 input.value = '';
             } catch (err) {
                 feedback.style.color = '#f44336';
@@ -1878,7 +2075,7 @@
             const badge = document.getElementById('group-admin-badge');
             if (badge) {
                 badge.textContent = count || 0;
-                badge.style.display = count > 0 ? 'inline-block' : 'none';
+                badge.style.display = count > 0 ? 'flex' : 'none';
             }
         }
 
@@ -1896,9 +2093,10 @@
                 div.innerHTML = `<span class="system-text">[${escapeHTML(msg.text)}]</span>`;
             } else {
                 div.className = 'chat-msg';
-                div.style.borderColor = msg.user_color || '#AB47BC';
+                const msgColor = msg.user_color || colorForName(msg.username);
+                div.style.borderColor = msgColor;
                 div.style.alignSelf   = isSelf ? 'flex-end' : 'flex-start';
-                div.innerHTML = `<div class="name-tag" style="font-size:10px;font-weight:bold;color:${msg.user_color};margin-bottom:4px;">${escapeHTML(msg.username)}</div><div>${msg.text}</div>`;
+                div.innerHTML = `<div class="name-tag" style="font-size:10px;font-weight:bold;color:${msgColor};margin-bottom:4px;">${escapeHTML(msg.username)}</div><div>${msg.text}</div>`;
             }
             area.appendChild(div);
             area.scrollTop = area.scrollHeight;
@@ -1917,7 +2115,7 @@
             input.style.height = 'auto';
             input.style.overflowY = 'hidden';
 
-            const userColor = getVibrantColor(profile.id);
+            const userColor = colorForName(profile.username);
             try {
                 await sbClient.from('group_messages').insert([{
                     group_code: currentActiveGroupCode,
@@ -1959,7 +2157,7 @@
                         group_code: currentActiveGroupCode,
                         user_id: profile.id,
                         username: profile.username,
-                        user_color: getVibrantColor(profile.id),
+                        user_color: colorForName(profile.username),
                         text: tag
                     }]);
                 };
@@ -2057,7 +2255,7 @@
                     const row = document.createElement('div');
                     row.className = 'user-row';
                     row.innerHTML = `
-                        <div class="user-pill" style="background:#555;">${escapeHTML(req.username)}</div>
+                        <div class="user-pill" style="background:${colorForName(req.username)};">${escapeHTML(req.username)}</div>
                         <div style="display:flex; gap:6px;">
                             <button class="save-btn" style="background:#2E7D32; padding:5px 12px; font-size:12px;">Approve</button>
                             <button class="save-btn cancel-modal-btn" style="padding:5px 12px; font-size:12px;">Deny</button>
@@ -2068,18 +2266,29 @@
 
                     approveBtn.onclick = async () => {
                         approveBtn.disabled = true;
+
+                        // Check duplicate username against current approved members
+                        const { data: currentMems } = await sbClient.from('group_members').select('id, user_id, username').eq('group_code', code);
+                        const hasDup = (currentMems || []).some(m => m.user_id !== req.user_id && (m.username || '').trim().toLowerCase() === req.username.trim().toLowerCase());
+                        if (hasDup) {
+                            await nexusAlert(`Cannot approve ${req.username}: Another member in this group already has this username (first-come, first-served). The user must change their username to join.`);
+                            approveBtn.disabled = false;
+                            return;
+                        }
+
                         await sbClient.from('group_requests').update({ status: 'approved' }).eq('id', req.id);
                         await sbClient.from('group_members').insert([{
                             group_code: code,
                             user_id: req.user_id,
                             username: req.username,
-                            user_color: getVibrantColor(req.user_id)
+                            user_color: colorForName(req.username),
+                            is_admin: false
                         }]);
                         await sbClient.from('group_messages').insert([{
                             group_code: code,
                             user_id: 'system',
                             username: 'System',
-                            user_color: '#777',
+                            user_color: '#4CAF50',
                             text: `${req.username} joined the group.`
                         }]);
                         loadAdminModalData();
@@ -2108,7 +2317,7 @@
                     row.className = 'user-row';
                     const isSelf = profile && profile.id === mem.user_id;
                     row.innerHTML = `
-                        <div class="user-pill" style="background:${mem.user_color || '#4CAF50'};">${escapeHTML(mem.username)} ${isSelf ? '(Admin)' : ''}</div>
+                        <div class="user-pill" style="background:${mem.user_color || colorForName(mem.username)};">${escapeHTML(mem.username)} ${isSelf ? '(Admin)' : ''}</div>
                         ${!isSelf ? `<button class="save-btn cancel-modal-btn" style="padding:5px 12px; font-size:12px; background:#c62828;">Remove</button>` : ''}
                     `;
                     if (!isSelf) {

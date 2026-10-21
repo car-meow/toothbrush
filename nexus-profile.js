@@ -17,12 +17,13 @@
         } catch (_) { return null; }
     }
     function clean(name) { return String(name || '').replace(/[<>&"']/g, '').trim().replace(/\s+/g, ' ').slice(0, 24); }
-    function save(name) {
+    function save(name, options) {
         name = clean(name);
         if (!name) throw new Error('Enter a username.');
         const storage = global.nexusStorage || global.localStorage;
         const current = get();
-        if (current && isLocked() && clean(current.username).toLowerCase() !== name.toLowerCase()) {
+        const force = options === true || (options && options.force);
+        if (!force && current && isLocked() && clean(current.username).toLowerCase() !== name.toLowerCase()) {
             throw new Error('You cannot change your username while enrolled in group chats. Leave all groups first.');
         }
         const profile = { id: current ? current.id : (global.crypto && crypto.randomUUID ? crypto.randomUUID() : 'profile-' + Date.now().toString(36) + Math.random().toString(36).slice(2)), username: name, createdAt: current && current.createdAt ? current.createdAt : Date.now() };
