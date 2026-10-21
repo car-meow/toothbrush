@@ -506,11 +506,21 @@
         if (profileInput && existingProfile) profileInput.value = existingProfile.username;
         document.getElementById('profile-save').onclick = async () => {
             try { NexusProfile.save(profileInput.value); await nexusAlert('Your local username has been saved.'); }
-            catch (error) { await nexusAlert(error.message); }
+            catch (error) {
+                await nexusAlert(error.message);
+                const current = window.NexusProfile && NexusProfile.get();
+                if (profileInput) profileInput.value = current ? current.username : '';
+            }
         };
         document.getElementById('profile-clear').onclick = async () => {
-            NexusProfile.clear(); profileInput.value = '';
-            await nexusAlert('Your local profile was removed. You can still join anonymous rooms as a guest.');
+            try {
+                NexusProfile.clear(); profileInput.value = '';
+                await nexusAlert('Your local profile was removed. You can still join anonymous rooms as a guest.');
+            } catch (error) {
+                await nexusAlert(error.message);
+                const current = window.NexusProfile && NexusProfile.get();
+                if (profileInput) profileInput.value = current ? current.username : '';
+            }
         };
         document.getElementById('backup-export').onclick = async event => {
             const button = event.currentTarget; button.disabled = true;

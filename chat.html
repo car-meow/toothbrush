@@ -27,6 +27,26 @@
             document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"><\/script>');
         }
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module">
+        (async () => {
+            try {
+                const { defineUnicodeEmojiPicker } = await import('https://cdn.jsdelivr.net/npm/unicode-emoji-picker@latest/+esm');
+                defineUnicodeEmojiPicker();
+                window.__unicodeEmojiPickerLoaded = true;
+            } catch (err) {
+                console.warn('unicode-emoji-picker failed to load, loading fallback:', err);
+                try {
+                    await import('https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js');
+                    window.__emojiPickerFallbackLoaded = true;
+                    const mount = document.getElementById('emoji-picker-mount');
+                    if (mount) mount.innerHTML = '<emoji-picker></emoji-picker>';
+                } catch(err2) {
+                    console.error('Emoji picker fallback failed:', err2);
+                }
+            }
+        })();
+    </script>
     <style>
         .status-header { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 20px; font-size: 11px; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
@@ -91,24 +111,51 @@
     </div>
 
     <header>
-        <h1 onclick="navigateWithFade('index.html')" style="cursor:pointer">Nexus Chat</h1>
-        
-        <div class="status-header">
-            <div id="status-dot" class="status-dot"></div>
-            <span id="status-text">Network Offline</span>
+        <div class="header-left">
+            <h1 onclick="handleBackAction()" style="cursor:pointer">Nexus Chat</h1>
+            
+            <div class="status-header" id="anon-status-header">
+                <div id="status-dot" class="status-dot"></div>
+                <span id="status-text">Network Offline</span>
+            </div>
+
+            <div id="stats-area" class="online-stats" style="display:none;">
+                <span class="online-count"><span id="count-num">1</span> Online</span>
+                <span class="online-hint">Ctrl+Shift+L to view list</span>
+            </div>
+
+            <div id="room-header-info" style="display:none; font-weight:bold; margin-left: 12px; align-items:center; gap:8px;">
+                <span id="display-room-name"></span>
+                <span style="opacity:0.4;">|</span>
+                <span id="pin-wrapper" class="code-reveal-wrapper" title="Click to Show/Hide PIN">
+                    <span id="display-pin"></span>
+                    <span id="pin-cover" class="code-reveal-cover">Click to Show/Hide PIN</span>
+                </span>
+            </div>
+
+            <div id="group-room-info" style="display:none; font-weight:bold; margin-left: 12px; align-items:center; gap:8px;">
+                <span id="display-group-emoji" style="font-size:20px; line-height:1; user-select:none;">💬</span>
+                <span id="display-group-name"></span>
+                <span style="opacity:0.4;">|</span>
+                <span id="group-code-wrapper" class="code-reveal-wrapper" title="Click to Show/Hide Code">
+                    <span id="display-group-code"></span>
+                    <span id="group-code-cover" class="code-reveal-cover">Click to Show/Hide Code</span>
+                </span>
+                <span style="opacity:0.4;">|</span>
+                <span id="display-group-count" style="font-size:12px; color:var(--muted-text,#888); font-weight:bold;">1 Member</span>
+            </div>
         </div>
 
-        <div id="stats-area" class="online-stats" style="display:none;">
-            <span class="online-count"><span id="count-num">1</span> Online</span>
-            <span class="online-hint">Ctrl+Shift+L to view list</span>
-        </div>
-
-        <div id="room-header-info" style="display:none; font-weight:bold; margin-left: 20px;">
-            <span id="display-room-name"></span> | 
-            <span id="pin-wrapper">
-                <span id="display-pin"></span>
-                <span id="pin-cover">Click to Show/Hide PIN</span>
-            </span>
+        <div class="chat-mode-switch-wrapper">
+            <div class="chat-mode-switch" id="chat-mode-switch" role="tablist">
+                <div class="mode-switch-slider" id="mode-switch-slider"></div>
+                <button type="button" class="mode-switch-btn active" id="mode-btn-anon" role="tab" aria-selected="true">
+                    <span>Anonymous</span>
+                </button>
+                <button type="button" class="mode-switch-btn" id="mode-btn-group" role="tab" aria-selected="false">
+                    <span>Group</span>
+                </button>
+            </div>
         </div>
 
         <div class="controls">
@@ -118,47 +165,150 @@
             <button id="disband-btn" class="material-nav-btn" style="--expanded-width: 145px; display:none;">
                 <img src="Assets/Delete.svg" alt=""><span>Disband</span>
             </button>
-            <button id="chat-back-btn" onclick="navigateWithFade('index.html')" class="material-nav-btn" style="--expanded-width: 125px;">
-                <img src="Assets/media-back-arrow.svg" alt=""><span>Home</span>
+            <button id="group-admin-btn" class="material-nav-btn" style="--expanded-width: 175px; display:none;">
+                <img src="Assets/Settings.svg" alt=""><span>Admin Settings</span>
+                <span id="group-admin-badge" class="admin-badge">0</span>
+            </button>
+            <button id="chat-back-btn" class="material-nav-btn" style="--expanded-width: 125px;">
+                <img id="chat-back-icon" src="Assets/media-back-arrow.svg" alt=""><span id="chat-back-text">Home</span>
             </button>
         </div>
     </header>
 
-    <main id="chat-home" style="display:flex; align-items:center; justify-content:center; flex:1;">
-        <div class="modal-box" style="padding:40px; border-radius:25px; border:2px solid var(--white-outline); text-align:center; width:380px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
-            <h2 id="pin-header-title" style="margin-top:0; margin-bottom:20px; color:var(--title-color);">Enter PIN</h2>
-            <input type="text" id="pin-entry" class="pin-input-large" placeholder="------" maxlength="6">
-            <div id="pin-error" style="color:#f44336; margin-top:10px; margin-bottom:15px; display:none; font-weight:bold;">Host Offline or Incorrect PIN!</div>
-            
-            <button id="join-btn" class="save-btn" style="background:#2E7D32; width:100%; height:55px; font-size:18px; margin-top: 15px;">Join Room</button>
-            <div style="margin:25px 0; color:var(--muted-text, #888); font-weight:bold;">OR</div>
-            <button id="open-host-panel" class="save-btn" style="width:100%;">Host New Room</button>
-        </div>
-    </main>
+    <!-- ═══════════════════════════════════════════════════
+         CAROUSEL VIEWPORT (ANONYMOUS & GROUP SLIDE TRACK)
+    ═══════════════════════════════════════════════════ -->
+    <div class="chat-viewport">
+        <div class="chat-slider-track" id="chat-slider-track">
+            <!-- PANE 1: ANONYMOUS CHAT -->
+            <div id="anon-section" class="chat-pane">
+                <main id="chat-home" style="display:flex; align-items:center; justify-content:center; flex:1;">
+                    <div class="modal-box" style="padding:40px; border-radius:25px; border:2px solid var(--white-outline); text-align:center; width:380px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+                        <h2 id="pin-header-title" style="margin-top:0; margin-bottom:20px; color:var(--title-color);">Enter PIN</h2>
+                        <input type="text" id="pin-entry" class="pin-input-large" placeholder="------" maxlength="6">
+                        <div id="pin-error" style="color:#f44336; margin-top:10px; margin-bottom:15px; display:none; font-weight:bold;">Host Offline or Incorrect PIN!</div>
+                        
+                        <button id="join-btn" class="save-btn" style="background:#2E7D32; width:100%; height:55px; font-size:18px; margin-top: 15px;">Join Room</button>
+                        <div style="margin:25px 0; color:var(--muted-text, #888); font-weight:bold;">OR</div>
+                        <button id="open-host-panel" class="save-btn" style="width:100%;">Host New Room</button>
+                    </div>
+                </main>
 
-    <div id="host-modal" class="overlay" style="z-index: 30000;">
-        <div class="modal-box" style="padding:35px; border-radius:20px; width:350px; border:2px solid var(--white-outline); text-align:center;">
-            <h3 style="margin-top:0; margin-bottom:20px; color:var(--title-color);">Host Room</h3>
-            <input type="text" id="host-name-input" placeholder="Room Name" class="pin-input-large" style="width:100%; margin-top:15px; font-size:18px; letter-spacing:0;">
-            <input type="text" id="host-pin-input" placeholder="6-Digit PIN" maxlength="6" class="pin-input-large" style="width:100%; margin-top:10px;">
-            <label style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;color:var(--text-color);font-weight:700"><input type="checkbox" id="host-anonymous-mode" checked> Anonymous mode</label>
-            
-            <button id="start-host-btn" class="save-btn" style="background:#2E7D32; width:100%; height:50px; margin-top:15px;">Go Live</button>
-            <button onclick="document.getElementById('host-modal').style.display='none'" class="save-btn cancel-modal-btn" style="width:100%; margin-top:10px;">Cancel</button>
+                <div id="host-modal" class="overlay" style="z-index: 30000;">
+                    <div class="modal-box" style="padding:35px; border-radius:20px; width:350px; border:2px solid var(--white-outline); text-align:center;">
+                        <h3 style="margin-top:0; margin-bottom:20px; color:var(--title-color);">Host Room</h3>
+                        <input type="text" id="host-name-input" placeholder="Room Name" class="pin-input-large" style="width:100%; margin-top:15px; font-size:18px; letter-spacing:0;">
+                        <input type="text" id="host-pin-input" placeholder="6-Digit PIN" maxlength="6" class="pin-input-large" style="width:100%; margin-top:10px;">
+                        <button id="start-host-btn" class="save-btn" style="background:#2E7D32; width:100%; height:50px; margin-top:15px;">Go Live</button>
+                        <button onclick="document.getElementById('host-modal').style.display='none'" class="save-btn cancel-modal-btn" style="width:100%; margin-top:10px;">Cancel</button>
+                    </div>
+                </div>
+
+                <main id="chat-room" style="display:none; flex-direction:column; flex:1; height: 100%; position:relative;">
+                    <div id="messages" style="flex:1; overflow-y:auto; padding:30px; display:flex; flex-direction:column;"></div>
+                    <button id="anon-jump-btn" class="jump-to-bottom-btn" title="Jump to bottom">↓</button>
+                    <div style="padding:20px; background: var(--panel-bg-alt); display:flex; gap:12px; border-top:1px solid var(--border-color); align-items:center;">
+                        <label for="img-upload" class="save-btn" style="background:#1e3a8a; padding:0; width:50px; height:50px; border-radius:12px; flex-shrink:0;" title="Upload Photo">
+                            <img src="Assets/photoIcon.png" alt="Photos" style="width:24px; height:24px; object-fit:contain;">
+                        </label>
+                        <input type="file" id="img-upload" accept="image/*" style="display:none;">
+                        <textarea id="msg-input" placeholder="Type a message..." rows="1" class="auto-expand-textarea"></textarea>
+                        <button id="send-btn" class="save-btn" style="background:#2E7D32; padding: 12px 30px; border-radius: 12px; height: 50px;">Send</button>
+                    </div>
+                </main>
+            </div>
+
+            <!-- PANE 2: GROUP CHAT -->
+            <div id="group-section" class="chat-pane group-chat-container">
+                <aside class="group-sidebar">
+                    <button id="group-create-btn" class="sidebar-new-chat-btn">
+                        <img src="Assets/New Chat.svg" alt="New Group"><span>Create New Group</span>
+                    </button>
+                    <ul id="enrolled-group-list" class="group-list"></ul>
+                    <div id="group-empty-state" class="group-empty-hint">Looking a little empty...</div>
+                </aside>
+
+                <main class="group-main">
+                    <!-- Center Join Card (when no group active) -->
+                    <div id="group-join-view">
+                        <div class="group-card-box">
+                            <h2 style="margin-top:0; margin-bottom:12px; color:var(--title-color);">Join Groups</h2>
+                            <p style="font-size:13px; color:var(--muted-text,#888); margin-bottom:20px;">Enter a 6-character group code to request access.</p>
+                            <input type="text" id="join-group-code-input" class="pin-input-large" placeholder="NX-XXXX" maxlength="7" style="text-transform:uppercase;">
+                            <div id="join-code-feedback" style="margin-top:12px; font-weight:bold; font-size:13.5px; display:none;"></div>
+                            <button id="submit-join-code-btn" class="save-btn" style="background:#2E7D32; width:100%; height:50px; font-size:16px; margin-top:18px;">Request to Join</button>
+                        </div>
+                    </div>
+
+                    <!-- Active Group Chat Room (Single unified header!) -->
+                    <div id="group-chat-room">
+                        <div id="group-messages" style="flex:1; overflow-y:auto; padding:30px; display:flex; flex-direction:column; position:relative;"></div>
+
+                        <button id="group-jump-btn" class="jump-to-bottom-btn" title="Jump to bottom">↓</button>
+
+                        <div style="padding:20px; background: var(--panel-bg-alt); display:flex; gap:12px; border-top:1px solid var(--border-color); align-items:center;">
+                            <label for="group-img-upload" class="save-btn" style="background:#1e3a8a; padding:0; width:50px; height:50px; border-radius:12px; flex-shrink:0;" title="Upload Photo">
+                                <img src="Assets/photoIcon.png" alt="Photos" style="width:24px; height:24px; object-fit:contain;">
+                            </label>
+                            <input type="file" id="group-img-upload" accept="image/*" style="display:none;">
+                            <textarea id="group-msg-input" placeholder="Type a message..." rows="1" class="auto-expand-textarea"></textarea>
+                            <button id="group-send-btn" class="save-btn" style="background:#2E7D32; padding: 12px 30px; border-radius: 12px; height: 50px;">Send</button>
+                        </div>
+                    </div>
+                </main>
+            </div>
         </div>
     </div>
 
-    <main id="chat-room" style="display:none; flex-direction:column; flex:1; height: calc(100vh - 70px);">
-        <div id="messages" style="flex:1; overflow-y:auto; padding:30px; display:flex; flex-direction:column;"></div>
-        <div style="padding:20px; background: var(--panel-bg-alt); display:flex; gap:12px; border-top:1px solid var(--border-color); align-items:center;">
-            <label for="img-upload" class="save-btn" style="background:#1e3a8a; padding:0; width:50px; height:50px; border-radius:12px; flex-shrink:0;" title="Upload Photo">
-                <img src="Assets/photoIcon.png" alt="Photos" style="width:24px; height:24px; object-fit:contain;">
-            </label>
-            <input type="file" id="img-upload" accept="image/*" style="display:none;">
-            <input type="text" id="msg-input" placeholder="Type a message..." style="flex:1; background: var(--input-bg); border:1px solid var(--border-color); color: var(--text-color); padding:15px; border-radius:12px; outline:none;">
-            <button id="send-btn" class="save-btn" style="background:#2E7D32; padding: 12px 30px; border-radius: 12px; height: 50px;">Send</button>
+    <!-- Modals for Group Chat -->
+    <div id="create-group-modal" class="overlay" style="z-index: 30000;">
+        <div class="modal-box" style="padding:35px; border-radius:20px; width:380px; border:2px solid var(--white-outline); text-align:center;">
+            <h3 style="margin-top:0; margin-bottom:12px; color:var(--title-color);">Create New Group</h3>
+            <p style="font-size:12px; color:var(--muted-text,#888); margin-bottom:16px;">You will be the group admin and can approve or remove members.</p>
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px; width:100%;">
+                <button type="button" id="create-group-emoji-btn" class="group-emoji-btn" title="Choose Emoji">💬</button>
+                <input type="text" id="create-group-name" placeholder="Group Name (e.g. Study Hall)" class="pin-input-large" style="flex:1; font-size:16px; letter-spacing:0; margin:0;" maxlength="30">
+            </div>
+            <button id="confirm-create-group-btn" class="save-btn" style="background:#2E7D32; width:100%; height:48px; margin-top:5px;">Create & Launch</button>
+            <button onclick="document.getElementById('create-group-modal').style.display='none'" class="save-btn cancel-modal-btn" style="width:100%; margin-top:10px;">Cancel</button>
         </div>
-    </main>
+    </div>
+
+    <div id="admin-manage-modal" class="overlay" style="z-index: 30000;">
+        <div class="modal-box" style="padding:30px; border-radius:20px; width:480px; max-width:92%; border:2px solid var(--white-outline); text-align:left; color:var(--text-color);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0; color:var(--title-color);">Admin Settings</h3>
+                <span id="admin-modal-code" style="font-family:monospace; font-size:12px; color:#4CAF50; font-weight:bold;"></span>
+            </div>
+
+            <h4 style="margin:5px 0 8px 0; color:#fff; font-size:14px;">Group Details</h4>
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px; width:100%;">
+                <button type="button" id="admin-group-emoji-btn" class="group-emoji-btn" title="Change Emoji">💬</button>
+                <input type="text" id="admin-group-name-input" placeholder="Group Name" class="pin-input-large" style="flex:1; font-size:15px; letter-spacing:0; margin:0;" maxlength="30">
+                <button type="button" id="admin-save-details-btn" class="save-btn" style="background:#2E7D32; padding:8px 16px; height:44px; font-size:13px; margin:0; flex-shrink:0;">Save</button>
+            </div>
+            
+            <h4 style="margin:15px 0 8px 0; color:#4CAF50; font-size:14px;">Pending Join Requests</h4>
+            <div id="admin-pending-list" style="max-height:140px; overflow-y:auto; border:1px solid var(--border-color); border-radius:10px; padding:8px; margin-bottom:15px; background:rgba(0,0,0,0.2);">
+                <div style="color:#777; font-size:12px; text-align:center; padding:10px;">No pending requests.</div>
+            </div>
+
+            <h4 style="margin:15px 0 8px 0; color:#fff; font-size:14px;">Active Members</h4>
+            <div id="admin-members-list" style="max-height:160px; overflow-y:auto; border:1px solid var(--border-color); border-radius:10px; padding:8px; background:rgba(0,0,0,0.2);"></div>
+
+            <button onclick="document.getElementById('admin-manage-modal').style.display='none'" class="save-btn" style="width:100%; margin-top:20px; background:#444;">Close</button>
+        </div>
+    </div>
+
+    <div id="profile-prompt-modal" class="overlay" style="z-index: 30000;">
+        <div class="modal-box" style="padding:35px; border-radius:20px; width:360px; border:2px solid var(--white-outline); text-align:center;">
+            <h3 style="margin-top:0; margin-bottom:12px; color:var(--title-color);">Username Required</h3>
+            <p style="font-size:13px; color:var(--muted-text,#888); margin-bottom:18px;">You must set a username to enter Group Chats.</p>
+            <input type="text" id="prompt-username-input" placeholder="Choose a username..." class="pin-input-large" style="width:100%; font-size:16px; letter-spacing:0; margin-bottom:15px;">
+            <button id="save-prompt-username-btn" class="save-btn" style="background:#2E7D32; width:100%; height:48px;">Set Username & Continue</button>
+            <button id="cancel-prompt-username-btn" class="save-btn cancel-modal-btn" style="width:100%; margin-top:10px;">Cancel</button>
+        </div>
+    </div>
 
     <div id="user-list-modal" class="list-modal">
         <h3 id="modal-title">Active Users</h3>
@@ -170,6 +320,228 @@
     <script>
         const localStorage = window.nexusStorage || window.localStorage;
         document.addEventListener('DOMContentLoaded', async () => {
+
+        // ═══════════════════════════════════════════════════
+        //  EMOJI UTILITIES & PICKER
+        // ═══════════════════════════════════════════════════
+        const POPULAR_EMOJIS = [
+            '💬', '🎮', '📚', '🍕', '🔥', '🚀',
+            '🎨', '🎵', '🍿', '⚡', '🌟', '💻',
+            '🏆', '🎲', '👾', '🪐', '🐾', '☕',
+            '🛡️', '👑', '⚽', '🛸', '🐱', '💡',
+            '🎉', '🔒', '🎯', '🍔', '💎', '🌈',
+            '🌊', '🎸', '🍦', '🍩', '🤖', '✨'
+        ];
+
+        let activeEmojiTargetBtn = null;
+        let activeEmojiCallback = null;
+        let createGroupSelectedEmoji = '💬';
+        let adminGroupSelectedEmoji = '💬';
+
+        function extractSingleEmoji(input) {
+            if (!input) return '💬';
+            if (typeof input === 'object') {
+                input = input.emoji || input.unicode || input.character || (input.detail ? (input.detail.emoji || input.detail.unicode || input.detail) : '') || '';
+            }
+            input = String(input).trim();
+            if (!input) return '💬';
+            if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+                const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+                const segments = Array.from(segmenter.segment(input));
+                if (segments.length > 0 && /\p{Extended_Pictographic}/u.test(segments[0].segment)) {
+                    return segments[0].segment;
+                }
+            }
+            const match = input.match(/\p{Extended_Pictographic}/u);
+            return match ? match[0] : (input || '💬');
+        }
+
+        function parseGroupEmojiAndTitle(fullName) {
+            if (!fullName) return { emoji: '💬', title: 'Group' };
+            if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+                const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+                const segments = Array.from(segmenter.segment(fullName));
+                if (segments.length > 0) {
+                    const firstChar = segments[0].segment;
+                    if (/\p{Extended_Pictographic}/u.test(firstChar)) {
+                        const rest = fullName.slice(firstChar.length).trim();
+                        return { emoji: firstChar, title: rest || fullName };
+                    }
+                }
+            }
+            const match = fullName.match(/^(\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(.*)$/u);
+            if (match) {
+                return { emoji: match[1], title: match[2].trim() };
+            }
+            return { emoji: '💬', title: fullName };
+        }
+
+        function positionEmojiPicker() {
+            if (!activeEmojiTargetBtn) return;
+            const popover = document.getElementById('nexus-emoji-popover');
+            if (!popover || popover.style.display === 'none') return;
+
+            const rect = activeEmojiTargetBtn.getBoundingClientRect();
+            const popoverWidth = popover.offsetWidth || Math.min(360, window.innerWidth * 0.92);
+            const popoverHeight = popover.offsetHeight || Math.min(440, window.innerHeight * 0.78);
+
+            let top = rect.bottom + 8;
+            let left = rect.left;
+
+            if (left + popoverWidth > window.innerWidth - 12) {
+                left = window.innerWidth - popoverWidth - 12;
+            }
+            if (left < 12) left = 12;
+
+            if (top + popoverHeight > window.innerHeight - 12) {
+                const topAbove = rect.top - popoverHeight - 8;
+                if (topAbove >= 12 || rect.top > window.innerHeight / 2) {
+                    top = Math.max(12, topAbove);
+                } else {
+                    top = Math.max(12, window.innerHeight - popoverHeight - 12);
+                }
+            }
+            if (top < 12) top = 12;
+
+            popover.style.top = `${Math.round(top)}px`;
+            popover.style.left = `${Math.round(left)}px`;
+        }
+
+        function customizePickerShadow(picker) {
+            if (!picker) return;
+            try {
+                if (typeof picker.selectTab === 'function') picker.selectTab('search');
+            } catch(e) {}
+
+            // Attach direct listeners on the picker element
+            if (!picker._nexusPickerHooked) {
+                picker._nexusPickerHooked = true;
+                const onPick = (e) => {
+                    const raw = e.detail?.emoji || e.detail?.unicode || e.detail?.character || e.detail;
+                    const char = extractSingleEmoji(raw);
+                    if (char) selectEmoji(char);
+                };
+                picker.addEventListener('emoji-pick', onPick);
+                picker.addEventListener('emoji-click', onPick);
+            }
+
+            if (picker.shadowRoot) {
+                if (!picker.shadowRoot.querySelector('#picker-search-override')) {
+                    const style = document.createElement('style');
+                    style.id = 'picker-search-override';
+                    style.textContent = `
+                        .tabs-wrapper { display: none !important; }
+                        .content { border-top: none !important; }
+                        .title-bar {
+                            height: 48px !important;
+                            padding: 4px 6px !important;
+                            background: transparent !important;
+                            box-shadow: none !important;
+                        }
+                        .search-input {
+                            border: 1.5px solid var(--search-input-border-color, rgba(255,255,255,0.2)) !important;
+                            border-radius: 10px !important;
+                            padding: 8px 12px !important;
+                            font-size: 14px !important;
+                            height: 40px !important;
+                            box-sizing: border-box !important;
+                            background: rgba(0, 0, 0, 0.28) !important;
+                            color: var(--text-color, #ffffff) !important;
+                            width: 100% !important;
+                        }
+                        .search-input:focus {
+                            border-color: var(--search-input-border-color-hover, #4CAF50) !important;
+                        }
+                        .title { display: none !important; }
+                    `;
+                    picker.shadowRoot.appendChild(style);
+                }
+
+                // Shadow DOM button click delegate (guarantees selection even if CustomEvent doesn't bubble)
+                if (!picker.shadowRoot._nexusClickHooked) {
+                    picker.shadowRoot._nexusClickHooked = true;
+                    picker.shadowRoot.addEventListener('click', (ev) => {
+                        const btn = ev.target.closest('button');
+                        if (btn) {
+                            const raw = btn.textContent || btn.innerText;
+                            const char = extractSingleEmoji(raw);
+                            if (char && char !== '💬') {
+                                selectEmoji(char);
+                            }
+                        }
+                    }, true);
+                }
+            }
+        }
+
+        function setupEmojiPicker() {
+            const popover = document.getElementById('nexus-emoji-popover');
+            const mount = document.getElementById('emoji-picker-mount');
+            const closeBtn = document.getElementById('close-emoji-popover');
+            if (!popover || !mount) return;
+
+            closeBtn.onclick = () => { popover.style.display = 'none'; };
+
+            const handlePickEvent = (e) => {
+                const raw = e.detail?.emoji || e.detail?.unicode || e.detail?.character || e.detail;
+                const char = extractSingleEmoji(raw);
+                if (char) selectEmoji(char);
+            };
+
+            // Capture phase listeners catch non-bubbling events on parent containers
+            mount.addEventListener('emoji-pick', handlePickEvent, true);
+            mount.addEventListener('emoji-click', handlePickEvent, true);
+            popover.addEventListener('emoji-pick', handlePickEvent, true);
+            popover.addEventListener('emoji-click', handlePickEvent, true);
+            window.addEventListener('emoji-pick', handlePickEvent, true);
+            window.addEventListener('emoji-click', handlePickEvent, true);
+
+            const initialPicker = mount.querySelector('unicode-emoji-picker, emoji-picker');
+            if (initialPicker) customizePickerShadow(initialPicker);
+
+            document.addEventListener('pointerdown', (e) => {
+                if (popover.style.display !== 'none' && !popover.contains(e.target) && e.target !== activeEmojiTargetBtn) {
+                    popover.style.display = 'none';
+                }
+            });
+
+            window.addEventListener('resize', positionEmojiPicker);
+            window.addEventListener('scroll', positionEmojiPicker, true);
+        }
+
+        function openEmojiPicker(targetBtn, onSelect) {
+            activeEmojiTargetBtn = targetBtn;
+            activeEmojiCallback = onSelect;
+            const popover = document.getElementById('nexus-emoji-popover');
+            if (!popover) return;
+
+            popover.style.display = 'flex';
+            positionEmojiPicker();
+
+            const picker = popover.querySelector('unicode-emoji-picker');
+            if (picker) {
+                customizePickerShadow(picker);
+                setTimeout(() => {
+                    customizePickerShadow(picker);
+                    const input = picker.shadowRoot?.querySelector('.search-input');
+                    if (input) input.focus();
+                }, 50);
+            }
+        }
+
+        function selectEmoji(emoji) {
+            const clean = extractSingleEmoji(emoji);
+            if (activeEmojiTargetBtn) {
+                activeEmojiTargetBtn.textContent = clean;
+            }
+            if (typeof activeEmojiCallback === 'function') {
+                activeEmojiCallback(clean);
+            }
+            const popover = document.getElementById('nexus-emoji-popover');
+            if (popover) popover.style.display = 'none';
+        }
+
+        setupEmojiPicker();
 
         // ═══════════════════════════════════════════════════
         //  0.  BAN CHECK
@@ -549,7 +921,6 @@
                 setTimeout(() => {
                     publish({ type: 'room-info', name: document.getElementById('display-room-name').textContent, pin: document.getElementById('display-pin').textContent, anonymous: roomAnonymous });
                     broadcastRegistry();
-                    appendSystemMessage(`${assignedName} joined.`);
                     publish({ type: 'msg', name: 'System', color: '#777', text: `${assignedName} joined.` });
                     updateOccupancy();
                 }, 100);
@@ -609,8 +980,12 @@
             }
 
             // ─── Regular chat message ────────────────────────
-            if (data.type === 'msg' && data.name !== myName) {
-                appendMessage(data.name, data.color, data.text, data.uuid || data.name);
+            if (data.type === 'msg') {
+                if (data.name === 'System') {
+                    appendMessage('System', '#888', data.text, 'system');
+                } else if (data.name !== myName) {
+                    appendMessage(data.name, data.color, data.text, data.uuid || data.name);
+                }
             }
 
             // ─── Disband ─────────────────────────────────────
@@ -624,7 +999,6 @@
             // ─── Kick ────────────────────────────────────────
             if (data.type === 'kick') {
                 if (isHost) {
-                    appendSystemMessage(`${data.targetName} was kicked from the room.`);
                     publish({ type: 'msg', name: 'System', color: '#777', text: `${data.targetName} was kicked from the room.` });
                 }
                 if (data.targetPeerId === myUuid) {
@@ -643,7 +1017,6 @@
                     usedNames.delete(departed.name);
                     delete registry[data.peerId];
                     globalUserList = Object.values(registry);
-                    appendSystemMessage(`${departed.name} left the room.`);
                     publish({ type: 'msg', name: 'System', color: '#777', text: `${departed.name} left.` });
                     updateOccupancy();
                     broadcastRegistry();
@@ -652,7 +1025,7 @@
 
             // ─── Name change (re-roll) ───────────────────────
             if (data.type === 'name-change') {
-                appendSystemMessage(`${data.oldName} changed their name to ${data.newName}`);
+                publish({ type: 'msg', name: 'System', color: '#777', text: `${data.oldName} changed their name to ${data.newName}` });
                 updateMessagesInUI(data.uuid, data.newName, data.newColor);
                 if (isHost && data.peerId !== myUuid) {
                     const entry = registry[data.peerId];
@@ -678,32 +1051,101 @@
             document.getElementById('chat-home').style.display = 'none';
             document.getElementById('host-modal').style.display = 'none';
             document.getElementById('chat-room').style.display  = 'flex';
-            document.getElementById('room-header-info').style.display = 'block';
+            document.getElementById('room-header-info').style.display = 'flex';
             document.getElementById('stats-area').style.display = 'flex';
             document.getElementById('reroll-btn').style.display = roomAnonymous ? 'inline-flex' : 'none';
             document.getElementById('display-room-name').textContent = name;
             document.getElementById('display-pin').textContent = pin;
-            document.getElementById('pin-wrapper').classList.remove('revealed');
+            const pinWrap = document.getElementById('pin-wrapper');
+            if (pinWrap) {
+                pinWrap.classList.remove('revealed');
+                pinWrap.onclick = () => pinWrap.classList.toggle('revealed');
+            }
 
-            const backBtn = document.getElementById('chat-back-btn');
             if (isHost) {
                 document.getElementById('disband-btn').style.display = 'inline-flex';
-                if (backBtn) backBtn.style.display = 'none';
+            }
+            updateNavBackButton();
+        }
+
+        function leaveAnonymousRoom() {
+            if (isDisconnecting) return;
+            isDisconnecting = true;
+            if (mqttClient && mqttClient.connected) {
+                publish({ type: 'leave', peerId: myUuid, name: myName });
+                try { mqttClient.end(true); } catch(e) {}
+            }
+            document.getElementById('chat-room').style.display = 'none';
+            document.getElementById('chat-home').style.display = 'flex';
+            document.getElementById('room-header-info').style.display = 'none';
+            document.getElementById('stats-area').style.display = 'none';
+            document.getElementById('reroll-btn').style.display = 'none';
+            document.getElementById('disband-btn').style.display = 'none';
+            setStatus('ready', 'Network Ready');
+            isDisconnecting = false;
+            uiReady = false;
+            updateNavBackButton();
+        }
+
+        function updateNavBackButton() {
+            const backBtn = document.getElementById('chat-back-btn');
+            if (!backBtn) return;
+            const img = document.getElementById('chat-back-icon') || backBtn.querySelector('img');
+            const span = document.getElementById('chat-back-text') || backBtn.querySelector('span');
+
+            const isGroup = document.getElementById('chat-mode-switch')?.classList.contains('group-active');
+            let isInsideRoom = false;
+
+            if (isGroup) {
+                isInsideRoom = (currentActiveGroupCode !== null);
             } else {
-                if (backBtn && backBtn.querySelector('span')) backBtn.querySelector('span').textContent = 'Leave';
+                const roomEl = document.getElementById('chat-room');
+                isInsideRoom = (roomEl && roomEl.style.display === 'flex');
+            }
+
+            if (isInsideRoom) {
+                // Inside chat room -> 1 step backward
+                if (img) img.src = 'Assets/Back.svg';
+                if (span) span.textContent = 'Back';
+                backBtn.style.setProperty('--expanded-width', '120px');
+            } else {
+                // On main menu -> going to homescreen
+                if (img) img.src = 'Assets/media-back-arrow.svg';
+                if (span) span.textContent = 'Home';
+                backBtn.style.setProperty('--expanded-width', '125px');
             }
         }
 
+        window.handleBackAction = () => {
+            const isGroup = document.getElementById('chat-mode-switch')?.classList.contains('group-active');
+            if (isGroup) {
+                if (currentActiveGroupCode) {
+                    closeCurrentGroup();
+                } else {
+                    navigateWithFade('index.html');
+                }
+            } else {
+                const roomVisible = (document.getElementById('chat-room')?.style.display === 'flex');
+                if (roomVisible) {
+                    if (isHost) {
+                        document.getElementById('disband-btn').click();
+                    } else {
+                        leaveAnonymousRoom();
+                    }
+                } else {
+                    navigateWithFade('index.html');
+                }
+            }
+            updateNavBackButton();
+        };
+        document.getElementById('chat-back-btn').onclick = window.handleBackAction;
+        updateNavBackButton();
+
         // ═══════════════════════════════════════════════════
-        //  8.  MESSAGE RENDERING
+        //  8.  MESSAGE RENDERING (ANONYMOUS CHAT)
         // ═══════════════════════════════════════════════════
         function appendSystemMessage(text) {
-            const area = document.getElementById('messages');
-            const div  = document.createElement('div');
-            div.style.cssText = 'color:#777;font-weight:bold;text-align:center;margin:10px 0;font-size:12px;';
-            div.textContent = text;
-            area.appendChild(div);
-            area.scrollTop = area.scrollHeight;
+            appendMessage('System', '#888', text, 'system');
         }
 
         function updateMessagesInUI(uuid, newName, newColor) {
@@ -718,31 +1160,46 @@
         function appendMessage(name, color, text, uuid) {
             const area = document.getElementById('messages');
             const div  = document.createElement('div');
+            if (name === 'System') {
+                div.className = 'chat-msg system-msg';
+                div.innerHTML = `<span class="system-text">[${escapeHTML(text)}]</span>`;
+                area.appendChild(div);
+                area.scrollTop = area.scrollHeight;
+                const jumpBtn = document.getElementById('anon-jump-btn');
+                if (jumpBtn) updateJumpButton(area, jumpBtn);
+                return;
+            }
             const safe = (uuid || name || '').replace(/[^a-zA-Z0-9_-]/g, '_');
             div.className   = `chat-msg msg-uuid-${safe}`;
             div.style.borderColor = color;
             div.style.alignSelf   = (name === myName) ? 'flex-end' : 'flex-start';
-            div.innerHTML = `<div class="name-tag" style="font-size:10px;font-weight:bold;color:${color};margin-bottom:4px;">${name}</div><div>${text}</div>`;
+            div.innerHTML = `<div class="name-tag" style="font-size:10px;font-weight:bold;color:${color};margin-bottom:4px;">${escapeHTML(name)}</div><div>${text}</div>`;
             area.appendChild(div);
             area.scrollTop = area.scrollHeight;
+            const jumpBtn = document.getElementById('anon-jump-btn');
+            if (jumpBtn) updateJumpButton(area, jumpBtn);
         }
 
         // ═══════════════════════════════════════════════════
-        //  9.  SEND / INPUT
+        //  9.  SEND / INPUT (ANONYMOUS CHAT)
         // ═══════════════════════════════════════════════════
         document.getElementById('send-btn').onclick = () => {
-            const val = document.getElementById('msg-input').value.trim();
+            const inputEl = document.getElementById('msg-input');
+            const val = inputEl.value.trim();
             if (!val || !myName) return;
             appendMessage(myName, myColor, val, myUuid);
             publish({ type: 'msg', name: myName, color: myColor, text: val, uuid: myUuid });
-            document.getElementById('msg-input').value = '';
+            inputEl.value = '';
+            inputEl.style.height = 'auto';
+            inputEl.style.overflowY = 'hidden';
+            const jumpBtn = document.getElementById('anon-jump-btn');
+            if (jumpBtn) updateJumpButton(document.getElementById('messages'), jumpBtn);
         };
 
-        document.getElementById('msg-input').onkeypress  = (e) => { if (e.key === 'Enter') document.getElementById('send-btn').click(); };
         document.getElementById('pin-entry').onkeypress   = (e) => { if (e.key === 'Enter') document.getElementById('join-btn').click(); };
 
         // ═══════════════════════════════════════════════════
-        //  10. IMAGE UPLOAD
+        //  10. IMAGE UPLOAD (ANONYMOUS CHAT)
         // ═══════════════════════════════════════════════════
         document.getElementById('img-upload').onchange = function(e) {
             const file = e.target.files[0];
@@ -800,7 +1257,6 @@
             if (rerollCooldown) return nexusAlert('You must wait 3 minutes between name changes.');
             if (!myName) return;
 
-            // Figure out which names are in use
             const inUse = new Set(globalUserList.map(u => u.name));
             const available = USERNAME_POOL.filter(n => !inUse.has(n));
             if (available.length === 0) return nexusAlert('No usernames available right now.');
@@ -809,7 +1265,6 @@
             const newName  = available[Math.floor(Math.random() * available.length)];
             const newColor = colorForName(newName);
 
-            // If host, update own registry entry
             if (isHost) {
                 usedNames.delete(oldName);
                 usedNames.add(newName);
@@ -820,7 +1275,7 @@
             myName  = newName;
             myColor = newColor;
 
-            appendSystemMessage(`${oldName} changed their name to ${myName}`);
+            publish({ type: 'msg', name: 'System', color: '#777', text: `${oldName} changed their name to ${myName}` });
             updateMessagesInUI(myUuid, myName, myColor);
             publish({ type: 'name-change', oldName, newName: myName, newColor: myColor, uuid: myUuid, peerId: myUuid });
 
@@ -853,6 +1308,835 @@
             document.getElementById('pin-error').style.display = 'none';
         };
 
+        // ═══════════════════════════════════════════════════
+        //  13. AUTO-EXPAND & JUMP BUTTON HELPERS
+        // ═══════════════════════════════════════════════════
+        function escapeHTML(str) {
+            return String(str || '').replace(/[&<>'"]/g, tag => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+            }[tag] || tag));
+        }
+
+        function setupAutoExpand(textarea, sendBtn) {
+            if (!textarea) return;
+            textarea.addEventListener('input', () => {
+                textarea.style.height = 'auto';
+                const h = Math.min(textarea.scrollHeight, 120);
+                textarea.style.height = h + 'px';
+                textarea.style.overflowY = textarea.scrollHeight > 120 ? 'auto' : 'hidden';
+            });
+            textarea.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (sendBtn) sendBtn.click();
+                }
+            });
+        }
+
+        function updateJumpButton(area, btn) {
+            if (!area || !btn) return;
+            const atBottom = (area.scrollHeight - area.scrollTop - area.clientHeight) < 120;
+            btn.style.display = atBottom ? 'none' : 'flex';
+        }
+
+        function setupJumpButton(area, btn) {
+            if (!area || !btn) return;
+            area.addEventListener('scroll', () => updateJumpButton(area, btn));
+            btn.onclick = () => {
+                area.scrollTo({ top: area.scrollHeight, behavior: 'smooth' });
+            };
+        }
+
+        setupAutoExpand(document.getElementById('msg-input'), document.getElementById('send-btn'));
+        setupJumpButton(document.getElementById('messages'), document.getElementById('anon-jump-btn'));
+
+        // ═══════════════════════════════════════════════════
+        //  14. GROUP CHAT & SUPABASE INTEGRATION
+        // ═══════════════════════════════════════════════════
+        const SUPABASE_URL = 'https://lprpobjgkohwuzvbkmdh.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_nIWAou1a4B73EVVu3PqQcg_ZCcf3zCF';
+        let sbClient = null;
+        try {
+            if (window.supabase && window.supabase.createClient) {
+                sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            }
+        } catch(e) {
+            console.error("Supabase init error:", e);
+        }
+
+        const VIBRANT_PALETTE = [
+            "#FF5722", "#4CAF50", "#00BCD4", "#E91E63", "#9C27B0",
+            "#3F51B5", "#2196F3", "#009688", "#FF9800", "#FFC107",
+            "#8BC34A", "#03A9F4", "#F06292", "#BA68C8", "#4DD0E1"
+        ];
+        function getVibrantColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return VIBRANT_PALETTE[Math.abs(hash) % VIBRANT_PALETTE.length];
+        }
+
+        let currentActiveGroupCode = null;
+        let groupRealtimeChannel   = null;
+
+        function getEnrolledGroups() {
+            try {
+                const raw = localStorage.getItem('tb_enrolled_groups');
+                return JSON.parse(raw || '[]');
+            } catch (_) { return []; }
+        }
+
+        function saveEnrolledGroups(groups) {
+            try {
+                localStorage.setItem('tb_enrolled_groups', JSON.stringify(groups));
+            } catch (_) {}
+        }
+
+        function addEnrolledGroup(grp) {
+            const list = getEnrolledGroups().filter(g => g.code !== grp.code);
+            list.push(grp);
+            saveEnrolledGroups(list);
+            renderGroupSidebar();
+        }
+
+        function removeEnrolledGroup(code) {
+            const list = getEnrolledGroups().filter(g => g.code !== code);
+            saveEnrolledGroups(list);
+            renderGroupSidebar();
+            if (currentActiveGroupCode === code) {
+                closeCurrentGroup();
+            }
+        }
+
+        // Two-Sided Switch & Viewport Slide Carousel
+        const modeBtnAnon   = document.getElementById('mode-btn-anon');
+        const modeBtnGroup  = document.getElementById('mode-btn-group');
+        const modeSwitch    = document.getElementById('chat-mode-switch');
+        const sliderTrack   = document.getElementById('chat-slider-track');
+
+        function setMode(mode, save = true) {
+            const isGroup = (mode === 'group');
+            if (isGroup) {
+                const profile = window.NexusProfile ? NexusProfile.get() : null;
+                if (!profile || !profile.username) {
+                    document.getElementById('profile-prompt-modal').style.display = 'flex';
+                    const input = document.getElementById('prompt-username-input');
+                    input.value = '';
+                    input.focus();
+                    return;
+                }
+                modeBtnGroup.classList.add('active');
+                modeBtnAnon.classList.remove('active');
+                modeSwitch.classList.add('group-active');
+                sliderTrack.classList.add('group-active');
+                document.getElementById('anon-status-header').style.display = 'none';
+                if (save) localStorage.setItem('tb_chat_last_mode', 'group');
+                renderGroupSidebar();
+                syncEnrolledStatuses();
+                closeCurrentGroup(); // always stay on main menu when switching
+            } else {
+                modeBtnAnon.classList.add('active');
+                modeBtnGroup.classList.remove('active');
+                modeSwitch.classList.remove('group-active');
+                sliderTrack.classList.remove('group-active');
+                document.getElementById('anon-status-header').style.display = 'flex';
+                if (save) localStorage.setItem('tb_chat_last_mode', 'anon');
+            }
+            updateNavBackButton();
+        }
+
+        modeBtnAnon.onclick  = () => setMode('anon', true);
+        modeBtnGroup.onclick = () => setMode('group', true);
+
+        // Load saved mode preference on startup
+        const savedMode = localStorage.getItem('tb_chat_last_mode') || 'anon';
+        if (savedMode === 'group') {
+            const profile = window.NexusProfile ? NexusProfile.get() : null;
+            if (profile && profile.username) {
+                setMode('group', false);
+            } else {
+                setMode('anon', false);
+            }
+        } else {
+            setMode('anon', false);
+        }
+
+        document.getElementById('save-prompt-username-btn').onclick = () => {
+            const nameInput = document.getElementById('prompt-username-input');
+            const name = (nameInput.value || '').trim();
+            if (!name) return alert('Please enter a username.');
+            try {
+                NexusProfile.save(name);
+                document.getElementById('profile-prompt-modal').style.display = 'none';
+                setMode('group', true);
+            } catch (err) {
+                alert(err.message);
+            }
+        };
+
+        document.getElementById('cancel-prompt-username-btn').onclick = () => {
+            document.getElementById('profile-prompt-modal').style.display = 'none';
+        };
+
+        // Render Group Sidebar with Games Tab Hold-to-Delete Style
+        function renderGroupSidebar() {
+            const list = document.getElementById('enrolled-group-list');
+            const emptyHint = document.getElementById('group-empty-state');
+            const groups = getEnrolledGroups();
+
+            list.innerHTML = '';
+            if (groups.length === 0) {
+                emptyHint.style.display = 'block';
+                return;
+            }
+            emptyHint.style.display = 'none';
+
+            groups.forEach(grp => {
+                const li = document.createElement('li');
+                li.className = 'group-list-item' + (grp.code === currentActiveGroupCode ? ' active' : '');
+                
+                const isPending = grp.status === 'pending';
+                const parsed = parseGroupEmojiAndTitle(grp.name);
+                li.innerHTML = `
+                    <div class="group-item-emoji">${escapeHTML(parsed.emoji)}</div>
+                    <div class="group-item-info">
+                        <div class="group-item-title">${escapeHTML(parsed.title)}</div>
+                        ${isPending ? '<div class="group-item-subtitle" style="color:#FFA726;">Pending Approval</div>' : ''}
+                    </div>
+                    <span class="app-action-btn trash-btn" title="Hold to delete">
+                        <img src="Assets/Delete.svg" alt="Delete" style="width:17px;height:17px;vertical-align:middle;">
+                    </span>
+                `;
+
+                // Open group on row click
+                li.onclick = (e) => {
+                    if (e.target.closest('.trash-btn')) return;
+                    if (isPending) {
+                        checkPendingApproval(grp);
+                        return;
+                    }
+                    openGroup(grp.code, grp.name, grp.isAdmin);
+                };
+
+                // Games-tab style 1.5s press hold-to-delete
+                const del = li.querySelector('.trash-btn');
+                const HOLD_MS = 1500;
+                let holdRAF = null;
+                let holdStart = null;
+                let didDelete = false;
+
+                function startHold(e) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    if (holdRAF) return;
+                    didDelete = false;
+                    holdStart = performance.now();
+                    del.classList.add('holding');
+                    li.classList.add('is-deleting');
+
+                    function tick(now) {
+                        const progress = Math.min((now - holdStart) / HOLD_MS, 1);
+                        del.style.setProperty('--hold-progress', `${progress * 360}deg`);
+                        if (progress >= 1) {
+                            endHold();
+                            didDelete = true;
+                            leaveGroup(grp.code, grp.name);
+                        } else {
+                            holdRAF = requestAnimationFrame(tick);
+                        }
+                    }
+                    holdRAF = requestAnimationFrame(tick);
+                }
+
+                function endHold() {
+                    if (holdRAF) { cancelAnimationFrame(holdRAF); holdRAF = null; }
+                    holdStart = null;
+                    del.classList.remove('holding');
+                    del.style.removeProperty('--hold-progress');
+                    li.classList.remove('is-deleting');
+                }
+
+                del.addEventListener('pointerdown', startHold);
+                del.addEventListener('pointerup', (e) => {
+                    e.stopPropagation();
+                    endHold();
+                });
+                del.addEventListener('pointerleave', endHold);
+                del.addEventListener('pointercancel', endHold);
+                del.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); endHold(); });
+                del.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
+
+                list.appendChild(li);
+            });
+        }
+
+        async function checkPendingApproval(grp) {
+            if (!sbClient) return;
+            const profile = NexusProfile.get();
+            if (!profile) return;
+            const { data } = await sbClient.from('group_requests').select('status').eq('group_code', grp.code).eq('user_id', profile.id).single();
+            if (data && data.status === 'approved') {
+                grp.status = 'approved';
+                addEnrolledGroup(grp);
+                openGroup(grp.code, grp.name, grp.isAdmin);
+            } else if (data && data.status === 'rejected') {
+                await nexusAlert('Your request to join this group was denied by the admin.');
+                removeEnrolledGroup(grp.code);
+            } else {
+                nexusAlert('You are still awaiting admin approval to join ' + grp.name + '.');
+            }
+        }
+
+        async function syncEnrolledStatuses() {
+            if (!sbClient) return;
+            const profile = NexusProfile.get();
+            if (!profile) return;
+            const groups = getEnrolledGroups();
+            let changed = false;
+
+            for (const grp of groups) {
+                if (grp.status === 'pending') {
+                    const { data } = await sbClient.from('group_requests').select('status').eq('group_code', grp.code).eq('user_id', profile.id).single();
+                    if (data && data.status === 'approved') {
+                        grp.status = 'approved';
+                        changed = true;
+                    }
+                }
+            }
+            if (changed) {
+                saveEnrolledGroups(groups);
+                renderGroupSidebar();
+            }
+        }
+
+        async function leaveGroup(code, name) {
+            const profile = NexusProfile.get();
+            if (!profile) return;
+            if (sbClient) {
+                try {
+                    await sbClient.from('group_members').delete().eq('group_code', code).eq('user_id', profile.id);
+                    await sbClient.from('group_requests').delete().eq('group_code', code).eq('user_id', profile.id);
+                    await sbClient.from('group_messages').insert([{
+                        group_code: code,
+                        user_id: 'system',
+                        username: 'System',
+                        user_color: '#777',
+                        text: `${profile.username} left the group.`
+                    }]);
+                } catch(e) {}
+            }
+            removeEnrolledGroup(code);
+            await nexusAlert(`You left ${name || code}.`);
+        }
+
+        function closeCurrentGroup() {
+            currentActiveGroupCode = null;
+            if (groupRealtimeChannel && sbClient) {
+                sbClient.removeChannel(groupRealtimeChannel);
+                groupRealtimeChannel = null;
+            }
+            document.getElementById('group-chat-room').style.display = 'none';
+            document.getElementById('group-room-info').style.display = 'none';
+            const adminBtn = document.getElementById('group-admin-btn');
+            if (adminBtn) adminBtn.style.display = 'none';
+            document.getElementById('group-join-view').style.display = 'flex';
+            renderGroupSidebar();
+            updateNavBackButton();
+        }
+
+        // Create Group
+        const createGroupEmojiBtn = document.getElementById('create-group-emoji-btn');
+        if (createGroupEmojiBtn) {
+            createGroupEmojiBtn.onclick = () => {
+                openEmojiPicker(createGroupEmojiBtn, (em) => {
+                    createGroupSelectedEmoji = em;
+                });
+            };
+        }
+
+        document.getElementById('group-create-btn').onclick = () => {
+            const profile = NexusProfile.get();
+            if (!profile || !profile.username) {
+                modeBtnGroup.click();
+                return;
+            }
+            createGroupSelectedEmoji = '💬';
+            if (createGroupEmojiBtn) createGroupEmojiBtn.textContent = '💬';
+            document.getElementById('create-group-modal').style.display = 'flex';
+            const nameInput = document.getElementById('create-group-name');
+            nameInput.value = '';
+            nameInput.focus();
+        };
+
+        function generateGroupCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = 'NX-';
+            for (let i = 0; i < 4; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        document.getElementById('confirm-create-group-btn').onclick = async () => {
+            const profile = NexusProfile.get();
+            if (!profile || !profile.username) return;
+            const nameInput = document.getElementById('create-group-name');
+            const rawTitle = (nameInput.value || '').trim() || 'Nexus Group';
+            const btnEmoji = document.getElementById('create-group-emoji-btn')?.textContent?.trim();
+            const emoji = (btnEmoji ? extractSingleEmoji(btnEmoji) : null) || createGroupSelectedEmoji || '💬';
+            const fullName = `${emoji} ${rawTitle}`;
+
+            const btn = document.getElementById('confirm-create-group-btn');
+            btn.disabled = true;
+            btn.textContent = 'Creating…';
+
+            const code = generateGroupCode();
+            try {
+                if (!sbClient) throw new Error('Database client offline.');
+                
+                // 1. Insert Group
+                const { error: gErr } = await sbClient.from('groups').insert([{
+                    code: code,
+                    name: fullName,
+                    admin_id: profile.id,
+                    admin_name: profile.username
+                }]);
+                if (gErr) throw gErr;
+
+                // 2. Insert creator as first member
+                const { error: mErr } = await sbClient.from('group_members').insert([{
+                    group_code: code,
+                    user_id: profile.id,
+                    username: profile.username,
+                    user_color: getVibrantColor(profile.id)
+                }]);
+                if (mErr) throw mErr;
+
+                // 3. Welcome system message
+                await sbClient.from('group_messages').insert([{
+                    group_code: code,
+                    user_id: 'system',
+                    username: 'System',
+                    user_color: '#777',
+                    text: `${profile.username} created the group.`
+                }]);
+
+                addEnrolledGroup({ code, name: fullName, isAdmin: true, status: 'approved' });
+                document.getElementById('create-group-modal').style.display = 'none';
+                openGroup(code, fullName, true);
+            } catch (err) {
+                alert('Could not create group: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Create & Launch';
+            }
+        };
+
+        // Join Group Flow
+        document.getElementById('submit-join-code-btn').onclick = async () => {
+            const profile = NexusProfile.get();
+            if (!profile || !profile.username) {
+                modeBtnGroup.click();
+                return;
+            }
+            const input = document.getElementById('join-group-code-input');
+            const feedback = document.getElementById('join-code-feedback');
+            let rawCode = (input.value || '').trim().toUpperCase();
+            if (!rawCode) return;
+            if (!rawCode.startsWith('NX-') && rawCode.length === 4) rawCode = 'NX-' + rawCode;
+
+            feedback.style.display = 'block';
+            feedback.style.color = '#FFA726';
+            feedback.textContent = 'Checking code…';
+
+            try {
+                if (!sbClient) throw new Error('Database client offline.');
+
+                const { data: grp, error: gErr } = await sbClient.from('groups').select('*').eq('code', rawCode).single();
+                if (gErr || !grp) {
+                    feedback.style.color = '#f44336';
+                    feedback.textContent = 'Invalid or nonexistent group code.';
+                    return;
+                }
+
+                // Check if already approved member
+                const { data: mem } = await sbClient.from('group_members').select('*').eq('group_code', rawCode).eq('user_id', profile.id).maybeSingle();
+                if (mem) {
+                    feedback.style.color = '#4CAF50';
+                    feedback.textContent = 'You are already a member! Opening group…';
+                    addEnrolledGroup({ code: grp.code, name: grp.name, isAdmin: grp.admin_id === profile.id, status: 'approved' });
+                    setTimeout(() => openGroup(grp.code, grp.name, grp.admin_id === profile.id), 400);
+                    return;
+                }
+
+                // Check if existing request
+                const { data: req } = await sbClient.from('group_requests').select('*').eq('group_code', rawCode).eq('user_id', profile.id).maybeSingle();
+                if (req) {
+                    if (req.status === 'pending') {
+                        feedback.style.color = '#FFA726';
+                        feedback.textContent = 'Request already sent — awaiting admin approval.';
+                        addEnrolledGroup({ code: grp.code, name: grp.name, isAdmin: false, status: 'pending' });
+                        return;
+                    } else if (req.status === 'rejected') {
+                        feedback.style.color = '#f44336';
+                        feedback.textContent = 'Your join request was previously denied by the admin.';
+                        return;
+                    }
+                }
+
+                // Submit request
+                const { error: rErr } = await sbClient.from('group_requests').insert([{
+                    group_code: grp.code,
+                    user_id: profile.id,
+                    username: profile.username,
+                    status: 'pending'
+                }]);
+                if (rErr) throw rErr;
+
+                feedback.style.color = '#4CAF50';
+                feedback.textContent = 'Request sent! Awaiting admin approval.';
+                addEnrolledGroup({ code: grp.code, name: grp.name, isAdmin: false, status: 'pending' });
+                input.value = '';
+            } catch (err) {
+                feedback.style.color = '#f44336';
+                feedback.textContent = err.message || 'Error joining group.';
+            }
+        };
+
+        // Open Group
+        async function openGroup(code, name, isAdmin) {
+            currentActiveGroupCode = code;
+            document.getElementById('group-join-view').style.display = 'none';
+            document.getElementById('group-chat-room').style.display = 'flex';
+            
+            // Unified header active group info
+            document.getElementById('group-room-info').style.display = 'flex';
+            const parsed = parseGroupEmojiAndTitle(name);
+            const emojiEl = document.getElementById('display-group-emoji');
+            if (emojiEl) emojiEl.textContent = parsed.emoji;
+            document.getElementById('display-group-name').textContent = parsed.title;
+            document.getElementById('display-group-code').textContent = code;
+            const codeWrapper = document.getElementById('group-code-wrapper');
+            if (codeWrapper) {
+                codeWrapper.classList.remove('revealed');
+                codeWrapper.onclick = () => codeWrapper.classList.toggle('revealed');
+            }
+
+            const adminBtn = document.getElementById('group-admin-btn');
+            if (adminBtn) adminBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+
+            renderGroupSidebar();
+            updateNavBackButton();
+
+            const messagesArea = document.getElementById('group-messages');
+            messagesArea.innerHTML = '<div style="color:#777; text-align:center; padding:20px;">Loading messages…</div>';
+
+            refreshGroupMemberCount(code);
+            if (isAdmin) refreshAdminBadge(code);
+
+            // Fetch past messages
+            if (sbClient) {
+                const { data: msgs } = await sbClient.from('group_messages').select('*').eq('group_code', code).order('created_at', { ascending: true }).limit(100);
+                messagesArea.innerHTML = '';
+                if (msgs && msgs.length) {
+                    msgs.forEach(m => appendGroupMessage(m));
+                } else {
+                    messagesArea.innerHTML = '<div style="color:#666; text-align:center; padding:30px; font-style:italic;">No messages yet. Say hello!</div>';
+                }
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+                updateJumpButton(messagesArea, document.getElementById('group-jump-btn'));
+
+                // Subscribe to Realtime changes
+                if (groupRealtimeChannel) sbClient.removeChannel(groupRealtimeChannel);
+                groupRealtimeChannel = sbClient.channel(`room-${code}`)
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_code=eq.${code}` }, payload => {
+                        appendGroupMessage(payload.new);
+                    })
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `group_code=eq.${code}` }, () => {
+                        refreshGroupMemberCount(code);
+                    })
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'group_requests', filter: `group_code=eq.${code}` }, () => {
+                        if (isAdmin) refreshAdminBadge(code);
+                    })
+                    .subscribe();
+            }
+        }
+
+        async function refreshGroupMemberCount(code) {
+            if (!sbClient) return;
+            const { count } = await sbClient.from('group_members').select('*', { count: 'exact', head: true }).eq('group_code', code);
+            const el = document.getElementById('display-group-count');
+            if (el && count !== null) {
+                el.textContent = `${count} Member${count === 1 ? '' : 's'}`;
+            }
+        }
+
+        async function refreshAdminBadge(code) {
+            if (!sbClient) return;
+            const { count } = await sbClient.from('group_requests').select('*', { count: 'exact', head: true }).eq('group_code', code).eq('status', 'pending');
+            const badge = document.getElementById('group-admin-badge');
+            if (badge) {
+                badge.textContent = count || 0;
+                badge.style.display = count > 0 ? 'inline-block' : 'none';
+            }
+        }
+
+        function appendGroupMessage(msg) {
+            const area = document.getElementById('group-messages');
+            const placeholder = area.querySelector('div[style*="font-style:italic"]');
+            if (placeholder) placeholder.remove();
+
+            const profile = NexusProfile.get();
+            const isSelf = profile && profile.id === msg.user_id;
+
+            const div = document.createElement('div');
+            if (msg.username === 'System') {
+                div.className = 'chat-msg system-msg';
+                div.innerHTML = `<span class="system-text">[${escapeHTML(msg.text)}]</span>`;
+            } else {
+                div.className = 'chat-msg';
+                div.style.borderColor = msg.user_color || '#AB47BC';
+                div.style.alignSelf   = isSelf ? 'flex-end' : 'flex-start';
+                div.innerHTML = `<div class="name-tag" style="font-size:10px;font-weight:bold;color:${msg.user_color};margin-bottom:4px;">${escapeHTML(msg.username)}</div><div>${msg.text}</div>`;
+            }
+            area.appendChild(div);
+            area.scrollTop = area.scrollHeight;
+            updateJumpButton(area, document.getElementById('group-jump-btn'));
+        }
+
+        // Group Send Button
+        document.getElementById('group-send-btn').onclick = async () => {
+            const profile = NexusProfile.get();
+            if (!profile || !profile.username || !currentActiveGroupCode || !sbClient) return;
+            const input = document.getElementById('group-msg-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            input.value = '';
+            input.style.height = 'auto';
+            input.style.overflowY = 'hidden';
+
+            const userColor = getVibrantColor(profile.id);
+            try {
+                await sbClient.from('group_messages').insert([{
+                    group_code: currentActiveGroupCode,
+                    user_id: profile.id,
+                    username: profile.username,
+                    user_color: userColor,
+                    text: text
+                }]);
+            } catch(e) {
+                console.error("Error sending group message:", e);
+            }
+        };
+
+        setupAutoExpand(document.getElementById('group-msg-input'), document.getElementById('group-send-btn'));
+        setupJumpButton(document.getElementById('group-messages'), document.getElementById('group-jump-btn'));
+
+        // Group Photo Upload
+        document.getElementById('group-img-upload').onchange = function(e) {
+            const profile = NexusProfile.get();
+            if (!profile || !profile.username || !currentActiveGroupCode || !sbClient) return;
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                const img = new Image();
+                img.onload = async function() {
+                    const canvas = document.createElement('canvas');
+                    let w = img.width, h = img.height;
+                    const MAX = 450;
+                    if (w > h && w > MAX) { h *= MAX / w; w = MAX; }
+                    else if (h > MAX) { w *= MAX / h; h = MAX; }
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    const b64 = canvas.toDataURL('image/jpeg', 0.65);
+                    const tag = `<img src="${b64}" style="max-width:100%;border-radius:8px;margin-top:5px;cursor:pointer;" onclick="window.open(this.src)">`;
+
+                    await sbClient.from('group_messages').insert([{
+                        group_code: currentActiveGroupCode,
+                        user_id: profile.id,
+                        username: profile.username,
+                        user_color: getVibrantColor(profile.id),
+                        text: tag
+                    }]);
+                };
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+            this.value = '';
+        };
+
+        // Admin Management Modal
+        const adminEmojiBtn = document.getElementById('admin-group-emoji-btn');
+        if (adminEmojiBtn) {
+            adminEmojiBtn.onclick = () => {
+                openEmojiPicker(adminEmojiBtn, (em) => {
+                    adminGroupSelectedEmoji = em;
+                });
+            };
+        }
+
+        const adminSaveDetailsBtn = document.getElementById('admin-save-details-btn');
+        if (adminSaveDetailsBtn) {
+            adminSaveDetailsBtn.onclick = async () => {
+                const code = currentActiveGroupCode;
+                if (!code || !sbClient) return;
+                const newTitle = (document.getElementById('admin-group-name-input').value || '').trim();
+                if (!newTitle) {
+                    await nexusAlert('Please enter a group title.');
+                    return;
+                }
+                const btnEmoji = document.getElementById('admin-group-emoji-btn')?.textContent?.trim();
+                const emoji = (btnEmoji ? extractSingleEmoji(btnEmoji) : null) || adminGroupSelectedEmoji || '💬';
+                const fullName = `${emoji} ${newTitle}`;
+                adminSaveDetailsBtn.disabled = true;
+                adminSaveDetailsBtn.textContent = 'Saving…';
+                try {
+                    const { error } = await sbClient.from('groups').update({ name: fullName }).eq('code', code);
+                    if (error) throw error;
+
+                    const groups = getEnrolledGroups();
+                    const grp = groups.find(g => g.code === code);
+                    if (grp) grp.name = fullName;
+                    saveEnrolledGroups(groups);
+
+                    const emojiEl = document.getElementById('display-group-emoji');
+                    if (emojiEl) emojiEl.textContent = emoji;
+                    document.getElementById('display-group-name').textContent = newTitle;
+                    renderGroupSidebar();
+
+                    adminSaveDetailsBtn.textContent = 'Saved!';
+                    setTimeout(() => {
+                        adminSaveDetailsBtn.disabled = false;
+                        adminSaveDetailsBtn.textContent = 'Save';
+                    }, 1000);
+                } catch(e) {
+                    alert('Failed to update group: ' + e.message);
+                    adminSaveDetailsBtn.disabled = false;
+                    adminSaveDetailsBtn.textContent = 'Save';
+                }
+            };
+        }
+
+        document.getElementById('group-admin-btn').onclick = async () => {
+            if (!currentActiveGroupCode || !sbClient) return;
+            document.getElementById('admin-manage-modal').style.display = 'flex';
+            document.getElementById('admin-modal-code').textContent = currentActiveGroupCode;
+            loadAdminModalData();
+        };
+
+        async function loadAdminModalData() {
+            if (!currentActiveGroupCode || !sbClient) return;
+            const code = currentActiveGroupCode;
+
+            // Load group details for editing
+            const enrolled = getEnrolledGroups().find(g => g.code === code);
+            const currentFullName = enrolled ? enrolled.name : (document.getElementById('display-group-name').textContent || 'Group');
+            const parsed = parseGroupEmojiAndTitle(currentFullName);
+            adminGroupSelectedEmoji = parsed.emoji;
+            if (adminEmojiBtn) adminEmojiBtn.textContent = parsed.emoji;
+            const titleInput = document.getElementById('admin-group-name-input');
+            if (titleInput) titleInput.value = parsed.title;
+
+            const pendingList = document.getElementById('admin-pending-list');
+            const membersList = document.getElementById('admin-members-list');
+
+            pendingList.innerHTML = '<div style="color:#777; text-align:center; padding:10px;">Loading…</div>';
+            membersList.innerHTML = '<div style="color:#777; text-align:center; padding:10px;">Loading…</div>';
+
+            const profile = NexusProfile.get();
+
+            // 1. Pending Requests
+            const { data: requests } = await sbClient.from('group_requests').select('*').eq('group_code', code).eq('status', 'pending');
+            pendingList.innerHTML = '';
+            if (requests && requests.length) {
+                requests.forEach(req => {
+                    const row = document.createElement('div');
+                    row.className = 'user-row';
+                    row.innerHTML = `
+                        <div class="user-pill" style="background:#555;">${escapeHTML(req.username)}</div>
+                        <div style="display:flex; gap:6px;">
+                            <button class="save-btn" style="background:#2E7D32; padding:5px 12px; font-size:12px;">Approve</button>
+                            <button class="save-btn cancel-modal-btn" style="padding:5px 12px; font-size:12px;">Deny</button>
+                        </div>
+                    `;
+                    const approveBtn = row.querySelectorAll('button')[0];
+                    const denyBtn    = row.querySelectorAll('button')[1];
+
+                    approveBtn.onclick = async () => {
+                        approveBtn.disabled = true;
+                        await sbClient.from('group_requests').update({ status: 'approved' }).eq('id', req.id);
+                        await sbClient.from('group_members').insert([{
+                            group_code: code,
+                            user_id: req.user_id,
+                            username: req.username,
+                            user_color: getVibrantColor(req.user_id)
+                        }]);
+                        await sbClient.from('group_messages').insert([{
+                            group_code: code,
+                            user_id: 'system',
+                            username: 'System',
+                            user_color: '#777',
+                            text: `${req.username} joined the group.`
+                        }]);
+                        loadAdminModalData();
+                        refreshAdminBadge(code);
+                    };
+
+                    denyBtn.onclick = async () => {
+                        denyBtn.disabled = true;
+                        await sbClient.from('group_requests').update({ status: 'rejected' }).eq('id', req.id);
+                        loadAdminModalData();
+                        refreshAdminBadge(code);
+                    };
+
+                    pendingList.appendChild(row);
+                });
+            } else {
+                pendingList.innerHTML = '<div style="color:#777; font-size:12px; text-align:center; padding:10px;">No pending requests.</div>';
+            }
+
+            // 2. Active Members
+            const { data: members } = await sbClient.from('group_members').select('*').eq('group_code', code);
+            membersList.innerHTML = '';
+            if (members && members.length) {
+                members.forEach(mem => {
+                    const row = document.createElement('div');
+                    row.className = 'user-row';
+                    const isSelf = profile && profile.id === mem.user_id;
+                    row.innerHTML = `
+                        <div class="user-pill" style="background:${mem.user_color || '#4CAF50'};">${escapeHTML(mem.username)} ${isSelf ? '(Admin)' : ''}</div>
+                        ${!isSelf ? `<button class="save-btn cancel-modal-btn" style="padding:5px 12px; font-size:12px; background:#c62828;">Remove</button>` : ''}
+                    `;
+                    if (!isSelf) {
+                        const remBtn = row.querySelector('button');
+                        remBtn.onclick = async () => {
+                            const ok = await nexusConfirm(`Remove ${mem.username} permanently from this group?`);
+                            if (!ok) return;
+                            remBtn.disabled = true;
+                            await sbClient.from('group_members').delete().eq('id', mem.id);
+                            await sbClient.from('group_requests').delete().eq('group_code', code).eq('user_id', mem.user_id);
+                            await sbClient.from('group_messages').insert([{
+                                group_code: code,
+                                user_id: 'system',
+                                username: 'System',
+                                user_color: '#777',
+                                text: `${mem.username} was removed from the group.`
+                            }]);
+                            loadAdminModalData();
+                            refreshGroupMemberCount(code);
+                        };
+                    }
+                    membersList.appendChild(row);
+                });
+            } else {
+                membersList.innerHTML = '<div style="color:#777; font-size:12px; text-align:center; padding:10px;">No members found.</div>';
+            }
+        }
+
     });
     </script>
     <script src="tutorial-engine.js?v=2"></script>
@@ -862,5 +2146,15 @@
         });
     </script>
     <script src="online-presence.js?v=4" defer></script>
+    <!-- Emoji Picker Popover -->
+    <div id="nexus-emoji-popover" class="nexus-emoji-popover">
+        <div class="emoji-popover-header">
+            <span>Choose Emoji</span>
+            <button type="button" class="emoji-popover-close" id="close-emoji-popover">&times;</button>
+        </div>
+        <div id="emoji-picker-mount" class="emoji-picker-mount">
+            <unicode-emoji-picker default-tab="search"></unicode-emoji-picker>
+        </div>
+    </div>
 </body>
 </html>
