@@ -188,9 +188,28 @@ function enterGameStandbyScreen() {
     gameAutosaveTimer = null;
     window.dispatchEvent(new CustomEvent('nexus-game-standby-change', { detail: { active: true } }));
 
-    // Keeping the Games document in a DocumentFragment still retains its full
-    // DOM, event listeners, preloaded Stash, and JS heap. Replace it with a
-    // minimal document instead, so the game receives the available RAM/CPU.
+    // Decouple window.opener on popup references so Chromium's SiteInstance
+    // scheduler does not lock the standby tab and the game popup into the same renderer process.
+    if (activeGameSessions && activeGameSessions.size) {
+        activeGameSessions.forEach(session => {
+            try {
+                if (session && session.win) session.win.opener = null;
+            } catch (e) {}
+        });
+    }
+
+    // Release cached memory and DOM nodes before document replacement
+    if (Array.isArray(games)) {
+        games.forEach(g => {
+            if (g && g.content) g.content = null;
+        });
+    }
+    suspendMainGameFrames();
+    try {
+        document.body.innerHTML = '';
+    } catch (e) {}
+
+    // Minimal document navigation
     window.location.replace('game-standby.html');
 }
 
@@ -256,6 +275,35 @@ function handleGamePopupClosed(sessionId) {
         } else hideTransitionOverlay(overlay);
     }
 }
+
+if (typeof BroadcastChannel === 'function') {
+    try {
+        const sessionChannel = new BroadcastChannel('nexus-game-session');
+        sessionChannel.addEventListener('message', event => {
+            if (event.data && event.data.type === 'nexus-popup-closed' && activeGameSessions.size) {
+                for (const [sid, sess] of activeGameSessions.entries()) {
+                    if (!event.data.gameId || sess.gameId === String(event.data.gameId)) {
+                        handleGamePopupClosed(sid);
+                        break;
+                    }
+                }
+            }
+        });
+    } catch (e) {}
+}
+window.addEventListener('storage', event => {
+    if (event.key === 'nexus_popup_closed' && activeGameSessions.size) {
+        try {
+            const data = JSON.parse(event.newValue || '{}');
+            for (const [sid, sess] of activeGameSessions.entries()) {
+                if (!data.gameId || sess.gameId === String(data.gameId)) {
+                    handleGamePopupClosed(sid);
+                    break;
+                }
+            }
+        } catch (e) {}
+    }
+});
 
 
 window.showAddingState = function(sourceKey, title) {
@@ -2068,6 +2116,7 @@ function launchGameFullscreen(game) {
     // Asynchronously load content/snapshots and initialize game document inside about:blank
     (async () => {
         try {
+            let ifr;
             if (game.type === 'file') {
                 if (!game.content) {
                     await initDB();
@@ -2122,14 +2171,13 @@ function launchGameFullscreen(game) {
                 win.document.body.style.margin = '0';
                 win.document.body.style.padding = '0';
                 win.document.body.style.overflow = 'hidden';
-                const ifr = win.document.createElement('iframe');
+                ifr = win.document.createElement('iframe');
                 Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
                 ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
                 ifr.srcdoc = gameSrcDoc;
                 win.document.body.appendChild(ifr);
-                setTimeout(() => { try { win.focus(); } catch (e) {} }, 100);
             } else {
-                const ifr = win.document.createElement('iframe');
+                ifr = win.document.createElement('iframe');
                 Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
                 ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
                 const resolved = await resolveGameUrl(game);
@@ -2167,6 +2215,7 @@ function launchGameFullscreen(game) {
                 win.document.body.style.padding = '0';
                 win.document.body.style.overflow = 'hidden';
                 win.document.body.appendChild(ifr);
+            }
 
                 const targetGameAliases = [game.id];
                 if (game.sourceKey && !targetGameAliases.includes(game.sourceKey)) targetGameAliases.push(game.sourceKey);
@@ -2253,14 +2302,29 @@ function launchGameFullscreen(game) {
                     var titleTimer = setInterval(function() {
                         if (document.title !== ct) syncTitle();
                     }, 2000);
-                    window.addEventListener('beforeunload', function() {
+                    var popupClosedNotified = false;
+                    function notifyGameClosed() {
+                        if (popupClosedNotified) return;
+                        popupClosedNotified = true;
                         clearInterval(titleTimer);
+                        try {
+                            if (typeof BroadcastChannel === 'function') {
+                                var bc = new BroadcastChannel('nexus-game-session');
+                                bc.postMessage({ type: 'nexus-popup-closed', gameId: primaryGameId });
+                                bc.close();
+                            }
+                        } catch(err) {}
+                        try {
+                            localStorage.setItem('nexus_popup_closed', JSON.stringify({ gameId: primaryGameId, time: Date.now() }));
+                        } catch(err) {}
                         try {
                             if (window.opener && !window.opener.closed) {
                                 window.opener.postMessage({ type: 'nexus-popup-closed', gameId: primaryGameId }, '*');
                             }
                         } catch(err) {}
-                    }, { once: true });
+                    }
+                    window.addEventListener('beforeunload', notifyGameClosed, { once: true });
+                    window.addEventListener('pagehide', notifyGameClosed, { once: true });
 
                     // Standalone IndexedDB snapshot persistence engine for about:blank popup
                     function saveToIDB(incomingData) {
@@ -2433,9 +2497,15 @@ function launchGameFullscreen(game) {
                     document.addEventListener('visibilitychange', function() {
                         if (document.hidden) triggerAutosaveFlush();
                     }, { passive: true });
+                    try {
+                        window.opener = null;
+                    } catch(err) {}
                 })();
                 `;
                 win.document.head.appendChild(controllerScriptEl);
+                try {
+                    win.opener = null;
+                } catch(err) {}
                 hibernateMainTabForGame();
 
                 function doFocusAndClick() {
@@ -2458,7 +2528,6 @@ function launchGameFullscreen(game) {
                 setTimeout(doFocusAndClick, 100);
                 setTimeout(doFocusAndClick, 500);
                 setTimeout(doFocusAndClick, 1000);
-            }
         } catch(err) {
             console.error("Error launching game in fullscreen window:", err);
             try { win.close(); } catch (e) {}

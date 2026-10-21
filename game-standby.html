@@ -4,12 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>New Tab</title>
+    <link rel="icon" id="dynamic-favicon" type="image/png" href="Assets/newtab.png">
+    <link rel="shortcut icon" type="image/png" href="Assets/newtab.png">
     <link rel="stylesheet" href="style.css?v=65">
     <script>
         (function () {
             try {
                 var storage = window.nexusStorage || window.localStorage;
                 if (storage.getItem('tb_theme') === 'light') document.documentElement.classList.add('light-mode');
+            } catch (error) {}
+            try {
+                var isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                var iconEl = document.getElementById('dynamic-favicon');
+                if (iconEl && isDark) iconEl.href = 'Assets/newtabLight.png';
+                var mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                if (mediaQuery) {
+                    var updateIcon = function(e) {
+                        var href = e.matches ? 'Assets/newtabLight.png' : 'Assets/newtab.png';
+                        if (iconEl) iconEl.href = href;
+                    };
+                    if (mediaQuery.addEventListener) mediaQuery.addEventListener('change', updateIcon);
+                    else if (mediaQuery.addListener) mediaQuery.addListener(updateIcon);
+                }
             } catch (error) {}
         })();
     </script>
@@ -67,6 +83,22 @@
                     confirmOverlay.style.display = 'none';
                 }
             });
+            // 1. Cross-tab BroadcastChannel listener (works across isolated renderer processes)
+            if (typeof BroadcastChannel === 'function') {
+                try {
+                    var sessionChannel = new BroadcastChannel('nexus-game-session');
+                    sessionChannel.addEventListener('message', function (event) {
+                        if (event.data && event.data.type === 'nexus-popup-closed') returnToGames();
+                    });
+                } catch (e) {}
+            }
+
+            // 2. Storage event listener (fallback across isolated renderer processes)
+            window.addEventListener('storage', function (event) {
+                if (event.key === 'nexus_popup_closed') returnToGames();
+            });
+
+            // 3. PostMessage listener (legacy fallback)
             window.addEventListener('message', function (event) {
                 if (event.data && event.data.type === 'nexus-popup-closed') returnToGames();
             });
