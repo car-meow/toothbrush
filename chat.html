@@ -196,16 +196,6 @@
                     </div>
                 </main>
 
-                <div id="host-modal" class="overlay" style="z-index: 30000;">
-                    <div class="modal-box" style="padding:35px; border-radius:20px; width:350px; border:2px solid var(--white-outline); text-align:center;">
-                        <h3 style="margin-top:0; margin-bottom:20px; color:var(--title-color);">Host Room</h3>
-                        <input type="text" id="host-name-input" placeholder="Room Name" class="pin-input-large" style="width:100%; margin-top:15px; font-size:18px; letter-spacing:0;">
-                        <input type="text" id="host-pin-input" placeholder="6-Digit PIN" maxlength="6" class="pin-input-large" style="width:100%; margin-top:10px;">
-                        <button id="start-host-btn" class="save-btn" style="background:#2E7D32; width:100%; height:50px; margin-top:15px;">Go Live</button>
-                        <button onclick="document.getElementById('host-modal').style.display='none'" class="save-btn cancel-modal-btn" style="width:100%; margin-top:10px;">Cancel</button>
-                    </div>
-                </div>
-
                 <main id="chat-room" style="display:none; flex-direction:column; flex:1; height: 100%; position:relative;">
                     <div id="messages" style="flex:1; overflow-y:auto; padding:30px; display:flex; flex-direction:column;"></div>
                     <button id="anon-jump-btn" class="jump-to-bottom-btn" title="Jump to bottom">↓</button>
@@ -271,6 +261,17 @@
                     </div>
                 </main>
             </div>
+        </div>
+    </div>
+
+    <!-- Modals (Placed at body level to guarantee center alignment in all modes) -->
+    <div id="host-modal" class="overlay" style="z-index: 30000;">
+        <div class="modal-box" style="padding:35px; border-radius:20px; width:350px; border:2px solid var(--white-outline); text-align:center;">
+            <h3 style="margin-top:0; margin-bottom:20px; color:var(--title-color);">Host Room</h3>
+            <input type="text" id="host-name-input" placeholder="Room Name" class="pin-input-large" style="width:100%; margin-top:15px; font-size:18px; letter-spacing:0;">
+            <input type="text" id="host-pin-input" placeholder="6-Digit PIN" maxlength="6" class="pin-input-large" style="width:100%; margin-top:10px;">
+            <button id="start-host-btn" class="save-btn" style="background:#2E7D32; width:100%; height:50px; margin-top:15px;">Go Live</button>
+            <button onclick="document.getElementById('host-modal').style.display='none'" class="save-btn cancel-modal-btn" style="width:100%; margin-top:10px;">Cancel</button>
         </div>
     </div>
 
