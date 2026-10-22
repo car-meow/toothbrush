@@ -1818,6 +1818,14 @@
                 isInsideRoom = (roomEl && roomEl.style.display === 'flex');
             }
 
+            if (!isGroup && isInsideRoom && isHost) {
+                // When hosting an anonymous room, remove the "Back" button completely; only Disband shows
+                backBtn.style.display = 'none';
+                return;
+            } else {
+                backBtn.style.display = 'inline-flex';
+            }
+
             if (isInsideRoom) {
                 // Inside chat room -> 1 step backward
                 if (img) img.src = 'Assets/Back.svg';
@@ -1983,8 +1991,7 @@
                 if (isDisconnecting) return;
                 isDisconnecting = true;
                 publish({ type: 'disband' });
-                await nexusAlert('Room Disbanded.');
-                setTimeout(() => location.reload(), 500);
+                navigateWithFade('index.html');
             }
         };
 

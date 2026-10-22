@@ -1874,14 +1874,14 @@ html.light-mode #nexus-red-confirm-msg {
 
 html.light-mode .red-dialog-ok-btn {
     background: #c62828 !important;
-    border: 2px solid #b71c1c !important;
+    border: 2px solid #140d24 !important;
     color: #ffffff !important;
     box-shadow: 0 4px 14px rgba(198, 40, 40, 0.35) !important;
 }
 
 html.light-mode .red-dialog-ok-btn:hover {
     background: #d32f2f !important;
-    border-color: #c62828 !important;
+    border-color: #000000 !important;
 }
 
 .red-dialog-cancel-btn {
@@ -1909,13 +1909,13 @@ html.light-mode .red-dialog-ok-btn:hover {
 
 html.light-mode .red-dialog-cancel-btn {
     background: #ded4eb !important;
-    border: 2px solid #4a366e !important;
+    border: 2px solid #140d24 !important;
     color: #140d24 !important;
 }
 
 html.light-mode .red-dialog-cancel-btn:hover {
     background: #cfc1e3 !important;
-    border-color: #140d24 !important;
+    border-color: #000000 !important;
 }
 
 #nexus-red-confirm-overlay .red-dialog-cancel-btn.green-game-cancel-btn {
@@ -2082,14 +2082,45 @@ html.light-mode #nexus-dialog-input {
 
 html.light-mode #nexus-dialog-ok {
     background: #1976D2 !important;
-    border: 2px solid #1565C0 !important;
+    border: 2.5px solid #140d24 !important;
     color: #ffffff !important;
 }
 
 html.light-mode #nexus-dialog-cancel {
     background: #ded4eb !important;
-    border: 2px solid var(--border-color, #4a366e) !important;
+    border: 2.5px solid #140d24 !important;
     color: #140d24 !important;
+}
+
+/* Cancel / Close buttons across popup dialogs & modals */
+.cancel-modal-btn {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 2px solid var(--white-outline, rgba(255, 255, 255, 0.5)) !important;
+    color: var(--text-color, #ffffff) !important;
+    box-shadow: none !important;
+}
+
+.cancel-modal-btn:hover {
+    background: rgba(255, 255, 255, 0.16) !important;
+    border-color: var(--white-outline, #ffffff) !important;
+}
+
+html.light-mode .cancel-modal-btn {
+    background: rgba(20, 13, 36, 0.07) !important;
+    border: 2px solid #140d24 !important;
+    color: #140d24 !important;
+}
+
+html.light-mode .cancel-modal-btn:hover {
+    background: rgba(20, 13, 36, 0.15) !important;
+    border-color: #000000 !important;
+}
+
+/* Modal and overlay action buttons in light mode have black borders */
+html.light-mode .modal-box .save-btn,
+html.light-mode .overlay .save-btn,
+html.light-mode .list-modal .save-btn {
+    border-color: #140d24 !important;
 }
 
 #splash-text {
@@ -2233,7 +2264,7 @@ html.light-mode .tutorial-popup strong {
     margin-top: 12px;
     padding: 8px;
     background: rgba(255, 255, 255, 0.1) !important;
-    border: 1.5px solid #ffffff !important;
+    border: 1.5px solid var(--white-outline, #ffffff) !important;
     color: #ffffff !important;
     border-radius: 6px !important;
     font-size: 12px !important;
@@ -2245,6 +2276,17 @@ html.light-mode .tutorial-popup strong {
 
 .tutorial-popup button:hover {
     background: rgba(255, 255, 255, 0.2) !important;
+}
+
+html.light-mode .tutorial-popup button {
+    background: rgba(20, 13, 36, 0.08) !important;
+    border: 2px solid #140d24 !important;
+    color: #140d24 !important;
+}
+
+html.light-mode .tutorial-popup button:hover {
+    background: rgba(20, 13, 36, 0.16) !important;
+    border-color: #000000 !important;
 }
 
 .tutorial-skip {

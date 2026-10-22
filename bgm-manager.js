@@ -254,8 +254,8 @@ window.BGMManager = {
                     </div>
                     <input type="text" id="nexus-dialog-input" style="display:none; width:100%; padding:12px; margin-bottom:18px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color, #362854); background:var(--input-bg, #0d0818); color:var(--text-color, #fff); font-size:15px; outline:none;">
                     <div style="display:flex; gap:12px; justify-content:center; margin-top:8px;">
-                        <button id="nexus-dialog-ok" class="save-btn" style="background:#2196F3 !important; border:2.5px solid #ffffff !important; padding:10px 24px; border-radius:999px; font-weight:bold; color:white; cursor:pointer; flex:1; min-width:90px; text-shadow:none;">OK</button>
-                        <button id="nexus-dialog-cancel" class="save-btn" style="background:rgba(255,255,255,0.1) !important; border:2.5px solid rgba(255,255,255,0.5) !important; padding:10px 24px; border-radius:999px; font-weight:bold; color:#ccc; cursor:pointer; flex:1; min-width:90px; text-shadow:none;">Cancel</button>
+                        <button id="nexus-dialog-ok" class="save-btn" style="background:#2196F3 !important; border:2.5px solid var(--white-outline, #ffffff) !important; padding:10px 24px; border-radius:999px; font-weight:bold; color:white; cursor:pointer; flex:1; min-width:90px; text-shadow:none;">OK</button>
+                        <button id="nexus-dialog-cancel" class="save-btn" style="background:rgba(255,255,255,0.1) !important; border:2.5px solid var(--white-outline, rgba(255,255,255,0.5)) !important; padding:10px 24px; border-radius:999px; font-weight:bold; color:#ccc; cursor:pointer; flex:1; min-width:90px; text-shadow:none;">Cancel</button>
                     </div>
                 </div>
             `;
