@@ -41,6 +41,9 @@
   <script>
     const hideFullScreenButton = "";
     const buildUrl = "https://cdn.jsdelivr.net/gh/centerclassroom/mc55@main/Build";
+    // The current branch deleted data chunks 0–2. Keep the matching original
+    // Unity data pack pinned to the last revision that still contains them.
+    const dataBuildUrl = "https://cdn.jsdelivr.net/gh/centerclassroom/mc55@8f54039e1c432c8a4642e06887a1c77480a808b4/Build";
     const loaderUrl = buildUrl + "/bb0d9ecdb05db3e84da20bd14a4f84dc.loader.js";
     const config = {
       dataUrl: buildUrl + "/cffd2fddc93a5e3bb5ff56ac3bb5a297.data.br",
@@ -244,7 +247,7 @@
       try {
         const dataPartsCount = 4;
         config.dataUrl = await mergeFileParts(
-          buildUrl + "/cffd2fddc93a5e3bb5ff56ac3bb5a297.data.br",
+          dataBuildUrl + "/cffd2fddc93a5e3bb5ff56ac3bb5a297.data.br",
           dataPartsCount
         );
 
@@ -278,14 +281,15 @@
                 loadingCover.style.display = "none";
               })
               .catch((message) => {
-                console.error("Unity load error:", message);
+                showStartupError(message);
               });
           };
           StartUnityInstance();
         } catch (error) {
-          console.error("Error during Unity init:", error);
+          showStartupError(error);
         }
       };
+      script.onerror = () => showStartupError(new Error("Unity loader script could not be downloaded."));
       document.body.appendChild(script);
     } catch (error) {
       console.error("Error during startup:", error);
@@ -303,9 +307,23 @@
       }
     }
 
+    function showStartupError(error) {
+      console.error("GTA Mods startup failed:", error);
+      loadingCover.style.display = "flex";
+      loadingCover.style.position = "fixed";
+      loadingCover.style.inset = "0";
+      loadingCover.style.alignItems = "center";
+      loadingCover.style.justifyContent = "center";
+      loadingCover.style.background = "#111";
+      loadingCover.style.color = "#fff";
+      loadingCover.style.zIndex = "10000";
+      loadingCover.innerHTML = '<div style="max-width:520px;padding:24px;text-align:center;font:600 16px system-ui,sans-serif">GTA Mods could not load its game files. Please reload to retry.</div>';
+    }
+
     window.addEventListener("unhandledrejection", function (event) {
-      console.warn("Unhandled rejection ignored:", event.reason);
+      console.warn("GTA Mods startup rejection:", event.reason);
       event.preventDefault();
+      showStartupError(event.reason);
     });
   </script>
 </body>
