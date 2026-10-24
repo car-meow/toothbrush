@@ -3,11 +3,6 @@
   <!-- For the regularly updating doc go to https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/ -->
 
   <head>
-    <script src="//www.google.com/jsapi"></script>
-    <script>
-      window.parent.maeExportApis_();
-    </script>
-
     <style>
       body {
         overflow: hidden;
@@ -82,9 +77,21 @@
         EJS_core = "gba";
         EJS_color = "#000000";
         EJS_startOnLoaded = true;
-        EJS_pathtodata = "https://cdn.jsdelivr.net/gh/bubblfan/emu@master/";
-        EJS_gameUrl =
-          "https://cdn.jsdelivr.net/gh/Far0ffGames/test222@5d4b205c5db5e2bd75e4f0508488617273a965bb/FIFA%202007%20%23%20GBA.GBA";
+        EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
+        var appBaseUrl = null;
+        try {
+          appBaseUrl = window.parent.document.baseURI;
+          if (!appBaseUrl || appBaseUrl === "about:blank") appBaseUrl = null;
+        } catch (e) {}
+        if (!appBaseUrl) {
+          try {
+            appBaseUrl = window.opener.document.baseURI;
+            if (!appBaseUrl || appBaseUrl === "about:blank") appBaseUrl = null;
+          } catch (e) {}
+        }
+        EJS_gameUrl = appBaseUrl
+          ? new URL("fifa07/fifa07.gba", appBaseUrl).href
+          : new URL("../../fifa07/fifa07.gba", document.baseURI).href;
         loadGame();
       }
       document
@@ -92,8 +99,12 @@
         .addEventListener("click", startGame);
       function loadGame() {
         var script = document.createElement("script");
-        script.src =
-          "https://cdn.jsdelivr.net/gh/bubblfan/emu@master/loader.js";
+        script.src = "https://cdn.emulatorjs.org/stable/data/loader.js";
+        script.onerror = function() {
+          document.getElementById("startButton").style.display = "block";
+          document.getElementById("startButton").textContent = "EMULATOR FAILED TO LOAD — RETRY";
+          document.getElementById("game").style.display = "none";
+        };
         document.body.appendChild(script);
       }
     </script>

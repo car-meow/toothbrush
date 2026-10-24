@@ -53,13 +53,45 @@ body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 const HASH = "20b998679f3a2a598bf5c10a5dd8422b47272a04";
 const BASE = `https://cdn.jsdelivr.net/gh/aahspaghetticode/ignore@${HASH}/`;
 const TOTAL_MB = "160.54";
+const PCK_SIZE = 147972096;
 
 const originalFetch = window.fetch;
 const mergedData = {};
 const pendingRequests = {};
+const gameAssetObjectUrls = {};
 let bytesLoadedSoFar = 0;
 
 const statusEl = document.getElementById('status');
+
+function getGameAssetName(input) {
+    let url = input && typeof input.url === 'string' ? input.url : String(input || '');
+    try { url = decodeURIComponent(url); } catch (e) {}
+    if (/Brotato\.pck(?:$|[?#])/i.test(url)) return 'Brotato.pck';
+    if (/Brotato\.wasm(?:$|[?#])/i.test(url)) return 'Brotato.wasm';
+    return null;
+}
+
+function respondWithGameAsset(name) {
+    const data = mergedData[name];
+    return new Response(data, {
+        status: 200,
+        headers: { 'Content-Type': 'application/octet-stream' }
+    });
+}
+
+function getGameAssetObjectUrl(name) {
+    if (!gameAssetObjectUrls[name]) gameAssetObjectUrls[name] = URL.createObjectURL(mergedData[name]);
+    return gameAssetObjectUrls[name];
+}
+
+// Godot may load its project pack through XMLHttpRequest instead of fetch.
+// Redirect only the two already-downloaded game assets to their assembled blobs.
+const originalXhrOpen = XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open = function(method, url, ...args) {
+    const assetName = getGameAssetName(url);
+    const assetUrl = assetName && mergedData[assetName] ? getGameAssetObjectUrl(assetName) : url;
+    return originalXhrOpen.call(this, method, assetUrl, ...args);
+};
 
 function updateStatus(currentBytes) {
     const currentMB = (currentBytes / 1048576).toFixed(2);
@@ -67,10 +99,9 @@ function updateStatus(currentBytes) {
 }
 
 window.fetch = function(url, ...args) {
-    const u = url.toString();
-    if (u.includes("Brotato.pck") || u.includes("Brotato.wasm")) {
-        const f = u.includes(".pck") ? "Brotato.pck" : "Brotato.wasm";
-        if (mergedData[f]) return Promise.resolve(new Response(mergedData[f]));
+    const f = getGameAssetName(url);
+    if (f) {
+        if (mergedData[f]) return Promise.resolve(respondWithGameAsset(f));
         return new Promise((resolve) => {
             if (!pendingRequests[f]) pendingRequests[f] = [];
             pendingRequests[f].push(resolve);
@@ -91,9 +122,12 @@ async function merge(name, start, end) {
         updateStatus(bytesLoadedSoFar);
     }
     const b = new Blob(bufs, { type: 'application/octet-stream' });
+    if (name === 'Brotato.pck' && b.size !== PCK_SIZE) {
+        throw new Error(`Brotato.pck parts assembled to ${b.size} bytes; expected ${PCK_SIZE} bytes.`);
+    }
     mergedData[name] = b;
     if (pendingRequests[name]) {
-        pendingRequests[name].forEach(res => res(new Response(b)));
+        pendingRequests[name].forEach(res => res(respondWithGameAsset(name)));
         delete pendingRequests[name];
     }
 }
@@ -108,7 +142,7 @@ async function fetchSingle(name) {
     const b = new Blob([data], { type: 'application/octet-stream' });
     mergedData[name] = b;
     if (pendingRequests[name]) {
-        pendingRequests[name].forEach(res => res(new Response(b)));
+        pendingRequests[name].forEach(res => res(respondWithGameAsset(name)));
         delete pendingRequests[name];
     }
 }
@@ -126,7 +160,7 @@ async function init() {
                 "canvasResizePolicy":2,
                 "executable":"Brotato",
                 "experimentalVK":false,
-                "fileSizes":{"Brotato.pck":147972096,"Brotato.wasm":19796835},
+                "fileSizes":{"Brotato.pck":PCK_SIZE,"Brotato.wasm":19796835},
                 "focusCanvas":true,
                 "gdnativeLibs":[]
             });
@@ -144,7 +178,12 @@ async function init() {
         };
         document.body.appendChild(s);
     } catch (e) {
-        statusEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> LOAD ERROR`;
+        console.error('Brotato asset load failed:', e);
+        Object.keys(pendingRequests).forEach(name => {
+            pendingRequests[name].forEach(resolve => resolve(new Response('', { status: 503 })));
+            delete pendingRequests[name];
+        });
+        statusEl.textContent = `Unable to download Brotato game data: ${e.message || 'unknown error'}`;
     }
 }
 init();

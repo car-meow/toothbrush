@@ -1986,6 +1986,14 @@ body.game-standby-active {
     background: #a8333d;
 }
 
+#game-standby-back,
+#game-standby-back:hover,
+#game-standby-back:focus-visible {
+    background: #ffffff !important;
+    border: 2px solid #ffffff !important;
+    color: #111111 !important;
+}
+
 .game-standby-back {
     transition: background-color 160ms ease, opacity .35s ease;
 }

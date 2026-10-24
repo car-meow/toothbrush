@@ -1821,8 +1821,18 @@ function isCrossyRoadGame(game) {
     return fileName === 'clcrossyroad.html' || fileName.endsWith('/clcrossyroad.html') || gameId.includes('crossyroad');
 }
 
+function isBrotatoGame(game) {
+    const sourceFile = String(game && (game.sourceFile || game.url) || '').replace(/\\/g, '/').toLowerCase();
+    const fileName = sourceFile.split(/[?#]/, 1)[0];
+    const gameId = String(game && game.id || '').toLowerCase();
+    return fileName === 'clbrotato.html' || fileName.endsWith('/clbrotato.html') || gameId.includes('brotato');
+}
+
 function shouldInjectGamePersistence(game, url) {
     if (!game || !url) return false;
+    // Brotato installs a cross-origin-isolation service worker. Keep its real
+    // document URL so the worker and Godot's large PCK request load natively.
+    if (isBrotatoGame(game)) return false;
     if (game.nexusExternalSource || isTagC3Game(game) || isCrossyRoadGame(game)) return true;
     try {
         // Every local Stash page can be fetched into srcdoc before it starts.
@@ -1835,6 +1845,26 @@ function shouldInjectGamePersistence(game, url) {
 
 function getGamePersistenceBootstrap(gameId, snapshot = {}) {
     return getGameRestoreScript(gameId, snapshot) + getUniversalAutosaveBridge(gameId);
+}
+
+function getGameLaunchDiagnostics(gameId, loadToken) {
+    return `<script>(function(){
+        var gameId=${JSON.stringify(String(gameId))};
+        var loadToken=${Number(loadToken) || 0};
+        var reported=false;
+        function report(kind,message){
+            if(reported)return;
+            reported=true;
+            try{window.parent.postMessage({type:'nexus-game-launch-error',gameId:gameId,loadToken:loadToken,kind:kind,message:String(message||'Game startup failed').slice(0,500)},'*');}catch(e){}
+        }
+        window.addEventListener('error',function(event){
+            report('script',event.message||event.error&&event.error.message||'Game script failed');
+        });
+        window.addEventListener('unhandledrejection',function(event){
+            var reason=event.reason;
+            report('promise',reason&&reason.message||reason||'Game startup failed');
+        });
+    })();<\/script>`;
 }
 
 async function fetchExternalGameHtml(url, bootstrap = '', options = {}) {
@@ -2017,6 +2047,47 @@ function launchGameFullscreen(game) {
     const startLaunch = win => {
         if (win.closed) return;
         const gameSession = registerGameSession(game, win);
+        const launchToken = Date.now() + Math.random();
+        let launchFrame = null;
+        let injectedLaunch = false;
+        let directFallbackTried = false;
+        let directFallbackUrl = null;
+        let unmodifiedHtml = null;
+        const showPopupLoadError = () => {
+            if (!win.document || !win.document.body) return;
+            let panel = win.document.getElementById('nexus-game-load-error');
+            if (!panel) {
+                panel = win.document.createElement('div');
+                panel.id = 'nexus-game-load-error';
+                panel.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#10131c;color:#fff;font:600 16px system-ui;text-align:center;padding:24px;box-sizing:border-box';
+                const label = win.document.createElement('div');
+                label.textContent = 'This game could not start.';
+                const retry = win.document.createElement('button');
+                retry.textContent = 'Retry game';
+                retry.style.cssText = 'padding:10px 22px;border:0;border-radius:8px;background:#fff;color:#111;font:700 15px system-ui;cursor:pointer';
+                retry.onclick = () => {
+                    panel.remove();
+                    if (!launchFrame) return;
+                    if (directFallbackUrl) launchFrame.src = directFallbackUrl;
+                    else if (unmodifiedHtml) launchFrame.srcdoc = unmodifiedHtml;
+                };
+                panel.append(label, retry);
+                win.document.body.appendChild(panel);
+            }
+        };
+        win.addEventListener('message', event => {
+            const detail = event.data;
+            if (!detail || detail.type !== 'nexus-game-launch-error' || String(detail.gameId) !== String(game.id) || Number(detail.loadToken) !== launchToken) return;
+            if (injectedLaunch && !directFallbackTried && launchFrame) {
+                directFallbackTried = true;
+                injectedLaunch = false;
+                if (directFallbackUrl) launchFrame.src = directFallbackUrl;
+                else if (unmodifiedHtml) launchFrame.srcdoc = unmodifiedHtml;
+                else showPopupLoadError();
+                return;
+            }
+            showPopupLoadError();
+        });
         try { win.focus(); } catch(e) {}
 
         // Keep the selected cloak on the game tab while the Nexus tab is
@@ -2166,18 +2237,23 @@ function launchGameFullscreen(game) {
                 })();
                 <\/script>`;
 
-                const gameSrcDoc = injectGameBootstrap(rawHtml, unityCompatibility + popupRestore + popupBridge + autoFocusScript + titleEnforceScript);
+                const gameSrcDoc = injectGameBootstrap(rawHtml, getGameLaunchDiagnostics(game.id, launchToken) + unityCompatibility + popupRestore + popupBridge + autoFocusScript + titleEnforceScript);
                 win.document.body.innerHTML = '';
                 win.document.body.style.margin = '0';
                 win.document.body.style.padding = '0';
                 win.document.body.style.overflow = 'hidden';
                 ifr = win.document.createElement('iframe');
+                ifr.onerror = showPopupLoadError;
                 Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
                 ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
+                launchFrame = ifr;
+                injectedLaunch = true;
+                unmodifiedHtml = rawHtml;
                 ifr.srcdoc = gameSrcDoc;
                 win.document.body.appendChild(ifr);
             } else {
                 ifr = win.document.createElement('iframe');
+                ifr.onerror = showPopupLoadError;
                 Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
                 ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
                 const resolved = await resolveGameUrl(game);
@@ -2189,8 +2265,11 @@ function launchGameFullscreen(game) {
                 if (resolved.usedFallback) game = { ...game, nexusExternalSource: true };
                 if (shouldInjectGamePersistence(game, resolvedUrl)) {
                     const snapshot = await getLaunchSnapshot(game.id);
-                    const persistenceBootstrap = getGamePersistenceBootstrap(game.id, snapshot);
+                    const persistenceBootstrap = getGameLaunchDiagnostics(game.id, launchToken) + getGamePersistenceBootstrap(game.id, snapshot);
                     try {
+                        launchFrame = ifr;
+                        injectedLaunch = true;
+                        directFallbackUrl = resolvedUrl;
                         ifr.srcdoc = await fetchExternalGameHtml(
                             resolvedUrl,
                             persistenceBootstrap + titleEnforceScript,
@@ -2206,9 +2285,12 @@ function launchGameFullscreen(game) {
                         // The source page may still load in a frame when a fetch for
                         // save/compatibility injection is blocked or times out.
                         console.warn('External game bootstrap failed; trying direct load.', bootstrapError);
+                        injectedLaunch = false;
                         ifr.src = resolvedUrl;
                     }
                 } else {
+                    launchFrame = ifr;
+                    directFallbackUrl = resolvedUrl;
                     ifr.src = resolvedUrl;
                 }
                 win.document.body.style.margin = '0';
@@ -2937,6 +3019,45 @@ function injectGameBootstrap(html, bootstrap) {
 let gameStatusFadeTimer = null;
 let isStashPreloaded = false;
 let activeHostLoader = null;
+let activeGameLaunch = null;
+
+window.addEventListener('message', event => {
+    const detail = event.data;
+    if (!detail || detail.type !== 'nexus-game-launch-error' || !activeGameLaunch) return;
+    if (String(detail.gameId) !== String(activeGameLaunch.gameId) || Number(detail.loadToken) !== activeGameLaunch.loadToken) return;
+
+    const frame = document.getElementById('game-frame');
+    if (!frame || activeGameLaunch.loadToken !== gameLoadToken) return;
+
+    if (activeGameLaunch.injected && !activeGameLaunch.directFallbackTried) {
+        activeGameLaunch.directFallbackTried = true;
+        activeGameLaunch.injected = false;
+        console.warn('Injected game startup failed; retrying the source page directly.', detail.message);
+        completeHostLoader();
+        updateGameStatusUI('loading');
+        beginHostLoader(document);
+        frame.onload = () => {
+            if (activeGameLaunch && activeGameLaunch.loadToken === gameLoadToken) {
+                completeHostLoader();
+                updateGameStatusUI('loaded');
+                frame.style.setProperty('visibility', 'visible', 'important');
+                frame.style.opacity = '1';
+            }
+        };
+        frame.onerror = () => {
+            completeHostLoader();
+            showGameLoadError(activeGameLaunch.game, frame);
+        };
+        frame.removeAttribute('srcdoc');
+        if (activeGameLaunch.url) frame.src = activeGameLaunch.url;
+        else if (activeGameLaunch.fallbackHtml) frame.srcdoc = activeGameLaunch.fallbackHtml;
+        else showGameLoadError(activeGameLaunch.game, frame);
+        return;
+    }
+
+    completeHostLoader();
+    showGameLoadError(activeGameLaunch.game, frame);
+});
 
 function beginHostLoader(parentDoc = document) {
     if (activeHostLoader) activeHostLoader.complete();
@@ -3141,6 +3262,14 @@ async function loadGame(game, forceInternal = false, options = {}) {
     if (frame) {
         requestCurrentGameAutosave();
         releaseIframe(frame);
+        activeGameLaunch = {
+            game,
+            gameId: String(game.id),
+            loadToken: requestedLoadToken,
+            url: resolvedGameUrl,
+            injected: false,
+            directFallbackTried: false
+        };
         frame.style.setProperty('display', 'block', 'important');
         frame.style.setProperty('visibility', 'hidden', 'important');
         frame.style.opacity = '0';
@@ -3186,13 +3315,16 @@ async function loadGame(game, forceInternal = false, options = {}) {
             const restoreScript = getGameRestoreScript(game.id, snapshot);
             const autosaveBridge = getUniversalAutosaveBridge(game.id);
             const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
-            const finalHTML = injectGameBootstrap(htmlContent, unityCompatibility + restoreScript + persistenceScript + autosaveBridge);
+            const finalHTML = injectGameBootstrap(htmlContent, getGameLaunchDiagnostics(game.id, requestedLoadToken) + unityCompatibility + restoreScript + persistenceScript + autosaveBridge);
+            activeGameLaunch.injected = true;
+            activeGameLaunch.fallbackHtml = htmlContent;
 
             try {
                 const blob = new Blob([finalHTML], { type: 'text/html' });
                 frame.removeAttribute('srcdoc');
                 frame.src = URL.createObjectURL(blob);
             } catch (err1) {
+                activeGameLaunch.injected = false;
                 try {
                     frame.srcdoc = finalHTML;
                 } catch (err2) {
@@ -3204,7 +3336,7 @@ async function loadGame(game, forceInternal = false, options = {}) {
                 const snapshot = await getGameSnapshot(game.id);
                 if (requestedLoadToken !== gameLoadToken) return;
 
-                const persistenceBootstrap = getGamePersistenceBootstrap(game.id, snapshot);
+                const persistenceBootstrap = getGameLaunchDiagnostics(game.id, requestedLoadToken) + getGamePersistenceBootstrap(game.id, snapshot);
                 const gameHtml = await fetchExternalGameHtml(
                     resolvedGameUrl,
                     persistenceBootstrap,
@@ -3217,6 +3349,7 @@ async function loadGame(game, forceInternal = false, options = {}) {
                 );
                 if (requestedLoadToken !== gameLoadToken) return;
 
+                activeGameLaunch.injected = true;
                 frame.removeAttribute('src');
                 frame.srcdoc = gameHtml;
             } catch (error) {
