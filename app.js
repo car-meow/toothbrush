@@ -1856,8 +1856,10 @@ function getGameLaunchDiagnostics(gameId, loadToken) {
         var gameId=${JSON.stringify(String(gameId))};
         var loadToken=${Number(loadToken) || 0};
         var reported=false;
+        var gameReady=false;
+        window.addEventListener('nexus-game-ready',function(){gameReady=true;});
         function report(kind,message){
-            if(reported)return;
+            if(reported||gameReady)return;
             reported=true;
             try{window.parent.postMessage({type:'nexus-game-launch-error',gameId:gameId,loadToken:loadToken,kind:kind,message:String(message||'Game startup failed').slice(0,500)},'*');}catch(e){}
         }

@@ -96,6 +96,7 @@
 
     let StartUnityInstance;
     let myGameInstance;
+    let unityInstanceLoaded = false;
     let ysdk = null;
 
     let environmentData = {
@@ -278,6 +279,11 @@
             })
               .then((unityInstance) => {
                 myGameInstance = unityInstance;
+                unityInstanceLoaded = true;
+                window.dispatchEvent(new Event("nexus-game-ready"));
+                try {
+                  window.parent.postMessage({ type: "nexus-game-ready" }, "*");
+                } catch (error) {}
                 loadingCover.style.display = "none";
               })
               .catch((message) => {
@@ -308,6 +314,7 @@
     }
 
     function showStartupError(error) {
+      if (unityInstanceLoaded) return;
       console.error("GTA Mods startup failed:", error);
       loadingCover.style.display = "flex";
       loadingCover.style.position = "fixed";
@@ -321,8 +328,9 @@
     }
 
     window.addEventListener("unhandledrejection", function (event) {
-      console.warn("GTA Mods startup rejection:", event.reason);
       event.preventDefault();
+      if (unityInstanceLoaded) return;
+      console.warn("GTA Mods startup rejection:", event.reason);
       showStartupError(event.reason);
     });
   </script>
