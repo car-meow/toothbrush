@@ -221,6 +221,11 @@
             opacity: 0.7;
         }
 
+        #search-container { gap: 12px !important; }
+        .surprise-me-btn { --expanded-width: 174px; flex: 0 0 auto; }
+        .slots-dev-btn { display: none; --expanded-width: 150px; flex: 0 0 auto; }
+        html.dev-mode .slots-dev-btn { display: inline-flex; }
+
         .search-results-container {
             display: none;
             flex-direction: column;
@@ -327,6 +332,12 @@
             style="position: sticky; top: 0; padding: 15px 0; background: var(--panel-bg-alt); z-index: 900; display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
             <input type="text" placeholder="Search..." id="searchInput"
                 style="padding: 13px; width: 100%; max-width: 420px; border-radius: 8px; border: none; box-shadow: 0 2px 4px rgba(156, 39, 176, 0.1); background: var(--btn-bg); color: var(--text-color);">
+            <button type="button" class="material-nav-btn surprise-me-btn" id="surprise-me-btn" aria-label="Surprise Me" title="Add a random game to your sidebar">
+                <img src="Assets/Gift.svg" alt=""><span>Surprise Me</span>
+            </button>
+            <button type="button" class="material-nav-btn slots-dev-btn" id="slots-dev-btn" aria-label="Slots Dev" title="Preview the slot machine without adding a game">
+                <img src="Assets/Gift.svg" alt=""><span>Slots Dev</span>
+            </button>
         </div>
 
 
@@ -887,6 +898,32 @@
         // Parent-side sidebar renders may request this frequently. Coalesce those requests
         window.refreshBookmarkAvailability = refreshBookmarkAvailability;
         window.queueBookmarkAvailabilityRefresh = queueBookmarkAvailabilityRefresh;
+        window.addBookmarkToSidebar = addBookmarkToSidebar;
+        window.getSurpriseGameTitles = function() {
+            return Array.from(document.querySelectorAll('#sections-container input[data-original-value], #search-results-container input[data-original-value]'))
+                .map(btn => btn.value).filter(Boolean);
+        };
+        window.getSurpriseGameCandidates = function() {
+            const parentGames = window.parent && Array.isArray(window.parent.games) ? window.parent.games : [];
+            return Array.from(document.querySelectorAll('#sections-container input[data-original-value], #search-results-container input[data-original-value]'))
+                .filter(btn => {
+                    const file = normalizeBookmarkFileName(btn.dataset.originalValue);
+                    const key = buildBookmarkSourceKey(file).toLowerCase();
+                    const id = buildBookmarkIdFromSourceKey(key).toLowerCase();
+                    return !parentGames.some(game => game && (
+                        String(game.id).toLowerCase() === id ||
+                        String(game.sourceKey || '').toLowerCase() === key ||
+                        String(game.sourceFile || '').toLowerCase() === file.toLowerCase()
+                    ));
+                })
+                .map(btn => ({ title: btn.value, raw: btn.dataset.originalValue }));
+        };
+        document.getElementById('surprise-me-btn')?.addEventListener('click', () => {
+            if (window.parent && typeof window.parent.launchSurpriseMe === 'function') window.parent.launchSurpriseMe();
+        });
+        document.getElementById('slots-dev-btn')?.addEventListener('click', () => {
+            if (window.parent && typeof window.parent.launchSurpriseMe === 'function') window.parent.launchSurpriseMe({ devMode: true });
+        });
         window.addEventListener('message', (e) => {
             if (e.data && e.data.type === 'nexus-refresh-bookmarks') {
                 refreshBookmarkAvailability();

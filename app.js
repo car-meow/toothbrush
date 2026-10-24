@@ -6,6 +6,8 @@ appStorage.setItem('tb_preload_stash', 'true');
 
 const dbName = "GameStorageDB";
 let db, games =[], currentGame = null;
+// The same-origin Game Stash frame reads this list to avoid duplicate bookmarks.
+Object.defineProperty(window, 'games', { configurable: true, get: () => games });
 const popupMuteSources = new Set();
 const loadingGames = new Map();
 let defaultGamesPromise = null;
@@ -4225,3 +4227,400 @@ if (window.MutationObserver) {
         }
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 }
+
+
+/* =========================================
+   SURPRISE ME — SLOT MACHINE PICKER
+========================================= */
+(function initSurpriseMe() {
+    let active = false;
+    let devModeSession = false;
+    let phase = 'idle';
+    let selected = null;
+    let stashTitles = [];
+    let stashCandidates = [];
+    let overlay = null;
+    let keyHandler = null;
+    let lightResizeHandler = null;
+    let lightAnimationFrameId = null;
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const spinningHeadlines = [
+        'What will it be this time?',
+        'Let’s see!',
+        'Spinning the dice…',
+        'Come on, come on…',
+        'Spinning it…',
+        'Rolling the wheel…',
+        'Please land on one that’s good…',
+        'Maybe it’s a good one!',
+        'What’s coming up?',
+        'Almost there…',
+        'No peeking!',
+        'One lucky game…',
+        'Pick something fun!',
+        'Maybe this one?',
+        'The suspense is real!',
+        'Let’s find a favorite!'
+    ];
+
+    function setMachineHeading(message) {
+        if (!overlay) return;
+        const heading = overlay.querySelector('.surprise-machine h2');
+        if (!heading) return;
+        heading.textContent = message;
+        let size = window.innerWidth <= 560 ? 22 : 24;
+        const minimumSize = 16;
+        heading.style.fontSize = `${size}px`;
+        while (heading.scrollHeight > heading.clientHeight + 1 && size > minimumSize) {
+            size -= 1;
+            heading.style.fontSize = `${size}px`;
+        }
+    }
+
+    function buildMachine() {
+        overlay = document.createElement('div');
+        overlay.className = 'surprise-overlay';
+        if (devModeSession) overlay.classList.add('is-dev-mode');
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-label', 'Surprise Me slot machine');
+        const lights = Array.from({length:64}, (_, index) => `<i class="surprise-light" data-light-index="${index}" aria-hidden="true"></i>`).join('');
+        overlay.innerHTML = `
+            <section class="surprise-machine" aria-live="polite">
+                <div class="surprise-lights" aria-hidden="true">${lights}</div>
+                <button id="surprise-close" class="surprise-close" type="button" aria-label="Close Surprise Me">×</button>
+                <h2>Find your next favorite game!</h2>
+                <div class="surprise-slot-shell">
+                    <div class="surprise-slot-window"><div class="surprise-reel-track"></div><div class="surprise-slot-selector" aria-hidden="true"><i class="surprise-selector-left"></i><i class="surprise-selector-right"></i></div><div class="surprise-slot-curtains" aria-hidden="true"><i class="surprise-curtain-left"></i><i class="surprise-curtain-right"></i></div></div>
+                </div>
+                <div class="surprise-controls"><div class="surprise-ticket-slot" aria-hidden="true"></div><button id="surprise-spin-button" class="surprise-spin-button" type="button" aria-label="Spin the slot machine"><span>SPIN</span></button></div>
+            </section>
+            <div class="surprise-fly-card" aria-hidden="true"></div>`;
+        document.body.appendChild(overlay);
+        lightResizeHandler = () => layoutSurpriseLights();
+        lightResizeHandler();
+        window.addEventListener('resize', lightResizeHandler);
+        overlay.querySelector('.surprise-close').addEventListener('click', closeMachine);
+        overlay.querySelector('.surprise-spin-button').addEventListener('click', pullLever);
+        overlay.addEventListener('click', e => {
+            if (phase !== 'result-wait' || devModeSession) return;
+            e.preventDefault();
+            e.stopPropagation();
+            finishResult();
+        }, true);
+        keyHandler = e => {
+            if (!active) return;
+            if (e.code === 'Space' && !e.target.closest('.surprise-close')) { e.preventDefault(); if (phase === 'ready') pullLever(); }
+            if (e.key === 'Escape' && phase === 'ready' && !devModeSession) closeMachine();
+        };
+        document.addEventListener('keydown', keyHandler, true);
+        return overlay;
+    }
+
+    function layoutSurpriseLights() {
+        if (!overlay) return;
+        const machine = overlay.querySelector('.surprise-machine');
+        if (!machine) return;
+        const inset = 13;
+        const width = Math.max(0, machine.clientWidth - inset * 2);
+        const height = Math.max(0, machine.clientHeight - inset * 2);
+        const radius = Math.min(16, width / 2, height / 2);
+        const straightTop = Math.max(0, width - radius * 2);
+        const straightSide = Math.max(0, height - radius * 2);
+        const arc = Math.PI * radius / 2;
+        const segments = [straightTop, arc, straightSide, arc, straightTop, arc, straightSide, arc];
+        const perimeter = segments.reduce((sum, length) => sum + length, 0);
+        const lights = overlay.querySelectorAll('.surprise-light');
+        const rainbow = ['#ff3e3e', '#ff8a24', '#ffe34d', '#48dc74', '#38c8ff', '#536bff', '#aa55ff', '#ff55b9'];
+        lights.forEach((light, index) => {
+            let distance = perimeter * index / lights.length;
+            let x = radius, y = 0;
+            if (distance <= segments[0]) { x += distance; }
+            else if ((distance -= segments[0]) <= segments[1]) {
+                const angle = -Math.PI / 2 + distance / radius;
+                x = width - radius + radius * Math.cos(angle); y = radius + radius * Math.sin(angle);
+            } else if ((distance -= segments[1]) <= segments[2]) { x = width; y = radius + distance; }
+            else if ((distance -= segments[2]) <= segments[3]) {
+                const angle = distance / radius;
+                x = width - radius + radius * Math.cos(angle); y = height - radius + radius * Math.sin(angle);
+            } else if ((distance -= segments[3]) <= segments[4]) { x = width - radius - distance; y = height; }
+            else if ((distance -= segments[4]) <= segments[5]) {
+                const angle = Math.PI / 2 + distance / radius;
+                x = radius + radius * Math.cos(angle); y = height - radius + radius * Math.sin(angle);
+            } else if ((distance -= segments[5]) <= segments[6]) { x = 0; y = height - radius - distance; }
+            else {
+                distance -= segments[6];
+                const angle = Math.PI + distance / radius;
+                x = radius + radius * Math.cos(angle); y = radius + radius * Math.sin(angle);
+            }
+            light.style.left = `${inset + x}px`;
+            light.style.top = `${inset + y}px`;
+            light.style.setProperty('--light-index', index);
+            light.style.setProperty('--rainbow-color', rainbow[Math.floor(index / 2) % rainbow.length]);
+        });
+    }
+
+    function syncLightsToReel(track) {
+        const lights = overlay ? overlay.querySelectorAll('.surprise-light') : [];
+        if (!lights.length || phase !== 'spinning') return;
+        const transform = getComputedStyle(track).transform;
+        let translateY = 0;
+        if (transform && transform !== 'none') {
+            const values = transform.slice(transform.indexOf('(') + 1, -1).split(',').map(Number);
+            translateY = values.length === 16 ? values[13] : values[5] || 0;
+        }
+        const reelIndex = Math.max(1, Math.min(39, (58 - translateY) / 58));
+        const ringPosition = ((reelIndex - 1) / 38) * lights.length * 1.45;
+        const firstLit = Math.floor(ringPosition) % lights.length;
+        lights.forEach((light, index) => {
+            const distance = (index - firstLit + lights.length) % lights.length;
+            light.classList.toggle('is-rainbow-on', distance < lights.length * .75);
+        });
+        lightAnimationFrameId = requestAnimationFrame(() => syncLightsToReel(track));
+    }
+
+    function paintReel() {
+        const track = overlay.querySelector('.surprise-reel-track');
+        const pool = stashTitles.length ? stashTitles : [selected.title];
+        const nearMisses = pool.filter(name => name !== selected.title);
+        const nearMissTitle = nearMisses.length ? nearMisses[Math.floor(Math.random() * nearMisses.length)] : selected.title;
+        const items = Array.from({ length: 52 }, (_, index) => index === 38 ? nearMissTitle : index === 39 ? selected.title : pool[Math.floor(Math.random() * pool.length)]);
+        track.innerHTML = items.map(name => `<div class="surprise-reel-item">${escapeSurpriseText(name)}</div>`).join('');
+        track.style.transform = 'translateY(0)';
+        track.style.setProperty('--near-stop', `calc(87px - ${38 * 58 + 29}px)`);
+        track.style.setProperty('--final-stop', `calc(87px - ${39 * 58 + 29}px)`);
+        return track;
+    }
+
+    function escapeSurpriseText(value) {
+        return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+    }
+
+    async function start(options = {}) {
+        if (active) return;
+        // The Dev button is only shown by the stash while Dev Mode is active.
+        // Trust its explicit request; the iframe and parent can observe storage differently.
+        devModeSession = Boolean(options && options.devMode);
+        const frame = document.getElementById('stash-frame');
+        const stashWindow = frame && frame.contentWindow;
+        stashTitles = [];
+        let candidates = [];
+        try {
+            if (stashWindow && typeof stashWindow.getSurpriseGameCandidates === 'function') candidates = stashWindow.getSurpriseGameCandidates();
+            if (stashWindow && typeof stashWindow.getSurpriseGameTitles === 'function') stashTitles = stashWindow.getSurpriseGameTitles();
+        } catch (_) {}
+        if (!candidates.length) {
+            const stash = window.games && window.games.find(game => game && game.id === 'ugs-stash');
+            if (stash && typeof ensureStashPreloaded === 'function') {
+                await ensureStashPreloaded();
+                try {
+                    candidates = frame.contentWindow.getSurpriseGameCandidates();
+                    stashTitles = frame.contentWindow.getSurpriseGameTitles();
+                } catch (_) {}
+            }
+        }
+        if (!candidates.length) {
+            if (typeof showSidebarPointerMessage === 'function') showSidebarPointerMessage('All available games are already in your sidebar!', window.innerWidth / 2, window.innerHeight / 2);
+            return;
+        }
+        stashCandidates = candidates.slice();
+        selected = candidates[Math.floor(Math.random() * candidates.length)];
+        active = true; phase = 'entering';
+        buildMachine();
+        paintReel();
+        requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('is-visible')));
+        await wait(1000);
+        if (!active) return;
+        phase = 'ready';
+        overlay.classList.add('is-ready');
+        overlay.querySelector('.surprise-spin-button').focus({ preventScroll: true });
+    }
+
+    async function pullLever() {
+        if (!active || phase !== 'ready') return;
+        if (devModeSession) {
+            if (stashCandidates.length) selected = stashCandidates[Math.floor(Math.random() * stashCandidates.length)];
+            const previousCard = overlay.querySelector('.surprise-fly-card');
+            previousCard.getAnimations().forEach(animation => animation.cancel());
+            previousCard.style.display = 'none';
+            previousCard.style.transform = '';
+            previousCard.style.clipPath = '';
+            previousCard.classList.remove('is-ticket', 'is-flying');
+            overlay.classList.remove('is-result-wait', 'is-result-flashing', 'is-awarding', 'is-result-curtains-closed');
+        }
+        phase = 'spinning';
+        const spinButton = overlay.querySelector('.surprise-spin-button');
+        spinButton.classList.add('is-clicking');
+        spinButton.disabled = true;
+        overlay.classList.add('is-revealing');
+        await wait(100);
+        if (!active) return;
+        overlay.classList.remove('is-revealing');
+        overlay.classList.add('is-spinning');
+        const spinMessage = spinningHeadlines[Math.floor(Math.random() * spinningHeadlines.length)];
+        setMachineHeading(spinMessage);
+        const reelTrack = paintReel();
+        reelTrack.getBoundingClientRect();
+        lightAnimationFrameId = requestAnimationFrame(() => syncLightsToReel(reelTrack));
+        await wait(4200);
+        if (!active) return;
+        if (lightAnimationFrameId !== null) cancelAnimationFrame(lightAnimationFrameId);
+        lightAnimationFrameId = null;
+        phase = 'awarding';
+        overlay.classList.add('is-awarding');
+        setMachineHeading('Game selected!');
+        if (!devModeSession) overlay.classList.add('is-result-curtains-closed');
+        const sidebarBefore = devModeSession ? null : new Map(Array.from(document.querySelectorAll('#game-list li[data-game-id]')).map(item => [item.dataset.gameId, item.getBoundingClientRect().top]));
+        let game = null;
+        if (devModeSession) {
+            game = { title: selected.title, preserveStashTitle: true };
+        } else {
+            try {
+                const frame = document.getElementById('stash-frame');
+                await frame.contentWindow.addBookmarkToSidebar(selected.raw);
+            } catch (error) {
+                console.error('Surprise Me could not add the selected game:', error);
+                setMachineHeading('Could not add that game');
+                await wait(1500); closeMachine(); return;
+            }
+            for (let attempt = 0; attempt < 100 && !game; attempt++) {
+                game = (window.games || []).find(item => item && (
+                    String(item.sourceFile || '').toLowerCase() === String(selected.raw).toLowerCase() ||
+                    String(item.title || '').toLowerCase() === String(selected.title).toLowerCase()
+                ));
+                if (!game) await wait(100);
+            }
+        }
+        if (game) {
+            if (!devModeSession) document.querySelectorAll('#game-list li[data-game-id]').forEach(item => {
+                const oldTop = sidebarBefore.get(item.dataset.gameId);
+                if (oldTop === undefined) return;
+                const offset = oldTop - item.getBoundingClientRect().top;
+                if (offset) item.animate(
+                    [{ transform: `translateY(${offset}px)` }, { transform: 'translateY(0)' }],
+                    { duration: 1000, easing: 'cubic-bezier(.2,.8,.2,1)' }
+                );
+            });
+            const flyer = overlay.querySelector('.surprise-fly-card');
+            const slot = overlay.querySelector('.surprise-ticket-slot').getBoundingClientRect();
+            const machineRect = overlay.querySelector('.surprise-machine').getBoundingClientRect();
+            const ticketCenterX = slot.left + slot.width / 2;
+            flyer.textContent = getSidebarTitle(game);
+            flyer.style.left = `${ticketCenterX}px`;
+            flyer.style.display = 'block';
+            flyer.classList.add('is-ticket');
+            const cardWidth = flyer.getBoundingClientRect().width;
+            const cardHeight = flyer.getBoundingClientRect().height;
+            const revealStartHeight = Math.min(14, Math.max(8, slot.height * .24));
+            // Put the first visible strip fully inside the slot: its upper edge aligns
+            // with the slot's inner edge instead of floating just above the opening.
+            const ticketCenterY = slot.top + 3 + revealStartHeight - cardWidth / 2;
+            flyer.style.top = `${ticketCenterY}px`;
+            const hiddenWidthPercent = Math.max(0, Math.min(96, (1 - revealStartHeight / cardWidth) * 100));
+            // Rotated 90deg, the source card's right edge is its visible bottom edge.
+            // Expand the clip toward the top while translating down by the same pixels.
+            const ticketStartingClip = `inset(0 0 0 ${hiddenWidthPercent}%)`;
+            const base = 'translate(-50%, -50%)';
+            const vertical = `${base} translate(0px, 0px) rotate(90deg)`;
+            const revealTravel = cardWidth - revealStartHeight;
+            const revealedDown = `${base} translate(0px, ${revealTravel}px) rotate(90deg)`;
+            const underX = machineRect.left + machineRect.width / 2 - ticketCenterX;
+            const underY = machineRect.bottom + cardHeight / 2 + 74 - ticketCenterY;
+            const horizontalRest = `${base} translate(${underX}px, ${underY}px) rotate(0deg)`;
+            flyer.style.transform = vertical;
+            const reveal = flyer.animate([
+                { transform: vertical, clipPath: ticketStartingClip, offset: 0 },
+                { transform: revealedDown, clipPath: 'inset(0)', offset: 1 }
+            ], { duration: 1500, easing: 'linear', fill: 'forwards' });
+            await reveal.finished;
+            if (!active || phase !== 'awarding') return;
+            flyer.style.clipPath = 'inset(0)';
+            flyer.style.transform = revealedDown;
+            reveal.cancel();
+            const dropAndTurn = flyer.animate([
+                { transform: revealedDown },
+                { transform: horizontalRest }
+            ], { duration: 1100, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'forwards' });
+            await dropAndTurn.finished;
+            if (!active || phase !== 'awarding') return;
+            flyer.style.transform = horizontalRest;
+            dropAndTurn.cancel();
+            overlay.classList.add('is-result-flashing');
+            if (devModeSession) {
+                const reelTrack = overlay.querySelector('.surprise-reel-track');
+                const stoppedReelTransform = getComputedStyle(reelTrack).transform;
+                overlay.classList.add('is-dev-curtains-open');
+                overlay.classList.remove('is-awarding', 'is-spinning', 'is-revealing');
+                reelTrack.style.transform = stoppedReelTransform;
+                overlay.classList.add('is-ready');
+                overlay.querySelector('.surprise-spin-button').disabled = false;
+                overlay.querySelector('.surprise-spin-button').classList.remove('is-clicking');
+                phase = 'ready';
+                overlay.setAttribute('aria-label', `${getSidebarTitle(game)} selected. Press Spin to choose again, or the close button to exit.`);
+                return;
+            }
+            phase = 'result-wait';
+            overlay.classList.add('is-result-wait');
+            overlay.setAttribute('aria-label', devModeSession ? `${getSidebarTitle(game)} selected. Press the close button to exit.` : `${getSidebarTitle(game)} selected. Click anywhere to continue.`);
+        } else {
+            phase = 'result-wait';
+        }
+    }
+
+    async function finishResult() {
+        if (!active || phase !== 'result-wait') return;
+        phase = 'exiting';
+        const flyer = overlay.querySelector('.surprise-fly-card');
+        const game = selected && (window.games || []).find(item => item && (
+            String(item.sourceFile || '').toLowerCase() === String(selected.raw).toLowerCase() ||
+            String(item.title || '').toLowerCase() === String(selected.title).toLowerCase()
+        ));
+        const target = game && document.querySelector(`#game-list li[data-game-id="${CSS.escape(String(game.id))}"]`);
+        if (flyer && target) {
+            const flyerRect = flyer.getBoundingClientRect();
+            const to = target.getBoundingClientRect();
+            flyer.getAnimations().forEach(animation => animation.cancel());
+            const fromCenterX = flyerRect.left + flyerRect.width / 2;
+            const fromCenterY = flyerRect.top + flyerRect.height / 2;
+            flyer.style.left = `${fromCenterX}px`;
+            flyer.style.top = `${fromCenterY}px`;
+            flyer.style.transform = 'translate(-50%, -50%)';
+            flyer.animate([
+                { transform: 'translate(-50%, -50%)', opacity: 1 },
+                { transform: `translate(-50%, -50%) translate(${to.left + to.width / 2 - fromCenterX}px, ${to.top + to.height / 2 - fromCenterY}px) scale(.72)`, opacity: 0 }
+            ], { duration: 1000, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+            target.classList.add('surprise-arrival');
+            setTimeout(() => target.classList.remove('surprise-arrival'), 1200);
+        }
+        overlay.classList.remove('is-result-wait');
+        overlay.classList.add('is-exiting');
+        await wait(500);
+        if (!active) return;
+        overlay.classList.add('is-interactive-through');
+        await wait(500);
+        closeMachine();
+    }
+    function closeMachine() {
+        if (!active) return;
+        active = false; phase = 'idle';
+        if (keyHandler) document.removeEventListener('keydown', keyHandler, true);
+        keyHandler = null;
+        if (lightResizeHandler) window.removeEventListener('resize', lightResizeHandler);
+        lightResizeHandler = null;
+        if (lightAnimationFrameId !== null) cancelAnimationFrame(lightAnimationFrameId);
+        lightAnimationFrameId = null;
+        selected = null;
+        stashTitles = [];
+        stashCandidates = [];
+        if (overlay) {
+            overlay.classList.add('is-closing');
+            const oldOverlay = overlay; overlay = null;
+            setTimeout(() => oldOverlay.remove(), 500);
+        }
+    }
+
+    window.launchSurpriseMe = start;
+    document.addEventListener('click', e => {
+        if (e.target.closest('#surprise-me-btn')) { e.preventDefault(); start(); }
+    });
+})();
