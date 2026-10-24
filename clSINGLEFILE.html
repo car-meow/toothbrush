@@ -387,7 +387,8 @@
 
         // Blocklist of removed Game Stash IDs (managed by developer upon receiving reports)
         const REMOVED_STASH_IDS = new Set([
-            // Add reported unique IDs here to permanently delete them from the Stash
+            'stash_extra_survivalrace_index_html',
+            'stash_s_clsurvivalracev2'
         ]);
 
         const stashManifestMap = new Map();
@@ -804,7 +805,9 @@
                     id: bookmarkId,
                     sourceKey,
                     sourceFile,
-                    title: getStashDisplayName(sourceFile, true),
+                    title: manifestItem && manifestItem.file.toLowerCase() === 'cldasharena.html'
+                        ? manifestItem.title
+                        : getStashDisplayName(sourceFile, true),
                     userRenamed: false,
                     type: 'url',
                     url: `singlefile-bubbls/UGS-Files/${encoded}`,
@@ -904,9 +907,6 @@
             STASH_SECTIONS.forEach(c => filesByChar.set(c, []));
 
             manifestGames.forEach(item => {
-                const rawLower = String(item.raw || item.file || '').toLowerCase().replace(/\.(?:html?|url)$/i, '').replace(/[\s_-]+/g, '');
-                if (rawLower === 'survivalracev2') return;
-
                 stashManifestMap.set(item.file.toLowerCase(), item);
                 stashManifestMap.set(item.raw.toLowerCase(), item);
                 const baseName = item.file.replace(/\.html$/, '').toLowerCase();

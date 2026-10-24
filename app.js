@@ -1152,6 +1152,10 @@ function isUserManagedGame(game) {
 
 function getSidebarTitle(game) {
     if (game && game.preserveStashTitle) return game.title;
+    const sourceFile = String(game && game.sourceFile || '').replace(/\\/g, '/').toLowerCase();
+    if (game && !game.userRenamed && sourceFile.split(/[?#]/, 1)[0].split('/').pop() === 'cldasharena.html') {
+        return 'Survival Race';
+    }
     if (game && game.sourceKey && !game.userRenamed && typeof humanizeBookmarkDisplayName === "function") {
         if (game.title && game.sourceFile && (game.sourceFile.includes('/') || game.sourceFile.endsWith('index.html') || game.sourceFile.endsWith('sfs.html'))) {
             return game.title;
@@ -1964,6 +1968,18 @@ async function fetchExternalGameHtml(url, bootstrap = '', options = {}) {
         }
     }
 
+    // Unity loader builds commonly call new URL(streamingAssetsUrl) without
+    // providing a base URL. A bare value such as "StreamingAssets" is valid
+    // in the original hosted page but throws when the game is launched from
+    // an about:srcdoc document. Resolve the configured path against the
+    // source page's <base> before any game scripts execute. Absolute URLs stay
+    // unchanged after URL resolution, and computed config expressions work
+    // the same way as literal paths.
+    documentHtml = documentHtml.replace(
+        /(\bstreamingAssetsUrl\s*:\s*)([^,\r\n}]+)/gi,
+        (_match, property, value) => property + 'new URL((' + value.trim() + '), document.baseURI).href'
+    );
+
     return injectGameBootstrap(documentHtml, bootstrap);
 }
 
@@ -2245,7 +2261,7 @@ function launchGameFullscreen(game) {
                 ifr = win.document.createElement('iframe');
                 ifr.onerror = showPopupLoadError;
                 Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
-                ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
+                ifr.setAttribute('allow', 'storage-access; fullscreen');
                 launchFrame = ifr;
                 injectedLaunch = true;
                 unmodifiedHtml = rawHtml;
@@ -2255,7 +2271,7 @@ function launchGameFullscreen(game) {
                 ifr = win.document.createElement('iframe');
                 ifr.onerror = showPopupLoadError;
                 Object.assign(ifr.style, { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', border: 'none' });
-                ifr.setAttribute('allow', 'allow-storage-access-by-user-activation; storage-access; fullscreen; autoplay');
+                ifr.setAttribute('allow', 'storage-access; fullscreen');
                 const resolved = await resolveGameUrl(game);
                 let resolvedUrl = resolved.url || game.url;
                 try {
