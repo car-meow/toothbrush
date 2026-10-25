@@ -4521,11 +4521,11 @@ html.light-mode .group-unread-badge {
 .chat-mode-switch-wrapper { transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s; }
 .chat-mode-switch-wrapper.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; transform: translate(-50%, -8px); }
 @media (max-width: 900px) { .chat-mode-switch-wrapper.is-hidden { transform: translateY(-8px); } }
-.chat-msg-container { width: fit-content; max-width: min(72vw, 900px); }
-.chat-msg { box-sizing: border-box; width: fit-content; min-width: max-content; max-width: 100%; overflow-wrap: break-word; word-break: normal; }
+.chat-msg-container { width: fit-content; max-width: 50vw; }
+.chat-msg { box-sizing: border-box; width: fit-content; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: normal; }
 .chat-msg .name-tag { white-space: nowrap; }
 .chat-msg .msg-content { overflow-wrap: anywhere; word-break: normal; }
-.chat-msg-container .chat-reply-quote { min-width: clamp(180px, 25vw, 520px); max-width: 100%; box-sizing: border-box; }
+.chat-msg-container .chat-reply-quote { min-width: 25vw; max-width: 100%; box-sizing: border-box; }
 .chat-msg-actions { position: absolute; top: calc(100% - 8px); z-index: 8; }
 .chat-msg-container.is-self .chat-msg-actions { right: 0; }
 .chat-msg-container.is-other .chat-msg-actions { left: 0; }
@@ -4540,6 +4540,8 @@ html.light-mode .group-unread-badge {
 .group-invite-chip { color: #fff; background: #292631; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 700; }
 .group-invite-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
 .group-invite-actions button { padding: 10px 18px; font-size: 13px; border-radius: 10px; }
-@media (max-width: 640px) { .chat-msg-container { max-width: 86vw; } .chat-msg-container .chat-reply-quote { min-width: clamp(160px, 35vw, 320px); } }
+
 
 .chat-msg-container.emoji-picker-open .chat-msg-actions { display: flex; }
+
+.chat-send-feedback { display: none; padding-left: 58px; color: #f44336; font-size: 12px; font-weight: 600; }

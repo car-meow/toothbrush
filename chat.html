@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Nexus Chat</title>
-    <link rel="stylesheet" href="style.css?v=59">
+    <link rel="stylesheet" href="style.css?v=60">
     <script src="bgm-manager.js?v=64"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
@@ -246,6 +246,7 @@
                                 <div id="group-reply-bar" class="chat-reply-bar" style="display:none;"></div>
                                 <div id="group-image-preview-tray" class="chat-image-preview-tray" style="display:none;"></div>
                             </div>
+                            <div id="group-send-feedback" class="chat-send-feedback" aria-live="polite"></div>
                             <div id="group-typing-indicator" class="chat-typing-indicator" aria-live="polite"></div>
                             <div style="display:flex; gap:12px; align-items:center;">
                                 <label for="group-img-upload" class="save-btn chat-photo-btn" title="Upload Photo">
@@ -1345,6 +1346,7 @@
         let isHost        = false;
         let isDisconnecting = false;
         let hostWaitTimeout = null;
+        let networkConnectTimeout = null;
         let isModalAdmin  = false;
 
         const myUuid = Math.random().toString(36).substr(2, 9);
@@ -1521,6 +1523,8 @@
         };
 
         function startNetwork(pin, roomName) {
+            if (networkConnectTimeout) clearTimeout(networkConnectTimeout);
+            if (hostWaitTimeout) { clearTimeout(hostWaitTimeout); hostWaitTimeout = null; }
             setStatus('loading', 'Connecting to secure relay…');
             if (mqttClient) {
                 try { mqttClient.end(true); } catch(e) {}
@@ -1556,9 +1560,26 @@
                 return;
             }
 
+            networkConnectTimeout = setTimeout(() => {
+                if (uiReady) return;
+                showWaiting(false);
+                setStatus('error', 'Relay connection timed out. Check your connection and retry.');
+                const pinError = document.getElementById('pin-error');
+                if (!isHost && pinError) { pinError.textContent = 'Could not connect to the chat relay. Please retry.'; pinError.style.display = 'block'; }
+                try { mqttClient?.end(true); } catch(e) {}
+            }, 12000);
+
             mqttClient.on('connect', () => {
+                if (networkConnectTimeout) { clearTimeout(networkConnectTimeout); networkConnectTimeout = null; }
                 mqttClient.subscribe(currentTopic, { qos: 1 }, (err) => {
-                    if (err) return;
+                    if (err) {
+                        showWaiting(false);
+                        setStatus('error', 'Could not subscribe to the room. Please retry.');
+                        const pinError = document.getElementById('pin-error');
+                        if (!isHost && pinError) { pinError.textContent = 'Could not join this room. Please retry.'; pinError.style.display = 'block'; }
+                        try { mqttClient.end(true); } catch(e) {}
+                        return;
+                    }
 
                     if (isHost) {
                         // ── Host: assign self a name from the pool ──
@@ -2000,7 +2021,7 @@
             if (jumpBtn) updateJumpButton(document.getElementById('messages'), jumpBtn);
         };
 
-        document.getElementById('pin-entry').onkeypress   = (e) => { if (e.key === 'Enter') document.getElementById('join-btn').click(); };
+        document.getElementById('pin-entry').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); document.getElementById('join-btn').click(); } });
 
         // ═══════════════════════════════════════════════════
         //  10. IMAGE UPLOAD (ANONYMOUS CHAT)
@@ -2115,6 +2136,7 @@
             textarea.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
+                    e.stopPropagation();
                     if (sendBtn) sendBtn.click();
                 }
             });
@@ -2208,6 +2230,7 @@
             const isOwn = profile && (profile.id === msg.user_id || (profile.username && profile.username === msg.username));
 
             if (msg.group_code === currentActiveGroupCode) {
+                if (msg.id && document.querySelector(`[data-msg-id="${CSS.escape(String(msg.id))}"]`)) return;
                 appendGroupMessage(msg);
                 const area = document.getElementById('group-messages');
                 const isBottom = area.scrollHeight - area.scrollTop - area.clientHeight <= 40;
@@ -2244,6 +2267,9 @@
 
         let currentActiveGroupCode = null;
         let groupRealtimeChannel   = null;
+        let groupMessagePollTimer = null;
+        let groupRealtimeFallbackTimer = null;
+        let lastGroupMessageCreatedAt = null;
         let userApprovalsChannel   = null;
         let approvalPollingTimer   = null;
 
@@ -2750,6 +2776,9 @@
 
         function closeCurrentGroup() {
             currentActiveGroupCode = null;
+            if (groupMessagePollTimer) { clearInterval(groupMessagePollTimer); groupMessagePollTimer = null; }
+            if (groupRealtimeFallbackTimer) { clearTimeout(groupRealtimeFallbackTimer); groupRealtimeFallbackTimer = null; }
+            lastGroupMessageCreatedAt = null;
             groupTypingUsers.clear();
             renderTypingIndicator(groupTypingUsers, 'group-typing-indicator', NexusProfile.get()?.username);
             if (groupRealtimeChannel && sbClient) {
@@ -2857,6 +2886,9 @@
         };
 
         // Join Group Flow
+        document.getElementById('join-group-code-input').addEventListener('keydown', event => {
+            if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); document.getElementById('submit-join-code-btn').click(); }
+        });
         document.getElementById('submit-join-code-btn').onclick = async () => {
             const profile = NexusProfile.get();
             if (!profile || !profile.username) {
@@ -2950,8 +2982,26 @@
             }
         };
 
+        // Realtime is preferred, with a small polling fallback if the channel is unavailable.
+        async function pollGroupMessages(code) {
+            if (!sbClient || currentActiveGroupCode !== code) return;
+            let query = sbClient.from('group_messages').select('*').eq('group_code', code);
+            if (lastGroupMessageCreatedAt) query = query.gte('created_at', lastGroupMessageCreatedAt);
+            const { data, error } = await query.order('created_at', { ascending: true }).limit(100);
+            if (error) { console.warn('Group message fallback poll failed:', error); return; }
+            (data || []).forEach(message => handleIncomingGroupMessage(message));
+        }
+        function startGroupMessagePolling(code) {
+            if (groupMessagePollTimer || currentActiveGroupCode !== code) return;
+            pollGroupMessages(code);
+            groupMessagePollTimer = setInterval(() => pollGroupMessages(code), 5000);
+        }
+
         // Open Group
         async function openGroup(code, name, isAdmin) {
+            if (groupMessagePollTimer) { clearInterval(groupMessagePollTimer); groupMessagePollTimer = null; }
+            if (groupRealtimeFallbackTimer) { clearTimeout(groupRealtimeFallbackTimer); groupRealtimeFallbackTimer = null; }
+            lastGroupMessageCreatedAt = null;
             currentActiveGroupCode = code;
             document.getElementById('group-join-view').style.display = 'none';
             document.getElementById('group-chat-room').style.display = 'flex';
@@ -3025,14 +3075,17 @@
                 }
 
                 // Query newest messages up to 200 and reverse so recent messages/photos always load
-                const { data: msgs } = await sbClient.from('group_messages')
+                const { data: msgs, error: messagesError } = await sbClient.from('group_messages')
                     .select('*')
                     .eq('group_code', code)
                     .order('created_at', { ascending: false })
                     .limit(200);
 
                 messagesArea.innerHTML = '';
-                if (msgs && msgs.length) {
+                if (messagesError) {
+                    console.error('Could not load group messages:', messagesError);
+                    messagesArea.innerHTML = `<div class="group-messages-error" style="color:#f44336;text-align:center;padding:30px;">Could not load messages: ${escapeHTML(messagesError.message || 'connection error')}</div>`;
+                } else if (msgs && msgs.length) {
                     msgs.reverse().forEach(m => appendGroupMessage(m));
                 } else {
                     messagesArea.innerHTML = '<div style="color:#666; text-align:center; padding:30px; font-style:italic;">No messages yet. Say hello!</div>';
@@ -3088,7 +3141,21 @@
                     .on('postgres_changes', { event: '*', schema: 'public', table: 'group_requests', filter: `group_code=eq.${code}` }, () => {
                         if (effectiveIsAdmin) refreshAdminBadge(code);
                     })
-                    .subscribe();
+                    .subscribe(status => {
+                        if (status === 'SUBSCRIBED') {
+                            if (groupMessagePollTimer) { clearInterval(groupMessagePollTimer); groupMessagePollTimer = null; }
+                            if (groupRealtimeFallbackTimer) { clearTimeout(groupRealtimeFallbackTimer); groupRealtimeFallbackTimer = null; }
+                            pollGroupMessages(code);
+                        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                            startGroupMessagePolling(code);
+                        }
+                    });
+                groupRealtimeFallbackTimer = setTimeout(() => {
+                    groupRealtimeFallbackTimer = null;
+                    if (currentActiveGroupCode === code && groupRealtimeChannel?.state !== 'joined') startGroupMessagePolling(code);
+                }, 5000);
+            } else {
+                messagesArea.innerHTML = '<div class="group-messages-error" style="color:#f44336;text-align:center;padding:30px;">Could not load messages: chat service is unavailable.</div>';
             }
         }
 
@@ -3114,10 +3181,13 @@
         function appendGroupMessage(msg) {
             const area = document.getElementById('group-messages');
             const placeholder = area.querySelector('div[style*="font-style:italic"]');
+            const loadError = area.querySelector('.group-messages-error');
             if (placeholder) placeholder.remove();
+            if (loadError) loadError.remove();
 
-            if (msg.id && area.querySelector(`[data-msg-id="${CSS.escape(msg.id)}"]`)) {
-                return;
+            if (msg.id && area.querySelector(`[data-msg-id="${CSS.escape(String(msg.id))}"]`)) return;
+            if (msg.created_at && (!lastGroupMessageCreatedAt || msg.created_at > lastGroupMessageCreatedAt)) {
+                lastGroupMessageCreatedAt = msg.created_at;
             }
 
             const profile = NexusProfile.get();
@@ -3125,6 +3195,7 @@
 
             if (msg.username === 'System') {
                 const div = document.createElement('div');
+                if (msg.id) div.dataset.msgId = msg.id;
                 div.className = 'chat-msg system-msg';
                 div.innerHTML = `<span class="system-text">[${escapeHTML(msg.text)}]</span>`;
                 area.appendChild(div);
@@ -3182,42 +3253,52 @@
         // Group Send Button
         document.getElementById('group-send-btn').onclick = async () => {
             const profile = NexusProfile.get();
-            if (!profile || !profile.username || !currentActiveGroupCode || !sbClient) return;
+            if (!profile || !profile.username || !currentActiveGroupCode) return;
             const input = document.getElementById('group-msg-input');
+            const feedback = document.getElementById('group-send-feedback');
             const text = input.value.trim();
             if (!text && pendingImagesGroup.length === 0) return;
-
-            input.value = '';
-            input.style.height = 'auto';
-            input.style.overflowY = 'hidden';
+            if (!sbClient) {
+                if (feedback) { feedback.textContent = 'Message not sent: chat service is unavailable.'; feedback.style.display = 'block'; }
+                return;
+            }
 
             let messageBody = '';
-            if (pendingImagesGroup.length > 0) {
-                messageBody += buildImagesGridHtml(pendingImagesGroup);
-            }
-            if (text) {
-                if (messageBody) {
-                    messageBody += `<div style="margin-top:6px;">${escapeHTML(text)}</div>`;
-                } else {
-                    messageBody = escapeHTML(text);
-                }
-            }
+            if (pendingImagesGroup.length > 0) messageBody += buildImagesGridHtml(pendingImagesGroup);
+            if (text) messageBody += messageBody ? `<div style="margin-top:6px;">${escapeHTML(text)}</div>` : escapeHTML(text);
 
+            const code = currentActiveGroupCode;
             const userColor = colorForName(profile.username);
             const fullTextToSend = buildMessageWithReply('group', messageBody, true);
-            clearReplyTarget('group');
-            clearPendingImages('group');
-
+            const payload = {
+                group_code: code,
+                user_id: profile.id,
+                username: profile.username,
+                user_color: userColor,
+                text: fullTextToSend
+            };
+            const button = document.getElementById('group-send-btn');
+            button.disabled = true;
+            if (feedback) { feedback.textContent = ''; feedback.style.display = 'none'; }
             try {
-                await sbClient.from('group_messages').insert([{
-                    group_code: currentActiveGroupCode,
-                    user_id: profile.id,
-                    username: profile.username,
-                    user_color: userColor,
-                    text: fullTextToSend
-                }]);
-            } catch(e) {
-                console.error("Error sending group message:", e);
+                const { data: savedMessage, error } = await sbClient.from('group_messages').insert([payload]).select('*').single();
+                if (error) throw error;
+                if (savedMessage && currentActiveGroupCode === code && !document.querySelector(`[data-msg-id="${CSS.escape(String(savedMessage.id))}"]`)) {
+                    appendGroupMessage(savedMessage);
+                }
+                input.value = '';
+                input.style.height = 'auto';
+                input.style.overflowY = 'hidden';
+                clearReplyTarget('group');
+                clearPendingImages('group');
+            } catch (error) {
+                console.error('Error sending group message:', error);
+                if (feedback) {
+                    feedback.textContent = `Message not sent: ${error.message || 'connection error'}`;
+                    feedback.style.display = 'block';
+                }
+            } finally {
+                button.disabled = false;
             }
         };
 
@@ -3310,17 +3391,29 @@
             showInviteError('');
             if (!names.length) return;
             if (!sbClient) { showInviteError('Error: Could not check usernames right now.'); return; }
-            const [membersResult, requestsResult] = await Promise.all([
-                sbClient.from('group_members').select('user_id, username'),
-                sbClient.from('group_requests').select('user_id, username')
+            const [membersResult, requestsResult, messagesResult] = await Promise.all([
+                sbClient.from('group_members').select('user_id, username').limit(1000),
+                sbClient.from('group_requests').select('user_id, username').limit(1000),
+                sbClient.from('group_messages').select('user_id, username').neq('username', 'System').not('user_id', 'is', null).limit(500)
             ]);
-            if (membersResult.error && requestsResult.error) { showInviteError('Error: Could not check usernames right now.'); return; }
-            const rows = [...(membersResult.data || []), ...(requestsResult.data || [])];
+            const results = [membersResult, requestsResult, messagesResult];
+            const rows = results.flatMap(result => result.data || []);
+            const lookupIncomplete = results.some(result => result.error);
+            if (!rows.length && results.every(result => result.error)) {
+                showInviteError(`Error: Could not search users. ${results.map(result => result.error.message).join(' ')}`);
+                return;
+            }
             const errors = [];
             names.forEach(name => {
-                const match = rows.find(person => (person.username || '').trim().toLowerCase() === name.toLowerCase());
-                if (!match) errors.push(`Error: ${name} does not exist.`);
-                else if (!inviteSelection.has(match.user_id)) inviteSelection.set(match.user_id, { user_id: match.user_id, username: match.username, user_color: colorForName(match.username) });
+                const matches = [...new Map(rows
+                    .filter(person => person.user_id && (person.username || '').trim().toLowerCase() === name.toLowerCase())
+                    .map(person => [person.user_id, person])).values()];
+                if (!matches.length) errors.push(lookupIncomplete ? `Error: Could not verify ${name}; user lookup was incomplete.` : `Error: ${name} does not exist.`);
+                else if (matches.length > 1) errors.push(`Error: More than one user is named ${name}.`);
+                else {
+                    const match = matches[0];
+                    if (!inviteSelection.has(match.user_id)) inviteSelection.set(match.user_id, { user_id: match.user_id, username: match.username, user_color: colorForName(match.username) });
+                }
             });
             renderInviteSelection();
             showInviteError(errors.join(' '));
