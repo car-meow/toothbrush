@@ -271,6 +271,7 @@
         const name = greeting.querySelector('.nexus-greeting-name');
         opening.textContent = message;
         name.textContent = `${profile.username}!`;
+        name.classList.toggle('nexus-rainbow-text', !!(window.NexusProfile && NexusProfile.hasRainbowEffectFor(profile.username)));
         logo.style.display = '';
         logoRow.insertBefore(logo, logoRow.firstChild);
         if (!logo._greetingMeasure) {
@@ -286,6 +287,7 @@
         }
         logo._greetingMeasure();
     }
+    window.addEventListener('nexus-legolooper-rainbow-change', updateGreeting);
     function goTo(nextStep) {
         const oldCard = overlay && overlay.querySelector('.nw-card');
         const goingBack = nextStep < step;

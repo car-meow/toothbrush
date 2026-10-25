@@ -4525,23 +4525,133 @@ html.light-mode .group-unread-badge {
 .chat-msg { box-sizing: border-box; width: fit-content; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: normal; }
 .chat-msg .name-tag { white-space: nowrap; }
 .chat-msg .msg-content { overflow-wrap: anywhere; word-break: normal; }
-.chat-msg-container .chat-reply-quote { min-width: 25vw; max-width: 100%; box-sizing: border-box; }
+.chat-msg-container .chat-reply-quote { min-width: 0; max-width: 25vw; box-sizing: border-box; }
+.chat-msg-container .chat-reply-quote .reply-quote-text { flex: 1 1 auto; min-width: 0; }
 .chat-msg-actions { position: absolute; top: calc(100% - 8px); z-index: 8; }
 .chat-msg-container.is-self .chat-msg-actions { right: 0; }
 .chat-msg-container.is-other .chat-msg-actions { left: 0; }
 .chat-msg-container:hover .chat-msg-actions { display: flex; }
 .chat-typing-indicator { min-height: 0; color: var(--muted-text, #888); font-size: 12px; font-weight: 600; padding-left: 58px; }
 .chat-typing-indicator:empty { display: none; }
-.group-invite-box { padding: 28px; border-radius: 20px; width: 430px; max-width: 92vw; border: 2px solid var(--white-outline); text-align: left; background: var(--modal-bg); color: var(--text-color); }
-.group-invite-description { margin: 0 0 16px; color: var(--muted-text, #888); font-size: 13px; line-height: 1.4; }
-.group-invite-box .pin-input-large { width: 100%; box-sizing: border-box; font-size: 15px; letter-spacing: 0; text-align: left; padding: 12px; }
-.group-invite-error { min-height: 18px; margin-top: 7px; color: #f44336; font-size: 12px; font-weight: 600; }
-.group-invite-selected { display: flex; flex-wrap: wrap; gap: 7px; min-height: 0; margin-top: 2px; }
-.group-invite-chip { color: #fff; background: #292631; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 700; }
-.group-invite-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
-.group-invite-actions button { padding: 10px 18px; font-size: 13px; border-radius: 10px; }
-
-
 .chat-msg-container.emoji-picker-open .chat-msg-actions { display: flex; }
 
 .chat-send-feedback { display: none; padding-left: 58px; color: #f44336; font-size: 12px; font-weight: 600; }
+
+@keyframes nexus-rainbow-flow {
+    from { background-position: 0% 50%; }
+    to { background-position: 100% 50%; }
+}
+
+@keyframes nexus-rainbow-outline-flow {
+    from { background-position: 0 0, 0% 50%; }
+    to { background-position: 0 0, 100% 50%; }
+}
+
+.nexus-rainbow-text {
+    color: transparent !important;
+    background-image: linear-gradient(90deg, #ff1744, #ff9100, #ffea00, #00e676, #00b0ff, #651fff, #f500d4, #ff1744);
+    background-size: 300% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    animation: nexus-rainbow-flow 3.2s linear infinite;
+    text-shadow: none !important;
+}
+
+.chat-msg.nexus-rainbow-outline {
+    border: 4px solid transparent !important;
+    background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)) padding-box,
+                linear-gradient(90deg, #ff1744, #ff9100, #ffea00, #00e676, #00b0ff, #651fff, #f500d4, #ff1744) border-box !important;
+    background-size: 100% 100%, 300% 100% !important;
+    animation: nexus-rainbow-outline-flow 3.2s linear infinite;
+}
+
+html.light-mode .chat-msg.nexus-rainbow-outline {
+    background: linear-gradient(#fff, #fff) padding-box,
+                linear-gradient(90deg, #ff1744, #ff9100, #ffea00, #00e676, #00b0ff, #651fff, #f500d4, #ff1744) border-box !important;
+    background-size: 100% 100%, 300% 100% !important;
+}
+
+.user-pill.nexus-rainbow-pill {
+    border: 2px solid transparent !important;
+    background: linear-gradient(rgba(20, 16, 30, 0.96), rgba(20, 16, 30, 0.96)) padding-box,
+                linear-gradient(90deg, #ff1744, #ff9100, #ffea00, #00e676, #00b0ff, #651fff, #f500d4, #ff1744) border-box !important;
+    background-size: 100% 100%, 300% 100% !important;
+    animation: nexus-rainbow-outline-flow 3.2s linear infinite;
+}
+
+.chat-msg.chat-msg-deleted {
+    border: 4px solid #777 !important;
+    background: #3a3a3a !important;
+    color: #aaa !important;
+    font-style: italic;
+    text-shadow: none !important;
+    box-shadow: none !important;
+    animation: none !important;
+}
+
+html.light-mode .chat-msg.chat-msg-deleted {
+    border-color: #999 !important;
+    background: #e5e5e5 !important;
+    color: #666 !important;
+}
+
+.nexus-legolooper-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.82);
+}
+
+.nexus-legolooper-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    width: min(360px, calc(100vw - 32px));
+    padding: 22px;
+    border: 2px solid var(--white-outline, #444);
+    border-radius: 16px;
+    background: var(--modal-bg, #1a1a1a);
+    box-shadow: 0 18px 55px rgba(0, 0, 0, 0.65);
+}
+
+.nexus-legolooper-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color, #444);
+    border-radius: 9px;
+    outline: none;
+    background: var(--input-bg, #111);
+    color: var(--text-color, #fff);
+    font: inherit;
+}
+
+.nexus-legolooper-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.nexus-legolooper-actions button {
+    min-width: 100px;
+    padding: 10px 18px;
+    border: 0;
+    border-radius: 9px;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.nexus-legolooper-cancel { background: #555 !important; }
+.nexus-legolooper-confirm { background: #2e7d32 !important; }
+
+@media (prefers-reduced-motion: reduce) {
+    .nexus-rainbow-text,
+    .chat-msg.nexus-rainbow-outline,
+    .user-pill.nexus-rainbow-pill { animation-duration: 10s; }
+}

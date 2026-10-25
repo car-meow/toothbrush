@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Nexus Chat</title>
-    <link rel="stylesheet" href="style.css?v=60">
+    <link rel="stylesheet" href="style.css?v=61">
     <script src="bgm-manager.js?v=64"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
@@ -164,9 +164,6 @@
                 <img src="Assets/Settings.svg" alt=""><span>Admin Settings</span>
                 <div id="group-admin-badge" class="admin-badge">0</div>
             </button>
-            <button id="group-invite-btn" class="material-nav-btn" style="--expanded-width: 135px; display:none;" title="Invite">
-                <img src="Assets/Invite.svg" alt=""><span>Invite</span>
-            </button>
             <button id="chat-back-btn" class="material-nav-btn" style="--expanded-width: 125px;">
                 <img id="chat-back-icon" src="Assets/media-back-arrow.svg" alt=""><span id="chat-back-text">Home</span>
             </button>
@@ -288,31 +285,6 @@
         </div>
     </div>
 
-    <div id="group-invite-modal" class="overlay" style="z-index: 31000;">
-        <div class="modal-box group-invite-box">
-            <h3 style="margin:0 0 8px; color:var(--title-color);">Invite people</h3>
-            <p class="group-invite-description">Type people's usernames separated by a comma, then press Enter.</p>
-            <input id="group-invite-input" type="text" class="pin-input-large" placeholder="Username, username..." autocomplete="off">
-            <div id="group-invite-error" class="group-invite-error" aria-live="polite"></div>
-            <div id="group-invite-selected" class="group-invite-selected" aria-live="polite"></div>
-            <div class="group-invite-actions">
-                <button id="group-invite-submit" class="save-btn" style="background:#2E7D32;">Invite</button>
-                <button id="group-invite-cancel" class="save-btn cancel-modal-btn">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="group-invite-confirm" class="overlay" style="z-index: 32000;">
-        <div class="modal-box group-invite-box">
-            <h3 style="margin:0 0 12px; color:var(--title-color);">Confirm invitation</h3>
-            <p id="group-invite-confirm-text" style="color:var(--text-color); line-height:1.5;"></p>
-            <div class="group-invite-actions">
-                <button id="group-invite-confirm-yes" class="save-btn" style="background:#2E7D32;">Confirm</button>
-                <button id="group-invite-confirm-no" class="save-btn cancel-modal-btn">Cancel</button>
-            </div>
-        </div>
-    </div>
-
     <div id="admin-manage-modal" class="overlay" style="z-index: 30000;">
         <div class="modal-box" style="padding:30px; border-radius:20px; width:480px; max-width:92%; border:2px solid var(--white-outline); text-align:left; color:var(--text-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
@@ -392,7 +364,7 @@
         </div>
     </div>
 
-    <script src="nexus-profile.js?v=1"></script>
+    <script src="nexus-profile.js?v=3"></script>
     <script>
         const localStorage = window.nexusStorage || window.localStorage;
         document.addEventListener('DOMContentLoaded', async () => {
@@ -731,7 +703,7 @@
             const hasImg = temp.querySelector('img');
             const clean = temp.textContent.trim();
             if (!clean && hasImg) return '📷 Photo';
-            return (clean.length > 55 ? clean.slice(0, 55) + '…' : clean) || 'Message';
+            return clean || 'Message';
         }
 
         function setReplyTarget(type, username, fullText) {
@@ -786,9 +758,33 @@
             const target = (type === 'anon') ? activeReplyAnon : activeReplyGroup;
             const body = isAlreadyHtml ? contentHtml : escapeHTML(contentHtml);
             if (!target) return body;
-            const quote = `<div class="chat-reply-quote"><img src="Assets/Reply.svg" class="reply-quote-icon" alt=""><span class="reply-quote-user">${escapeHTML(target.username)}:</span> <span class="reply-quote-text">${escapeHTML(target.snippet)}</span></div>`;
+            const quote = `<div class="chat-reply-quote"><img src="Assets/Reply.svg" class="reply-quote-icon" alt=""><span class="reply-quote-user" data-username="${escapeHTML(target.username)}">${escapeHTML(target.username)}:</span> <span class="reply-quote-text">${escapeHTML(target.snippet)}</span></div>`;
             return quote + body;
         }
+
+        function syncReplyQuoteWidth(messageElement) {
+            const bubble = messageElement?.matches?.('.chat-msg') ? messageElement : messageElement?.querySelector?.('.chat-msg');
+            const quote = bubble?.querySelector('.chat-reply-quote');
+            if (!bubble || !quote) return;
+
+            const quoteCap = Math.max(1, Math.round(window.innerWidth * 0.25));
+            quote.style.width = '';
+            quote.style.maxWidth = `${quoteCap}px`;
+            requestAnimationFrame(() => {
+                if (!bubble.isConnected || !quote.isConnected) return;
+                const bubbleStyle = getComputedStyle(bubble);
+                const padding = (parseFloat(bubbleStyle.paddingLeft) || 0) + (parseFloat(bubbleStyle.paddingRight) || 0);
+                const contentWidth = bubble.clientWidth - padding;
+                if (contentWidth > quoteCap + 1) {
+                    quote.style.width = '100%';
+                    quote.style.maxWidth = '100%';
+                }
+            });
+        }
+
+        window.addEventListener('resize', () => {
+            document.querySelectorAll('.chat-msg').forEach(syncReplyQuoteWidth);
+        }, { passive: true });
 
         // ═══════════════════════════════════════════════════
         //  IMAGE VIEWER & STAGING HELPERS
@@ -1091,30 +1087,56 @@
 
         function handleAnonMsgEdit(msgId, newHtml) {
             const container = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
-            if (container) {
+            if (container && !container.classList.contains('message-deleted')) {
                 const content = container.querySelector('.msg-content');
-                if (content) content.innerHTML = newHtml;
+                if (content) {
+                    content.innerHTML = newHtml;
+                    syncReplyQuoteWidth(container);
+                }
             }
+        }
+
+        const DELETED_MESSAGE_MARKUP = '<span data-nexus-deleted-message="true">This message was deleted by user.</span>';
+        function isDeletedMessage(text) {
+            return String(text || '').includes('data-nexus-deleted-message="true"');
+        }
+
+        function renderDeletedMessage(container) {
+            if (!container) return;
+            const bubble = container.querySelector('.chat-msg');
+            if (!bubble) return;
+            container.classList.add('message-deleted');
+            bubble.classList.remove('nexus-rainbow-outline');
+            bubble.classList.add('chat-msg-deleted');
+            bubble.innerHTML = '<div class="msg-content">This message was deleted by user.</div>';
+            container.querySelector('.chat-msg-actions')?.remove();
         }
 
         function handleAnonMsgDelete(msgId) {
             const container = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
-            if (container) container.remove();
+            renderDeletedMessage(container);
         }
 
         function handleGroupMessageUpdate(newMsg) {
             if (!newMsg || !newMsg.id) return;
             const container = document.querySelector(`[data-msg-id="${CSS.escape(newMsg.id)}"]`);
             if (container) {
+                if (isDeletedMessage(newMsg.text)) {
+                    renderDeletedMessage(container);
+                    return;
+                }
                 const content = container.querySelector('.msg-content');
-                if (content) content.innerHTML = newMsg.text;
+                if (content) {
+                    content.innerHTML = newMsg.text;
+                    syncReplyQuoteWidth(container);
+                }
             }
         }
 
         function handleGroupMessageDelete(msgId) {
             if (!msgId) return;
             const container = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
-            if (container) container.remove();
+            renderDeletedMessage(container);
         }
 
         // --- Action Listeners for Message Hover Bar ---
@@ -1138,13 +1160,20 @@
                                 handleAnonMsgDelete(msgId);
                                 publish({ type: 'msg-delete', msgId });
                             } else {
-                                handleGroupMessageDelete(msgId);
-                                if (sbClient) {
-                                    try {
-                                        await sbClient.from('group_messages').delete().eq('id', msgId);
-                                    } catch(err) {
-                                        console.error("Delete group msg failed:", err);
-                                    }
+                                if (!sbClient || !currentActiveGroupCode) return;
+                                try {
+                                    const { data, error } = await sbClient.from('group_messages')
+                                        .update({ text: DELETED_MESSAGE_MARKUP })
+                                        .eq('id', msgId)
+                                        .eq('group_code', currentActiveGroupCode)
+                                        .select('id')
+                                        .maybeSingle();
+                                    if (error) throw error;
+                                    if (!data) throw new Error('You do not have permission to delete this message.');
+                                    handleGroupMessageDelete(msgId);
+                                } catch (err) {
+                                    console.error('Delete group message failed:', err);
+                                    await nexusAlert(`Could not delete message: ${err.message || 'connection error'}`);
                                 }
                             }
                         }
@@ -1159,6 +1188,24 @@
                         openDisplayNameModal(sender);
                     }
                 };
+            });
+        }
+
+        function addAdminDeleteActions() {
+            if (!currentActiveGroupIsAdmin) return;
+            const profile = NexusProfile.get();
+            document.querySelectorAll('#group-messages .chat-msg-container[data-user-id]').forEach(container => {
+                if (container.dataset.userId === String(profile?.id || '') || container.classList.contains('message-deleted')) return;
+                const actions = container.querySelector('.chat-msg-actions');
+                if (!actions || actions.querySelector('[data-action="delete"]')) return;
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'msg-action-btn';
+                button.dataset.action = 'delete';
+                button.title = 'Delete message';
+                button.innerHTML = '<img src="Assets/Delete.svg" alt="Delete">';
+                actions.prepend(button);
+                attachActionListeners(actions, container, 'group');
             });
         }
 
@@ -1338,6 +1385,102 @@
             return getVibrantColor(username);
         }
 
+        function hslToHex(hue, saturation = 0.82, lightness = 0.62) {
+            const h = ((hue % 360) + 360) % 360;
+            const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+            const x = chroma * (1 - Math.abs((h / 60) % 2 - 1));
+            const offset = lightness - chroma / 2;
+            let rgb;
+            if (h < 60) rgb = [chroma, x, 0];
+            else if (h < 120) rgb = [x, chroma, 0];
+            else if (h < 180) rgb = [0, chroma, x];
+            else if (h < 240) rgb = [0, x, chroma];
+            else if (h < 300) rgb = [x, 0, chroma];
+            else rgb = [chroma, 0, x];
+            return '#' + rgb.map(channel => Math.round((channel + offset) * 255).toString(16).padStart(2, '0')).join('');
+        }
+
+        function buildDistinctGroupColors(members, groupCode) {
+            const ordered = [...(members || [])]
+                .filter(member => member && member.user_id)
+                .sort((a, b) => {
+                    const aName = String(a.username || '').trim().toLowerCase();
+                    const bName = String(b.username || '').trim().toLowerCase();
+                    if (aName !== bName) return aName < bName ? -1 : 1;
+                    const aId = String(a.user_id);
+                    const bId = String(b.user_id);
+                    return aId === bId ? 0 : (aId < bId ? -1 : 1);
+                });
+            const byId = new Map();
+            const byName = new Map();
+            if (!ordered.length) return { byId, byName };
+
+            let hash = 0;
+            for (const character of String(groupCode || '')) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+            const startingHue = hash % 360;
+            const goldenAngle = 137.507764;
+            const lightnessSteps = [0.56, 0.68, 0.49, 0.62];
+            ordered.forEach((member, index) => {
+                const color = hslToHex(startingHue + goldenAngle * index, 0.86, lightnessSteps[index % lightnessSteps.length]);
+                byId.set(String(member.user_id), color);
+                if (member.username) byName.set(String(member.username).trim().toLowerCase(), color);
+            });
+            return { byId, byName };
+        }
+
+        function colorForGroupUser(userId, username, fallbackColor) {
+            return currentGroupColorsById.get(String(userId || '')) || currentGroupColorsByName.get(String(username || '').trim().toLowerCase()) || fallbackColor || colorForName(username);
+        }
+
+        function isRainbowUsername(username) {
+            return !!(window.NexusProfile && NexusProfile.hasRainbowEffectFor && NexusProfile.hasRainbowEffectFor(username));
+        }
+
+        function renderUserPillMarkup(username, backgroundColor, suffix = '') {
+            const escapedUsername = escapeHTML(username);
+            const rainbow = isRainbowUsername(username);
+            const label = rainbow ? `<span class="nexus-rainbow-text">${escapedUsername}</span>` : escapedUsername;
+            const background = rainbow ? '' : ` style="background:${backgroundColor || colorForName(username)};"`;
+            return `<div class="user-pill${rainbow ? ' nexus-rainbow-pill' : ''}" data-username="${escapedUsername}"${background}>${label}${escapeHTML(suffix)}</div>`;
+        }
+
+        function syncRainbowClasses(root = document) {
+            const collect = selector => [
+                ...(root.matches?.(selector) ? [root] : []),
+                ...root.querySelectorAll(selector)
+            ];
+            collect('.name-tag[data-username], .reply-quote-user[data-username]').forEach(element => {
+                element.classList.toggle('nexus-rainbow-text', isRainbowUsername(element.dataset.username));
+            });
+            collect('.chat-msg-container[data-sender]').forEach(container => {
+                const bubble = container.querySelector('.chat-msg');
+                if (bubble && !container.classList.contains('message-deleted')) {
+                    bubble.classList.toggle('nexus-rainbow-outline', isRainbowUsername(container.dataset.sender));
+                }
+            });
+            collect('.user-pill[data-username]').forEach(pill => {
+                const rainbow = isRainbowUsername(pill.dataset.username);
+                pill.classList.toggle('nexus-rainbow-pill', rainbow);
+                let label = pill.querySelector('.nexus-rainbow-text');
+                if (rainbow && !label) {
+                    const textNodes = [...pill.childNodes].filter(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+                    textNodes.forEach(node => {
+                        const span = document.createElement('span');
+                        span.className = 'nexus-rainbow-text';
+                        span.textContent = node.textContent;
+                        node.replaceWith(span);
+                    });
+                    label = pill.querySelector('.nexus-rainbow-text');
+                }
+                if (label) label.classList.toggle('nexus-rainbow-text', rainbow);
+            });
+        }
+
+        window.addEventListener('nexus-legolooper-rainbow-change', () => {
+            syncRainbowClasses();
+            refreshRenderedGroupColors();
+        });
+
         // ═══════════════════════════════════════════════════
         //  2.  STATE
         // ═══════════════════════════════════════════════════
@@ -1448,7 +1591,7 @@
             globalUserList.forEach(user => {
                 const row = document.createElement('div');
                 row.className = 'user-row';
-                let html = `<div class="user-pill" style="background:${user.color}">${user.name}</div>`;
+                let html = renderUserPillMarkup(user.name, user.color);
                 if (isAdmin) html += `<span class="ip-text">${user.ip}</span>`;
                 if (isHost && user.peerId !== myUuid) {
                     html += `<span onclick="kickById('${user.peerId}','${user.name}')" style="cursor:pointer"><img src="Assets/Delete.svg" alt="Kick" style="width:18px;height:18px;filter:var(--icon-filter);vertical-align:middle;"></span>`;
@@ -1887,6 +2030,26 @@
             }
         }
 
+        function updateChatModeSwitchVisibility() {
+            const switchWrapper = document.querySelector('.chat-mode-switch-wrapper');
+            const isGroupMode = document.getElementById('chat-mode-switch')?.classList.contains('group-active') || false;
+            const anonRoom = document.getElementById('chat-room');
+            const groupRoom = document.getElementById('group-chat-room');
+            const isAnonChatActive = !isGroupMode && anonRoom?.style.display === 'flex';
+            const isGroupChatActive = isGroupMode && currentActiveGroupCode !== null && groupRoom?.style.display === 'flex';
+            const isInActiveChat = isAnonChatActive || isGroupChatActive;
+
+            if (switchWrapper) {
+                switchWrapper.classList.toggle('is-hidden', isInActiveChat);
+                switchWrapper.setAttribute('aria-hidden', String(isInActiveChat));
+            }
+
+            const adminButton = document.getElementById('group-admin-btn');
+            if (adminButton) {
+                adminButton.style.display = isGroupChatActive && currentActiveGroupIsAdmin ? 'inline-flex' : 'none';
+            }
+        }
+
         window.handleBackAction = () => {
             const isGroup = document.getElementById('chat-mode-switch')?.classList.contains('group-active');
             if (isGroup) {
@@ -1952,10 +2115,11 @@
 
             const safe = (uuid || name || '').replace(/[^a-zA-Z0-9_-]/g, '_');
             const div = document.createElement('div');
-            div.className = `chat-msg msg-uuid-${safe}`;
+            const rainbowUser = isRainbowUsername(name);
+            div.className = `chat-msg msg-uuid-${safe}${rainbowUser ? ' nexus-rainbow-outline' : ''}`;
             div.style.borderColor = color;
             div.innerHTML = `
-                <div class="name-tag" style="font-size:10px;font-weight:bold;color:${color};margin-bottom:4px;">${escapeHTML(name)}</div>
+                <div class="name-tag${rainbowUser ? ' nexus-rainbow-text' : ''}" data-username="${escapeHTML(name)}" style="font-size:10px;font-weight:bold;color:${color};margin-bottom:4px;">${escapeHTML(name)}</div>
                 <div class="msg-content">${text}</div>
                 <div class="chat-reactions-row" style="display:none;"></div>
             `;
@@ -1981,6 +2145,8 @@
             container.appendChild(actions);
             area.appendChild(container);
             renderReactionsForMessage(msgId, div.querySelector('.chat-reactions-row'));
+            syncReplyQuoteWidth(div);
+            syncRainbowClasses(container);
 
             area.scrollTop = area.scrollHeight;
             const jumpBtn = document.getElementById('anon-jump-btn');
@@ -2266,6 +2432,9 @@
         }
 
         let currentActiveGroupCode = null;
+        let currentActiveGroupIsAdmin = false;
+        let currentGroupColorsById = new Map();
+        let currentGroupColorsByName = new Map();
         let groupRealtimeChannel   = null;
         let groupMessagePollTimer = null;
         let groupRealtimeFallbackTimer = null;
@@ -2356,28 +2525,14 @@
                 sliderTrack.classList.remove('group-active');
                 document.getElementById('anon-status-header').style.display = 'flex';
                 if (save) localStorage.setItem('tb_chat_last_mode', 'anon');
+                if (currentActiveGroupCode !== null) closeCurrentGroup();
             }
             updateNavBackButton();
+            updateChatModeSwitchVisibility();
         }
 
         modeBtnAnon.onclick  = () => setMode('anon', true);
         modeBtnGroup.onclick = () => setMode('group', true);
-
-        // Load saved mode preference on startup
-        const savedMode = localStorage.getItem('tb_chat_last_mode') || 'anon';
-        if (savedMode === 'group') {
-            const profile = window.NexusProfile ? NexusProfile.get() : null;
-            if (profile && profile.username) {
-                setMode('group', false);
-            } else {
-                setMode('anon', false);
-            }
-        } else {
-            setMode('anon', false);
-        }
-        if (window.NexusProfile && NexusProfile.get()) {
-            initUserApprovalsWatcher();
-        }
 
         document.getElementById('save-prompt-username-btn').onclick = async () => {
             const nameInput = document.getElementById('prompt-username-input');
@@ -2711,10 +2866,9 @@
                             renderGroupSidebar();
                             showAdminGrantedNotification(grp);
                             if (currentActiveGroupCode === grp.code) {
-                                const adminBtn = document.getElementById('group-admin-btn');
-                                if (adminBtn) adminBtn.style.display = 'inline-flex';
-                                const inviteBtn = document.getElementById('group-invite-btn');
-                                if (inviteBtn) inviteBtn.style.display = 'inline-flex';
+                                currentActiveGroupIsAdmin = true;
+                                updateChatModeSwitchVisibility();
+                                addAdminDeleteActions();
                                 refreshAdminBadge(grp.code);
                             }
                         }
@@ -2776,6 +2930,7 @@
 
         function closeCurrentGroup() {
             currentActiveGroupCode = null;
+            currentActiveGroupIsAdmin = false;
             if (groupMessagePollTimer) { clearInterval(groupMessagePollTimer); groupMessagePollTimer = null; }
             if (groupRealtimeFallbackTimer) { clearTimeout(groupRealtimeFallbackTimer); groupRealtimeFallbackTimer = null; }
             lastGroupMessageCreatedAt = null;
@@ -2787,10 +2942,10 @@
             }
             document.getElementById('group-chat-room').style.display = 'none';
             document.getElementById('group-room-info').style.display = 'none';
+            const adminModal = document.getElementById('admin-manage-modal');
+            if (adminModal) adminModal.style.display = 'none';
             const adminBtn = document.getElementById('group-admin-btn');
             if (adminBtn) adminBtn.style.display = 'none';
-            const inviteBtn = document.getElementById('group-invite-btn');
-            if (inviteBtn) inviteBtn.style.display = 'none';
             document.getElementById('group-join-view').style.display = 'flex';
             renderGroupSidebar();
             updateNavBackButton();
@@ -3003,6 +3158,9 @@
             if (groupRealtimeFallbackTimer) { clearTimeout(groupRealtimeFallbackTimer); groupRealtimeFallbackTimer = null; }
             lastGroupMessageCreatedAt = null;
             currentActiveGroupCode = code;
+            currentActiveGroupIsAdmin = !!isAdmin;
+            currentGroupColorsById = new Map();
+            currentGroupColorsByName = new Map();
             document.getElementById('group-join-view').style.display = 'none';
             document.getElementById('group-chat-room').style.display = 'flex';
             
@@ -3020,10 +3178,7 @@
             }
 
             let effectiveIsAdmin = !!isAdmin;
-            const adminBtn = document.getElementById('group-admin-btn');
-            if (adminBtn) adminBtn.style.display = effectiveIsAdmin ? 'inline-flex' : 'none';
-            const inviteBtn = document.getElementById('group-invite-btn');
-            if (inviteBtn) inviteBtn.style.display = effectiveIsAdmin ? 'inline-flex' : 'none';
+            currentActiveGroupIsAdmin = effectiveIsAdmin;
 
             renderGroupSidebar();
             updateNavBackButton();
@@ -3042,6 +3197,7 @@
 
             // Fetch past messages & authoritative admin status
             if (sbClient) {
+                await refreshGroupColorMap(code);
                 const profile = NexusProfile.get();
                 if (profile && profile.id) {
                     try {
@@ -3053,9 +3209,9 @@
                         if (grpData && isGroupAdmin(grpData.admin_id, profile.id)) {
                             const wasNotAdmin = !effectiveIsAdmin;
                             effectiveIsAdmin = true;
-                            if (adminBtn) adminBtn.style.display = 'inline-flex';
-                            const inviteBtn = document.getElementById('group-invite-btn');
-                            if (inviteBtn) inviteBtn.style.display = 'inline-flex';
+                            currentActiveGroupIsAdmin = true;
+                            updateChatModeSwitchVisibility();
+                            addAdminDeleteActions();
                             refreshAdminBadge(code);
 
                             const groups = getEnrolledGroups();
@@ -3119,14 +3275,15 @@
                     })
                     .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `group_code=eq.${code}` }, () => {
                         refreshGroupMemberCount(code);
+                        refreshGroupColorMap(code);
                     })
                     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'groups', filter: `code=eq.${code}` }, payload => {
                         const prof = NexusProfile.get();
                         if (payload && payload.new && prof && isGroupAdmin(payload.new.admin_id, prof.id)) {
                             effectiveIsAdmin = true;
-                            if (adminBtn) adminBtn.style.display = 'inline-flex';
-                            const inviteBtn = document.getElementById('group-invite-btn');
-                            if (inviteBtn) inviteBtn.style.display = 'inline-flex';
+                            currentActiveGroupIsAdmin = true;
+                            updateChatModeSwitchVisibility();
+                            addAdminDeleteActions();
                             refreshAdminBadge(code);
                             const groups = getEnrolledGroups();
                             const enrolled = groups.find(g => g.code === code);
@@ -3166,6 +3323,32 @@
             if (el && count !== null) {
                 el.textContent = `${count} Member${count === 1 ? '' : 's'}`;
             }
+        }
+
+        async function refreshGroupColorMap(code) {
+            if (!sbClient) return;
+            const { data: members, error } = await sbClient.from('group_members').select('user_id, username').eq('group_code', code);
+            if (error) {
+                console.warn('Could not refresh group member colors:', error);
+                return;
+            }
+            if (currentActiveGroupCode !== code) return;
+            const colors = buildDistinctGroupColors(members || [], code);
+            currentGroupColorsById = colors.byId;
+            currentGroupColorsByName = colors.byName;
+            refreshRenderedGroupColors();
+        }
+
+        function refreshRenderedGroupColors() {
+            document.querySelectorAll('#group-messages .chat-msg-container[data-user-id]').forEach(container => {
+                const color = colorForGroupUser(container.dataset.userId, container.dataset.sender);
+                const bubble = container.querySelector('.chat-msg');
+                const name = container.querySelector('.name-tag');
+                if (bubble && !bubble.classList.contains('chat-msg-deleted')) bubble.style.borderColor = color;
+                if (name) name.style.color = color;
+            });
+            const groupMessages = document.getElementById('group-messages');
+            if (groupMessages) syncRainbowClasses(groupMessages);
         }
 
         async function refreshAdminBadge(code) {
@@ -3208,43 +3391,43 @@
             container.className = `chat-msg-container ${isSelf ? 'is-self' : 'is-other'}`;
             container.dataset.msgId = msg.id || ('grp-msg-' + Date.now());
             container.dataset.sender = msg.username;
+            container.dataset.userId = String(msg.user_id || '');
             container.dataset.groupMsg = 'true';
 
             const div = document.createElement('div');
-            div.className = 'chat-msg';
-            const msgColor = msg.user_color || colorForName(msg.username);
+            const rainbowUser = isRainbowUsername(msg.username);
+            div.className = `chat-msg${rainbowUser ? ' nexus-rainbow-outline' : ''}`;
+            const msgColor = colorForGroupUser(msg.user_id, msg.username, msg.user_color);
             div.style.borderColor = msgColor;
 
             const displayUser = isSelf ? msg.username : getEffectiveDisplayName(msg.username);
 
             div.innerHTML = `
-                <div class="name-tag" data-original-username="${escapeHTML(msg.username)}" style="font-size:10px;font-weight:bold;color:${msgColor};margin-bottom:4px;">${escapeHTML(displayUser)}</div>
+                <div class="name-tag${rainbowUser ? ' nexus-rainbow-text' : ''}" data-username="${escapeHTML(msg.username)}" data-original-username="${escapeHTML(msg.username)}" style="font-size:10px;font-weight:bold;color:${msgColor};margin-bottom:4px;">${escapeHTML(displayUser)}</div>
                 <div class="msg-content">${msg.text}</div>
                 <div class="chat-reactions-row" style="display:none;"></div>
             `;
 
             const actions = document.createElement('div');
             actions.className = 'chat-msg-actions';
-            if (isSelf) {
-                actions.innerHTML = `
-                    <button type="button" class="msg-action-btn" data-action="edit" title="Edit message"><img src="Assets/Edit.svg" alt="Edit"></button>
-                    <button type="button" class="msg-action-btn" data-action="delete" title="Delete message"><img src="Assets/Delete.svg" alt="Delete"></button>
-                    <button type="button" class="msg-action-btn" data-action="react" title="React with emoji"><img src="Assets/Emoji.svg" alt="React"></button>
-                    <button type="button" class="msg-action-btn" data-action="reply" title="Reply"><img src="Assets/Reply.svg" alt="Reply"></button>
-                `;
-            } else {
-                actions.innerHTML = `
-                    <button type="button" class="msg-action-btn" data-action="react" title="React with emoji"><img src="Assets/Emoji.svg" alt="React"></button>
-                    <button type="button" class="msg-action-btn" data-action="reply" title="Reply"><img src="Assets/Reply.svg" alt="Reply"></button>
-                    <button type="button" class="msg-action-btn" data-action="rename" title="Change display name"><img src="Assets/Name.svg" alt="Change Name"></button>
-                `;
-            }
+            actions.innerHTML = `
+                ${isSelf ? '<button type="button" class="msg-action-btn" data-action="edit" title="Edit message"><img src="Assets/Edit.svg" alt="Edit"></button>' : ''}
+                ${isSelf || currentActiveGroupIsAdmin ? '<button type="button" class="msg-action-btn" data-action="delete" title="Delete message"><img src="Assets/Delete.svg" alt="Delete"></button>' : ''}
+                <button type="button" class="msg-action-btn" data-action="react" title="React with emoji"><img src="Assets/Emoji.svg" alt="React"></button>
+                <button type="button" class="msg-action-btn" data-action="reply" title="Reply"><img src="Assets/Reply.svg" alt="Reply"></button>
+                ${!isSelf ? '<button type="button" class="msg-action-btn" data-action="rename" title="Change display name"><img src="Assets/Name.svg" alt="Change Name"></button>' : ''}
+            `;
 
             attachActionListeners(actions, container, 'group');
             container.appendChild(div);
             container.appendChild(actions);
             area.appendChild(container);
-            renderReactionsForMessage(container.dataset.msgId, div.querySelector('.chat-reactions-row'));
+            if (isDeletedMessage(msg.text)) renderDeletedMessage(container);
+            else {
+                renderReactionsForMessage(container.dataset.msgId, div.querySelector('.chat-reactions-row'));
+                syncReplyQuoteWidth(div);
+            }
+            syncRainbowClasses(container);
 
             area.scrollTop = area.scrollHeight;
             updateJumpButton(area, document.getElementById('group-jump-btn'));
@@ -3268,7 +3451,7 @@
             if (text) messageBody += messageBody ? `<div style="margin-top:6px;">${escapeHTML(text)}</div>` : escapeHTML(text);
 
             const code = currentActiveGroupCode;
-            const userColor = colorForName(profile.username);
+            const userColor = colorForGroupUser(profile.id, profile.username);
             const fullTextToSend = buildMessageWithReply('group', messageBody, true);
             const payload = {
                 group_code: code,
@@ -3364,115 +3547,13 @@
         }
 
         document.getElementById('group-admin-btn').onclick = async () => {
-            if (!currentActiveGroupCode || !sbClient) return;
+            const isGroupMode = document.getElementById('chat-mode-switch')?.classList.contains('group-active');
+            const roomIsOpen = document.getElementById('group-chat-room')?.style.display === 'flex';
+            if (!currentActiveGroupCode || !currentActiveGroupIsAdmin || !isGroupMode || !roomIsOpen || !sbClient) return;
             document.getElementById('admin-manage-modal').style.display = 'flex';
             document.getElementById('admin-modal-code').textContent = currentActiveGroupCode;
             loadAdminModalData();
         };
-
-        const inviteSelection = new Map();
-        const inviteModal = document.getElementById('group-invite-modal');
-        const inviteInput = document.getElementById('group-invite-input');
-        const inviteError = document.getElementById('group-invite-error');
-        const inviteSelected = document.getElementById('group-invite-selected');
-        function renderInviteSelection() {
-            inviteSelected.innerHTML = '';
-            inviteSelection.forEach(person => {
-                const chip = document.createElement('span');
-                chip.className = 'group-invite-chip';
-                chip.textContent = person.username;
-                inviteSelected.appendChild(chip);
-            });
-        }
-        function showInviteError(message) { inviteError.textContent = message || ''; }
-        async function addInviteNamesFromInput() {
-            const names = [...new Set(inviteInput.value.split(',').map(name => name.trim()).filter(Boolean))];
-            inviteInput.value = '';
-            showInviteError('');
-            if (!names.length) return;
-            if (!sbClient) { showInviteError('Error: Could not check usernames right now.'); return; }
-            const [membersResult, requestsResult, messagesResult] = await Promise.all([
-                sbClient.from('group_members').select('user_id, username').limit(1000),
-                sbClient.from('group_requests').select('user_id, username').limit(1000),
-                sbClient.from('group_messages').select('user_id, username').neq('username', 'System').not('user_id', 'is', null).limit(500)
-            ]);
-            const results = [membersResult, requestsResult, messagesResult];
-            const rows = results.flatMap(result => result.data || []);
-            const lookupIncomplete = results.some(result => result.error);
-            if (!rows.length && results.every(result => result.error)) {
-                showInviteError(`Error: Could not search users. ${results.map(result => result.error.message).join(' ')}`);
-                return;
-            }
-            const errors = [];
-            names.forEach(name => {
-                const matches = [...new Map(rows
-                    .filter(person => person.user_id && (person.username || '').trim().toLowerCase() === name.toLowerCase())
-                    .map(person => [person.user_id, person])).values()];
-                if (!matches.length) errors.push(lookupIncomplete ? `Error: Could not verify ${name}; user lookup was incomplete.` : `Error: ${name} does not exist.`);
-                else if (matches.length > 1) errors.push(`Error: More than one user is named ${name}.`);
-                else {
-                    const match = matches[0];
-                    if (!inviteSelection.has(match.user_id)) inviteSelection.set(match.user_id, { user_id: match.user_id, username: match.username, user_color: colorForName(match.username) });
-                }
-            });
-            renderInviteSelection();
-            showInviteError(errors.join(' '));
-        }
-        async function submitGroupInvites() {
-            if (inviteInput.value.trim()) {
-                await addInviteNamesFromInput();
-                return;
-            }
-            if (!inviteSelection.size) { showInviteError('Select people to invite!'); return; }
-            const names = [...inviteSelection.values()].map(person => person.username);
-            document.getElementById('group-invite-confirm-text').textContent = `Invite the following people: ${names.join(', ')}?`;
-            document.getElementById('group-invite-confirm').style.display = 'flex';
-        }
-        async function confirmGroupInvites() {
-            if (!currentActiveGroupCode || !sbClient) return;
-            const code = currentActiveGroupCode;
-            const people = [...inviteSelection.values()];
-            const current = await sbClient.from('group_members').select('user_id, username').eq('group_code', code);
-            if (current.error) {
-                document.getElementById('group-invite-confirm').style.display = 'none';
-                showInviteError(`Error: ${current.error.message}`);
-                return;
-            }
-            const existingIds = new Set((current.data || []).map(person => person.user_id));
-            const pending = people.filter(person => !existingIds.has(person.user_id));
-            if (pending.length) {
-                const { error } = await sbClient.from('group_members').insert(pending.map(person => ({
-                    group_code: code, user_id: person.user_id, username: person.username, user_color: person.user_color
-                })));
-                if (error) {
-                    document.getElementById('group-invite-confirm').style.display = 'none';
-                    showInviteError(`Error: ${error.message}`);
-                    return;
-                }
-                const inviter = NexusProfile.get()?.username || 'An admin';
-                await sbClient.from('group_messages').insert([{
-                    group_code: code, user_id: 'system', username: 'System', user_color: '#4CAF50',
-                    text: `${pending.map(person => person.username).join(', ')} ${pending.length === 1 ? 'was' : 'were'} invited by ${inviter}.`
-                }]);
-            }
-            document.getElementById('group-invite-confirm').style.display = 'none';
-            inviteModal.style.display = 'none';
-            inviteSelection.clear();
-            renderInviteSelection();
-            showInviteError('');
-            refreshGroupMemberCount(code);
-        }
-        document.getElementById('group-invite-btn').onclick = () => {
-            inviteSelection.clear(); renderInviteSelection(); showInviteError(''); inviteInput.value = '';
-            inviteModal.style.display = 'flex'; setTimeout(() => inviteInput.focus(), 50);
-        };
-        inviteInput.addEventListener('keydown', event => {
-            if (event.key === 'Enter') { event.preventDefault(); submitGroupInvites(); }
-        });
-        document.getElementById('group-invite-submit').onclick = submitGroupInvites;
-        document.getElementById('group-invite-cancel').onclick = () => { inviteModal.style.display = 'none'; };
-        document.getElementById('group-invite-confirm-yes').onclick = confirmGroupInvites;
-        document.getElementById('group-invite-confirm-no').onclick = () => { document.getElementById('group-invite-confirm').style.display = 'none'; };
 
         async function loadAdminModalData() {
             if (!currentActiveGroupCode || !sbClient) return;
@@ -3503,7 +3584,7 @@
                     const row = document.createElement('div');
                     row.className = 'user-row';
                     row.innerHTML = `
-                        <div class="user-pill" style="background:${colorForName(req.username)};">${escapeHTML(req.username)}</div>
+                        ${renderUserPillMarkup(req.username, colorForName(req.username))}
                         <div style="display:flex; gap:6px;">
                             <button class="save-btn" style="background:#2E7D32; padding:5px 12px; font-size:12px;">Approve</button>
                             <button class="save-btn cancel-modal-btn" style="padding:5px 12px; font-size:12px;">Deny</button>
@@ -3558,16 +3639,22 @@
             // 2. Active Members
             const { data: members } = await sbClient.from('group_members').select('*').eq('group_code', code);
             const { data: grpRow } = await sbClient.from('groups').select('admin_id, admin_name').eq('code', code).maybeSingle();
+            if (currentActiveGroupCode === code) {
+                const colors = buildDistinctGroupColors(members || [], code);
+                currentGroupColorsById = colors.byId;
+                currentGroupColorsByName = colors.byName;
+                refreshRenderedGroupColors();
+            }
             membersList.innerHTML = '';
             if (members && members.length) {
                 members.forEach(mem => {
                     const row = document.createElement('div');
                     row.className = 'user-row';
                     const isSelf = profile && profile.id === mem.user_id;
-                    const memColor = mem.user_color || colorForName(mem.username);
+                    const memColor = colorForGroupUser(mem.user_id, mem.username, mem.user_color);
                     const isMemAdmin = isGroupAdmin(grpRow ? grpRow.admin_id : '', mem.user_id);
                     row.innerHTML = `
-                        <div class="user-pill" style="background:${memColor};">${escapeHTML(mem.username)} ${isMemAdmin ? '(Admin)' : ''}</div>
+                        ${renderUserPillMarkup(mem.username, memColor, isMemAdmin ? ' (Admin)' : '')}
                         <div style="display:flex; gap:6px; align-items:center;">
                             ${!isSelf && !isMemAdmin ? `<button class="save-btn make-admin-btn" style="padding:5px 10px; font-size:11px; background:#1976D2;">Make Admin</button>` : ''}
                             ${!isSelf ? `<button class="save-btn cancel-modal-btn remove-mem-btn" style="padding:5px 10px; font-size:11px; background:#c62828;">Remove</button>` : ''}
@@ -3648,6 +3735,17 @@
             } else {
                 membersList.innerHTML = '<div style="color:#777; font-size:12px; text-align:center; padding:10px;">No members found.</div>';
             }
+        }
+
+        // Apply the saved tab only after every chat control has its handlers.
+        try {
+            const savedMode = localStorage.getItem('tb_chat_last_mode') || 'anon';
+            const profile = window.NexusProfile ? NexusProfile.get() : null;
+            setMode(savedMode === 'group' && profile?.username ? 'group' : 'anon', false);
+            if (profile) initUserApprovalsWatcher();
+        } catch (error) {
+            console.error('Chat mode initialization failed:', error);
+            setMode('anon', false);
         }
 
     });
