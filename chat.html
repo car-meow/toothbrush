@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Nexus Chat</title>
-    <link rel="stylesheet" href="style.css?v=58">
+    <link rel="stylesheet" href="style.css?v=59">
     <script src="bgm-manager.js?v=64"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
@@ -55,13 +55,6 @@
         .online-stats { display: flex; align-items: center; gap: 10px; margin-left: 15px; }
         .online-count { color: white; font-weight: bold; font-size: 16px; }
         .online-hint { color: #777; font-weight: bold; font-size: 10px; }
-
-        .chat-msg {
-            padding: 12px 18px; border-radius: 15px; background: rgba(0,0,0,0.6);
-            border: 2.5px solid; max-width: 80%; margin-bottom: 12px; color: white;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
-            word-break: break-word; overflow-wrap: anywhere;
-        }
 
         .list-modal {
             display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -171,6 +164,9 @@
                 <img src="Assets/Settings.svg" alt=""><span>Admin Settings</span>
                 <div id="group-admin-badge" class="admin-badge">0</div>
             </button>
+            <button id="group-invite-btn" class="material-nav-btn" style="--expanded-width: 135px; display:none;" title="Invite">
+                <img src="Assets/Invite.svg" alt=""><span>Invite</span>
+            </button>
             <button id="chat-back-btn" class="material-nav-btn" style="--expanded-width: 125px;">
                 <img id="chat-back-icon" src="Assets/media-back-arrow.svg" alt=""><span id="chat-back-text">Home</span>
             </button>
@@ -204,6 +200,7 @@
                             <div id="anon-reply-bar" class="chat-reply-bar" style="display:none;"></div>
                             <div id="anon-image-preview-tray" class="chat-image-preview-tray" style="display:none;"></div>
                         </div>
+                        <div id="anon-typing-indicator" class="chat-typing-indicator" aria-live="polite"></div>
                         <div style="display:flex; gap:12px; align-items:center;">
                             <label for="img-upload" class="save-btn chat-photo-btn" title="Upload Photo">
                                 <img src="Assets/photoIcon.png" alt="Photos">
@@ -249,6 +246,7 @@
                                 <div id="group-reply-bar" class="chat-reply-bar" style="display:none;"></div>
                                 <div id="group-image-preview-tray" class="chat-image-preview-tray" style="display:none;"></div>
                             </div>
+                            <div id="group-typing-indicator" class="chat-typing-indicator" aria-live="polite"></div>
                             <div style="display:flex; gap:12px; align-items:center;">
                                 <label for="group-img-upload" class="save-btn chat-photo-btn" title="Upload Photo">
                                     <img src="Assets/photoIcon.png" alt="Photos">
@@ -286,6 +284,31 @@
             </div>
             <button id="confirm-create-group-btn" class="save-btn" style="background:#2E7D32; width:100%; height:48px; margin-top:5px;">Create & Launch</button>
             <button onclick="document.getElementById('create-group-modal').style.display='none'" class="save-btn cancel-modal-btn" style="width:100%; margin-top:10px;">Cancel</button>
+        </div>
+    </div>
+
+    <div id="group-invite-modal" class="overlay" style="z-index: 31000;">
+        <div class="modal-box group-invite-box">
+            <h3 style="margin:0 0 8px; color:var(--title-color);">Invite people</h3>
+            <p class="group-invite-description">Type people's usernames separated by a comma, then press Enter.</p>
+            <input id="group-invite-input" type="text" class="pin-input-large" placeholder="Username, username..." autocomplete="off">
+            <div id="group-invite-error" class="group-invite-error" aria-live="polite"></div>
+            <div id="group-invite-selected" class="group-invite-selected" aria-live="polite"></div>
+            <div class="group-invite-actions">
+                <button id="group-invite-submit" class="save-btn" style="background:#2E7D32;">Invite</button>
+                <button id="group-invite-cancel" class="save-btn cancel-modal-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="group-invite-confirm" class="overlay" style="z-index: 32000;">
+        <div class="modal-box group-invite-box">
+            <h3 style="margin:0 0 12px; color:var(--title-color);">Confirm invitation</h3>
+            <p id="group-invite-confirm-text" style="color:var(--text-color); line-height:1.5;"></p>
+            <div class="group-invite-actions">
+                <button id="group-invite-confirm-yes" class="save-btn" style="background:#2E7D32;">Confirm</button>
+                <button id="group-invite-confirm-no" class="save-btn cancel-modal-btn">Cancel</button>
+            </div>
         </div>
     </div>
 
@@ -428,12 +451,13 @@
             return { emoji: '💬', title: fullName };
         }
 
+        let activeEmojiAnchorRect = null;
         function positionEmojiPicker() {
             if (!activeEmojiTargetBtn) return;
             const popover = document.getElementById('nexus-emoji-popover');
             if (!popover || popover.style.display === 'none') return;
 
-            const rect = activeEmojiTargetBtn.getBoundingClientRect();
+            const rect = activeEmojiAnchorRect || activeEmojiTargetBtn.getBoundingClientRect();
             const popoverWidth = popover.offsetWidth || Math.min(360, window.innerWidth * 0.92);
             const popoverHeight = popover.offsetHeight || Math.min(440, window.innerHeight * 0.78);
 
@@ -532,7 +556,7 @@
             const closeBtn = document.getElementById('close-emoji-popover');
             if (!popover || !mount) return;
 
-            closeBtn.onclick = () => { popover.style.display = 'none'; };
+            closeBtn.onclick = closeEmojiPopover;
 
             const handlePickEvent = (e) => {
                 const raw = e.detail?.emoji || e.detail?.unicode || e.detail?.character || e.detail;
@@ -552,8 +576,8 @@
             if (initialPicker) customizePickerShadow(initialPicker);
 
             document.addEventListener('pointerdown', (e) => {
-                if (popover.style.display !== 'none' && !popover.contains(e.target) && e.target !== activeEmojiTargetBtn) {
-                    popover.style.display = 'none';
+                if (popover.style.display !== 'none' && !popover.contains(e.target) && !e.target.closest('.msg-action-btn')) {
+                    closeEmojiPopover();
                 }
             });
 
@@ -561,14 +585,27 @@
             window.addEventListener('scroll', positionEmojiPicker, true);
         }
 
+        function closeEmojiPopover() {
+            const popover = document.getElementById('nexus-emoji-popover');
+            if (popover) popover.style.display = 'none';
+            activeEmojiTargetBtn?.closest('.chat-msg-container')?.classList.remove('emoji-picker-open');
+            activeEmojiAnchorRect = null;
+            activeEmojiTargetBtn = null;
+            activeEmojiCallback = null;
+        }
+
         function openEmojiPicker(targetBtn, onSelect) {
+            activeEmojiTargetBtn?.closest('.chat-msg-container')?.classList.remove('emoji-picker-open');
             activeEmojiTargetBtn = targetBtn;
             activeEmojiCallback = onSelect;
+            activeEmojiAnchorRect = targetBtn.getBoundingClientRect();
+            targetBtn.closest('.chat-msg-container')?.classList.add('emoji-picker-open');
             const popover = document.getElementById('nexus-emoji-popover');
             if (!popover) return;
 
             popover.style.display = 'flex';
             positionEmojiPicker();
+            requestAnimationFrame(positionEmojiPicker);
 
             const picker = popover.querySelector('unicode-emoji-picker');
             if (picker) {
@@ -591,8 +628,7 @@
             if (typeof activeEmojiCallback === 'function') {
                 activeEmojiCallback(clean);
             }
-            const popover = document.getElementById('nexus-emoji-popover');
-            if (popover) popover.style.display = 'none';
+            closeEmojiPopover();
         }
 
         setupEmojiPicker();
@@ -976,10 +1012,16 @@
             };
         }
 
-        // --- Reactions (Local Storage & Realtime sync) ---
+        // --- Reactions (one reaction per username, synchronized across chat clients) ---
         function getStoredReactions(msgId) {
-            try { return JSON.parse(localStorage.getItem(`tb_msg_reactions_${msgId}`) || '{}'); }
-            catch(e) { return {}; }
+            try {
+                const parsed = JSON.parse(localStorage.getItem(`tb_msg_reactions_${msgId}`) || '{}');
+                const normalized = {};
+                Object.entries(parsed).forEach(([emoji, users]) => {
+                    if (Array.isArray(users)) normalized[emoji] = [...new Set(users.map(String))];
+                });
+                return normalized;
+            } catch(e) { return {}; }
         }
 
         function saveStoredReactions(msgId, reactions) {
@@ -989,78 +1031,61 @@
         function renderReactionsForMessage(msgId, rowEl) {
             if (!rowEl) return;
             const reactions = getStoredReactions(msgId);
-            const emojis = Object.keys(reactions);
             rowEl.innerHTML = '';
-            if (emojis.length === 0) {
-                rowEl.style.display = 'none';
-                return;
-            }
-            rowEl.style.display = 'flex';
-            emojis.forEach(em => {
-                const count = reactions[em] || 0;
-                if (count <= 0) return;
+            Object.entries(reactions).forEach(([emoji, users]) => {
+                if (!users.length) return;
                 const pill = document.createElement('span');
                 pill.className = 'chat-reaction-pill';
-                pill.textContent = `${em} ${count}`;
-                pill.title = `${count} reaction${count === 1 ? '' : 's'}`;
+                pill.textContent = `${emoji} ${users.length}`;
+                pill.title = `${users.length} reaction${users.length === 1 ? '' : 's'}: ${users.join(', ')}`;
                 pill.onclick = (e) => {
                     e.stopPropagation();
                     const container = rowEl.closest('.chat-msg-container');
                     const isGroup = container && container.dataset.groupMsg === 'true';
-                    addReactionToMessage(msgId, em, isGroup ? 'group' : 'anon');
+                    addReactionToMessage(msgId, emoji, isGroup ? 'group' : 'anon');
                 };
                 rowEl.appendChild(pill);
             });
+            rowEl.style.display = rowEl.childElementCount ? 'flex' : 'none';
+        }
+
+        function applyReactionEvent(msgId, emoji, user, remove = false) {
+            if (!msgId || !emoji || !user) return;
+            const reactions = getStoredReactions(msgId);
+            Object.entries(reactions).forEach(([key, users]) => {
+                if (remove || key !== emoji) reactions[key] = users.filter(name => name !== user);
+            });
+            if (!remove) {
+                const users = reactions[emoji] || [];
+                if (!users.includes(user)) reactions[emoji] = [...users, user];
+            }
+            Object.keys(reactions).forEach(key => { if (!reactions[key].length) delete reactions[key]; });
+            saveStoredReactions(msgId, reactions);
+            const container = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
+            if (container) renderReactionsForMessage(msgId, container.querySelector('.chat-reactions-row'));
         }
 
         function addReactionToMessage(msgId, emoji, type) {
+            const profile = window.NexusProfile?.get?.();
+            const user = type === 'anon' ? myName : profile?.username;
+            if (!user) return;
             const reactions = getStoredReactions(msgId);
-            reactions[emoji] = (reactions[emoji] || 0) + 1;
-            saveStoredReactions(msgId, reactions);
-
-            const container = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
-            if (container) {
-                const row = container.querySelector('.chat-reactions-row');
-                renderReactionsForMessage(msgId, row);
-            }
-
+            const remove = (reactions[emoji] || []).includes(user);
+            applyReactionEvent(msgId, emoji, user, remove);
+            const payload = { msgId, emoji, user, remove };
             if (type === 'anon') {
-                publish({ type: 'reaction', msgId, emoji, user: myName });
-            } else if (type === 'group') {
-                if (groupRealtimeChannel) {
-                    try {
-                        groupRealtimeChannel.send({
-                            type: 'broadcast',
-                            event: 'reaction',
-                            payload: { msgId, emoji, username: NexusProfile.get()?.username }
-                        });
-                    } catch(e) {}
-                }
+                publish({ type: 'reaction', ...payload });
+            } else if (groupRealtimeChannel) {
+                groupRealtimeChannel.send({ type: 'broadcast', event: 'reaction', payload });
             }
         }
 
         function handleGroupReactionBroadcast(payload) {
-            if (!payload || !payload.msgId || !payload.emoji) return;
-            const reactions = getStoredReactions(payload.msgId);
-            reactions[payload.emoji] = (reactions[payload.emoji] || 0) + 1;
-            saveStoredReactions(payload.msgId, reactions);
-            const container = document.querySelector(`[data-msg-id="${CSS.escape(payload.msgId)}"]`);
-            if (container) {
-                const row = container.querySelector('.chat-reactions-row');
-                renderReactionsForMessage(payload.msgId, row);
-            }
+            if (payload) applyReactionEvent(payload.msgId, payload.emoji, payload.user || payload.username, !!payload.remove);
         }
 
-        function handleAnonReaction(msgId, emoji, user) {
-            if (!msgId || !emoji) return;
-            const reactions = getStoredReactions(msgId);
-            reactions[emoji] = (reactions[emoji] || 0) + 1;
-            saveStoredReactions(msgId, reactions);
-            const container = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
-            if (container) {
-                const row = container.querySelector('.chat-reactions-row');
-                renderReactionsForMessage(msgId, row);
-            }
+        function handleAnonReaction(msgId, emoji, user, remove = false) {
+            applyReactionEvent(msgId, emoji, user, !!remove);
         }
 
         function handleAnonMsgEdit(msgId, newHtml) {
@@ -1701,15 +1726,14 @@
             }
 
             if (data.type === 'reaction') {
-                handleAnonReaction(data.msgId, data.emoji, data.user);
+                handleAnonReaction(data.msgId, data.emoji, data.user, data.remove);
             }
+            if (data.type === 'typing') handleAnonTyping(data.name, !!data.active);
 
             // ─── Disband ─────────────────────────────────────
             if (data.type === 'disband') {
                 if (isDisconnecting) return;
-                isDisconnecting = true;
-                // Removed redundant alert to avoid double prompt
-                location.reload();
+                leaveAnonymousRoom();
             }
 
             // ─── Kick ────────────────────────────────────────
@@ -1782,6 +1806,7 @@
                 document.getElementById('disband-btn').style.display = 'inline-flex';
             }
             updateNavBackButton();
+            updateChatModeSwitchVisibility();
         }
 
         function leaveAnonymousRoom() {
@@ -1801,6 +1826,7 @@
             isDisconnecting = false;
             uiReady = false;
             updateNavBackButton();
+            updateChatModeSwitchVisibility();
         }
 
         function updateNavBackButton() {
@@ -1861,6 +1887,7 @@
                 }
             }
             updateNavBackButton();
+            updateChatModeSwitchVisibility();
         };
         document.getElementById('chat-back-btn').onclick = window.handleBackAction;
         updateNavBackButton();
@@ -1990,9 +2017,13 @@
             const ok = await nexusConfirm('Disband Room?');
             if (ok) {
                 if (isDisconnecting) return;
-                isDisconnecting = true;
                 publish({ type: 'disband' });
-                navigateWithFade('index.html');
+                const disbandBtn = document.getElementById('disband-btn');
+                disbandBtn.disabled = true;
+                setTimeout(() => {
+                    disbandBtn.disabled = false;
+                    leaveAnonymousRoom();
+                }, 180);
             }
         };
 
@@ -2105,6 +2136,52 @@
 
         setupAutoExpand(document.getElementById('msg-input'), document.getElementById('send-btn'));
         setupJumpButton(document.getElementById('messages'), document.getElementById('anon-jump-btn'));
+
+        const anonTypingUsers = new Map();
+        const groupTypingUsers = new Map();
+        let anonTypingTimer = null;
+        let groupTypingTimer = null;
+        function typingLabel(users) {
+            const names = [...users].filter(Boolean);
+            if (!names.length) return '';
+            if (names.length > 3) return 'Many people are typing...';
+            if (names.length === 1) return `${names[0]} is typing...`;
+            if (names.length === 2) return `${names[0]} and ${names[1]} are typing...`;
+            return `${names[0]}, ${names[1]}, and ${names[2]} are typing...`;
+        }
+        function renderTypingIndicator(map, elementId, ownName) {
+            const now = Date.now();
+            map.forEach((expiresAt, name) => { if (expiresAt <= now || name === ownName) map.delete(name); });
+            const indicator = document.getElementById(elementId);
+            if (indicator) indicator.textContent = typingLabel(map.keys());
+        }
+        function handleAnonTyping(name, isTyping) {
+            if (!name || name === myName) return;
+            if (isTyping) anonTypingUsers.set(name, Date.now() + 2200);
+            else anonTypingUsers.delete(name);
+            renderTypingIndicator(anonTypingUsers, 'anon-typing-indicator', myName);
+        }
+        const anonInput = document.getElementById('msg-input');
+        anonInput.addEventListener('input', () => {
+            if (!myName) return;
+            publish({ type: 'typing', name: myName, active: !!anonInput.value.trim() });
+            clearTimeout(anonTypingTimer);
+            if (anonInput.value.trim()) anonTypingTimer = setTimeout(() => publish({ type: 'typing', name: myName, active: false }), 1500);
+        });
+        setInterval(() => renderTypingIndicator(anonTypingUsers, 'anon-typing-indicator', myName), 700);
+
+        const groupInput = document.getElementById('group-msg-input');
+        groupInput.addEventListener('input', () => {
+            const profile = NexusProfile.get();
+            if (!profile?.username || !groupRealtimeChannel) return;
+            const active = !!groupInput.value.trim();
+            groupRealtimeChannel.send({ type: 'broadcast', event: 'typing', payload: { username: profile.username, active } });
+            clearTimeout(groupTypingTimer);
+            if (active) groupTypingTimer = setTimeout(() => {
+                groupRealtimeChannel?.send({ type: 'broadcast', event: 'typing', payload: { username: profile.username, active: false } });
+            }, 1500);
+        });
+        setInterval(() => renderTypingIndicator(groupTypingUsers, 'group-typing-indicator', NexusProfile.get()?.username), 700);
 
         // ═══════════════════════════════════════════════════
         //  14. GROUP CHAT & SUPABASE INTEGRATION
@@ -2478,6 +2555,18 @@
             const groups = getEnrolledGroups();
             let changed = false;
 
+            const { data: memberships } = await sbClient.from('group_members').select('group_code').eq('user_id', profile.id);
+            for (const membership of memberships || []) {
+                if (groups.some(group => group.code === membership.group_code)) continue;
+                const { data: group } = await sbClient.from('groups').select('code, name, admin_id').eq('code', membership.group_code).maybeSingle();
+                if (group) {
+                    const enrolled = { code: group.code, name: group.name, isAdmin: isGroupAdmin(group.admin_id, profile.id), status: 'approved' };
+                    groups.push(enrolled);
+                    changed = true;
+                    showApprovalNotification(enrolled);
+                }
+            }
+
             for (const grp of groups) {
                 if (grp.status === 'pending') {
                     const { data } = await sbClient.from('group_requests')
@@ -2560,12 +2649,22 @@
                     schema: 'public',
                     table: 'group_members',
                     filter: `user_id=eq.${profile.id}`
-                }, payload => {
+                }, async payload => {
                     if (payload && payload.new) {
                         const groups = getEnrolledGroups();
-                        const grp = groups.find(g => g.code === payload.new.group_code);
+                        let grp = groups.find(g => g.code === payload.new.group_code);
+                        if (!grp && sbClient) {
+                            const { data: group } = await sbClient.from('groups').select('code, name, admin_id').eq('code', payload.new.group_code).maybeSingle();
+                            if (group) {
+                                grp = { code: group.code, name: group.name, isAdmin: isGroupAdmin(group.admin_id, profile.id), status: 'approved' };
+                            }
+                        }
                         if (grp && grp.status !== 'approved') {
                             grp.status = 'approved';
+                            addEnrolledGroup(grp);
+                            renderGroupSidebar();
+                            showApprovalNotification(grp);
+                        } else if (grp && !groups.some(g => g.code === grp.code)) {
                             addEnrolledGroup(grp);
                             renderGroupSidebar();
                             showApprovalNotification(grp);
@@ -2588,6 +2687,8 @@
                             if (currentActiveGroupCode === grp.code) {
                                 const adminBtn = document.getElementById('group-admin-btn');
                                 if (adminBtn) adminBtn.style.display = 'inline-flex';
+                                const inviteBtn = document.getElementById('group-invite-btn');
+                                if (inviteBtn) inviteBtn.style.display = 'inline-flex';
                                 refreshAdminBadge(grp.code);
                             }
                         }
@@ -2649,6 +2750,8 @@
 
         function closeCurrentGroup() {
             currentActiveGroupCode = null;
+            groupTypingUsers.clear();
+            renderTypingIndicator(groupTypingUsers, 'group-typing-indicator', NexusProfile.get()?.username);
             if (groupRealtimeChannel && sbClient) {
                 sbClient.removeChannel(groupRealtimeChannel);
                 groupRealtimeChannel = null;
@@ -2657,9 +2760,12 @@
             document.getElementById('group-room-info').style.display = 'none';
             const adminBtn = document.getElementById('group-admin-btn');
             if (adminBtn) adminBtn.style.display = 'none';
+            const inviteBtn = document.getElementById('group-invite-btn');
+            if (inviteBtn) inviteBtn.style.display = 'none';
             document.getElementById('group-join-view').style.display = 'flex';
             renderGroupSidebar();
             updateNavBackButton();
+            updateChatModeSwitchVisibility();
         }
 
         // Create Group
@@ -2866,9 +2972,12 @@
             let effectiveIsAdmin = !!isAdmin;
             const adminBtn = document.getElementById('group-admin-btn');
             if (adminBtn) adminBtn.style.display = effectiveIsAdmin ? 'inline-flex' : 'none';
+            const inviteBtn = document.getElementById('group-invite-btn');
+            if (inviteBtn) inviteBtn.style.display = effectiveIsAdmin ? 'inline-flex' : 'none';
 
             renderGroupSidebar();
             updateNavBackButton();
+            updateChatModeSwitchVisibility();
 
             const messagesArea = document.getElementById('group-messages');
             messagesArea.innerHTML = `
@@ -2895,6 +3004,8 @@
                             const wasNotAdmin = !effectiveIsAdmin;
                             effectiveIsAdmin = true;
                             if (adminBtn) adminBtn.style.display = 'inline-flex';
+                            const inviteBtn = document.getElementById('group-invite-btn');
+                            if (inviteBtn) inviteBtn.style.display = 'inline-flex';
                             refreshAdminBadge(code);
 
                             const groups = getEnrolledGroups();
@@ -2945,6 +3056,14 @@
                     .on('broadcast', { event: 'reaction' }, payload => {
                         handleGroupReactionBroadcast(payload.payload);
                     })
+                    .on('broadcast', { event: 'typing' }, payload => {
+                        const data = payload.payload || {};
+                        if (data.username && data.username !== NexusProfile.get()?.username) {
+                            if (data.active) groupTypingUsers.set(data.username, Date.now() + 2200);
+                            else groupTypingUsers.delete(data.username);
+                            renderTypingIndicator(groupTypingUsers, 'group-typing-indicator', NexusProfile.get()?.username);
+                        }
+                    })
                     .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `group_code=eq.${code}` }, () => {
                         refreshGroupMemberCount(code);
                     })
@@ -2953,6 +3072,8 @@
                         if (payload && payload.new && prof && isGroupAdmin(payload.new.admin_id, prof.id)) {
                             effectiveIsAdmin = true;
                             if (adminBtn) adminBtn.style.display = 'inline-flex';
+                            const inviteBtn = document.getElementById('group-invite-btn');
+                            if (inviteBtn) inviteBtn.style.display = 'inline-flex';
                             refreshAdminBadge(code);
                             const groups = getEnrolledGroups();
                             const enrolled = groups.find(g => g.code === code);
@@ -3167,6 +3288,98 @@
             document.getElementById('admin-modal-code').textContent = currentActiveGroupCode;
             loadAdminModalData();
         };
+
+        const inviteSelection = new Map();
+        const inviteModal = document.getElementById('group-invite-modal');
+        const inviteInput = document.getElementById('group-invite-input');
+        const inviteError = document.getElementById('group-invite-error');
+        const inviteSelected = document.getElementById('group-invite-selected');
+        function renderInviteSelection() {
+            inviteSelected.innerHTML = '';
+            inviteSelection.forEach(person => {
+                const chip = document.createElement('span');
+                chip.className = 'group-invite-chip';
+                chip.textContent = person.username;
+                inviteSelected.appendChild(chip);
+            });
+        }
+        function showInviteError(message) { inviteError.textContent = message || ''; }
+        async function addInviteNamesFromInput() {
+            const names = [...new Set(inviteInput.value.split(',').map(name => name.trim()).filter(Boolean))];
+            inviteInput.value = '';
+            showInviteError('');
+            if (!names.length) return;
+            if (!sbClient) { showInviteError('Error: Could not check usernames right now.'); return; }
+            const [membersResult, requestsResult] = await Promise.all([
+                sbClient.from('group_members').select('user_id, username'),
+                sbClient.from('group_requests').select('user_id, username')
+            ]);
+            if (membersResult.error && requestsResult.error) { showInviteError('Error: Could not check usernames right now.'); return; }
+            const rows = [...(membersResult.data || []), ...(requestsResult.data || [])];
+            const errors = [];
+            names.forEach(name => {
+                const match = rows.find(person => (person.username || '').trim().toLowerCase() === name.toLowerCase());
+                if (!match) errors.push(`Error: ${name} does not exist.`);
+                else if (!inviteSelection.has(match.user_id)) inviteSelection.set(match.user_id, { user_id: match.user_id, username: match.username, user_color: colorForName(match.username) });
+            });
+            renderInviteSelection();
+            showInviteError(errors.join(' '));
+        }
+        async function submitGroupInvites() {
+            if (inviteInput.value.trim()) {
+                await addInviteNamesFromInput();
+                return;
+            }
+            if (!inviteSelection.size) { showInviteError('Select people to invite!'); return; }
+            const names = [...inviteSelection.values()].map(person => person.username);
+            document.getElementById('group-invite-confirm-text').textContent = `Invite the following people: ${names.join(', ')}?`;
+            document.getElementById('group-invite-confirm').style.display = 'flex';
+        }
+        async function confirmGroupInvites() {
+            if (!currentActiveGroupCode || !sbClient) return;
+            const code = currentActiveGroupCode;
+            const people = [...inviteSelection.values()];
+            const current = await sbClient.from('group_members').select('user_id, username').eq('group_code', code);
+            if (current.error) {
+                document.getElementById('group-invite-confirm').style.display = 'none';
+                showInviteError(`Error: ${current.error.message}`);
+                return;
+            }
+            const existingIds = new Set((current.data || []).map(person => person.user_id));
+            const pending = people.filter(person => !existingIds.has(person.user_id));
+            if (pending.length) {
+                const { error } = await sbClient.from('group_members').insert(pending.map(person => ({
+                    group_code: code, user_id: person.user_id, username: person.username, user_color: person.user_color
+                })));
+                if (error) {
+                    document.getElementById('group-invite-confirm').style.display = 'none';
+                    showInviteError(`Error: ${error.message}`);
+                    return;
+                }
+                const inviter = NexusProfile.get()?.username || 'An admin';
+                await sbClient.from('group_messages').insert([{
+                    group_code: code, user_id: 'system', username: 'System', user_color: '#4CAF50',
+                    text: `${pending.map(person => person.username).join(', ')} ${pending.length === 1 ? 'was' : 'were'} invited by ${inviter}.`
+                }]);
+            }
+            document.getElementById('group-invite-confirm').style.display = 'none';
+            inviteModal.style.display = 'none';
+            inviteSelection.clear();
+            renderInviteSelection();
+            showInviteError('');
+            refreshGroupMemberCount(code);
+        }
+        document.getElementById('group-invite-btn').onclick = () => {
+            inviteSelection.clear(); renderInviteSelection(); showInviteError(''); inviteInput.value = '';
+            inviteModal.style.display = 'flex'; setTimeout(() => inviteInput.focus(), 50);
+        };
+        inviteInput.addEventListener('keydown', event => {
+            if (event.key === 'Enter') { event.preventDefault(); submitGroupInvites(); }
+        });
+        document.getElementById('group-invite-submit').onclick = submitGroupInvites;
+        document.getElementById('group-invite-cancel').onclick = () => { inviteModal.style.display = 'none'; };
+        document.getElementById('group-invite-confirm-yes').onclick = confirmGroupInvites;
+        document.getElementById('group-invite-confirm-no').onclick = () => { document.getElementById('group-invite-confirm').style.display = 'none'; };
 
         async function loadAdminModalData() {
             if (!currentActiveGroupCode || !sbClient) return;
