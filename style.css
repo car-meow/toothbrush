@@ -4537,19 +4537,28 @@ html.light-mode .group-unread-badge {
 
 .chat-send-feedback { display: none; padding-left: 58px; color: #f44336; font-size: 12px; font-weight: 600; }
 
+@property --nexus-rainbow-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+}
+
 @keyframes nexus-rainbow-flow {
     from { background-position: 0% 50%; }
     to { background-position: 100% 50%; }
 }
 
-@keyframes nexus-rainbow-outline-flow {
-    from { background-position: 0 0, 0% 50%; }
-    to { background-position: 0 0, 100% 50%; }
+@keyframes nexus-rainbow-rotate {
+    from { --nexus-rainbow-angle: 0deg; }
+    to { --nexus-rainbow-angle: 360deg; }
 }
 
 .nexus-rainbow-text {
     color: transparent !important;
-    background-image: linear-gradient(90deg, #ff1744, #ff9100, #ffea00, #00e676, #00b0ff, #651fff, #f500d4, #ff1744);
+    background-image: linear-gradient(90deg,
+        #ff1744 0%, #ff9100 4.7619%, #ffea00 9.5238%, #00e676 14.2857%, #00b0ff 19.0476%, #651fff 23.8095%, #f500d4 28.5714%, #ff1744 33.3333%,
+        #ff9100 38.0952%, #ffea00 42.8571%, #00e676 47.6190%, #00b0ff 52.3810%, #651fff 57.1429%, #f500d4 61.9048%, #ff1744 66.6667%,
+        #ff9100 71.4286%, #ffea00 76.1905%, #00e676 80.9524%, #00b0ff 85.7143%, #651fff 90.4762%, #f500d4 95.2381%, #ff1744 100%);
     background-size: 300% 100%;
     background-clip: text;
     -webkit-background-clip: text;
@@ -4558,25 +4567,46 @@ html.light-mode .group-unread-badge {
 }
 
 .chat-msg.nexus-rainbow-outline {
+    position: relative;
+    isolation: isolate;
     border: 4px solid transparent !important;
-    background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)) padding-box,
-                linear-gradient(90deg, #ff1744, #ff9100, #ffea00, #00e676, #00b0ff, #651fff, #f500d4, #ff1744) border-box !important;
-    background-size: 100% 100%, 300% 100% !important;
-    animation: nexus-rainbow-outline-flow 3.2s linear infinite;
 }
 
-html.light-mode .chat-msg.nexus-rainbow-outline {
-    background: linear-gradient(#fff, #fff) padding-box,
-                linear-gradient(90deg, #ff1744, #ff9100, #ffea00, #00e676, #00b0ff, #651fff, #f500d4, #ff1744) border-box !important;
-    background-size: 100% 100%, 300% 100% !important;
+.chat-msg.nexus-rainbow-outline::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    padding: 4px;
+    border-radius: 19px;
+    background: conic-gradient(from var(--nexus-rainbow-angle), #ff1744, #ff9100, #ffea00, #00e676, #00b0ff, #651fff, #f500d4, #ff1744);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    animation: nexus-rainbow-rotate 3.2s linear infinite;
 }
 
 .user-pill.nexus-rainbow-pill {
+    position: relative;
+    isolation: isolate;
     border: 2px solid transparent !important;
-    background: linear-gradient(rgba(20, 16, 30, 0.96), rgba(20, 16, 30, 0.96)) padding-box,
-                linear-gradient(90deg, #ff1744, #ff9100, #ffea00, #00e676, #00b0ff, #651fff, #f500d4, #ff1744) border-box !important;
-    background-size: 100% 100%, 300% 100% !important;
-    animation: nexus-rainbow-outline-flow 3.2s linear infinite;
+    background: rgba(20, 16, 30, 0.96) !important;
+}
+
+.user-pill.nexus-rainbow-pill::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    padding: 2px;
+    border-radius: inherit;
+    background: conic-gradient(from var(--nexus-rainbow-angle), #ff1744, #ff9100, #ffea00, #00e676, #00b0ff, #651fff, #f500d4, #ff1744);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    animation: nexus-rainbow-rotate 3.2s linear infinite;
 }
 
 .chat-msg.chat-msg-deleted {
@@ -4652,6 +4682,6 @@ html.light-mode .chat-msg.chat-msg-deleted {
 
 @media (prefers-reduced-motion: reduce) {
     .nexus-rainbow-text,
-    .chat-msg.nexus-rainbow-outline,
-    .user-pill.nexus-rainbow-pill { animation-duration: 10s; }
+    .chat-msg.nexus-rainbow-outline::before,
+    .user-pill.nexus-rainbow-pill::before { animation-duration: 10s; }
 }
