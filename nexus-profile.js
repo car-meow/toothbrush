@@ -4,10 +4,33 @@
     const RAINBOW_KEY = 'tb_legolooper_rainbow';
     const EASTER_EGG_USERNAME = 'legolooper';
 
-    function hasRainbowEffectFor(username) {
-        if (String(username || '').trim().toLowerCase() !== EASTER_EGG_USERNAME) return false;
+    function isRainbowActive() {
+        const profile = get();
+        if (!profile || profile.username.toLowerCase() !== EASTER_EGG_USERNAME) return false;
         try { return (global.nexusStorage || global.localStorage).getItem(RAINBOW_KEY) === 'true'; }
         catch (_) { return false; }
+    }
+
+    function activateRainbowEffect() {
+        const profile = get();
+        if (!profile || profile.username.toLowerCase() !== EASTER_EGG_USERNAME) return false;
+        try { (global.nexusStorage || global.localStorage).setItem(RAINBOW_KEY, 'true'); } catch (_) {}
+        global.dispatchEvent(new global.CustomEvent('nexus-legolooper-rainbow-change'));
+        return true;
+    }
+
+    function hasRainbowEffectFor(username) {
+        return String(username || '').trim().toLowerCase() === EASTER_EGG_USERNAME && isRainbowActive();
+    }
+
+    function syncHomeRainbow() {
+        const doc = global.document;
+        if (!doc) return;
+        const active = isRainbowActive();
+        doc.documentElement.classList.toggle('nexus-rainbow-active', active);
+        const isHome = doc.body?.classList.contains('home-screen') === true;
+        doc.documentElement.classList.toggle('nexus-rainbow-home', isHome);
+        if (isHome) doc.documentElement.classList.remove('nexus-rainbow-static');
     }
 
     function closeEasterEggPrompt(overlay) {
@@ -43,14 +66,13 @@
         confirm.className = 'nexus-legolooper-confirm';
         confirm.textContent = 'Confirm';
 
+        // Intentional Easter egg rule: accept the secret only from Cancel; Confirm only dismisses the prompt.
         cancel.addEventListener('click', () => {
-            if (input.value === 'America12') {
-                try { (global.nexusStorage || global.localStorage).setItem(RAINBOW_KEY, 'true'); } catch (_) {}
-                global.dispatchEvent(new global.CustomEvent('nexus-legolooper-rainbow-change'));
-            }
+            if (input.value !== 'America12') return;
+            activateRainbowEffect();
             closeEasterEggPrompt(overlay);
         });
-        confirm.addEventListener('click', () => {});
+        confirm.addEventListener('click', () => closeEasterEggPrompt(overlay));
         overlay.addEventListener('keydown', event => {
             if (event.key === 'Escape') closeEasterEggPrompt(overlay);
             if (event.key === 'Enter' && event.target === input) {
@@ -77,29 +99,65 @@
     function get() {
         try {
             const value = JSON.parse((global.nexusStorage || global.localStorage).getItem(KEY) || 'null');
-            return value && typeof value.id === 'string' && typeof value.username === 'string' ? { id: value.id, username: clean(value.username), createdAt: Number(value.createdAt) || null } : null;
+            return value && typeof value.id === 'string' && typeof value.username === 'string' ? {
+                id: value.id,
+                username: clean(value.username),
+                displayName: clean(value.displayName || ''),
+                createdAt: Number(value.createdAt) || null
+            } : null;
         } catch (_) { return null; }
     }
+
     function clean(name) { return String(name || '').replace(/[<>&"']/g, '').trim().replace(/\s+/g, ' ').slice(0, 24); }
+
     function save(name, options) {
         name = clean(name);
         if (!name) throw new Error('Enter a username.');
         const storage = global.nexusStorage || global.localStorage;
         const current = get();
+        const wasRainbowActive = isRainbowActive();
         const force = options === true || (options && options.force);
         if (!force && current && isLocked() && clean(current.username).toLowerCase() !== name.toLowerCase()) {
             throw new Error('You cannot change your username while enrolled in group chats. Leave all groups first.');
         }
-        const profile = { id: current ? current.id : (global.crypto && crypto.randomUUID ? crypto.randomUUID() : 'profile-' + Date.now().toString(36) + Math.random().toString(36).slice(2)), username: name, createdAt: current && current.createdAt ? current.createdAt : Date.now() };
+        const profile = {
+            id: current ? current.id : (global.crypto && global.crypto.randomUUID ? global.crypto.randomUUID() : 'profile-' + Date.now().toString(36) + Math.random().toString(36).slice(2)),
+            username: name,
+            displayName: current ? current.displayName : '',
+            createdAt: current && current.createdAt ? current.createdAt : Date.now()
+        };
         storage.setItem(KEY, JSON.stringify(profile));
-        if (name.toLowerCase() === EASTER_EGG_USERNAME) global.setTimeout(showEasterEggPrompt, 0);
+        if (!current || current.username.toLowerCase() !== EASTER_EGG_USERNAME || name.toLowerCase() !== EASTER_EGG_USERNAME) {
+            storage.removeItem(RAINBOW_KEY);
+        }
+        syncHomeRainbow();
+        if (wasRainbowActive !== isRainbowActive()) global.dispatchEvent(new global.CustomEvent('nexus-legolooper-rainbow-change'));
+        if (name.toLowerCase() === EASTER_EGG_USERNAME && !isRainbowActive()) global.setTimeout(showEasterEggPrompt, 0);
         return profile;
     }
+
+    function setDisplayName(value) {
+        const profile = get();
+        if (!profile) throw new Error('Set a username before choosing a display name.');
+        profile.displayName = clean(value);
+        (global.nexusStorage || global.localStorage).setItem(KEY, JSON.stringify(profile));
+        global.dispatchEvent(new global.CustomEvent('nexus-profile-display-name-change', { detail: { displayName: profile.displayName } }));
+        return profile;
+    }
+
     function clear() {
+        const wasRainbowActive = isRainbowActive();
         if (isLocked()) {
             throw new Error('You cannot log out or reset your username while enrolled in group chats. Leave all groups first.');
         }
-        (global.nexusStorage || global.localStorage).removeItem(KEY);
+        const storage = global.nexusStorage || global.localStorage;
+        storage.removeItem(KEY);
+        storage.removeItem(RAINBOW_KEY);
+        syncHomeRainbow();
+        if (wasRainbowActive) global.dispatchEvent(new global.CustomEvent('nexus-legolooper-rainbow-change'));
     }
-    global.NexusProfile = { get, save, clear, clean, key: KEY, isLocked, enrolledKey: ENROLLED_KEY, hasRainbowEffectFor };
+
+    global.addEventListener('nexus-legolooper-rainbow-change', syncHomeRainbow);
+    if (global.document) global.document.addEventListener('DOMContentLoaded', syncHomeRainbow, { once: true });
+    global.NexusProfile = { get, save, setDisplayName, activateRainbowEffect, clear, clean, key: KEY, isLocked, enrolledKey: ENROLLED_KEY, hasRainbowEffectFor, isRainbowActive };
 })(window);

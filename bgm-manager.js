@@ -290,6 +290,8 @@ window.BGMManager = {
             
             els.title.textContent = options.title || 'Nexus';
             els.msg.textContent = options.message || '';
+            els.okBtn.textContent = options.confirmLabel || 'OK';
+            els.cancelBtn.textContent = options.cancelLabel || 'Cancel';
 
             const hasRawError = options.rawError !== undefined && options.rawError !== null && String(options.rawError).length > 0;
             els.errorDetails.style.display = hasRawError ? 'block' : 'none';
@@ -374,8 +376,8 @@ window.BGMManager = {
         }
         return showDialog({ message: String(message), title: title || 'Nexus', isConfirm: false, rawError });
     };
-    window.nexusConfirm = function(msg, title) {
-        return showDialog({ message: String(msg), title: title || 'Nexus', isConfirm: true });
+    window.nexusConfirm = function(msg, title, confirmLabel) {
+        return showDialog({ message: String(msg), title: title || 'Nexus', isConfirm: true, confirmLabel: confirmLabel || 'OK' });
     };
     window.nexusPrompt = function(msg, defaultVal, title) {
         return showDialog({ message: String(msg), defaultValue: defaultVal, title: title || 'Nexus', isPrompt: true });

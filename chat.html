@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Nexus Chat</title>
-    <link rel="stylesheet" href="style.css?v=62">
-    <script src="bgm-manager.js?v=64"></script>
+    <link rel="stylesheet" href="style.css?v=63">
+    <script src="bgm-manager.js?v=65"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
         (function() {
@@ -364,7 +364,7 @@
         </div>
     </div>
 
-    <script src="nexus-profile.js?v=3"></script>
+    <script src="nexus-profile.js?v=4"></script>
     <script>
         const localStorage = window.nexusStorage || window.localStorage;
         document.addEventListener('DOMContentLoaded', async () => {
@@ -641,6 +641,7 @@
             document.querySelectorAll(`[data-original-username="${CSS.escape(origName)}"]`).forEach(el => {
                 el.textContent = effective;
             });
+            if (currentActiveGroupCode) refreshRenderedGroupColors();
         }
 
         // Display Name Modal
@@ -1110,6 +1111,7 @@
             bubble.classList.add('chat-msg-deleted');
             bubble.innerHTML = '<div class="msg-content">This message was deleted by user.</div>';
             container.querySelector('.chat-msg-actions')?.remove();
+            syncRainbowClasses(container);
         }
 
         function handleAnonMsgDelete(msgId) {
@@ -1400,48 +1402,76 @@
             return '#' + rgb.map(channel => Math.round((channel + offset) * 255).toString(16).padStart(2, '0')).join('');
         }
 
-        function buildDistinctGroupColors(members, groupCode) {
-            const ordered = [...(members || [])]
-                .filter(member => member && member.user_id)
-                .sort((a, b) => {
-                    const aName = String(a.username || '').trim().toLowerCase();
-                    const bName = String(b.username || '').trim().toLowerCase();
-                    if (aName !== bName) return aName < bName ? -1 : 1;
-                    const aId = String(a.user_id);
-                    const bId = String(b.user_id);
-                    return aId === bId ? 0 : (aId < bId ? -1 : 1);
-                });
+        function colorForStableGroupUser(userId, username) {
+            const seed = String(userId || username || 'group-member');
+            let hash = 2166136261;
+            for (let index = 0; index < seed.length; index++) {
+                hash ^= seed.charCodeAt(index);
+                hash = Math.imul(hash, 16777619) >>> 0;
+            }
+            return hslToHex(hash % 360, 0.8, 0.58);
+        }
+
+        function buildDistinctGroupColors(members) {
             const byId = new Map();
             const byName = new Map();
-            if (!ordered.length) return { byId, byName };
-
-            let hash = 0;
-            for (const character of String(groupCode || '')) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-            const startingHue = hash % 360;
-            const goldenAngle = 137.507764;
-            const lightnessSteps = [0.56, 0.68, 0.49, 0.62];
-            ordered.forEach((member, index) => {
-                const color = hslToHex(startingHue + goldenAngle * index, 0.86, lightnessSteps[index % lightnessSteps.length]);
-                byId.set(String(member.user_id), color);
-                if (member.username) byName.set(String(member.username).trim().toLowerCase(), color);
+            const rainbowById = new Map();
+            const displayNameById = new Map();
+            (members || []).forEach(member => {
+                if (!member || !member.user_id) return;
+                const userId = String(member.user_id);
+                const username = String(member.username || '');
+                const savedColor = /^#[0-9a-f]{6}$/i.test(String(member.user_color || '')) ? member.user_color : colorForStableGroupUser(userId, username);
+                byId.set(userId, savedColor);
+                if (username) byName.set(username.trim().toLowerCase(), savedColor);
+                rainbowById.set(userId, username.trim().toLowerCase() === 'legolooper' && member.rainbow_active === true);
+                displayNameById.set(userId, String(member.display_name || ''));
             });
-            return { byId, byName };
+            return { byId, byName, rainbowById, displayNameById };
         }
 
         function colorForGroupUser(userId, username, fallbackColor) {
-            return currentGroupColorsById.get(String(userId || '')) || currentGroupColorsByName.get(String(username || '').trim().toLowerCase()) || fallbackColor || colorForName(username);
+            return currentGroupColorsById.get(String(userId || '')) || currentGroupColorsByName.get(String(username || '').trim().toLowerCase()) || fallbackColor || colorForStableGroupUser(userId, username);
         }
 
-        function isRainbowUsername(username) {
-            return !!(window.NexusProfile && NexusProfile.hasRainbowEffectFor && NexusProfile.hasRainbowEffectFor(username));
+        async function syncRainbowStateFromGroupMemberships(profile) {
+            if (!profile || profile.username.toLowerCase() !== 'legolooper' || NexusProfile.isRainbowActive() || !sbClient) return NexusProfile.isRainbowActive();
+            const { data, error } = await sbClient.from('group_members')
+                .select('rainbow_active')
+                .eq('user_id', profile.id)
+                .eq('rainbow_active', true)
+                .limit(1);
+            if (!error && data && data.length) NexusProfile.activateRainbowEffect();
+            return NexusProfile.isRainbowActive();
         }
 
-        function renderUserPillMarkup(username, backgroundColor, suffix = '') {
-            const escapedUsername = escapeHTML(username);
-            const rainbow = isRainbowUsername(username);
-            const label = rainbow ? `<span class="nexus-rainbow-text">${escapedUsername}</span>` : escapedUsername;
+        function isRainbowUser(username, userId, explicitRainbow = false) {
+            if (String(username || '').trim().toLowerCase() !== 'legolooper') return false;
+            const id = String(userId || '');
+            if (id && currentGroupRainbowById.has(id)) return currentGroupRainbowById.get(id) === true;
+            const activeRoomUser = globalUserList.find(user =>
+                String(user.peerId || '') === id || (!id && String(user.name || '').trim().toLowerCase() === 'legolooper')
+            );
+            if (activeRoomUser) return activeRoomUser.rainbowActive === true;
+            const profile = window.NexusProfile?.get?.();
+            return explicitRainbow === true || (!!profile && profile.id === id && NexusProfile.isRainbowActive());
+        }
+
+        function effectiveMemberDisplayName(username, storedName = '') {
+            const localName = getCustomDisplayNames()[username];
+            const sharedName = String(storedName || '').trim();
+            if (sharedName && sharedName !== username) return sharedName;
+            return String(localName || sharedName || '').trim() || username;
+        }
+
+        function renderUserPillMarkup(username, backgroundColor, suffix = '', options = {}) {
+            const safeUsername = escapeHTML(username);
+            const displayName = String(options.displayName || '').trim();
+            const visibleName = displayName && displayName !== username ? `${escapeHTML(displayName)} (${safeUsername})` : safeUsername;
+            const userId = String(options.userId || '');
+            const rainbow = isRainbowUser(username, userId, options.rainbowActive);
             const background = rainbow ? '' : ` style="background:${backgroundColor || colorForName(username)};"`;
-            return `<div class="user-pill${rainbow ? ' nexus-rainbow-pill' : ''}" data-username="${escapedUsername}"${background}>${label}${escapeHTML(suffix)}</div>`;
+            return `<div class="user-pill${rainbow ? ' nexus-rainbow-pill' : ''}" data-username="${safeUsername}" data-user-id="${escapeHTML(userId)}" data-rainbow-active="${rainbow}"${background}>${rainbow ? `<span class="nexus-rainbow-text">${visibleName}</span>` : visibleName}${escapeHTML(suffix)}</div>`;
         }
 
         function syncRainbowClasses(root = document) {
@@ -1450,35 +1480,91 @@
                 ...root.querySelectorAll(selector)
             ];
             collect('.name-tag[data-username], .reply-quote-user[data-username]').forEach(element => {
-                element.classList.toggle('nexus-rainbow-text', isRainbowUsername(element.dataset.username));
+                const rainbow = isRainbowUser(element.dataset.username, element.dataset.userId, element.dataset.rainbowActive === 'true');
+                element.classList.toggle('nexus-rainbow-text', rainbow);
             });
             collect('.chat-msg-container[data-sender]').forEach(container => {
                 const bubble = container.querySelector('.chat-msg');
                 if (bubble && !container.classList.contains('message-deleted')) {
-                    bubble.classList.toggle('nexus-rainbow-outline', isRainbowUsername(container.dataset.sender));
+                    const rainbow = isRainbowUser(container.dataset.sender, container.dataset.userId, container.dataset.rainbowActive === 'true');
+                    bubble.classList.toggle('nexus-rainbow-outline', rainbow);
                 }
             });
             collect('.user-pill[data-username]').forEach(pill => {
-                const rainbow = isRainbowUsername(pill.dataset.username);
+                const rainbow = isRainbowUser(pill.dataset.username, pill.dataset.userId, pill.dataset.rainbowActive === 'true');
+                pill.dataset.rainbowActive = String(rainbow);
                 pill.classList.toggle('nexus-rainbow-pill', rainbow);
-                let label = pill.querySelector('.nexus-rainbow-text');
+                const label = pill.querySelector('.nexus-rainbow-text');
                 if (rainbow && !label) {
-                    const textNodes = [...pill.childNodes].filter(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
-                    textNodes.forEach(node => {
+                    const firstText = [...pill.childNodes].find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+                    if (firstText) {
                         const span = document.createElement('span');
                         span.className = 'nexus-rainbow-text';
-                        span.textContent = node.textContent;
-                        node.replaceWith(span);
-                    });
-                    label = pill.querySelector('.nexus-rainbow-text');
+                        span.textContent = firstText.textContent;
+                        firstText.replaceWith(span);
+                    }
+                } else if (!rainbow && label) {
+                    label.replaceWith(document.createTextNode(label.textContent));
                 }
-                if (label) label.classList.toggle('nexus-rainbow-text', rainbow);
             });
+            const htmlRoot = document.documentElement;
+            const active = !!document.querySelector('.chat-msg.nexus-rainbow-outline, .user-pill.nexus-rainbow-pill');
+            htmlRoot.classList.toggle('nexus-rainbow-active', active);
+            htmlRoot.classList.toggle('nexus-rainbow-static', active && !document.body.classList.contains('home-screen') && (htmlRoot.classList.contains('performance-mode') || htmlRoot.classList.contains('performance-mode-lite')));
         }
 
-        window.addEventListener('nexus-legolooper-rainbow-change', () => {
+        function syncPerformanceModeClasses() {
+            const storage = window.nexusStorage || window.localStorage;
+            const htmlRoot = document.documentElement;
+            htmlRoot.classList.toggle('performance-mode', storage.getItem('tb_performance_mode') === 'true');
+            htmlRoot.classList.toggle('performance-mode-lite', storage.getItem('tb_performance_mode_lite') === 'true');
+            syncRainbowClasses();
+        }
+
+        window.addEventListener('storage', event => {
+            if (event.key === 'tb_performance_mode' || event.key === 'tb_performance_mode_lite') syncPerformanceModeClasses();
+        });
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) syncPerformanceModeClasses();
+        });
+        window.addEventListener('nexus-legolooper-rainbow-change', async () => {
+            const profile = NexusProfile.get();
+            const active = !!profile && profile.username.toLowerCase() === 'legolooper' && NexusProfile.isRainbowActive();
+            if (profile && sbClient) {
+                await sbClient.from('group_members').update({ rainbow_active: active }).eq('user_id', profile.id);
+                await sbClient.from('group_requests').update({ rainbow_active: active }).eq('user_id', profile.id);
+                if (currentActiveGroupCode) await refreshGroupColorMap(currentActiveGroupCode);
+            }
+            if (myName && localProfile && localProfile.id === profile?.id) {
+                publish({ type: 'profile-state', peerId: myUuid, rainbowActive: active, displayName: !roomAnonymous ? (profile.displayName || '') : '' });
+                const entry = globalUserList.find(user => user.peerId === myUuid);
+                if (entry) entry.rainbowActive = active;
+                if (isHost && registry[myUuid]) {
+                    registry[myUuid].rainbowActive = active;
+                    globalUserList = Object.values(registry);
+                }
+            }
             syncRainbowClasses();
             refreshRenderedGroupColors();
+        });
+
+        window.addEventListener('nexus-profile-display-name-change', async event => {
+            const profile = NexusProfile.get();
+            const displayName = event.detail?.displayName || '';
+            if (profile && sbClient) {
+                await sbClient.from('group_members').update({ display_name: displayName }).eq('user_id', profile.id);
+                await sbClient.from('group_requests').update({ display_name: displayName }).eq('user_id', profile.id);
+                if (currentActiveGroupCode) await refreshGroupColorMap(currentActiveGroupCode);
+            }
+            if (myName && localProfile?.id === profile?.id) {
+                publish({ type: 'profile-state', peerId: myUuid, rainbowActive: NexusProfile.isRainbowActive(), displayName: !roomAnonymous ? displayName : '' });
+                const entry = globalUserList.find(user => user.peerId === myUuid);
+                if (entry) entry.displayName = displayName;
+                if (isHost && registry[myUuid]) {
+                    registry[myUuid].displayName = displayName;
+                    globalUserList = Object.values(registry);
+                }
+            }
         });
 
         // ═══════════════════════════════════════════════════
@@ -1730,7 +1816,7 @@
                         myColor = colorForName(myName);
                         usedNames.add(myName);
 
-                        registry[myUuid] = { name: myName, color: myColor, ip: myIP, peerId: myUuid };
+                        registry[myUuid] = { name: myName, color: myColor, ip: myIP, peerId: myUuid, displayName: !roomAnonymous ? (localProfile?.displayName || '') : '', rainbowActive: !roomAnonymous && NexusProfile.isRainbowActive() };
                         globalUserList = Object.values(registry);
 
                         setStatus('ready', 'Room Live');
@@ -1740,7 +1826,7 @@
                         // ── Guest: ask to join ──
                         showWaiting(true);
                         setStatus('loading', 'Locating Host…');
-                        publish({ type: 'join', peerId: myUuid, ip: myIP, username: localProfile && localProfile.username || '' });
+                        publish({ type: 'join', peerId: myUuid, ip: myIP, username: localProfile && localProfile.username || '', displayName: localProfile?.displayName || '', rainbowActive: !!localProfile && NexusProfile.isRainbowActive() });
 
                         hostWaitTimeout = setTimeout(() => {
                             if (!myName) {
@@ -1770,7 +1856,7 @@
             if (isHost && data.type === 'join' && data.peerId !== myUuid) {
                 if (registry[data.peerId]) {
                     // Already in room — re-send state in case they missed it
-                    publish({ type: 'name-assign', targetPeerId: data.peerId, name: registry[data.peerId].name, color: registry[data.peerId].color });
+                    publish({ type: 'name-assign', targetPeerId: data.peerId, name: registry[data.peerId].name, color: registry[data.peerId].color, displayName: registry[data.peerId].displayName || '', rainbowActive: registry[data.peerId].rainbowActive === true });
                     publish({ type: 'room-info', name: document.getElementById('display-room-name').textContent, pin: document.getElementById('display-pin').textContent, anonymous: roomAnonymous });
                     broadcastRegistry();
                     return;
@@ -1788,11 +1874,11 @@
                 const assignedName  = roomAnonymous ? pickFreeName() : requestedUsername;
                 const assignedColor = colorForName(assignedName);
                 usedNames.add(assignedName);
-                registry[data.peerId] = { name: assignedName, color: assignedColor, ip: data.ip, peerId: data.peerId };
+                registry[data.peerId] = { name: assignedName, color: assignedColor, ip: data.ip, peerId: data.peerId, displayName: !roomAnonymous ? NexusProfile.clean(data.displayName || '') : '', rainbowActive: !roomAnonymous && requestedUsername.toLowerCase() === 'legolooper' && data.rainbowActive === true };
                 globalUserList = Object.values(registry);
 
                 // Send assignment FIRST, then room-info, then full registry
-                publish({ type: 'name-assign', targetPeerId: data.peerId, name: assignedName, color: assignedColor });
+                publish({ type: 'name-assign', targetPeerId: data.peerId, name: assignedName, color: assignedColor, displayName: registry[data.peerId].displayName, rainbowActive: registry[data.peerId].rainbowActive });
 
                 // Small delay to help ordering on the broker
                 setTimeout(() => {
@@ -1823,7 +1909,7 @@
                     const username = prompt('This room uses usernames. Create a local profile username to join:');
                     if (username === null) { if (mqttClient) mqttClient.end(true); showWaiting(false); return; }
                     try { localProfile = NexusProfile.save(username); } catch (error) { alert(error.message); if (mqttClient) mqttClient.end(true); showWaiting(false); return; }
-                    publish({ type: 'join', peerId: myUuid, ip: myIP, username: localProfile.username });
+                    publish({ type: 'join', peerId: myUuid, ip: myIP, username: localProfile.username, displayName: localProfile.displayName || '', rainbowActive: NexusProfile.isRainbowActive() });
                 }
                 if (myName && !uiReady) {
                     setupUI(data.name, data.pin);
@@ -1840,7 +1926,7 @@
                     if (username === null) { if (mqttClient) mqttClient.end(true); showWaiting(false); return; }
                     try { localProfile = NexusProfile.save(username); } catch (error) { alert(error.message); if (mqttClient) mqttClient.end(true); showWaiting(false); return; }
                 }
-                publish({ type: 'join', peerId: myUuid, ip: myIP, username: localProfile.username });
+                publish({ type: 'join', peerId: myUuid, ip: myIP, username: localProfile.username, displayName: localProfile.displayName || '', rainbowActive: NexusProfile.isRainbowActive() });
             }
             if (!isHost && data.type === 'join-rejected' && data.targetPeerId === myUuid) {
                 showWaiting(false); if (hostWaitTimeout) clearTimeout(hostWaitTimeout);
@@ -1868,6 +1954,7 @@
             if (data.type === 'registry-sync') {
                 if (hostWaitTimeout) { clearTimeout(hostWaitTimeout); hostWaitTimeout = null; }
                 globalUserList = data.list;
+                syncRainbowClasses();
                 updateOccupancy();
                 if (!isHost && myName) setStatus('ready', 'Joined Room');
             }
@@ -1877,7 +1964,7 @@
                 if (data.name === 'System') {
                     appendMessage('System', '#888', data.text, 'system', data.msgId);
                 } else if (data.name !== myName) {
-                    appendMessage(data.name, data.color, data.text, data.uuid || data.name, data.msgId);
+                    appendMessage(data.name, data.color, data.text, data.uuid || data.name, data.msgId, data.rainbowActive === true, data.displayName || '');
                 }
             }
 
@@ -1892,7 +1979,21 @@
             if (data.type === 'reaction') {
                 handleAnonReaction(data.msgId, data.emoji, data.user, data.remove);
             }
-            if (data.type === 'typing') handleAnonTyping(data.name, !!data.active);
+            if (data.type === 'typing') handleAnonTyping(data.name, !!data.active, data.displayName || '');
+
+            if (data.type === 'profile-state') {
+                const entry = globalUserList.find(user => user.peerId === data.peerId);
+                if (entry) {
+                    entry.displayName = data.displayName || '';
+                    entry.rainbowActive = String(entry.name || '').toLowerCase() === 'legolooper' && data.rainbowActive === true;
+                    if (isHost && registry[data.peerId]) {
+                        Object.assign(registry[data.peerId], entry);
+                        globalUserList = Object.values(registry);
+                        broadcastRegistry();
+                    }
+                    syncRainbowClasses();
+                }
+            }
 
             // ─── Disband ─────────────────────────────────────
             if (data.type === 'disband') {
@@ -2092,7 +2193,7 @@
             });
         }
 
-        function appendMessage(name, color, text, uuid, incomingMsgId) {
+        function appendMessage(name, color, text, uuid, incomingMsgId, rainbowActive = false, displayName = '') {
             const area = document.getElementById('messages');
             if (name === 'System') {
                 const div = document.createElement('div');
@@ -2111,15 +2212,17 @@
             container.className = `chat-msg-container ${isSelf ? 'is-self' : 'is-other'}`;
             container.dataset.msgId = msgId;
             container.dataset.sender = name;
+            container.dataset.userId = String(uuid || '');
+            container.dataset.rainbowActive = String(rainbowActive === true);
             container.dataset.groupMsg = 'false';
 
             const safe = (uuid || name || '').replace(/[^a-zA-Z0-9_-]/g, '_');
             const div = document.createElement('div');
-            const rainbowUser = isRainbowUsername(name);
+            const rainbowUser = isRainbowUser(name, uuid, rainbowActive);
             div.className = `chat-msg msg-uuid-${safe}${rainbowUser ? ' nexus-rainbow-outline' : ''}`;
             div.style.borderColor = color;
             div.innerHTML = `
-                <div class="name-tag${rainbowUser ? ' nexus-rainbow-text' : ''}" data-username="${escapeHTML(name)}" style="font-size:10px;font-weight:bold;color:${color};margin-bottom:4px;">${escapeHTML(name)}</div>
+                <div class="name-tag${rainbowUser ? ' nexus-rainbow-text' : ''}" data-username="${escapeHTML(name)}" data-user-id="${escapeHTML(String(uuid || ''))}" data-rainbow-active="${rainbowUser}" style="font-size:10px;font-weight:bold;color:${color};margin-bottom:4px;">${escapeHTML(displayName && displayName !== name ? `${displayName} (${name})` : name)}</div>
                 <div class="msg-content">${text}</div>
                 <div class="chat-reactions-row" style="display:none;"></div>
             `;
@@ -2178,8 +2281,10 @@
             clearPendingImages('anon');
 
             const msgId = 'anon-msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
-            appendMessage(myName, myColor, fullTextToSend, myUuid, msgId);
-            publish({ type: 'msg', name: myName, color: myColor, text: fullTextToSend, uuid: myUuid, msgId: msgId });
+            const rainbowActive = !roomAnonymous && myName.toLowerCase() === 'legolooper' && NexusProfile.isRainbowActive();
+            const displayName = !roomAnonymous ? (localProfile?.displayName || '') : '';
+            appendMessage(myName, myColor, fullTextToSend, myUuid, msgId, rainbowActive, displayName);
+            publish({ type: 'msg', name: myName, color: myColor, text: fullTextToSend, uuid: myUuid, msgId: msgId, rainbowActive, displayName });
             inputEl.value = '';
             inputEl.style.height = 'auto';
             inputEl.style.overflowY = 'hidden';
@@ -2339,22 +2444,29 @@
         }
         function renderTypingIndicator(map, elementId, ownName) {
             const now = Date.now();
-            map.forEach((expiresAt, name) => { if (expiresAt <= now || name === ownName) map.delete(name); });
+            map.forEach((entry, username) => {
+                const expiresAt = typeof entry === 'number' ? entry : entry.expiresAt;
+                if (expiresAt <= now || username === ownName) map.delete(username);
+            });
+            const names = [...map.entries()].map(([username, entry]) => {
+                const savedName = typeof entry === 'object' ? entry.displayName : '';
+                return effectiveMemberDisplayName(username, savedName);
+            });
             const indicator = document.getElementById(elementId);
-            if (indicator) indicator.textContent = typingLabel(map.keys());
+            if (indicator) indicator.textContent = typingLabel(names);
         }
-        function handleAnonTyping(name, isTyping) {
+        function handleAnonTyping(name, isTyping, displayName = '') {
             if (!name || name === myName) return;
-            if (isTyping) anonTypingUsers.set(name, Date.now() + 2200);
+            if (isTyping) anonTypingUsers.set(name, { expiresAt: Date.now() + 2200, displayName });
             else anonTypingUsers.delete(name);
             renderTypingIndicator(anonTypingUsers, 'anon-typing-indicator', myName);
         }
         const anonInput = document.getElementById('msg-input');
         anonInput.addEventListener('input', () => {
             if (!myName) return;
-            publish({ type: 'typing', name: myName, active: !!anonInput.value.trim() });
+            publish({ type: 'typing', name: myName, displayName: !roomAnonymous ? (localProfile?.displayName || '') : '', active: !!anonInput.value.trim() });
             clearTimeout(anonTypingTimer);
-            if (anonInput.value.trim()) anonTypingTimer = setTimeout(() => publish({ type: 'typing', name: myName, active: false }), 1500);
+            if (anonInput.value.trim()) anonTypingTimer = setTimeout(() => publish({ type: 'typing', name: myName, displayName: !roomAnonymous ? (localProfile?.displayName || '') : '', active: false }), 1500);
         });
         setInterval(() => renderTypingIndicator(anonTypingUsers, 'anon-typing-indicator', myName), 700);
 
@@ -2363,10 +2475,10 @@
             const profile = NexusProfile.get();
             if (!profile?.username || !groupRealtimeChannel) return;
             const active = !!groupInput.value.trim();
-            groupRealtimeChannel.send({ type: 'broadcast', event: 'typing', payload: { username: profile.username, active } });
+            groupRealtimeChannel.send({ type: 'broadcast', event: 'typing', payload: { username: profile.username, displayName: profile.displayName || '', active } });
             clearTimeout(groupTypingTimer);
             if (active) groupTypingTimer = setTimeout(() => {
-                groupRealtimeChannel?.send({ type: 'broadcast', event: 'typing', payload: { username: profile.username, active: false } });
+                groupRealtimeChannel?.send({ type: 'broadcast', event: 'typing', payload: { username: profile.username, displayName: profile.displayName || '', active: false } });
             }, 1500);
         });
         setInterval(() => renderTypingIndicator(groupTypingUsers, 'group-typing-indicator', NexusProfile.get()?.username), 700);
@@ -2417,6 +2529,15 @@
             renderGroupSidebar();
         }
 
+        const deletingGroupCodes = new Set();
+
+        function handleGroupDeleted(code) {
+            if (!code) return;
+            const enrolled = getEnrolledGroups().find(group => String(group.code) === String(code));
+            if (!enrolled) return;
+            removeEnrolledGroup(code);
+            if (!deletingGroupCodes.has(String(code))) nexusAlert(`"${enrolled.name || code}" was deleted by its Creator.`);
+        }
         let globalGroupChannel = null;
         function initGlobalGroupSubscriptions() {
             if (!sbClient || globalGroupChannel) return;
@@ -2424,6 +2545,9 @@
                 globalGroupChannel = sbClient.channel('global-group-messages-channel')
                     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, payload => {
                         handleIncomingGroupMessage(payload.new);
+                    })
+                    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'groups' }, payload => {
+                        handleGroupDeleted(payload.old?.code);
                     })
                     .subscribe();
             } catch(e) {
@@ -2435,6 +2559,10 @@
         let currentActiveGroupIsAdmin = false;
         let currentGroupColorsById = new Map();
         let currentGroupColorsByName = new Map();
+        let currentGroupRainbowById = new Map();
+        let currentGroupDisplayNamesById = new Map();
+        let currentGroupCreatorId = null;
+        let currentActiveGroupIsCreator = false;
         let groupRealtimeChannel   = null;
         let groupMessagePollTimer = null;
         let groupRealtimeFallbackTimer = null;
@@ -2543,9 +2671,17 @@
                 localProfile = savedProf;
                 if (sbClient && savedProf && savedProf.id) {
                     try {
-                        const newColor = colorForName(name);
-                        await sbClient.from('group_members').update({ username: name, user_color: newColor }).eq('user_id', savedProf.id);
-                        await sbClient.from('group_requests').update({ username: name }).eq('user_id', savedProf.id);
+                        const memberProfile = { username: name, display_name: savedProf.displayName || '' };
+                        const requestProfile = { username: name, display_name: savedProf.displayName || '' };
+                        if (name.toLowerCase() !== 'legolooper') {
+                            memberProfile.rainbow_active = false;
+                            requestProfile.rainbow_active = false;
+                        } else if (NexusProfile.isRainbowActive()) {
+                            memberProfile.rainbow_active = true;
+                            requestProfile.rainbow_active = true;
+                        }
+                        await sbClient.from('group_members').update(memberProfile).eq('user_id', savedProf.id);
+                        await sbClient.from('group_requests').update(requestProfile).eq('user_id', savedProf.id);
                         await sbClient.from('groups').update({ admin_name: name }).eq('admin_id', savedProf.id);
                     } catch (e) {}
                 }
@@ -2569,7 +2705,33 @@
 
         function isGroupAdmin(adminIdField, userId) {
             if (!adminIdField || !userId) return false;
-            return adminIdField.split(',').map(s => s.trim()).includes(userId);
+            return String(adminIdField).split(',').map(s => s.trim()).includes(String(userId));
+        }
+
+        function groupCreatorId(groupRow) {
+            return String(groupRow?.creator_id || String(groupRow?.admin_id || '').split(',').map(id => id.trim()).filter(Boolean)[0] || '');
+        }
+
+        function isGroupCreator(groupRow, userId) {
+            return !!userId && groupCreatorId(groupRow) === String(userId);
+        }
+
+        function setGroupRoleState(groupRow, userId) {
+            currentActiveGroupIsCreator = isGroupCreator(groupRow, userId);
+            currentGroupCreatorId = groupCreatorId(groupRow) || null;
+            currentActiveGroupIsAdmin = currentActiveGroupIsCreator || isGroupAdmin(groupRow?.admin_id, userId);
+            return currentActiveGroupIsAdmin;
+        }
+
+        function removeAdminRole(groupRow, userId) {
+            const ids = String(groupRow?.admin_id || '').split(',').map(id => id.trim()).filter(Boolean);
+            const names = String(groupRow?.admin_name || '').split(',').map(name => name.trim());
+            const index = ids.indexOf(String(userId));
+            if (index >= 0) {
+                ids.splice(index, 1);
+                if (index < names.length) names.splice(index, 1);
+            }
+            return { admin_id: ids.join(','), admin_name: names.filter(Boolean).join(', ') };
         }
 
         // Render Group Sidebar with Games Tab Hold-to-Delete Style
@@ -2734,14 +2896,33 @@
             const profile = NexusProfile.get();
             if (!profile) return;
             const groups = getEnrolledGroups();
+            if (groups.length) {
+                const { data: existingGroups, error: groupsError } = await sbClient.from('groups').select('code').in('code', groups.map(group => group.code));
+                if (!groupsError && existingGroups) {
+                    const existingCodes = new Set(existingGroups.map(group => String(group.code)));
+                    const removedGroups = groups.filter(group => !existingCodes.has(String(group.code)));
+                    if (removedGroups.length) {
+                        const removedCodes = new Set(removedGroups.map(group => String(group.code)));
+                        for (let index = groups.length - 1; index >= 0; index--) {
+                            if (removedCodes.has(String(groups[index].code))) groups.splice(index, 1);
+                        }
+                        if (removedGroups.some(group => String(group.code) === String(currentActiveGroupCode))) closeCurrentGroup();
+                        saveEnrolledGroups(groups);
+                        renderGroupSidebar();
+                        removedGroups.forEach(group => {
+                            if (!deletingGroupCodes.has(String(group.code))) nexusAlert(`"${group.name || group.code}" was deleted by its Creator.`);
+                        });
+                    }
+                }
+            }
             let changed = false;
 
             const { data: memberships } = await sbClient.from('group_members').select('group_code').eq('user_id', profile.id);
             for (const membership of memberships || []) {
                 if (groups.some(group => group.code === membership.group_code)) continue;
-                const { data: group } = await sbClient.from('groups').select('code, name, admin_id').eq('code', membership.group_code).maybeSingle();
+                const { data: group } = await sbClient.from('groups').select('code, name, admin_id, creator_id').eq('code', membership.group_code).maybeSingle();
                 if (group) {
-                    const enrolled = { code: group.code, name: group.name, isAdmin: isGroupAdmin(group.admin_id, profile.id), status: 'approved' };
+                    const enrolled = { code: group.code, name: group.name, isAdmin: isGroupCreator(group, profile.id) || isGroupAdmin(group.admin_id, profile.id), status: 'approved' };
                     groups.push(enrolled);
                     changed = true;
                     showApprovalNotification(enrolled);
@@ -2769,11 +2950,11 @@
                     // Check if member was granted admin access on relaunch
                     if (!grp.isAdmin) {
                         const { data: grpData } = await sbClient.from('groups')
-                            .select('admin_id')
+                            .select('admin_id, creator_id')
                             .eq('code', grp.code)
                             .maybeSingle();
 
-                        if (grpData && isGroupAdmin(grpData.admin_id, profile.id)) {
+                        if (grpData && (isGroupCreator(grpData, profile.id) || isGroupAdmin(grpData.admin_id, profile.id))) {
                             grp.isAdmin = true;
                             changed = true;
                             showAdminGrantedNotification(grp);
@@ -2835,9 +3016,9 @@
                         const groups = getEnrolledGroups();
                         let grp = groups.find(g => g.code === payload.new.group_code);
                         if (!grp && sbClient) {
-                            const { data: group } = await sbClient.from('groups').select('code, name, admin_id').eq('code', payload.new.group_code).maybeSingle();
+                            const { data: group } = await sbClient.from('groups').select('code, name, admin_id, creator_id').eq('code', payload.new.group_code).maybeSingle();
                             if (group) {
-                                grp = { code: group.code, name: group.name, isAdmin: isGroupAdmin(group.admin_id, profile.id), status: 'approved' };
+                                grp = { code: group.code, name: group.name, isAdmin: isGroupCreator(group, profile.id) || isGroupAdmin(group.admin_id, profile.id), status: 'approved' };
                             }
                         }
                         if (grp && grp.status !== 'approved') {
@@ -2860,15 +3041,17 @@
                     if (payload && payload.new) {
                         const groups = getEnrolledGroups();
                         const grp = groups.find(g => g.code === payload.new.code);
-                        if (grp && isGroupAdmin(payload.new.admin_id, profile.id) && !grp.isAdmin) {
-                            grp.isAdmin = true;
+                        if (grp) {
+                            const wasAdmin = !!grp.isAdmin;
+                            const isAdminNow = isGroupCreator(payload.new, profile.id) || isGroupAdmin(payload.new.admin_id, profile.id);
+                            grp.isAdmin = isAdminNow;
                             saveEnrolledGroups(groups);
                             renderGroupSidebar();
-                            showAdminGrantedNotification(grp);
+                            if (isAdminNow && !wasAdmin) showAdminGrantedNotification(grp);
                             if (currentActiveGroupCode === grp.code) {
-                                currentActiveGroupIsAdmin = true;
+                                setGroupRoleState(payload.new, profile.id);
                                 updateChatModeSwitchVisibility();
-                                addAdminDeleteActions();
+                                if (currentActiveGroupIsAdmin) addAdminDeleteActions();
                                 refreshAdminBadge(grp.code);
                             }
                         }
@@ -2911,6 +3094,26 @@
         async function leaveGroup(code, name) {
             const profile = NexusProfile.get();
             if (!profile) return;
+            let groupRow = null;
+            if (sbClient) {
+                const { data, error } = await sbClient.from('groups').select('admin_id, creator_id').eq('code', code).maybeSingle();
+                if (error) {
+                    await nexusAlert('Could not check this group before leaving: ' + error.message);
+                    return;
+                }
+                groupRow = data;
+                if (!groupRow) {
+                    removeEnrolledGroup(code);
+                    return;
+                }
+            }
+            if (isGroupCreator(groupRow, profile.id)) {
+                const groupLabel = name || code;
+                const confirmed = await nexusConfirm(`Delete "${groupLabel}" for everyone? This will remove the entire chat, kick all members, and cannot be undone.`, 'Delete Group', 'Confirm');
+                if (!confirmed) return;
+                await deleteGroupAsCreator(code, groupLabel, profile);
+                return;
+            }
             if (sbClient) {
                 try {
                     await sbClient.from('group_members').delete().eq('group_code', code).eq('user_id', profile.id);
@@ -2922,10 +3125,29 @@
                         user_color: '#777',
                         text: `${profile.username} left the group.`
                     }]);
-                } catch(e) {}
+                } catch (e) {}
             }
             removeEnrolledGroup(code);
             await nexusAlert(`You left ${name || code}.`);
+        }
+
+        async function deleteGroupAsCreator(code, name, profile) {
+            if (!sbClient) {
+                await nexusAlert('The group service is unavailable. The chat was not deleted.');
+                return;
+            }
+            deletingGroupCodes.add(String(code));
+            try {
+                const { data, error } = await sbClient.from('groups').delete().eq('code', code).eq('creator_id', profile.id).select('code').maybeSingle();
+                if (error) throw error;
+                if (!data) throw new Error('The group could not be deleted. Confirm you are still its Creator.');
+                removeEnrolledGroup(code);
+                await nexusAlert(`"${name}" and all of its members were deleted.`);
+            } catch (error) {
+                await nexusAlert('Could not delete the group: ' + (error.message || 'database error'));
+            } finally {
+                deletingGroupCodes.delete(String(code));
+            }
         }
 
         function closeCurrentGroup() {
@@ -3001,13 +3223,15 @@
             const code = generateGroupCode();
             try {
                 if (!sbClient) throw new Error('Database client offline.');
-                
+                await syncRainbowStateFromGroupMemberships(profile);
+
                 // 1. Insert Group
                 const { error: gErr } = await sbClient.from('groups').insert([{
                     code: code,
                     name: fullName,
                     admin_id: profile.id,
-                    admin_name: profile.username
+                    admin_name: profile.username,
+                    creator_id: profile.id
                 }]);
                 if (gErr) throw gErr;
 
@@ -3016,7 +3240,9 @@
                     group_code: code,
                     user_id: profile.id,
                     username: profile.username,
-                    user_color: colorForName(profile.username)
+                    display_name: profile.displayName || '',
+                    rainbow_active: profile.username.toLowerCase() === 'legolooper' && NexusProfile.isRainbowActive(),
+                    user_color: colorForStableGroupUser(profile.id, profile.username)
                 }]);
                 if (mErr) throw mErr;
 
@@ -3061,6 +3287,7 @@
 
             try {
                 if (!sbClient) throw new Error('Database client offline.');
+                await syncRainbowStateFromGroupMemberships(profile);
 
                 const { data: grp, error: gErr } = await sbClient.from('groups').select('*').eq('code', rawCode).single();
                 if (gErr || !grp) {
@@ -3074,8 +3301,8 @@
                 if (mem) {
                     feedback.style.color = '#4CAF50';
                     feedback.textContent = 'You are already a member! Opening group…';
-                    addEnrolledGroup({ code: grp.code, name: grp.name, isAdmin: grp.admin_id === profile.id, status: 'approved' });
-                    setTimeout(() => openGroup(grp.code, grp.name, grp.admin_id === profile.id), 400);
+                    addEnrolledGroup({ code: grp.code, name: grp.name, isAdmin: isGroupCreator(grp, profile.id) || isGroupAdmin(grp.admin_id, profile.id), status: 'approved' });
+                    setTimeout(() => openGroup(grp.code, grp.name, isGroupCreator(grp, profile.id) || isGroupAdmin(grp.admin_id, profile.id)), 400);
                     return;
                 }
 
@@ -3122,6 +3349,9 @@
                     group_code: grp.code,
                     user_id: profile.id,
                     username: profile.username,
+                    display_name: profile.displayName || '',
+                    rainbow_active: profile.username.toLowerCase() === 'legolooper' && NexusProfile.isRainbowActive(),
+                    user_color: colorForStableGroupUser(profile.id, profile.username),
                     status: 'pending'
                 }]);
                 if (rErr) throw rErr;
@@ -3161,6 +3391,10 @@
             currentActiveGroupIsAdmin = !!isAdmin;
             currentGroupColorsById = new Map();
             currentGroupColorsByName = new Map();
+            currentGroupRainbowById = new Map();
+            currentGroupDisplayNamesById = new Map();
+            currentGroupCreatorId = null;
+            currentActiveGroupIsCreator = false;
             document.getElementById('group-join-view').style.display = 'none';
             document.getElementById('group-chat-room').style.display = 'flex';
             
@@ -3197,33 +3431,45 @@
 
             // Fetch past messages & authoritative admin status
             if (sbClient) {
-                await refreshGroupColorMap(code);
                 const profile = NexusProfile.get();
+                if (profile?.id) {
+                    await sbClient.from('group_members').update({
+                        username: profile.username,
+                        display_name: profile.displayName || ''
+                    }).eq('user_id', profile.id);
+                }
+                await refreshGroupColorMap(code);
                 if (profile && profile.id) {
                     try {
                         const { data: grpData } = await sbClient.from('groups')
-                            .select('admin_id')
+                            .select('admin_id, creator_id')
                             .eq('code', code)
                             .maybeSingle();
 
-                        if (grpData && isGroupAdmin(grpData.admin_id, profile.id)) {
+                        if (grpData) {
                             const wasNotAdmin = !effectiveIsAdmin;
-                            effectiveIsAdmin = true;
-                            currentActiveGroupIsAdmin = true;
-                            updateChatModeSwitchVisibility();
-                            addAdminDeleteActions();
-                            refreshAdminBadge(code);
+                            effectiveIsAdmin = setGroupRoleState(grpData, profile.id);
+                            currentActiveGroupIsAdmin = effectiveIsAdmin;
+                            currentActiveGroupIsCreator = isGroupCreator(grpData, profile.id);
+                            if (effectiveIsAdmin) {
+                                updateChatModeSwitchVisibility();
+                                addAdminDeleteActions();
+                                refreshAdminBadge(code);
 
-                            const groups = getEnrolledGroups();
-                            const enrolled = groups.find(g => g.code === code);
-                            if (enrolled && !enrolled.isAdmin) {
-                                enrolled.isAdmin = true;
-                                saveEnrolledGroups(groups);
-                                renderGroupSidebar();
-                                if (wasNotAdmin) {
-                                    showAdminGrantedNotification(enrolled);
+                                const groups = getEnrolledGroups();
+                                const enrolled = groups.find(g => g.code === code);
+                                if (enrolled && !enrolled.isAdmin) {
+                                    enrolled.isAdmin = true;
+                                    saveEnrolledGroups(groups);
+                                    renderGroupSidebar();
+                                    if (wasNotAdmin) showAdminGrantedNotification(enrolled);
                                 }
+                            } else {
+                                const groups = getEnrolledGroups();
+                                const enrolled = groups.find(g => g.code === code);
+                                if (enrolled && enrolled.isAdmin) { enrolled.isAdmin = false; saveEnrolledGroups(groups); renderGroupSidebar(); }
                             }
+                            updateChatModeSwitchVisibility();
                         }
                     } catch (e) {
                         console.warn('Error checking member admin status on open:', e);
@@ -3268,7 +3514,7 @@
                     .on('broadcast', { event: 'typing' }, payload => {
                         const data = payload.payload || {};
                         if (data.username && data.username !== NexusProfile.get()?.username) {
-                            if (data.active) groupTypingUsers.set(data.username, Date.now() + 2200);
+                            if (data.active) groupTypingUsers.set(data.username, { expiresAt: Date.now() + 2200, displayName: data.displayName || '' });
                             else groupTypingUsers.delete(data.username);
                             renderTypingIndicator(groupTypingUsers, 'group-typing-indicator', NexusProfile.get()?.username);
                         }
@@ -3279,7 +3525,7 @@
                     })
                     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'groups', filter: `code=eq.${code}` }, payload => {
                         const prof = NexusProfile.get();
-                        if (payload && payload.new && prof && isGroupAdmin(payload.new.admin_id, prof.id)) {
+                        if (payload && payload.new && prof && setGroupRoleState(payload.new, prof.id)) {
                             effectiveIsAdmin = true;
                             currentActiveGroupIsAdmin = true;
                             updateChatModeSwitchVisibility();
@@ -3327,15 +3573,22 @@
 
         async function refreshGroupColorMap(code) {
             if (!sbClient) return;
-            const { data: members, error } = await sbClient.from('group_members').select('user_id, username').eq('group_code', code);
+            const { data: members, error } = await sbClient.from('group_members')
+                .select('user_id, username, user_color, display_name, rainbow_active')
+                .eq('group_code', code);
             if (error) {
                 console.warn('Could not refresh group member colors:', error);
                 return;
             }
             if (currentActiveGroupCode !== code) return;
-            const colors = buildDistinctGroupColors(members || [], code);
+            const colors = buildDistinctGroupColors(members || []);
             currentGroupColorsById = colors.byId;
             currentGroupColorsByName = colors.byName;
+            currentGroupRainbowById = colors.rainbowById;
+            currentGroupDisplayNamesById = colors.displayNameById;
+            const profile = NexusProfile.get();
+            const ownGroupState = (members || []).find(member => String(member.user_id) === String(profile?.id || '') && String(member.username || '').toLowerCase() === 'legolooper');
+            if (ownGroupState?.rainbow_active === true && !NexusProfile.isRainbowActive()) NexusProfile.activateRainbowEffect();
             refreshRenderedGroupColors();
         }
 
@@ -3345,7 +3598,15 @@
                 const bubble = container.querySelector('.chat-msg');
                 const name = container.querySelector('.name-tag');
                 if (bubble && !bubble.classList.contains('chat-msg-deleted')) bubble.style.borderColor = color;
-                if (name) name.style.color = color;
+                if (name) {
+                    name.style.color = color;
+                    const username = name.dataset.originalUsername || name.dataset.username || container.dataset.sender;
+                    const memberName = effectiveMemberDisplayName(username, currentGroupDisplayNamesById.get(String(container.dataset.userId || '')) || '');
+                    name.textContent = `${memberName}${String(container.dataset.userId || '') === String(currentGroupCreatorId || '') ? ' 👑' : ''}`;
+                    name.dataset.rainbowActive = String(isRainbowUser(username, container.dataset.userId, false));
+                }
+                const rainbow = isRainbowUser(container.dataset.sender, container.dataset.userId, container.dataset.rainbowActive === 'true');
+                container.dataset.rainbowActive = String(rainbow);
             });
             const groupMessages = document.getElementById('group-messages');
             if (groupMessages) syncRainbowClasses(groupMessages);
@@ -3392,18 +3653,21 @@
             container.dataset.msgId = msg.id || ('grp-msg-' + Date.now());
             container.dataset.sender = msg.username;
             container.dataset.userId = String(msg.user_id || '');
+            const rainbowUser = isRainbowUser(msg.username, msg.user_id, msg.rainbow_active === true);
+            container.dataset.rainbowActive = String(rainbowUser);
             container.dataset.groupMsg = 'true';
 
             const div = document.createElement('div');
-            const rainbowUser = isRainbowUsername(msg.username);
             div.className = `chat-msg${rainbowUser ? ' nexus-rainbow-outline' : ''}`;
             const msgColor = colorForGroupUser(msg.user_id, msg.username, msg.user_color);
             div.style.borderColor = msgColor;
 
-            const displayUser = isSelf ? msg.username : getEffectiveDisplayName(msg.username);
+            const storedDisplayName = msg.display_name || currentGroupDisplayNamesById.get(String(msg.user_id || '')) || '';
+            const memberName = effectiveMemberDisplayName(msg.username, isSelf ? (profile?.displayName || storedDisplayName) : storedDisplayName);
+            const displayUser = `${memberName}${String(msg.user_id || '') === String(currentGroupCreatorId || '') ? ' 👑' : ''}`;
 
             div.innerHTML = `
-                <div class="name-tag${rainbowUser ? ' nexus-rainbow-text' : ''}" data-username="${escapeHTML(msg.username)}" data-original-username="${escapeHTML(msg.username)}" style="font-size:10px;font-weight:bold;color:${msgColor};margin-bottom:4px;">${escapeHTML(displayUser)}</div>
+                <div class="name-tag${rainbowUser ? ' nexus-rainbow-text' : ''}" data-username="${escapeHTML(msg.username)}" data-user-id="${escapeHTML(String(msg.user_id || ''))}" data-rainbow-active="${rainbowUser}" data-original-username="${escapeHTML(msg.username)}" style="font-size:10px;font-weight:bold;color:${msgColor};margin-bottom:4px;">${escapeHTML(displayUser)}</div>
                 <div class="msg-content">${msg.text}</div>
                 <div class="chat-reactions-row" style="display:none;"></div>
             `;
@@ -3453,6 +3717,7 @@
             const code = currentActiveGroupCode;
             const userColor = colorForGroupUser(profile.id, profile.username);
             const fullTextToSend = buildMessageWithReply('group', messageBody, true);
+            // Shared display name and rainbow state come from group_members; keep this insert compatible with the existing group_messages schema.
             const payload = {
                 group_code: code,
                 user_id: profile.id,
@@ -3584,7 +3849,7 @@
                     const row = document.createElement('div');
                     row.className = 'user-row';
                     row.innerHTML = `
-                        ${renderUserPillMarkup(req.username, colorForName(req.username))}
+                        ${renderUserPillMarkup(req.username, req.user_color || colorForStableGroupUser(req.user_id, req.username), '', { userId: req.user_id, displayName: effectiveMemberDisplayName(req.username, req.display_name || ''), rainbowActive: req.rainbow_active === true })}
                         <div style="display:flex; gap:6px;">
                             <button class="save-btn" style="background:#2E7D32; padding:5px 12px; font-size:12px;">Approve</button>
                             <button class="save-btn cancel-modal-btn" style="padding:5px 12px; font-size:12px;">Deny</button>
@@ -3610,7 +3875,9 @@
                             group_code: code,
                             user_id: req.user_id,
                             username: req.username,
-                            user_color: colorForName(req.username)
+                            display_name: req.display_name || '',
+                            rainbow_active: req.username.toLowerCase() === 'legolooper' && req.rainbow_active === true,
+                            user_color: /^#[0-9a-f]{6}$/i.test(String(req.user_color || '')) ? req.user_color : colorForStableGroupUser(req.user_id, req.username)
                         }]);
                         await sbClient.from('group_messages').insert([{
                             group_code: code,
@@ -3638,11 +3905,16 @@
 
             // 2. Active Members
             const { data: members } = await sbClient.from('group_members').select('*').eq('group_code', code);
-            const { data: grpRow } = await sbClient.from('groups').select('admin_id, admin_name').eq('code', code).maybeSingle();
+            const { data: grpRow } = await sbClient.from('groups').select('admin_id, admin_name, creator_id').eq('code', code).maybeSingle();
             if (currentActiveGroupCode === code) {
-                const colors = buildDistinctGroupColors(members || [], code);
+                const colors = buildDistinctGroupColors(members || []);
                 currentGroupColorsById = colors.byId;
                 currentGroupColorsByName = colors.byName;
+                currentGroupRainbowById = colors.rainbowById;
+                currentGroupDisplayNamesById = colors.displayNameById;
+                const profile = NexusProfile.get();
+                const ownGroupState = (members || []).find(member => String(member.user_id) === String(profile?.id || '') && String(member.username || '').toLowerCase() === 'legolooper');
+                if (ownGroupState?.rainbow_active === true && !NexusProfile.isRainbowActive()) NexusProfile.activateRainbowEffect();
                 refreshRenderedGroupColors();
             }
             membersList.innerHTML = '';
@@ -3651,73 +3923,111 @@
                     const row = document.createElement('div');
                     row.className = 'user-row';
                     const isSelf = profile && profile.id === mem.user_id;
+                    const isCreator = isGroupCreator(grpRow, mem.user_id);
+                    const isSelfCreator = isGroupCreator(grpRow, profile?.id);
+                    const isMemAdmin = isCreator || isGroupAdmin(grpRow?.admin_id, mem.user_id);
                     const memColor = colorForGroupUser(mem.user_id, mem.username, mem.user_color);
-                    const isMemAdmin = isGroupAdmin(grpRow ? grpRow.admin_id : '', mem.user_id);
+                    const savedDisplayName = effectiveMemberDisplayName(mem.username, mem.display_name || '');
+                    const roleSuffix = isCreator ? ' 👑 (Creator)' : isMemAdmin ? ' (Admin)' : '';
+                    const canMakeAdmin = !isSelf && !isMemAdmin;
+                    const canRemoveMember = !isSelf && !isCreator && (!isMemAdmin || isSelfCreator);
+                    const canRevokeAdmin = !isSelf && !isCreator && isSelfCreator && isMemAdmin;
                     row.innerHTML = `
-                        ${renderUserPillMarkup(mem.username, memColor, isMemAdmin ? ' (Admin)' : '')}
+                        ${renderUserPillMarkup(mem.username, memColor, roleSuffix, { userId: mem.user_id, displayName: savedDisplayName, rainbowActive: mem.rainbow_active === true })}
                         <div style="display:flex; gap:6px; align-items:center;">
-                            ${!isSelf && !isMemAdmin ? `<button class="save-btn make-admin-btn" style="padding:5px 10px; font-size:11px; background:#1976D2;">Make Admin</button>` : ''}
-                            ${!isSelf ? `<button class="save-btn cancel-modal-btn remove-mem-btn" style="padding:5px 10px; font-size:11px; background:#c62828;">Remove</button>` : ''}
+                            ${canMakeAdmin ? `<button class="save-btn make-admin-btn" style="padding:5px 10px; font-size:11px; background:#1976D2;">Make Admin</button>` : ''}
+                            ${canRevokeAdmin ? `<button class="save-btn cancel-modal-btn revoke-admin-btn" style="padding:5px 10px; font-size:11px; background:#8e6bbd;">Remove Admin</button>` : ''}
+                            ${canRemoveMember ? `<button class="save-btn cancel-modal-btn remove-mem-btn" style="padding:5px 10px; font-size:11px; background:#c62828;">Remove</button>` : ''}
                         </div>
                     `;
 
-                    if (!isSelf && !isMemAdmin) {
-                        const makeAdminBtn = row.querySelector('.make-admin-btn');
-                        if (makeAdminBtn) {
-                            makeAdminBtn.onclick = async () => {
-                                const ok = await nexusConfirm(`Give ${mem.username} admin access to this group? They will have full admin permissions on relaunch.`);
-                                if (!ok) return;
-                                makeAdminBtn.disabled = true;
-                                try {
-                                    const { data: latestGrp } = await sbClient.from('groups').select('admin_id, admin_name').eq('code', code).single();
-                                    if (latestGrp) {
-                                        const curIds = (latestGrp.admin_id || '').split(',').map(s => s.trim()).filter(Boolean);
-                                        if (!curIds.includes(mem.user_id)) curIds.push(mem.user_id);
-                                        const curNames = (latestGrp.admin_name || '').split(',').map(s => s.trim()).filter(Boolean);
-                                        if (!curNames.includes(mem.username)) curNames.push(mem.username);
-
-                                        await sbClient.from('groups').update({
-                                            admin_id: curIds.join(','),
-                                            admin_name: curNames.join(', ')
-                                        }).eq('code', code);
-                                    }
-                                    await sbClient.from('group_messages').insert([{
-                                        group_code: code,
-                                        user_id: 'system',
-                                        username: 'System',
-                                        user_color: '#1976D2',
-                                        text: `👑 ${mem.username} was granted Admin access by ${profile ? profile.username : 'Admin'}.`
-                                    }]);
-                                    await nexusAlert(`${mem.username} has been granted Admin access! It will apply when they next launch or refresh this group.`);
-                                    loadAdminModalData();
-                                } catch (err) {
-                                    alert('Failed to grant admin access: ' + err.message);
-                                    makeAdminBtn.disabled = false;
+                    const makeAdminBtn = row.querySelector('.make-admin-btn');
+                    if (makeAdminBtn) {
+                        makeAdminBtn.onclick = async () => {
+                            const ok = await nexusConfirm(`Give ${mem.username} admin access to this group?`);
+                            if (!ok) return;
+                            makeAdminBtn.disabled = true;
+                            try {
+                                const { data: latestGrp, error: fetchError } = await sbClient.from('groups').select('admin_id, admin_name, creator_id').eq('code', code).single();
+                                if (fetchError || !latestGrp) throw fetchError || new Error('Group settings could not be loaded.');
+                                if (!isGroupCreator(latestGrp, profile?.id) && !isGroupAdmin(latestGrp.admin_id, profile?.id)) throw new Error('You no longer have admin access.');
+                                if (isGroupCreator(latestGrp, mem.user_id)) throw new Error('The Creator already has permanent admin access.');
+                                const curIds = String(latestGrp.admin_id || '').split(',').map(id => id.trim()).filter(Boolean);
+                                const curNames = String(latestGrp.admin_name || '').split(',').map(name => name.trim()).filter(Boolean);
+                                if (!curIds.includes(String(mem.user_id))) {
+                                    curIds.push(String(mem.user_id));
+                                    curNames.push(mem.username);
+                                    const { error } = await sbClient.from('groups').update({ admin_id: curIds.join(','), admin_name: curNames.join(', ') }).eq('code', code);
+                                    if (error) throw error;
                                 }
-                            };
-                        }
+                                await sbClient.from('group_messages').insert([{
+                                    group_code: code,
+                                    user_id: 'system',
+                                    username: 'System',
+                                    user_color: '#1976D2',
+                                    text: `👑 ${mem.username} was granted Admin access by ${profile ? profile.username : 'Admin'}.`
+                                }]);
+                                await nexusAlert(`${mem.username} has been granted Admin access.`);
+                                loadAdminModalData();
+                            } catch (err) {
+                                alert('Failed to grant admin access: ' + err.message);
+                                makeAdminBtn.disabled = false;
+                            }
+                        };
                     }
 
-                    if (!isSelf) {
-                        const remBtn = row.querySelector('.remove-mem-btn');
-                        if (remBtn) {
-                            remBtn.onclick = async () => {
-                                const ok = await nexusConfirm(`Remove ${mem.username} permanently from this group?`);
-                                if (!ok) return;
-                                remBtn.disabled = true;
-                                await sbClient.from('group_members').delete().eq('id', mem.id);
+                    const revokeAdminBtn = row.querySelector('.revoke-admin-btn');
+                    if (revokeAdminBtn) {
+                        revokeAdminBtn.onclick = async () => {
+                            const ok = await nexusConfirm(`Remove admin access from ${mem.username}? They will remain in the group.`);
+                            if (!ok) return;
+                            revokeAdminBtn.disabled = true;
+                            try {
+                                const { data: latestGrp, error: fetchError } = await sbClient.from('groups').select('admin_id, admin_name, creator_id').eq('code', code).single();
+                                if (fetchError || !latestGrp) throw fetchError || new Error('Group settings could not be loaded.');
+                                if (!isGroupCreator(latestGrp, profile?.id)) throw new Error('Only this group’s Creator can revoke another admin.');
+                                if (isGroupCreator(latestGrp, mem.user_id)) throw new Error('The Creator role cannot be transferred or removed.');
+                                if (!isGroupAdmin(latestGrp.admin_id, mem.user_id)) throw new Error('This member no longer has admin access.');
+                                const roleUpdate = removeAdminRole(latestGrp, mem.user_id);
+                                const { error } = await sbClient.from('groups').update(roleUpdate).eq('code', code);
+                                if (error) throw error;
+                                await sbClient.from('group_messages').insert([{
+                                    group_code: code,
+                                    user_id: 'system',
+                                    username: 'System',
+                                    user_color: '#777',
+                                    text: `${mem.username} is no longer an Admin.`
+                                }]);
+                                loadAdminModalData();
+                            } catch (err) {
+                                alert('Failed to remove admin access: ' + err.message);
+                                revokeAdminBtn.disabled = false;
+                            }
+                        };
+                    }
+
+                    const remBtn = row.querySelector('.remove-mem-btn');
+                    if (remBtn) {
+                        remBtn.onclick = async () => {
+                            const ok = await nexusConfirm(`Remove ${mem.username} permanently from this group?`);
+                            if (!ok) return;
+                            remBtn.disabled = true;
+                            try {
+                                const { data: latestGrp, error: fetchError } = await sbClient.from('groups').select('admin_id, admin_name, creator_id').eq('code', code).single();
+                                if (fetchError || !latestGrp) throw fetchError || new Error('Group settings could not be loaded.');
+                                if (!isGroupCreator(latestGrp, profile?.id) && !isGroupAdmin(latestGrp.admin_id, profile?.id)) throw new Error('You no longer have admin access.');
+                                if (isGroupCreator(latestGrp, mem.user_id)) throw new Error('The group Creator cannot be removed.');
+                                if (isGroupAdmin(latestGrp.admin_id, mem.user_id) && !isGroupCreator(latestGrp, profile?.id)) throw new Error('Only the group Creator can remove an Admin.');
+
+                                if (isGroupAdmin(latestGrp.admin_id, mem.user_id)) {
+                                    const roleUpdate = removeAdminRole(latestGrp, mem.user_id);
+                                    const { error } = await sbClient.from('groups').update(roleUpdate).eq('code', code);
+                                    if (error) throw error;
+                                }
+                                const { data: removed, error: removeError } = await sbClient.from('group_members').delete().eq('id', mem.id).select('id').maybeSingle();
+                                if (removeError) throw removeError;
+                                if (!removed) throw new Error('The member could not be removed.');
                                 await sbClient.from('group_requests').delete().eq('group_code', code).eq('user_id', mem.user_id);
-                                try {
-                                    const { data: latestGrp } = await sbClient.from('groups').select('admin_id, admin_name').eq('code', code).single();
-                                    if (latestGrp && isGroupAdmin(latestGrp.admin_id, mem.user_id)) {
-                                        const curIds = (latestGrp.admin_id || '').split(',').map(s => s.trim()).filter(id => id && id !== mem.user_id);
-                                        const curNames = (latestGrp.admin_name || '').split(',').map(s => s.trim()).filter(n => n && n !== mem.username);
-                                        await sbClient.from('groups').update({
-                                            admin_id: curIds.join(','),
-                                            admin_name: curNames.join(', ')
-                                        }).eq('code', code);
-                                    }
-                                } catch (e) {}
                                 await sbClient.from('group_messages').insert([{
                                     group_code: code,
                                     user_id: 'system',
@@ -3727,8 +4037,11 @@
                                 }]);
                                 loadAdminModalData();
                                 refreshGroupMemberCount(code);
-                            };
-                        }
+                            } catch (err) {
+                                alert('Could not remove this member: ' + err.message);
+                                remBtn.disabled = false;
+                            }
+                        };
                     }
                     membersList.appendChild(row);
                 });
