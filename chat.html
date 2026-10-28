@@ -1194,12 +1194,17 @@
         }
 
         function addAdminDeleteActions() {
-            if (!currentActiveGroupIsAdmin) return;
             const profile = NexusProfile.get();
             document.querySelectorAll('#group-messages .chat-msg-container[data-user-id]').forEach(container => {
-                if (container.dataset.userId === String(profile?.id || '') || container.classList.contains('message-deleted')) return;
                 const actions = container.querySelector('.chat-msg-actions');
-                if (!actions || actions.querySelector('[data-action="delete"]')) return;
+                if (!actions || container.classList.contains('message-deleted')) return;
+                const isOwnMessage = (!!profile?.id && container.dataset.userId === String(profile.id)) || (!!profile?.username && container.dataset.sender === profile.username);
+                const deleteButton = actions.querySelector('[data-action="delete"]');
+                if (!isOwnMessage && !currentActiveGroupIsAdmin) {
+                    deleteButton?.remove();
+                    return;
+                }
+                if (deleteButton) return;
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.className = 'msg-action-btn';
@@ -1241,9 +1246,21 @@
             }
         }
 
+        function requestEarlierGroupMessages() {
+            const area = document.getElementById('group-messages');
+            if (!area || !currentActiveGroupCode || !groupHistoryHasMore || area.scrollTop > 2) return;
+            loadEarlierGroupMessages(currentActiveGroupCode, GROUP_HISTORY_PAGE_SIZE, true);
+        }
+
         const groupMessagesArea = document.getElementById('group-messages');
         if (groupMessagesArea) {
-            groupMessagesArea.addEventListener('scroll', checkActiveGroupScrolledToBottom);
+            groupMessagesArea.addEventListener('scroll', () => {
+                checkActiveGroupScrolledToBottom();
+                requestEarlierGroupMessages();
+            });
+            groupMessagesArea.addEventListener('wheel', event => {
+                if (event.deltaY < 0) requestEarlierGroupMessages();
+            }, { passive: true });
         }
 
         // --- Code Normalization & Filtering Helpers ---
@@ -2510,10 +2527,12 @@
             const isOwn = profile && (profile.id === msg.user_id || (profile.username && profile.username === msg.username));
 
             if (msg.group_code === currentActiveGroupCode) {
-                if (msg.id && document.querySelector(`[data-msg-id="${CSS.escape(String(msg.id))}"]`)) return;
-                appendGroupMessage(msg);
                 const area = document.getElementById('group-messages');
+                if (!area || (msg.id && area.querySelector(`[data-msg-id="${CSS.escape(String(msg.id))}"]`))) return;
                 const isBottom = area.scrollHeight - area.scrollTop - area.clientHeight <= 40;
+                const renderedCount = countRenderedGroupMessages(area);
+                appendGroupMessage(msg, { scroll: false, position: 'sorted' });
+                if (renderedCount >= GROUP_MESSAGE_WINDOW_LIMIT) unloadOldestGroupMessage(area);
                 if (isBottom || isOwn) {
                     area.scrollTop = area.scrollHeight;
                     unreadGroupCounts[msg.group_code] = 0;
@@ -2569,6 +2588,16 @@
         let groupMessagePollTimer = null;
         let groupRealtimeFallbackTimer = null;
         let lastGroupMessageCreatedAt = null;
+        const INITIAL_GROUP_MESSAGE_COUNT = 20;
+        const INITIAL_GROUP_HISTORY_COUNT = 30;
+        const GROUP_HISTORY_PAGE_SIZE = 25;
+        const GROUP_MESSAGE_WINDOW_LIMIT = 50;
+        let groupOpenToken = 0;
+        let groupHistoryCursor = null;
+        let groupHistoryHasMore = false;
+        let groupHistoryLoadToken = 0;
+        let groupHistoryLoadPromise = null;
+        let groupHistoryQueuedUserLoad = false;
         let userApprovalsChannel   = null;
         let approvalPollingTimer   = null;
 
@@ -3153,8 +3182,13 @@
         }
 
         function closeCurrentGroup() {
+            groupOpenToken += 1;
             currentActiveGroupCode = null;
             currentActiveGroupIsAdmin = false;
+            groupHistoryCursor = null;
+            groupHistoryHasMore = false;
+            groupHistoryLoadPromise = null;
+            groupHistoryQueuedUserLoad = false;
             if (groupMessagePollTimer) { clearInterval(groupMessagePollTimer); groupMessagePollTimer = null; }
             if (groupRealtimeFallbackTimer) { clearTimeout(groupRealtimeFallbackTimer); groupRealtimeFallbackTimer = null; }
             lastGroupMessageCreatedAt = null;
@@ -3370,6 +3404,128 @@
         };
 
         // Realtime is preferred, with a small polling fallback if the channel is unavailable.
+        function getGroupMessageCursor(message) {
+            if (!message?.created_at || message.id === undefined || message.id === null) return null;
+            return { created_at: message.created_at, id: String(message.id) };
+        }
+
+        function compareGroupMessageIds(left, right) {
+            const leftId = String(left || '');
+            const rightId = String(right || '');
+            if (/^\d+$/.test(leftId) && /^\d+$/.test(rightId)) {
+                if (leftId.length !== rightId.length) return leftId.length - rightId.length;
+            }
+            return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
+        }
+
+        function countRenderedGroupMessages(area) {
+            return area?.querySelectorAll('.chat-msg-container[data-msg-id], .chat-msg.system-msg[data-msg-id]').length || 0;
+        }
+
+        function showGroupHistoryLoader(area, showLabel) {
+            if (!area) return;
+            let loader = area.querySelector('.group-history-loader');
+            if (!loader) {
+                loader = document.createElement('div');
+                loader.className = 'group-history-loader';
+                loader.setAttribute('role', 'status');
+                loader.innerHTML = `
+                    <div class="group-history-loader-content">
+                        <img src="Assets/loadingRoll.gif" alt="">
+                        <span class="group-history-loader-label">Loading earlier messages…</span>
+                    </div>
+                `;
+                area.insertBefore(loader, area.firstChild);
+            }
+            loader.classList.toggle('show-label', !!showLabel);
+        }
+
+        async function loadEarlierGroupMessages(code, limit, showLabel = false, openToken = groupOpenToken) {
+            if (!sbClient || currentActiveGroupCode !== code || openToken !== groupOpenToken || !groupHistoryHasMore) return;
+            if (groupHistoryLoadPromise && groupHistoryLoadToken === openToken) {
+                if (showLabel) {
+                    groupHistoryQueuedUserLoad = true;
+                    showGroupHistoryLoader(document.getElementById('group-messages'), true);
+                }
+                return groupHistoryLoadPromise;
+            }
+            if (!groupHistoryCursor) return;
+
+            const area = document.getElementById('group-messages');
+            if (!area) return;
+            showGroupHistoryLoader(area, showLabel);
+            const cursor = groupHistoryCursor;
+            const loadPromise = Promise.resolve().then(async () => {
+                const wasAtTop = area.scrollTop <= 2;
+                const wasAtBottom = area.scrollHeight - area.scrollTop - area.clientHeight <= 40;
+                const oldScrollTop = area.scrollTop;
+                const oldScrollHeight = area.scrollHeight;
+                let requestSucceeded = false;
+                try {
+                    const { data, error } = await sbClient.from('group_messages')
+                        .select('*')
+                        .eq('group_code', code)
+                        .or(`created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`)
+                        .order('created_at', { ascending: false })
+                        .order('id', { ascending: false })
+                        .limit(limit);
+
+                    if (groupOpenToken !== openToken || currentActiveGroupCode !== code) return;
+                    if (error) {
+                        console.warn('Could not load earlier group messages:', error);
+                        return;
+                    }
+                    requestSucceeded = true;
+
+                    const olderMessages = data || [];
+                    if (!olderMessages.length) {
+                        groupHistoryHasMore = false;
+                        return;
+                    }
+
+                    groupHistoryCursor = getGroupMessageCursor(olderMessages[olderMessages.length - 1]);
+                    groupHistoryHasMore = olderMessages.length === limit;
+                    [...olderMessages].reverse().forEach(message => {
+                        appendGroupMessage(message, { scroll: false, position: 'sorted' });
+                    });
+
+                    if (limit === INITIAL_GROUP_HISTORY_COUNT) {
+                        while (countRenderedGroupMessages(area) > GROUP_MESSAGE_WINDOW_LIMIT) unloadOldestGroupMessage(area);
+                    }
+                    if (wasAtTop) area.scrollTop = 0;
+                    else if (wasAtBottom) area.scrollTop = area.scrollHeight;
+                    else area.scrollTop = oldScrollTop + (area.scrollHeight - oldScrollHeight);
+                    updateJumpButton(area, document.getElementById('group-jump-btn'));
+                    checkActiveGroupScrolledToBottom();
+                } catch (error) {
+                    console.warn('Could not load earlier group messages:', error);
+                } finally {
+                    const shouldContinue = requestSucceeded && groupHistoryQueuedUserLoad && groupHistoryHasMore && groupOpenToken === openToken && currentActiveGroupCode === code;
+                    if (groupHistoryLoadToken === openToken) groupHistoryQueuedUserLoad = false;
+                    if (groupOpenToken === openToken && currentActiveGroupCode === code) {
+                        if (!shouldContinue) area.querySelector('.group-history-loader')?.remove();
+                    }
+                    if (groupHistoryLoadToken === openToken && groupHistoryLoadPromise === loadPromise) {
+                        groupHistoryLoadPromise = null;
+                    }
+                    if (shouldContinue) {
+                        setTimeout(() => {
+                            if (groupOpenToken === openToken && currentActiveGroupCode === code) {
+                                if (groupHistoryHasMore && area.scrollTop <= 2) {
+                                    void loadEarlierGroupMessages(code, GROUP_HISTORY_PAGE_SIZE, true, openToken);
+                                } else {
+                                    area.querySelector('.group-history-loader')?.remove();
+                                }
+                            }
+                        }, 0);
+                    }
+                }
+            });
+            groupHistoryLoadToken = openToken;
+            groupHistoryLoadPromise = loadPromise;
+            return loadPromise;
+        }
+
         async function pollGroupMessages(code) {
             if (!sbClient || currentActiveGroupCode !== code) return;
             let query = sbClient.from('group_messages').select('*').eq('group_code', code);
@@ -3386,9 +3542,19 @@
 
         // Open Group
         async function openGroup(code, name, isAdmin) {
+            const openToken = ++groupOpenToken;
             if (groupMessagePollTimer) { clearInterval(groupMessagePollTimer); groupMessagePollTimer = null; }
             if (groupRealtimeFallbackTimer) { clearTimeout(groupRealtimeFallbackTimer); groupRealtimeFallbackTimer = null; }
+            if (groupRealtimeChannel && sbClient) {
+                sbClient.removeChannel(groupRealtimeChannel);
+                groupRealtimeChannel = null;
+            }
             lastGroupMessageCreatedAt = null;
+            groupHistoryCursor = null;
+            groupHistoryHasMore = false;
+            groupHistoryLoadToken = openToken;
+            groupHistoryLoadPromise = null;
+            groupHistoryQueuedUserLoad = false;
             currentActiveGroupCode = code;
             currentActiveGroupIsAdmin = !!isAdmin;
             currentGroupColorsById = new Map();
@@ -3434,72 +3600,86 @@
             // Fetch past messages & authoritative admin status
             if (sbClient) {
                 const profile = NexusProfile.get();
-                if (profile?.id) {
-                    await sbClient.from('group_members').update({
-                        username: profile.username,
-                        display_name: profile.displayName || ''
-                    }).eq('user_id', profile.id);
-                }
-                await refreshGroupColorMap(code);
-                if (profile && profile.id) {
+                void (async () => {
                     try {
+                        if (profile?.id) {
+                            const { error } = await sbClient.from('group_members').update({
+                                username: profile.username,
+                                display_name: profile.displayName || ''
+                            }).eq('user_id', profile.id);
+                            if (error) console.warn('Could not refresh group member profile:', error);
+                        }
+                        if (groupOpenToken !== openToken) return;
+                        await refreshGroupColorMap(code);
+                        if (groupOpenToken !== openToken || !profile?.id) return;
+
                         const { data: grpData } = await sbClient.from('groups')
                             .select('admin_id, creator_id')
                             .eq('code', code)
                             .maybeSingle();
+                        if (groupOpenToken !== openToken || !grpData) return;
 
-                        if (grpData) {
-                            const wasNotAdmin = !effectiveIsAdmin;
-                            effectiveIsAdmin = setGroupRoleState(grpData, profile.id);
-                            currentActiveGroupIsAdmin = effectiveIsAdmin;
-                            currentActiveGroupIsCreator = isGroupCreator(grpData, profile.id);
-                            if (effectiveIsAdmin) {
-                                updateChatModeSwitchVisibility();
-                                addAdminDeleteActions();
-                                refreshAdminBadge(code);
-
-                                const groups = getEnrolledGroups();
-                                const enrolled = groups.find(g => g.code === code);
-                                if (enrolled && !enrolled.isAdmin) {
-                                    enrolled.isAdmin = true;
-                                    saveEnrolledGroups(groups);
-                                    renderGroupSidebar();
-                                    if (wasNotAdmin) showAdminGrantedNotification(enrolled);
-                                }
-                            } else {
-                                const groups = getEnrolledGroups();
-                                const enrolled = groups.find(g => g.code === code);
-                                if (enrolled && enrolled.isAdmin) { enrolled.isAdmin = false; saveEnrolledGroups(groups); renderGroupSidebar(); }
+                        const wasNotAdmin = !effectiveIsAdmin;
+                        effectiveIsAdmin = setGroupRoleState(grpData, profile.id);
+                        currentActiveGroupIsAdmin = effectiveIsAdmin;
+                        currentActiveGroupIsCreator = isGroupCreator(grpData, profile.id);
+                        addAdminDeleteActions();
+                        if (effectiveIsAdmin) {
+                            refreshAdminBadge(code);
+                            const groups = getEnrolledGroups();
+                            const enrolled = groups.find(g => g.code === code);
+                            if (enrolled && !enrolled.isAdmin) {
+                                enrolled.isAdmin = true;
+                                saveEnrolledGroups(groups);
+                                renderGroupSidebar();
+                                if (wasNotAdmin) showAdminGrantedNotification(enrolled);
                             }
-                            updateChatModeSwitchVisibility();
+                        } else {
+                            const groups = getEnrolledGroups();
+                            const enrolled = groups.find(g => g.code === code);
+                            if (enrolled && enrolled.isAdmin) { enrolled.isAdmin = false; saveEnrolledGroups(groups); renderGroupSidebar(); }
                         }
+                        updateChatModeSwitchVisibility();
+                        refreshRenderedGroupColors();
                     } catch (e) {
-                        console.warn('Error checking member admin status on open:', e);
+                        console.warn('Error refreshing group metadata on open:', e);
                     }
-                }
+                })();
 
-                // Query newest messages up to 200 and reverse so recent messages/photos always load
+                // Render the newest messages first, then fetch older history in the background.
                 const { data: msgs, error: messagesError } = await sbClient.from('group_messages')
                     .select('*')
                     .eq('group_code', code)
                     .order('created_at', { ascending: false })
-                    .limit(200);
+                    .order('id', { ascending: false })
+                    .limit(INITIAL_GROUP_MESSAGE_COUNT);
 
-                messagesArea.innerHTML = '';
+                if (groupOpenToken !== openToken) return;
+
+                messagesArea.querySelector('.group-messages-loading')?.remove();
                 if (messagesError) {
                     console.error('Could not load group messages:', messagesError);
-                    messagesArea.innerHTML = `<div class="group-messages-error" style="color:#f44336;text-align:center;padding:30px;">Could not load messages: ${escapeHTML(messagesError.message || 'connection error')}</div>`;
+                    if (!countRenderedGroupMessages(messagesArea)) {
+                        messagesArea.innerHTML = `<div class="group-messages-error" style="color:#f44336;text-align:center;padding:30px;">Could not load messages: ${escapeHTML(messagesError.message || 'connection error')}</div>`;
+                    }
                 } else if (msgs && msgs.length) {
-                    msgs.reverse().forEach(m => appendGroupMessage(m));
-                } else {
+                    const chronologicalMessages = [...msgs].reverse();
+                    groupHistoryCursor = getGroupMessageCursor(chronologicalMessages[0]);
+                    groupHistoryHasMore = msgs.length === INITIAL_GROUP_MESSAGE_COUNT;
+                    chronologicalMessages.forEach(m => appendGroupMessage(m, { scroll: false, position: 'sorted' }));
+                } else if (!countRenderedGroupMessages(messagesArea)) {
+                    groupHistoryHasMore = false;
                     messagesArea.innerHTML = '<div style="color:#666; text-align:center; padding:30px; font-style:italic;">No messages yet. Say hello!</div>';
                 }
                 messagesArea.scrollTop = messagesArea.scrollHeight;
                 updateJumpButton(messagesArea, document.getElementById('group-jump-btn'));
                 checkActiveGroupScrolledToBottom();
 
+                if (!messagesError && groupHistoryHasMore) {
+                    void loadEarlierGroupMessages(code, INITIAL_GROUP_HISTORY_COUNT, false, openToken);
+                }
+
                 // Subscribe to Realtime changes
-                if (groupRealtimeChannel) sbClient.removeChannel(groupRealtimeChannel);
                 groupRealtimeChannel = sbClient.channel(`room-${code}`)
                     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_code=eq.${code}` }, payload => {
                         handleIncomingGroupMessage(payload.new);
@@ -3560,6 +3740,7 @@
                     if (currentActiveGroupCode === code && groupRealtimeChannel?.state !== 'joined') startGroupMessagePolling(code);
                 }, 5000);
             } else {
+                if (groupOpenToken !== openToken) return;
                 messagesArea.innerHTML = '<div class="group-messages-error" style="color:#f44336;text-align:center;padding:30px;">Could not load messages: chat service is unavailable.</div>';
             }
         }
@@ -3567,6 +3748,7 @@
         async function refreshGroupMemberCount(code) {
             if (!sbClient) return;
             const { count } = await sbClient.from('group_members').select('*', { count: 'exact', head: true }).eq('group_code', code);
+            if (currentActiveGroupCode !== code) return;
             const el = document.getElementById('display-group-count');
             if (el && count !== null) {
                 el.textContent = `${count} Member${count === 1 ? '' : 's'}`;
@@ -3617,6 +3799,7 @@
         async function refreshAdminBadge(code) {
             if (!sbClient) return;
             const { count } = await sbClient.from('group_requests').select('*', { count: 'exact', head: true }).eq('group_code', code).eq('status', 'pending');
+            if (currentActiveGroupCode !== code) return;
             const badge = document.getElementById('group-admin-badge');
             if (badge) {
                 badge.textContent = count || 0;
@@ -3624,8 +3807,34 @@
             }
         }
 
-        function appendGroupMessage(msg) {
+        function insertGroupMessageElement(area, element, position = 'append') {
+            if (position !== 'sorted' || !element.dataset.createdAt) {
+                area.appendChild(element);
+                return;
+            }
+            const createdAt = element.dataset.createdAt;
+            const messageId = String(element.dataset.msgId || '');
+            const nextMessage = [...area.querySelectorAll('.chat-msg-container[data-created-at], .chat-msg.system-msg[data-created-at]')]
+                .find(existing => {
+                    const existingTime = existing.dataset.createdAt || '';
+                    if (existingTime !== createdAt) return existingTime > createdAt;
+                    return compareGroupMessageIds(existing.dataset.msgId, messageId) > 0;
+                });
+            area.insertBefore(element, nextMessage || null);
+        }
+
+        function unloadOldestGroupMessage(area) {
+            const oldest = area?.querySelector('.chat-msg-container[data-msg-id], .chat-msg.system-msg[data-msg-id]');
+            if (!oldest) return;
+            const areaTop = area.getBoundingClientRect().top;
+            const oldestRect = oldest.getBoundingClientRect();
+            if (oldestRect.bottom <= areaTop) area.scrollTop = Math.max(0, area.scrollTop - oldestRect.height);
+            oldest.remove();
+        }
+
+        function appendGroupMessage(msg, { scroll = true, position = 'append' } = {}) {
             const area = document.getElementById('group-messages');
+            if (!area) return;
             const placeholder = area.querySelector('div[style*="font-style:italic"]');
             const loadError = area.querySelector('.group-messages-error');
             if (placeholder) placeholder.remove();
@@ -3642,10 +3851,11 @@
             if (msg.username === 'System') {
                 const div = document.createElement('div');
                 if (msg.id) div.dataset.msgId = msg.id;
+                if (msg.created_at) div.dataset.createdAt = msg.created_at;
                 div.className = 'chat-msg system-msg';
                 div.innerHTML = `<span class="system-text">[${escapeHTML(msg.text)}]</span>`;
-                area.appendChild(div);
-                area.scrollTop = area.scrollHeight;
+                insertGroupMessageElement(area, div, position);
+                if (scroll) area.scrollTop = area.scrollHeight;
                 updateJumpButton(area, document.getElementById('group-jump-btn'));
                 return;
             }
@@ -3655,6 +3865,7 @@
             container.dataset.msgId = msg.id || ('grp-msg-' + Date.now());
             container.dataset.sender = msg.username;
             container.dataset.userId = String(msg.user_id || '');
+            if (msg.created_at) container.dataset.createdAt = msg.created_at;
             const rainbowUser = isRainbowUser(msg.username, msg.user_id, msg.rainbow_active === true);
             container.dataset.rainbowActive = String(rainbowUser);
             container.dataset.groupMsg = 'true';
@@ -3687,7 +3898,7 @@
             attachActionListeners(actions, container, 'group');
             container.appendChild(div);
             container.appendChild(actions);
-            area.appendChild(container);
+            insertGroupMessageElement(area, container, position);
             if (isDeletedMessage(msg.text)) renderDeletedMessage(container);
             else {
                 renderReactionsForMessage(container.dataset.msgId, div.querySelector('.chat-reactions-row'));
@@ -3695,7 +3906,7 @@
             }
             syncRainbowClasses(container);
 
-            area.scrollTop = area.scrollHeight;
+            if (scroll) area.scrollTop = area.scrollHeight;
             updateJumpButton(area, document.getElementById('group-jump-btn'));
         }
 
@@ -3734,7 +3945,7 @@
                 const { data: savedMessage, error } = await sbClient.from('group_messages').insert([payload]).select('*').single();
                 if (error) throw error;
                 if (savedMessage && currentActiveGroupCode === code && !document.querySelector(`[data-msg-id="${CSS.escape(String(savedMessage.id))}"]`)) {
-                    appendGroupMessage(savedMessage);
+                    handleIncomingGroupMessage(savedMessage);
                 }
                 input.value = '';
                 input.style.height = 'auto';
