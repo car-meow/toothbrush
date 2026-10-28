@@ -30,7 +30,7 @@
         doc.documentElement.classList.toggle('nexus-rainbow-active', active);
         const isHome = doc.body?.classList.contains('home-screen') === true;
         doc.documentElement.classList.toggle('nexus-rainbow-home', isHome);
-        if (isHome) doc.documentElement.classList.remove('nexus-rainbow-static');
+        doc.documentElement.classList.toggle('nexus-rainbow-static', active && isHome);
     }
 
     function closeEasterEggPrompt(overlay) {

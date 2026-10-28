@@ -4563,15 +4563,16 @@ html.nexus-rainbow-active:not(.nexus-rainbow-static) {
     animation: nexus-rainbow-left-right 3.2s ease-in-out infinite alternate;
 }
 
-/* Keep the home greeting moving even when global Performance Mode disables page animations. */
-html.performance-mode.nexus-rainbow-home.nexus-rainbow-active,
-html.performance-mode-lite.nexus-rainbow-home.nexus-rainbow-active {
-    animation: nexus-rainbow-left-right 3.2s ease-in-out infinite alternate !important;
-}
-
 html.nexus-rainbow-static {
     --nexus-rainbow-position: 50%;
     animation: none !important;
+}
+
+html.nexus-rainbow-static .nexus-rainbow-text,
+html.nexus-rainbow-static .chat-msg.nexus-rainbow-outline::before,
+html.nexus-rainbow-static .user-pill.nexus-rainbow-pill::before {
+    background-size: 100% 100%;
+    background-position: 50% 50%;
 }
 
 .chat-msg.nexus-rainbow-outline {

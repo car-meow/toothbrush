@@ -1510,7 +1510,9 @@
             const htmlRoot = document.documentElement;
             const active = !!document.querySelector('.chat-msg.nexus-rainbow-outline, .user-pill.nexus-rainbow-pill');
             htmlRoot.classList.toggle('nexus-rainbow-active', active);
-            htmlRoot.classList.toggle('nexus-rainbow-static', active && !document.body.classList.contains('home-screen') && (htmlRoot.classList.contains('performance-mode') || htmlRoot.classList.contains('performance-mode-lite')));
+            const isHome = document.body.classList.contains('home-screen');
+            const performanceMode = htmlRoot.classList.contains('performance-mode') || htmlRoot.classList.contains('performance-mode-lite');
+            htmlRoot.classList.toggle('nexus-rainbow-static', active && (isHome || performanceMode));
         }
 
         function syncPerformanceModeClasses() {
