@@ -4862,7 +4862,9 @@ html.performance-mode-lite .nexus-updates-overlay {
     overflow: hidden;
     border: 2px solid var(--white-outline, #fff);
     border-radius: 18px;
-    background: var(--modal-bg, #18102b);
+    background: rgba(24, 16, 43, .82);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
     color: var(--text-color, #e2dcf0);
     box-shadow: 0 18px 70px rgba(0, 0, 0, .56);
     font-family: var(--app-font, sans-serif);
@@ -5222,7 +5224,7 @@ html.performance-mode-lite .nexus-updates-overlay {
 
 html.light-mode .nexus-updates-modal {
     border-color: var(--white-outline, #140d24);
-    background: var(--modal-bg, #f9f7fd);
+    background: rgba(249, 247, 253, .82);
     color: #211a2b;
 }
 
