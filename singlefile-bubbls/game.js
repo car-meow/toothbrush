@@ -1987,7 +1987,6 @@ let files = [
 "clrun2",
 "clrun3",
 "clrunningfred",
-"clrussianbuckshot",
 "clrussiancardriver",
 "clrussiansandbox",
 "clsaihatestation",

@@ -157,6 +157,20 @@ function updatePopupGameIndex(gameId) {
     else popupGameWindows.delete(gameId);
 }
 
+function getGameSaveSessionKey(gameId) {
+    return 'tb_nexus_game_session:' + encodeURIComponent(String(gameId));
+}
+
+function ownsGameSaveSession(gameId, sessionId) {
+    if (!sessionId) return true;
+    try {
+        const activeSessionId = window.localStorage.getItem(getGameSaveSessionKey(gameId));
+        return activeSessionId === String(sessionId);
+    } catch (error) {
+        return true;
+    }
+}
+
 function ensureTransitionOverlay(parent = document.body) {
     let overlay = document.getElementById('page-fade-overlay');
     if (!overlay) {
@@ -231,7 +245,7 @@ function suspendMainGameFrames() {
 }
 
 function registerGameSession(game, win) {
-    const sessionId = `game-${Date.now()}-${++gameSessionSequence}`;
+    const sessionId = `game-${Date.now()}-${++gameSessionSequence}-${Math.random().toString(36).slice(2)}`;
     if (typeof window.setTemporaryGameCloak === 'function') {
         window.setTemporaryGameCloak(true);
     }
@@ -667,6 +681,7 @@ async function getGameSnapshot(gameId) {
 
 async function saveGameSnapshot(gameId, payload, skipMirror = false) {
     if (!gameId || !payload || typeof payload !== 'object') return;
+    if (!ownsGameSaveSession(gameId, payload.saveSessionId)) return;
     await initDB();
 
     // A popup can still deliver a save after a newer one has already been
@@ -689,123 +704,135 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
         incomingLs = payload;
     }
 
-    const existing = await new Promise(resolve => {
-        try {
-            const req = db.transaction('gameSnapshots', 'readonly').objectStore('gameSnapshots').get(gameId);
-            req.onsuccess = () => resolve(req.result || null);
-            req.onerror = () => resolve(null);
-        } catch (e) {
-            resolve(null);
-        }
-    });
-
-    if (existing && Number(existing.savedAt) > incomingSavedAt) return;
-
-    const incomingKeys = Object.keys(incomingLs);
-    const existingData = (existing && existing.localStorage && typeof existing.localStorage === 'object') ? existing.localStorage : {};
-    const existingKeys = Object.keys(existingData);
-
-    // Protection: If incoming localStorage snapshot is empty but existing snapshot has valid progress, preserve existing
-    let lsToSave = { ...incomingLs };
-    if (incomingKeys.length === 0 && existingKeys.length > 0) {
-        lsToSave = { ...existingData };
-    } else if (incomingKeys.length > 0 && existingKeys.length > 0) {
-        lsToSave = { ...existingData, ...incomingLs };
-    }
-
-    // Protection: Never overwrite non-empty virtual FS files with null or empty
-    let fsToSave = existing && existing.fsData ? { ...existing.fsData } : null;
-    if (incomingFs && Object.keys(incomingFs).length > 0) {
-        fsToSave = { ...(fsToSave || {}), ...incomingFs };
-    }
-
-    // Protection: Never overwrite non-empty IndexedDB records with null or empty
-    let idbToSave = existing && existing.idbData ? { ...existing.idbData } : null;
-    if (incomingIdb && Object.keys(incomingIdb).length > 0) {
-        idbToSave = { ...(idbToSave || {}), ...incomingIdb };
-    }
-
-    // Keep a real content signature. The previous length-only signature treated
-    // equally-sized progress values as unchanged, which silently skipped saves.
-    const signatureForValue = value => {
-        const encoded = typeof value === 'string' ? value : JSON.stringify(value);
-        const text = typeof encoded === 'string' ? encoded : String(value ?? '');
-        let hash = 2166136261;
-        for (let index = 0; index < text.length; index++) {
-            hash ^= text.charCodeAt(index);
-            hash = Math.imul(hash, 16777619);
-        }
-        return `${text.length}:${hash >>> 0}`;
-    };
-    let sig = '';
-    if (lsToSave) {
-        const lsKeys = Object.keys(lsToSave);
-        sig += 'L' + lsKeys.length;
-        for (let i = 0; i < lsKeys.length; i++) {
-            const key = lsKeys[i];
-            sig += ':' + key + '=' + signatureForValue(lsToSave[key]);
-        }
-    }
-    if (fsToSave) {
-        const fsKeys = Object.keys(fsToSave);
-        sig += '|F' + fsKeys.length;
-        for (let i = 0; i < fsKeys.length; i++) {
-            const f = fsToSave[fsKeys[i]];
-            sig += ':' + fsKeys[i] + '=' + signatureForValue(f && f.data ? f.data : '');
-        }
-    }
-    if (idbToSave) {
-        const idbKeys = Object.keys(idbToSave);
-        sig += '|I' + idbKeys.length;
-        for (let i = 0; i < idbKeys.length; i++) {
-            const ent = idbToSave[idbKeys[i]];
-            sig += ':' + idbKeys[i] + '=' + signatureForValue(ent && ent.contents ? ent.contents : '');
-        }
-    }
-    if (snapshotHashes.get(gameId) === sig && existing && Number(existing.savedAt) >= incomingSavedAt) return;
-
-    const savedAt = incomingSavedAt;
-    const history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
-    if (existing && existing.localStorage) {
-        history.push({
-            localStorage: existing.localStorage,
-            savedAt: existing.savedAt || savedAt
-        });
-    }
-
-    const snapshotRecord = {
-        gameId,
-        localStorage: lsToSave,
-        fsData: fsToSave,
-        idbData: idbToSave,
-        savedAt,
-        history
-    };
-
-    const tx = db.transaction('gameSnapshots', 'readwrite');
-    const store = tx.objectStore('gameSnapshots');
-    store.put(snapshotRecord);
-    snapshotHashes.set(gameId, sig);
-
-    // IndexedDB is the durable source of truth. Avoid retaining these full
-    // filesystem/IndexedDB snapshots in a page-level cache after the write;
-    // some game saves contain large binary payloads.
-    if (!skipMirror) {
-        const matched = findGameByIdOrSource(gameId);
-        if (matched && matched.id && matched.id !== gameId) {
-            saveGameSnapshot(matched.id, {
-                localStorage: lsToSave,
-                fsData: fsToSave,
-                idbData: idbToSave,
-                savedAt
-            }, true).catch(() => {});
-        }
-    }
-
+    // Read, compare, merge, and write in one readwrite transaction. Doing the
+    // read in a separate transaction lets two concurrent saves both compare
+    // against the same old record, so the older payload can commit last.
     return new Promise((resolve, reject) => {
-        tx.oncomplete = resolve;
-        tx.onerror = () => reject(tx.error);
-        tx.onabort = () => reject(tx.error);
+        let snapshotRecord = null;
+        let signature = null;
+        let didSave = false;
+        let tx;
+        try {
+            tx = db.transaction('gameSnapshots', 'readwrite');
+            const store = tx.objectStore('gameSnapshots');
+            const getReq = store.get(gameId);
+            getReq.onsuccess = () => {
+                if (!ownsGameSaveSession(gameId, payload.saveSessionId)) return;
+                const existing = getReq.result || null;
+                if (existing && Number(existing.savedAt) > incomingSavedAt) return;
+
+                const incomingKeys = Object.keys(incomingLs);
+                const existingData = (existing && existing.localStorage && typeof existing.localStorage === 'object') ? existing.localStorage : {};
+                const existingKeys = Object.keys(existingData);
+
+                // Protection: If incoming localStorage snapshot is empty but existing snapshot has valid progress, preserve existing
+                let lsToSave = { ...incomingLs };
+                if (incomingKeys.length === 0 && existingKeys.length > 0) {
+                    lsToSave = { ...existingData };
+                } else if (incomingKeys.length > 0 && existingKeys.length > 0) {
+                    lsToSave = { ...existingData, ...incomingLs };
+                }
+
+                // Protection: Never overwrite non-empty virtual FS files with null or empty
+                let fsToSave = existing && existing.fsData ? { ...existing.fsData } : null;
+                if (incomingFs && Object.keys(incomingFs).length > 0) {
+                    fsToSave = { ...(fsToSave || {}), ...incomingFs };
+                }
+
+                // Protection: Never overwrite non-empty IndexedDB records with null or empty
+                let idbToSave = existing && existing.idbData ? { ...existing.idbData } : null;
+                if (incomingIdb && Object.keys(incomingIdb).length > 0) {
+                    idbToSave = { ...(idbToSave || {}), ...incomingIdb };
+                }
+
+                // Keep a real content signature. The previous length-only signature treated
+                // equally-sized progress values as unchanged, which silently skipped saves.
+                const signatureForValue = value => {
+                    const encoded = typeof value === 'string' ? value : JSON.stringify(value);
+                    const text = typeof encoded === 'string' ? encoded : String(value ?? '');
+                    let hash = 2166136261;
+                    for (let index = 0; index < text.length; index++) {
+                        hash ^= text.charCodeAt(index);
+                        hash = Math.imul(hash, 16777619);
+                    }
+                    return `${text.length}:${hash >>> 0}`;
+                };
+                let sig = '';
+                if (lsToSave) {
+                    const lsKeys = Object.keys(lsToSave);
+                    sig += 'L' + lsKeys.length;
+                    for (let i = 0; i < lsKeys.length; i++) {
+                        const key = lsKeys[i];
+                        sig += ':' + key + '=' + signatureForValue(lsToSave[key]);
+                    }
+                }
+                if (fsToSave) {
+                    const fsKeys = Object.keys(fsToSave);
+                    sig += '|F' + fsKeys.length;
+                    for (let i = 0; i < fsKeys.length; i++) {
+                        const f = fsToSave[fsKeys[i]];
+                        sig += ':' + fsKeys[i] + '=' + signatureForValue(f && f.data ? f.data : '');
+                    }
+                }
+                if (idbToSave) {
+                    const idbKeys = Object.keys(idbToSave);
+                    sig += '|I' + idbKeys.length;
+                    for (let i = 0; i < idbKeys.length; i++) {
+                        const ent = idbToSave[idbKeys[i]];
+                        sig += ':' + idbKeys[i] + '=' + signatureForValue(ent && ent.contents ? ent.contents : '');
+                    }
+                }
+                if (snapshotHashes.get(gameId) === sig && existing && Number(existing.savedAt) >= incomingSavedAt) return;
+
+                const savedAt = incomingSavedAt;
+                const history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
+                if (existing && existing.localStorage) {
+                    history.push({
+                        localStorage: existing.localStorage,
+                        savedAt: existing.savedAt || savedAt
+                    });
+                }
+
+                snapshotRecord = {
+                    gameId,
+                    localStorage: lsToSave,
+                    fsData: fsToSave,
+                    idbData: idbToSave,
+                    savedAt,
+                    history
+                };
+                signature = sig;
+                didSave = true;
+                store.put(snapshotRecord);
+            };
+            getReq.onerror = () => reject(getReq.error || tx.error || new Error('Could not read the saved game snapshot.'));
+            tx.oncomplete = () => {
+                if (didSave) {
+                    snapshotHashes.set(gameId, signature);
+
+                    // IndexedDB is the durable source of truth. Avoid retaining these full
+                    // filesystem/IndexedDB snapshots in a page-level cache after the write;
+                    // some game saves contain large binary payloads.
+                    if (!skipMirror) {
+                        const matched = findGameByIdOrSource(gameId);
+                        if (matched && matched.id && matched.id !== gameId) {
+                            saveGameSnapshot(matched.id, {
+                                localStorage: snapshotRecord.localStorage,
+                                fsData: snapshotRecord.fsData,
+                                idbData: snapshotRecord.idbData,
+                                savedAt: snapshotRecord.savedAt,
+                                saveSessionId: payload.saveSessionId
+                            }, true).catch(() => {});
+                        }
+                    }
+                }
+                resolve(snapshotRecord);
+            };
+            tx.onerror = () => reject(tx.error || new Error('Could not save the game snapshot.'));
+            tx.onabort = () => reject(tx.error || new Error('Game snapshot save was interrupted.'));
+        } catch (error) {
+            reject(error);
+        }
     });
 }
 
@@ -869,7 +896,8 @@ window.addEventListener('message', event => {
                 localStorage: message.localStorage,
                 fsData: message.fsData,
                 idbData: message.idbData,
-                savedAt: message.savedAt
+                savedAt: message.savedAt,
+                saveSessionId: message.saveSessionId
             }).catch(() => {});
         }
     } else if (message.type === 'nexus-request-game-restore') {
@@ -1480,10 +1508,12 @@ function getGameRestoreScript(gameId, snapshot = {}) {
     }catch(e){}})();<\/script>`;
 }
 
-function getUniversalAutosaveBridge(gameId) {
+function getUniversalAutosaveBridge(gameId, saveSessionId = null) {
     return `<script>
 (function() {
     var gameId = ${JSON.stringify(gameId)};
+    var saveSessionId = ${JSON.stringify(saveSessionId)};
+    var saveSessionKey = 'tb_nexus_game_session:' + encodeURIComponent(String(gameId));
     var syncing = false;
     var syncQueued = false;
     var queuedImmediate = false;
@@ -1492,9 +1522,18 @@ function getUniversalAutosaveBridge(gameId) {
     var lastSavedAt = 0;
     var autosaveDisarmed = false;
     var journalKey = 'tb_nexus_game_autosave:' + encodeURIComponent(String(gameId));
+    window.__nexusGameSaveSessionId = saveSessionId;
+
+    function isCurrentSession() {
+        if (!saveSessionId) return true;
+        try {
+            var activeSessionId = localStorage.getItem(saveSessionKey);
+            return activeSessionId === String(saveSessionId);
+        } catch(e) { return true; }
+    }
 
     function saveSnapshotDirectToDB(targetId, snapshotData) {
-        if (autosaveDisarmed || !snapshotData || !targetId) return;
+        if (autosaveDisarmed || !isCurrentSession() || !snapshotData || !targetId) return;
         var incomingLs = snapshotData.localStorage || {};
         var incomingFs = snapshotData.fsData || null;
         var incomingIdb = snapshotData.idbData || null;
@@ -1511,12 +1550,12 @@ function getUniversalAutosaveBridge(gameId) {
                 var db = e.target.result;
                 db.onversionchange = function() { try { db.close(); } catch(err) {} };
                 try {
-                    if (autosaveDisarmed || !db.objectStoreNames.contains('gameSnapshots')) return;
+                    if (autosaveDisarmed || !isCurrentSession() || !db.objectStoreNames.contains('gameSnapshots')) return;
                     var tx = db.transaction('gameSnapshots', 'readwrite');
                     var store = tx.objectStore('gameSnapshots');
                     var getReq = store.get(targetId);
                     getReq.onsuccess = function() {
-                        if (autosaveDisarmed) return;
+                        if (autosaveDisarmed || !isCurrentSession()) return;
                         var existing = getReq.result || null;
                         if (existing && Number(existing.savedAt) > incomingSavedAt) return;
                         var existingData = (existing && existing.localStorage && typeof existing.localStorage === 'object') ? existing.localStorage : {};
@@ -1586,7 +1625,7 @@ function getUniversalAutosaveBridge(gameId) {
     }
 
     function sendSave(immediate) {
-        if (autosaveDisarmed) return;
+        if (autosaveDisarmed || !isCurrentSession()) return;
         try {
             var data = getStorageSnapshot();
             var currentHash = JSON.stringify(data);
@@ -1596,7 +1635,7 @@ function getUniversalAutosaveBridge(gameId) {
             lastSavedAt = savedAt;
             writeJournal(data, savedAt);
 
-            var msg = { type: 'nexus-game-save', gameId: gameId, localStorage: data, savedAt: savedAt };
+            var msg = { type: 'nexus-game-save', gameId: gameId, localStorage: data, savedAt: savedAt, saveSessionId: saveSessionId };
             saveSnapshotDirectToDB(gameId, msg);
             if (window.parent && window.parent !== window) {
                 try { window.parent.postMessage(msg, '*'); } catch(e) {}
@@ -1609,7 +1648,7 @@ function getUniversalAutosaveBridge(gameId) {
     }
 
     function syncAndSend(immediate) {
-        if (autosaveDisarmed) return;
+        if (autosaveDisarmed || !isCurrentSession()) return;
         if (syncing) {
             syncQueued = true;
             queuedImmediate = queuedImmediate || !!immediate;
@@ -1639,7 +1678,7 @@ function getUniversalAutosaveBridge(gameId) {
     }
 
     function debounceSync(delay) {
-        if (autosaveDisarmed) return;
+        if (autosaveDisarmed || !isCurrentSession()) return;
         if (syncTimer) clearTimeout(syncTimer);
         syncTimer = setTimeout(function() {
             syncTimer = null;
@@ -1652,7 +1691,7 @@ function getUniversalAutosaveBridge(gameId) {
         var origSetItem = Storage.prototype.setItem;
         Storage.prototype.setItem = function(k, v) {
             var res = origSetItem.apply(this, arguments);
-            if (!autosaveDisarmed && this === localStorage && k && k.indexOf('tb_') !== 0) {
+            if (!autosaveDisarmed && isCurrentSession() && this === localStorage && k && k.indexOf('tb_') !== 0) {
                 debounceSync(300);
             }
             return res;
@@ -1660,7 +1699,7 @@ function getUniversalAutosaveBridge(gameId) {
         var origRemoveItem = Storage.prototype.removeItem;
         Storage.prototype.removeItem = function(k) {
             var res = origRemoveItem.apply(this, arguments);
-            if (!autosaveDisarmed && this === localStorage && k && k.indexOf('tb_') !== 0) {
+            if (!autosaveDisarmed && isCurrentSession() && this === localStorage && k && k.indexOf('tb_') !== 0) {
                 debounceSync(300);
             }
             return res;
@@ -1668,7 +1707,7 @@ function getUniversalAutosaveBridge(gameId) {
         var origClear = Storage.prototype.clear;
         Storage.prototype.clear = function() {
             var res = origClear.apply(this, arguments);
-            if (!autosaveDisarmed && this === localStorage) {
+            if (!autosaveDisarmed && isCurrentSession() && this === localStorage) {
                 debounceSync(300);
             }
             return res;
@@ -1688,7 +1727,7 @@ function getUniversalAutosaveBridge(gameId) {
                 fs.syncfs = function(populate, callback) {
                     return origSyncfs.call(this, populate, function(err) {
                         if (typeof callback === 'function') callback(err);
-                        if (!populate && !autosaveDisarmed) {
+                        if (!populate && !autosaveDisarmed && isCurrentSession()) {
                             debounceSync(1000);
                         }
                     });
@@ -1703,7 +1742,7 @@ function getUniversalAutosaveBridge(gameId) {
     hookTimer = setInterval(hookFS, 2000);
 
     // Multi-Trigger Auto-Sync & Clear Handlers
-    window.addEventListener('storage', function() { if (!autosaveDisarmed) debounceSync(200); }, { passive: true });
+    window.addEventListener('storage', function() { if (!autosaveDisarmed && isCurrentSession()) debounceSync(200); }, { passive: true });
     window.addEventListener('message', function(e) {
         if (!e.data) return;
         if (e.data.type === 'nexus-disarm-autosave') {
@@ -1731,17 +1770,17 @@ function getUniversalAutosaveBridge(gameId) {
             }); } catch(err) {}
         }
         if (e.data.type === 'nexus-request-game-save') {
-            if (!autosaveDisarmed) syncAndSend(true);
+            if (!autosaveDisarmed && isCurrentSession()) syncAndSend(true);
         }
     });
     document.addEventListener('visibilitychange', function() {
-        if (document.hidden && !autosaveDisarmed) syncAndSend(true);
+        if (document.hidden && !autosaveDisarmed && isCurrentSession()) syncAndSend(true);
     }, { passive: true });
-    window.addEventListener('blur', function() { if (!autosaveDisarmed) syncAndSend(false); }, { passive: true });
-    window.addEventListener('pagehide', function() { if (!autosaveDisarmed) syncAndSend(true); }, { passive: true });
-    window.addEventListener('beforeunload', function() { if (!autosaveDisarmed) syncAndSend(true); }, { passive: true });
+    window.addEventListener('blur', function() { if (!autosaveDisarmed && isCurrentSession()) syncAndSend(false); }, { passive: true });
+    window.addEventListener('pagehide', function() { if (!autosaveDisarmed && isCurrentSession()) syncAndSend(true); }, { passive: true });
+    window.addEventListener('beforeunload', function() { if (!autosaveDisarmed && isCurrentSession()) syncAndSend(true); }, { passive: true });
 
-    setInterval(function() { if (!autosaveDisarmed) syncAndSend(false); }, 15000);
+    setInterval(function() { if (!autosaveDisarmed && isCurrentSession()) syncAndSend(false); }, 15000);
 })();
 <\/script>`;
 }
@@ -1849,8 +1888,8 @@ function shouldInjectGamePersistence(game, url) {
     }
 }
 
-function getGamePersistenceBootstrap(gameId, snapshot = {}) {
-    return getGameRestoreScript(gameId, snapshot) + getUniversalAutosaveBridge(gameId);
+function getGamePersistenceBootstrap(gameId, snapshot = {}, saveSessionId = null) {
+    return getGameRestoreScript(gameId, snapshot) + getUniversalAutosaveBridge(gameId, saveSessionId);
 }
 
 function getGameLaunchDiagnostics(gameId, loadToken) {
@@ -2059,6 +2098,11 @@ async function getLaunchSnapshot(gameId) {
 function launchGameFullscreen(game) {
     game = applyGameRunMode(game);
     if (!game || game.id === "ugs-stash") return;
+    const existingWindow = popupGameWindows.get(String(game.id));
+    if (existingWindow && !existingWindow.closed) {
+        try { existingWindow.focus(); } catch (error) {}
+        return;
+    }
     // Fullscreen launches bypass loadGame's normal inactive-content cleanup.
     // Release cached file payloads from earlier game visits before opening
     // another game window.
@@ -2067,6 +2111,9 @@ function launchGameFullscreen(game) {
     const startLaunch = win => {
         if (win.closed) return;
         const gameSession = registerGameSession(game, win);
+        try {
+            window.localStorage.setItem(getGameSaveSessionKey(game.id), gameSession.sessionId);
+        } catch (error) {}
         const launchToken = Date.now() + Math.random();
         let launchFrame = null;
         let injectedLaunch = false;
@@ -2233,7 +2280,7 @@ function launchGameFullscreen(game) {
                 const unityCompatibility = isUnityRuntime
                     ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
                     : '';
-                const popupBridge = getUniversalAutosaveBridge(game.id);
+                const popupBridge = getUniversalAutosaveBridge(game.id, gameSession.sessionId);
                 const popupRestore = getGameRestoreScript(game.id, latestSnapshot);
                 const autoFocusScript = `<script>
                 (function(){
@@ -2285,7 +2332,7 @@ function launchGameFullscreen(game) {
                 if (resolved.usedFallback) game = { ...game, nexusExternalSource: true };
                 if (shouldInjectGamePersistence(game, resolvedUrl)) {
                     const snapshot = await getLaunchSnapshot(game.id);
-                    const persistenceBootstrap = getGameLaunchDiagnostics(game.id, launchToken) + getGamePersistenceBootstrap(game.id, snapshot);
+                    const persistenceBootstrap = getGameLaunchDiagnostics(game.id, launchToken) + getGamePersistenceBootstrap(game.id, snapshot, gameSession.sessionId);
                     try {
                         launchFrame = ifr;
                         injectedLaunch = true;
@@ -2344,6 +2391,11 @@ function launchGameFullscreen(game) {
                     var ci = ${JSON.stringify(cloak.icon)};
                     var gameAliases = ${JSON.stringify(targetGameAliases)};
                     var primaryGameId = ${JSON.stringify(game.id)};
+                    var saveSessionId = ${JSON.stringify(gameSession.sessionId)};
+                    var saveSessionKey = 'tb_nexus_game_session:' + encodeURIComponent(String(primaryGameId));
+                    function isCurrentSession() {
+                        try { return localStorage.getItem(saveSessionKey) === String(saveSessionId); } catch(err) { return true; }
+                    }
                     var blankFavicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E";
                     function syncTitle() {
                         var titleEl = document.querySelector('title');
@@ -2430,7 +2482,7 @@ function launchGameFullscreen(game) {
 
                     // Standalone IndexedDB snapshot persistence engine for about:blank popup
                     function saveToIDB(incomingData) {
-                        if (!incomingData) return;
+                        if (!incomingData || !isCurrentSession() || String(incomingData.saveSessionId) !== String(saveSessionId)) return;
                         var ids = gameAliases.slice();
                         if (incomingData.gameId && ids.indexOf(incomingData.gameId) === -1) {
                             ids.push(incomingData.gameId);
@@ -2556,7 +2608,7 @@ function launchGameFullscreen(game) {
                     // Autonomous Message Bus: persists even if opener tab was closed
                     window.addEventListener('message', function(e) {
                         if (!e.data) return;
-                        if (e.data.type === 'nexus-game-save') {
+                        if (e.data.type === 'nexus-game-save' && isCurrentSession() && String(e.data.saveSessionId) === String(saveSessionId)) {
                             saveToIDB(e.data);
                             try {
                                 if (window.opener && !window.opener.closed) {

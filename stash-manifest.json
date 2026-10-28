@@ -2244,7 +2244,14 @@
   {
     "file": "clbuckshotroulette.html",
     "raw": "clbuckshotroulette",
-    "title": "Buckshotroulette",
+    "title": "Buckshot Roulette",
+    "letter": "B",
+    "isLocal": true
+  },
+  {
+    "file": "buckshotroulbackup.html",
+    "raw": "buckshotroulbackup",
+    "title": "Buckshot Roulette backup",
     "letter": "B",
     "isLocal": true
   },
@@ -13928,13 +13935,6 @@
     "file": "clrunningfred.html",
     "raw": "clrunningfred",
     "title": "Runningfred",
-    "letter": "R",
-    "isLocal": true
-  },
-  {
-    "file": "clrussianbuckshot.html",
-    "raw": "clrussianbuckshot",
-    "title": "Russianbuckshot",
     "letter": "R",
     "isLocal": true
   },

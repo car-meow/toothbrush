@@ -480,12 +480,25 @@
     (function() {
       var gameAliases = ['balatro', 'bookmark_stash:balatro.html'];
       var autosaveDisarmed = false;
+      var lastSavedAt = 0;
+      var saveSessionId = window.__nexusGameSaveSessionId || null;
+      var saveSessionKey = 'tb_nexus_game_session:' + encodeURIComponent('balatro');
+
+      function isCurrentSession() {
+        if (!saveSessionId) return true;
+        try {
+          var activeSessionId = localStorage.getItem(saveSessionKey);
+          return activeSessionId === String(saveSessionId);
+        } catch(e) { return true; }
+      }
 
       function saveSnapshotDirectToDB(incomingData) {
-        if (autosaveDisarmed || !incomingData) return;
+        if (autosaveDisarmed || !isCurrentSession() || !incomingData || (incomingData.saveSessionId && String(incomingData.saveSessionId) !== String(saveSessionId))) return;
         var incomingLs = incomingData.localStorage || {};
         var incomingFs = incomingData.fsData || null;
         var incomingIdb = incomingData.idbData || null;
+        var payloadSavedAt = Number(incomingData.savedAt);
+        var incomingSavedAt = isFinite(payloadSavedAt) && payloadSavedAt > 0 ? payloadSavedAt : Date.now();
         try {
           var req = indexedDB.open("GameStorageDB", 3);
           req.onupgradeneeded = function(e) {
@@ -500,9 +513,18 @@
               if (!db.objectStoreNames.contains('gameSnapshots')) return;
               var tx = db.transaction('gameSnapshots', 'readwrite');
               var store = tx.objectStore('gameSnapshots');
-              var getReq = store.get(gameAliases[0]);
-              getReq.onsuccess = function() {
-                var existing = getReq.result || null;
+              var existingRecords = [];
+              var checksLeft = gameAliases.length;
+              function finishRead() {
+                if (--checksLeft > 0) return;
+                var existing = null;
+                existingRecords.forEach(function(candidate) {
+                  var candidateSavedAt = Number(candidate && candidate.savedAt) || 0;
+                  var existingSavedAt = Number(existing && existing.savedAt) || 0;
+                  if (candidate && (!existing || candidateSavedAt > existingSavedAt)) existing = candidate;
+                });
+                if (!isCurrentSession() || (existing && Number(existing.savedAt) > incomingSavedAt)) return;
+
                 var existingData = (existing && existing.localStorage && typeof existing.localStorage === 'object') ? existing.localStorage : {};
                 var incomingKeys = Object.keys(incomingLs);
                 var existingKeys = Object.keys(existingData);
@@ -524,7 +546,7 @@
                   idbToSave = Object.assign({}, idbToSave || {}, incomingIdb);
                 }
 
-                var savedAt = Date.now();
+                var savedAt = incomingSavedAt;
                 var history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
                 if (existing && existing.localStorage) {
                   history.push({
@@ -545,7 +567,12 @@
                   };
                   try { store.put(record); } catch(err) {}
                 });
-              };
+              }
+              gameAliases.forEach(function(alias, index) {
+                var getReq = store.get(alias);
+                getReq.onsuccess = function() { existingRecords[index] = getReq.result || null; finishRead(); };
+                getReq.onerror = function() { finishRead(); };
+              });
             } catch(txErr) {}
           };
         } catch(err) {}
@@ -569,25 +596,24 @@
               }
               var tx = db.transaction('gameSnapshots', 'readonly');
               var store = tx.objectStore('gameSnapshots');
-              var idx = 0;
-              function checkNext() {
-                if (idx >= gameAliases.length) {
-                  if (callback) callback(null);
-                  return;
-                }
-                var curId = gameAliases[idx++];
-                var getReq = store.get(curId);
-                getReq.onsuccess = function() {
-                  var res = getReq.result;
-                  if (res && (res.localStorage || res.fsData || res.idbData)) {
-                    if (callback) callback(res);
-                  } else {
-                    checkNext();
-                  }
-                };
-                getReq.onerror = function() { checkNext(); };
+              var records = [];
+              var checksLeft = gameAliases.length;
+              function finishRead() {
+                if (--checksLeft > 0) return;
+                var found = null;
+                records.forEach(function(record) {
+                  var recordSavedAt = Number(record && record.savedAt) || 0;
+                  var foundSavedAt = Number(found && found.savedAt) || 0;
+                  if (record && (record.localStorage || record.fsData || record.idbData) &&
+                      (!found || recordSavedAt > foundSavedAt)) found = record;
+                });
+                if (callback) callback(found);
               }
-              checkNext();
+              gameAliases.forEach(function(alias, index) {
+                var getReq = store.get(alias);
+                getReq.onsuccess = function() { records[index] = getReq.result || null; finishRead(); };
+                getReq.onerror = function() { finishRead(); };
+              });
             } catch(txErr) {
               if (callback) callback(null);
             }
@@ -599,8 +625,10 @@
       }
 
       function sendSave() {
-        if (autosaveDisarmed) return;
+        if (autosaveDisarmed || !isCurrentSession()) return;
         try {
+          var savedAt = Math.max(Date.now(), lastSavedAt + 1);
+          lastSavedAt = savedAt;
           var s = {};
           for (var i = 0; i < localStorage.length; i++) {
             var k = localStorage.key(i);
@@ -614,7 +642,9 @@
               gameId: 'balatro',
               localStorage: s,
               fsData: (fsFiles && Object.keys(fsFiles).length > 0) ? fsFiles : null,
-              idbData: idbRecs || null
+              idbData: idbRecs || null,
+              savedAt: savedAt,
+              saveSessionId: saveSessionId
             };
             saveSnapshotDirectToDB(msg);
             if (window.parent && window.parent !== window) {
@@ -640,7 +670,7 @@
       }
 
       function applyRestore(data) {
-        if (!data) return;
+        if (!data || !isCurrentSession()) return;
         if (data.localStorage && typeof data.localStorage === 'object') {
           Object.keys(data.localStorage).forEach(function(k) {
             if (k && k.indexOf('tb_') !== 0) localStorage.setItem(k, data.localStorage[k]);
@@ -670,7 +700,7 @@
           } catch(err) {}
         }
         if (e.data.type === 'nexus-request-game-save' && !autosaveDisarmed) syncAndSend();
-        if (e.data.type === 'nexus-apply-game-restore') applyRestore(e.data);
+        if (e.data.type === 'nexus-apply-game-restore' && isCurrentSession()) applyRestore(e.data);
       });
 
       window.addEventListener('pagehide', function() { if (!autosaveDisarmed) syncAndSend(); }, { passive: true });
@@ -690,7 +720,7 @@
         try { opener.postMessage(reqMsg, '*'); } catch(e) {}
       }
       readSnapshotDirectFromDB(function(snap) {
-        if (snap) applyRestore(snap);
+        if (snap && isCurrentSession()) applyRestore(snap);
       });
     })();
   </script>

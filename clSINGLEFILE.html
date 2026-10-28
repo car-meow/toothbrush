@@ -538,6 +538,10 @@
         }
 
         function getStashDisplayName(name, stripExtension = false) {
+            const normalizedFile = normalizeBookmarkFileName(name).toLowerCase();
+            const manifestItem = stashManifestMap.get(normalizedFile) ||
+                                 stashManifestMap.get(normalizedFile.replace(/\.html$/, ''));
+            if (manifestItem && manifestItem.title) return manifestItem.title;
             return humanizeBookmarkDisplayName(name, stripExtension);
         }
 
