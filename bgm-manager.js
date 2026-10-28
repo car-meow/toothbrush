@@ -1,4 +1,4 @@
-// nexus-version: 4.45.2
+// nexus-version: 4.45.5
 // Register Service Worker for offline support
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
