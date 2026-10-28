@@ -1873,6 +1873,23 @@ function isBrotatoGame(game) {
     return fileName === 'clbrotato.html' || fileName.endsWith('/clbrotato.html') || gameId.includes('brotato');
 }
 
+function isMrMineGame(game) {
+    const identity = [game && game.id, game && game.sourceKey, game && game.sourceFile, game && game.url]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+    return /clmrmine(?:\.html)?/.test(identity);
+}
+
+function getMrMineMirrorHtml(html, attempt) {
+    const mirrorHosts = ['fastly.jsdelivr.net', 'gcore.jsdelivr.net'];
+    const mirrorHost = mirrorHosts[attempt];
+    if (!html || !mirrorHost) return null;
+    const basePattern = /https:\/\/(?:cdn|fastly|gcore)\.jsdelivr\.net\/gh\/bubbls\/UGS-Assets@main\/mr-mine\//ig;
+    const mirroredHtml = String(html).replace(basePattern, `https://${mirrorHost}/gh/bubbls/UGS-Assets@main/mr-mine/`);
+    return mirroredHtml === html ? null : mirroredHtml;
+}
+
 function shouldInjectGamePersistence(game, url) {
     if (!game || !url) return false;
     // Brotato installs a cross-origin-isolation service worker. Keep its real
@@ -1892,21 +1909,64 @@ function getGamePersistenceBootstrap(gameId, snapshot = {}, saveSessionId = null
     return getGameRestoreScript(gameId, snapshot) + getUniversalAutosaveBridge(gameId, saveSessionId);
 }
 
-function getGameLaunchDiagnostics(gameId, loadToken) {
+function getGameLaunchDiagnostics(gameId, loadToken, options = {}) {
     return `<script>(function(){
         var gameId=${JSON.stringify(String(gameId))};
         var loadToken=${Number(loadToken) || 0};
+        var captureMrMineAssets=${Boolean(options.captureMrMineAssets)};
         var reported=false;
         var gameReady=false;
         window.addEventListener('nexus-game-ready',function(){gameReady=true;});
+        window.addEventListener('load',function(){setTimeout(function(){gameReady=true;},30000);},{once:true});
         function report(kind,message){
             if(reported||gameReady)return;
             reported=true;
             try{window.parent.postMessage({type:'nexus-game-launch-error',gameId:gameId,loadToken:loadToken,kind:kind,message:String(message||'Game startup failed').slice(0,500)},'*');}catch(e){}
         }
+        function isMrMineAssetUrl(url){
+            return /https:\\/\\/(?:cdn|fastly|gcore)\\.jsdelivr\\.net\\/gh\\/bubbls\\/UGS-Assets@main\\/mr-mine\\//i.test(String(url||''));
+        }
+        if(captureMrMineAssets&&window.MutationObserver){
+            var trackedAssets=new WeakSet();
+            function trackAsset(node){
+                if(!node||trackedAssets.has(node))return;
+                var tagName=String(node.tagName||'').toUpperCase();
+                var url=String(node.currentSrc||node.src||node.href||'');
+                var isCoreScript=tagName==='SCRIPT'&&!!node.src;
+                var isCoreStyle=tagName==='LINK'&&String(node.rel||'').toLowerCase().indexOf('stylesheet')!==-1&&!!node.href;
+                if((!isCoreScript&&!isCoreStyle)||!isMrMineAssetUrl(url))return;
+                trackedAssets.add(node);
+                var timer=setTimeout(function(){report('resource-timeout',url);},25000);
+                var clearTimer=function(){clearTimeout(timer);};
+                node.addEventListener('load',clearTimer,{once:true});
+                node.addEventListener('error',clearTimer,{once:true});
+            }
+            function trackAssetTree(root){
+                if(!root)return;
+                if(root.nodeType===1)trackAsset(root);
+                if(root.querySelectorAll){
+                    Array.prototype.forEach.call(root.querySelectorAll('script[src],link[rel~="stylesheet"][href]'),trackAsset);
+                }
+            }
+            var assetRoot=document.documentElement||document;
+            trackAssetTree(assetRoot);
+            new MutationObserver(function(records){
+                records.forEach(function(record){Array.prototype.forEach.call(record.addedNodes||[],trackAssetTree);});
+            }).observe(assetRoot,{childList:true,subtree:true});
+        }
         window.addEventListener('error',function(event){
+            var target=event.target;
+            if(captureMrMineAssets&&target&&target!==window){
+                var resourceUrl=String(target.currentSrc||target.src||target.href||'');
+                var isCoreResource=target.tagName==='SCRIPT'||(target.tagName==='LINK'&&String(target.rel||'').toLowerCase().indexOf('stylesheet')!==-1);
+                if(isCoreResource&&isMrMineAssetUrl(resourceUrl)){
+                    report('resource',resourceUrl);
+                }
+                return;
+            }
+            if(target&&target!==window)return;
             report('script',event.message||event.error&&event.error.message||'Game script failed');
-        });
+        },true);
         window.addEventListener('unhandledrejection',function(event){
             var reason=event.reason;
             report('promise',reason&&reason.message||reason||'Game startup failed');
@@ -2032,6 +2092,9 @@ async function resolveGameUrl(game) {
     if (!localUrl || !fallbackUrl || !/^singlefile-bubbls\/UGS-Files\//i.test(localUrl)) {
         return { url: localUrl, usedFallback: false };
     }
+    // Mr. Mine's bundled HTML is present locally. Avoid a cache-bypassing HEAD
+    // request before the real HTML fetch.
+    if (isMrMineGame(game)) return { url: localUrl, usedFallback: false };
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4000);
@@ -2120,6 +2183,7 @@ function launchGameFullscreen(game) {
         let directFallbackTried = false;
         let directFallbackUrl = null;
         let unmodifiedHtml = null;
+        let mrMineMirrorAttempt = 0;
         const showPopupLoadError = () => {
             if (!win.document || !win.document.body) return;
             let panel = win.document.getElementById('nexus-game-load-error');
@@ -2145,6 +2209,17 @@ function launchGameFullscreen(game) {
         win.addEventListener('message', event => {
             const detail = event.data;
             if (!detail || detail.type !== 'nexus-game-launch-error' || String(detail.gameId) !== String(game.id) || Number(detail.loadToken) !== launchToken) return;
+            if (isMrMineGame(game)) {
+                const mirrorHtml = getMrMineMirrorHtml(unmodifiedHtml, mrMineMirrorAttempt);
+                if (mirrorHtml && launchFrame) {
+                    mrMineMirrorAttempt += 1;
+                    console.warn('Mr. Mine startup hit an asset error; retrying on an alternate asset route:', detail.message);
+                    launchFrame.removeAttribute('src');
+                    launchFrame.srcdoc = mirrorHtml;
+                    return;
+                }
+                if (mrMineMirrorAttempt > 0 || detail.kind === 'resource' || detail.kind === 'resource-timeout') return;
+            }
             if (injectedLaunch && !directFallbackTried && launchFrame) {
                 directFallbackTried = true;
                 injectedLaunch = false;
@@ -2304,7 +2379,7 @@ function launchGameFullscreen(game) {
                 })();
                 <\/script>`;
 
-                const gameSrcDoc = injectGameBootstrap(rawHtml, getGameLaunchDiagnostics(game.id, launchToken) + unityCompatibility + popupRestore + popupBridge + autoFocusScript + titleEnforceScript);
+                const gameSrcDoc = injectGameBootstrap(rawHtml, getGameLaunchDiagnostics(game.id, launchToken, { captureMrMineAssets: isMrMineGame(game) }) + unityCompatibility + popupRestore + popupBridge + autoFocusScript + titleEnforceScript);
                 win.document.body.innerHTML = '';
                 win.document.body.style.margin = '0';
                 win.document.body.style.padding = '0';
@@ -2315,7 +2390,7 @@ function launchGameFullscreen(game) {
                 ifr.setAttribute('allow', 'storage-access; fullscreen');
                 launchFrame = ifr;
                 injectedLaunch = true;
-                unmodifiedHtml = rawHtml;
+                unmodifiedHtml = gameSrcDoc;
                 ifr.srcdoc = gameSrcDoc;
                 win.document.body.appendChild(ifr);
             } else {
@@ -2332,12 +2407,12 @@ function launchGameFullscreen(game) {
                 if (resolved.usedFallback) game = { ...game, nexusExternalSource: true };
                 if (shouldInjectGamePersistence(game, resolvedUrl)) {
                     const snapshot = await getLaunchSnapshot(game.id);
-                    const persistenceBootstrap = getGameLaunchDiagnostics(game.id, launchToken) + getGamePersistenceBootstrap(game.id, snapshot, gameSession.sessionId);
+                    const persistenceBootstrap = getGameLaunchDiagnostics(game.id, launchToken, { captureMrMineAssets: isMrMineGame(game) }) + getGamePersistenceBootstrap(game.id, snapshot, gameSession.sessionId);
                     try {
                         launchFrame = ifr;
                         injectedLaunch = true;
                         directFallbackUrl = resolvedUrl;
-                        ifr.srcdoc = await fetchExternalGameHtml(
+                        const gameHtml = await fetchExternalGameHtml(
                             resolvedUrl,
                             persistenceBootstrap + titleEnforceScript,
                             {
@@ -2348,6 +2423,8 @@ function launchGameFullscreen(game) {
                                 timeoutMs: 15000
                             }
                         );
+                        unmodifiedHtml = gameHtml;
+                        ifr.srcdoc = gameHtml;
                     } catch (bootstrapError) {
                         // The source page may still load in a frame when a fetch for
                         // save/compatibility injection is blocked or times out.
@@ -3101,6 +3178,18 @@ window.addEventListener('message', event => {
     const frame = document.getElementById('game-frame');
     if (!frame || activeGameLaunch.loadToken !== gameLoadToken) return;
 
+    if (isMrMineGame(activeGameLaunch.game)) {
+        const mirrorHtml = getMrMineMirrorHtml(activeGameLaunch.bootstrapHtml || frame.srcdoc, activeGameLaunch.mrMineMirrorAttempt || 0);
+        if (mirrorHtml) {
+            activeGameLaunch.mrMineMirrorAttempt = (activeGameLaunch.mrMineMirrorAttempt || 0) + 1;
+            console.warn('Mr. Mine startup hit an asset error; retrying on an alternate asset route:', detail.message);
+            frame.removeAttribute('src');
+            frame.srcdoc = mirrorHtml;
+            return;
+        }
+        if ((activeGameLaunch.mrMineMirrorAttempt || 0) > 0 || detail.kind === 'resource' || detail.kind === 'resource-timeout') return;
+    }
+
     if (activeGameLaunch.injected && !activeGameLaunch.directFallbackTried) {
         activeGameLaunch.directFallbackTried = true;
         activeGameLaunch.injected = false;
@@ -3340,7 +3429,9 @@ async function loadGame(game, forceInternal = false, options = {}) {
             loadToken: requestedLoadToken,
             url: resolvedGameUrl,
             injected: false,
-            directFallbackTried: false
+            directFallbackTried: false,
+            mrMineMirrorAttempt: 0,
+            bootstrapHtml: null
         };
         frame.style.setProperty('display', 'block', 'important');
         frame.style.setProperty('visibility', 'hidden', 'important');
@@ -3387,9 +3478,10 @@ async function loadGame(game, forceInternal = false, options = {}) {
             const restoreScript = getGameRestoreScript(game.id, snapshot);
             const autosaveBridge = getUniversalAutosaveBridge(game.id);
             const persistenceScript = `<script>try{window.localStorage.setItem('p','1');}catch(e){}<\/script>`;
-            const finalHTML = injectGameBootstrap(htmlContent, getGameLaunchDiagnostics(game.id, requestedLoadToken) + unityCompatibility + restoreScript + persistenceScript + autosaveBridge);
+            const finalHTML = injectGameBootstrap(htmlContent, getGameLaunchDiagnostics(game.id, requestedLoadToken, { captureMrMineAssets: isMrMineGame(game) }) + unityCompatibility + restoreScript + persistenceScript + autosaveBridge);
             activeGameLaunch.injected = true;
             activeGameLaunch.fallbackHtml = htmlContent;
+            activeGameLaunch.bootstrapHtml = finalHTML;
 
             try {
                 const blob = new Blob([finalHTML], { type: 'text/html' });
@@ -3408,7 +3500,7 @@ async function loadGame(game, forceInternal = false, options = {}) {
                 const snapshot = await getGameSnapshot(game.id);
                 if (requestedLoadToken !== gameLoadToken) return;
 
-                const persistenceBootstrap = getGameLaunchDiagnostics(game.id, requestedLoadToken) + getGamePersistenceBootstrap(game.id, snapshot);
+                const persistenceBootstrap = getGameLaunchDiagnostics(game.id, requestedLoadToken, { captureMrMineAssets: isMrMineGame(game) }) + getGamePersistenceBootstrap(game.id, snapshot);
                 const gameHtml = await fetchExternalGameHtml(
                     resolvedGameUrl,
                     persistenceBootstrap,
@@ -3422,6 +3514,7 @@ async function loadGame(game, forceInternal = false, options = {}) {
                 if (requestedLoadToken !== gameLoadToken) return;
 
                 activeGameLaunch.injected = true;
+                activeGameLaunch.bootstrapHtml = gameHtml;
                 frame.removeAttribute('src');
                 frame.srcdoc = gameHtml;
             } catch (error) {

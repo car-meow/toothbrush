@@ -11,31 +11,64 @@
 
 <head>
 <script>
-// Mr. Mine's boot screen waits for every document image request to finish.
-// On slow or filtered networks a single image can remain pending forever,
-// leaving both its percentage and the window load event stuck. Let those
-// stalled decorative/UI images fail open so the game can finish starting.
+// Retry stalled Mr. Mine images through another jsDelivr route before using
+// an empty image, so one filtered or stuck CDN request cannot hold up startup.
 (function () {
 	var fallbackImage = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
-	var maxImageWaitMs = 25000;
-	var imageTimers = new WeakMap();
+	var retryDelayMs = 12000;
+	var imageStates = new WeakMap();
+	function getMirrorUrl(url) {
+		try {
+			var parsed = new URL(url, document.baseURI);
+			if (parsed.hostname === 'cdn.jsdelivr.net') parsed.hostname = 'fastly.jsdelivr.net';
+			else if (parsed.hostname === 'fastly.jsdelivr.net') parsed.hostname = 'gcore.jsdelivr.net';
+			else return null;
+			return parsed.href;
+		} catch (e) { return null; }
+	}
 	function watchImage(image) {
 		var requestUrl = image.src;
 		if (!requestUrl || requestUrl.indexOf('data:') === 0 || requestUrl.indexOf('blob:') === 0) return;
-		var existing = imageTimers.get(image);
-		if (existing && existing.url === requestUrl) return;
-		if (existing) clearTimeout(existing.timer);
-		var timer = setTimeout(function () {
-			if (!image.complete && image.src === requestUrl) image.src = fallbackImage;
-		}, maxImageWaitMs);
-		imageTimers.set(image, { url: requestUrl, timer: timer });
-		var clearTimer = function () {
-			clearTimeout(timer);
-			if (imageTimers.get(image) && imageTimers.get(image).timer === timer) imageTimers.delete(image);
+		var previous = imageStates.get(image);
+		if (previous && previous.url === requestUrl) return;
+		if (previous && previous.timer) clearTimeout(previous.timer);
+		var state = {
+			url: requestUrl,
+			timer: null
 		};
+		imageStates.set(image, state);
+		var clearTimer = function () {
+			if (state.timer) clearTimeout(state.timer);
+			state.timer = null;
+		};
+		var retryOrFallback = function () {
+			if (imageStates.get(image) !== state || image.src !== requestUrl) return;
+			clearTimer();
+			var mirrorUrl = getMirrorUrl(requestUrl);
+			image.src = mirrorUrl || fallbackImage;
+		};
+		state.timer = setTimeout(retryOrFallback, retryDelayMs);
 		image.addEventListener('load', clearTimer, { once: true });
-		image.addEventListener('error', clearTimer, { once: true });
+		image.addEventListener('error', retryOrFallback, { once: true });
 	}
+	var imageSrc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+	if (imageSrc && imageSrc.get && imageSrc.set) {
+		try {
+			Object.defineProperty(HTMLImageElement.prototype, 'src', {
+				configurable: true,
+				enumerable: imageSrc.enumerable,
+				get: function () { return imageSrc.get.call(this); },
+				set: function (value) { imageSrc.set.call(this, value); watchImage(this); }
+			});
+		} catch (e) {}
+	}
+	var nativeSetAttribute = HTMLImageElement.prototype.setAttribute;
+	try {
+		HTMLImageElement.prototype.setAttribute = function (name, value) {
+			nativeSetAttribute.call(this, name, value);
+			if (String(name).toLowerCase() === 'src') watchImage(this);
+		};
+	} catch (e) {}
 	function scanImages() {
 		Array.prototype.forEach.call(document.images, watchImage);
 	}
@@ -50,7 +83,7 @@
 	}
 })();
 </script>
-<script src="https://payments.playsaurus.com/v1/main.js" data-src="Mr.Mine Web"></script>
+<script src="https://payments.playsaurus.com/v1/main.js" data-src="Mr.Mine Web" async></script>
   <base href="https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/mr-mine/">
 	<link rel="shortcut icon" href="icon.png">
 	<meta name="Description" content="Get rich or die mining! Idle your way through the mines, unearth treasures, and discover what great mysteries lie in the depths below!" />
@@ -63,61 +96,61 @@
 	<meta http-equiv="Expires" content="0">
 	<title>Mr.Mine</title>
 	<link rel="stylesheet" href="style.css?v=5" type="text/css" media="screen, projection" />
-	<script src="https://cdn.trackjs.com/agent/v3/latest/t.js"></script>
-	<script src="Shared/lib/pako.min.js"></script>
-	<script src="Shared/lib/playsaurus-sdk.js?t=1768598228"></script>
-	<script src="Core/BigNumber.js?t=1759504413"></script>
-	<script src="Shared/constants.js?t=1759504317"></script>
-	<script src="Shared/formulas.js?t=1759504318"></script>
-	<script src="Shared/helperfunctions.js?t=1760653476"></script>
-	<script src="Shared/SplitTest.js?t=1759504317"></script>
-	<script src="Shared/eventhook.js?t=1759504318"></script>
-	<script src="Shared/src/translations/translationManager.js?t=1759504319" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/arabic.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/brazilian.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/portuguese.js?t=1764864659" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/czech.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/danish.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/dutch.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/empty.js?t=1765308410" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/english.js?t=1764864659" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/filipino.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/finnish.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/french.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/german.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/hebrew.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/hindi.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/hungarian.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/indonesian.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/italian.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/japanese.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/koreana.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/norwegian.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/polish.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/russian.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/schinese.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/slovak.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/spanish.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/latam.js?t=1764864659" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/swedish.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/tchinese.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/thai.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/turkish.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/ukrainian.js?t=1768598228" charset="utf-8"></script>
-	<script src="Shared/src/translations/languages/vietnamese.js?t=1768598228" charset="utf-8"></script>
+	<script async src="https://cdn.trackjs.com/agent/v3/latest/t.js"></script>
+	<script src="Shared/lib/pako.min.js" defer></script>
+	<script src="Shared/lib/playsaurus-sdk.js?t=1768598228" defer></script>
+	<script src="Core/BigNumber.js?t=1759504413" defer></script>
+	<script src="Shared/constants.js?t=1759504317" defer></script>
+	<script src="Shared/formulas.js?t=1759504318" defer></script>
+	<script src="Shared/helperfunctions.js?t=1760653476" defer></script>
+	<script src="Shared/SplitTest.js?t=1759504317" defer></script>
+	<script src="Shared/eventhook.js?t=1759504318" defer></script>
+	<script src="Shared/src/translations/translationManager.js?t=1759504319" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/arabic.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/brazilian.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/portuguese.js?t=1764864659" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/czech.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/danish.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/dutch.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/empty.js?t=1765308410" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/english.js?t=1764864659" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/filipino.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/finnish.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/french.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/german.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/hebrew.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/hindi.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/hungarian.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/indonesian.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/italian.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/japanese.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/koreana.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/norwegian.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/polish.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/russian.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/schinese.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/slovak.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/spanish.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/latam.js?t=1764864659" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/swedish.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/tchinese.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/thai.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/turkish.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/ukrainian.js?t=1768598228" charset="utf-8" defer></script>
+	<script src="Shared/src/translations/languages/vietnamese.js?t=1768598228" charset="utf-8" defer></script>
 
 
-	<script src="Shared/platform.js?t=1759504318"></script>
-	<script src="Shared/AssetData.js?t=1759504289"></script>
-	<script src="Shared/assetloader.js?t=1759504317"></script>
-	<script src="Shared/purchasehistory.js?t=1759504318"></script>
-	<script src="assets.js?t=1768598228"></script>
-	<script src="steamapi.js?t=1759503877"></script>
-	<script src="web.js?t=1759504339"></script>
-	<script src="Shared/shortcut.js?v=1"></script>
-	<script src="Shared/shortcuts.js?t=1759504318"></script>
-	<script src="Shared/cache.js?t=1759504317"></script>
-	<script src="Shared/PlayerStats.js?t=1759504317"></script>
+	<script src="Shared/platform.js?t=1759504318" defer></script>
+	<script src="Shared/AssetData.js?t=1759504289" defer></script>
+	<script src="Shared/assetloader.js?t=1759504317" defer></script>
+	<script src="Shared/purchasehistory.js?t=1759504318" defer></script>
+	<script src="assets.js?t=1768598228" defer></script>
+	<script src="steamapi.js?t=1759503877" defer></script>
+	<script src="web.js?t=1759504339" defer></script>
+	<script src="Shared/shortcut.js?v=1" defer></script>
+	<script src="Shared/shortcuts.js?t=1759504318" defer></script>
+	<script src="Shared/cache.js?t=1759504317" defer></script>
+	<script src="Shared/PlayerStats.js?t=1759504317" defer></script>
 	<!-- https://cdn.jsdelivr.net/npm/statsig-js/build/statsig-prod-web-sdk.min.js -->
 	<!-- <script src="Shared/statsig-prod-web-sdk.min.js"></script> -->
 	<script async src="https://www.googletagmanager.com/gtag/js?id=G-98HXVM1ER8"></script>
@@ -1258,159 +1291,159 @@
 	</div>
 
 
-	<script src="Shared/revisionnumber.js?t=1768598228"></script>
-	<script src="Shared/purchasepacks.js?t=1759504318"></script>
-	<script src="Shared/app.js?t=1768834435"></script>
-	<script src="Shared/PlaysaurusErrorHandler.js?t=1763405033"></script>
-	<script src="Shared/PlaysaurusSdkWrapper.js?t=1768598228"></script>
-	<script src="Core/Random.js?t=1759504413"></script>
-	<script src="Shared/Rollers.js?t=1759504317"></script>
-	<script src="Shared/src/util/ScaledPosition.js?t=1759504319"></script>
-	<script src="Shared/advertisement.js?t=1759504317"></script>
-	<script src="Shared/animatehelpers2.js?t=1760655330"></script>
-	<script src="Core/UI/uilayer.js?t=1768255684"></script>
-	<script src="Shared/UI/Elements/scrollbox.js?t=1759504317"></script>
-	<script src="Shared/UI/Elements/horizontalscrollbox.js?t=1759504317"></script>
-	<script src="Shared/UI/Elements/collapsiblemenu.js?t=1759504317"></script>
-	<script src="Shared/UI/Elements/slider.js?t=1764711583"></script>
-	<script src="Shared/UI/Elements/contextmenu.js?t=1759504317"></script>
-	<script src="Shared/UI/Elements/hintarrow.js?t=1759504317"></script>
-	<script src="Shared/UI/Elements/hinthighlight.js?t=1760373728"></script>
-	<script src="Shared/UI/Elements/questbutton.js?t=1759504317"></script>
-	<script src="Shared/UI/Elements/spritesheetanimation.js?t=1759504317"></script>
-	<script src="Shared/UI/popupwindow.js?t=1768314039"></script>
-	<script src="Shared/UI/dialoguemanager.js?t=1768598228"></script>
-	<script src="Core/Input/dragdrop.js?t=1759963241"></script>
-	<script src="Shared/animate.js?t=1768598228"></script>
-	<script src="Shared/input.js?t=1768598228"></script>
-	<script src="Shared/display.js?t=1768598228"></script>
-	<script src="worldconfig.js?t=1759503877"></script>
-	<script src="MainUILayer.js?t=1768598228"></script>
-	<script src="WorldLayer.js?t=1768598228"></script>
-	<script src="PinnedBlueprintsLayer.js?t=1759503855"></script>
-	<script src="Shared/stage.js?t=1759504319"></script>
-	<script src="Shared/particles.js?t=1759504318"></script>
-	<script src="Core/Input/mousemanager.js?t=1759504413"></script>
-	<script src="Core/UI/hitboxdebug.js?t=1759504413"></script>
-	<script src="Shared/src/superminers/superminerworldrenderer.js?t=1759504318"></script>
-	<script src="Shared/src/superminers/superMiner.js?t=1759504318"></script>
-	<script src="Shared/src/superminers/superMinerManager.js?t=1759516965"></script>
-	<script src="Shared/src/superminers/baseMiners.js?t=1768417381"></script>
-	<script src="Shared/buffs.js?t=1765402265"></script>
-	<script src="Shared/mineralmanagement.js?t=1768598228"></script>
-	<script src="Shared/staticvalues.js?t=1759504319"></script>
-	<script src="Shared/scientists.js?t=1765402267"></script>
-	<script src="Shared/quests.js?t=1768598228"></script>
-	<script src="Shared/tutorial.js?t=1768598228"></script>
-	<script src="Shared/audio.js?t=1764864570"></script>
-	<script src="Shared/equips.js?t=1759504318"></script>
-	<script src="Shared/world.js?t=1759504319"></script>
-	<script src="Shared/oilmanagement.js?t=1759504318"></script>
-	<script src="Shared/structures.js?t=1768598228"></script>
-	<script src="Shared/tradingpost.js?t=1760655331"></script>
-	<script src="Shared/drillmanagement.js?t=1768598228"></script>
-	<script src="Shared/workermanagement.js?t=1759504319"></script>
-	<script src="Shared/coderedemption.js?t=1765402266"></script>
-	<script src="Shared/news.js?t=1759504318"></script>
-	<script src="Shared/transienteffects.js?t=1759504319"></script>
-	<script src="Shared/worldclickables.js?t=1764265909"></script>
-	<script src="Shared/userexperiencemanager.js?t=1768598228"></script>
+	<script src="Shared/revisionnumber.js?t=1768598228" defer></script>
+	<script src="Shared/purchasepacks.js?t=1759504318" defer></script>
+	<script src="Shared/app.js?t=1768834435" defer></script>
+	<script src="Shared/PlaysaurusErrorHandler.js?t=1763405033" defer></script>
+	<script src="Shared/PlaysaurusSdkWrapper.js?t=1768598228" defer></script>
+	<script src="Core/Random.js?t=1759504413" defer></script>
+	<script src="Shared/Rollers.js?t=1759504317" defer></script>
+	<script src="Shared/src/util/ScaledPosition.js?t=1759504319" defer></script>
+	<script src="Shared/advertisement.js?t=1759504317" defer></script>
+	<script src="Shared/animatehelpers2.js?t=1760655330" defer></script>
+	<script src="Core/UI/uilayer.js?t=1768255684" defer></script>
+	<script src="Shared/UI/Elements/scrollbox.js?t=1759504317" defer></script>
+	<script src="Shared/UI/Elements/horizontalscrollbox.js?t=1759504317" defer></script>
+	<script src="Shared/UI/Elements/collapsiblemenu.js?t=1759504317" defer></script>
+	<script src="Shared/UI/Elements/slider.js?t=1764711583" defer></script>
+	<script src="Shared/UI/Elements/contextmenu.js?t=1759504317" defer></script>
+	<script src="Shared/UI/Elements/hintarrow.js?t=1759504317" defer></script>
+	<script src="Shared/UI/Elements/hinthighlight.js?t=1760373728" defer></script>
+	<script src="Shared/UI/Elements/questbutton.js?t=1759504317" defer></script>
+	<script src="Shared/UI/Elements/spritesheetanimation.js?t=1759504317" defer></script>
+	<script src="Shared/UI/popupwindow.js?t=1768314039" defer></script>
+	<script src="Shared/UI/dialoguemanager.js?t=1768598228" defer></script>
+	<script src="Core/Input/dragdrop.js?t=1759963241" defer></script>
+	<script src="Shared/animate.js?t=1768598228" defer></script>
+	<script src="Shared/input.js?t=1768598228" defer></script>
+	<script src="Shared/display.js?t=1768598228" defer></script>
+	<script src="worldconfig.js?t=1759503877" defer></script>
+	<script src="MainUILayer.js?t=1768598228" defer></script>
+	<script src="WorldLayer.js?t=1768598228" defer></script>
+	<script src="PinnedBlueprintsLayer.js?t=1759503855" defer></script>
+	<script src="Shared/stage.js?t=1759504319" defer></script>
+	<script src="Shared/particles.js?t=1759504318" defer></script>
+	<script src="Core/Input/mousemanager.js?t=1759504413" defer></script>
+	<script src="Core/UI/hitboxdebug.js?t=1759504413" defer></script>
+	<script src="Shared/src/superminers/superminerworldrenderer.js?t=1759504318" defer></script>
+	<script src="Shared/src/superminers/superMiner.js?t=1759504318" defer></script>
+	<script src="Shared/src/superminers/superMinerManager.js?t=1759516965" defer></script>
+	<script src="Shared/src/superminers/baseMiners.js?t=1768417381" defer></script>
+	<script src="Shared/buffs.js?t=1765402265" defer></script>
+	<script src="Shared/mineralmanagement.js?t=1768598228" defer></script>
+	<script src="Shared/staticvalues.js?t=1759504319" defer></script>
+	<script src="Shared/scientists.js?t=1765402267" defer></script>
+	<script src="Shared/quests.js?t=1768598228" defer></script>
+	<script src="Shared/tutorial.js?t=1768598228" defer></script>
+	<script src="Shared/audio.js?t=1764864570" defer></script>
+	<script src="Shared/equips.js?t=1759504318" defer></script>
+	<script src="Shared/world.js?t=1759504319" defer></script>
+	<script src="Shared/oilmanagement.js?t=1759504318" defer></script>
+	<script src="Shared/structures.js?t=1768598228" defer></script>
+	<script src="Shared/tradingpost.js?t=1760655331" defer></script>
+	<script src="Shared/drillmanagement.js?t=1768598228" defer></script>
+	<script src="Shared/workermanagement.js?t=1759504319" defer></script>
+	<script src="Shared/coderedemption.js?t=1765402266" defer></script>
+	<script src="Shared/news.js?t=1759504318" defer></script>
+	<script src="Shared/transienteffects.js?t=1759504319" defer></script>
+	<script src="Shared/worldclickables.js?t=1764265909" defer></script>
+	<script src="Shared/userexperiencemanager.js?t=1768598228" defer></script>
 
-	<script src="Shared/emails.js?t=1759504318"></script>
-	<script src="Shared/backpack.js?t=1759504317"></script>
-	<script src="Shared/craftingitems.js?t=1759504317"></script>
-	<script src="Shared/crafting.js?t=1760033960"></script>
-	<script src="Shared/src/reactorbuildings/reactorcomponents.js?t=1759504318"></script>
-	<script src="Shared/blueprints.js?t=1759504317"></script>
-	<script src="Shared/offlineprogress.js?t=1759504318"></script>
-	<script src="Shared/simulation.js?t=1764364003"></script>
-	<script src="Shared/promo.js?t=1759504318"></script>
-	<script src="Shared/quotes.js?t=1759504318"></script>
-	<script src="Shared/dialogues.js?t=1759504318"></script>
-	<script src="Shared/src/battles/GemForge.js?t=1759504318"></script>
-	<script src="Shared/src/battles/gemUpgrades.js?t=1759504318"></script>
-	<script src="Shared/src/pit/Pit.js?t=1759504318"></script>
-	<script src="Shared/src/pit/PitConfig.js?t=1759504318"></script>
-	<script src="Shared/src/reactorbuildings/reactor.js?t=1765402268"></script>
+	<script src="Shared/emails.js?t=1759504318" defer></script>
+	<script src="Shared/backpack.js?t=1759504317" defer></script>
+	<script src="Shared/craftingitems.js?t=1759504317" defer></script>
+	<script src="Shared/crafting.js?t=1760033960" defer></script>
+	<script src="Shared/src/reactorbuildings/reactorcomponents.js?t=1759504318" defer></script>
+	<script src="Shared/blueprints.js?t=1759504317" defer></script>
+	<script src="Shared/offlineprogress.js?t=1759504318" defer></script>
+	<script src="Shared/simulation.js?t=1764364003" defer></script>
+	<script src="Shared/promo.js?t=1759504318" defer></script>
+	<script src="Shared/quotes.js?t=1759504318" defer></script>
+	<script src="Shared/dialogues.js?t=1759504318" defer></script>
+	<script src="Shared/src/battles/GemForge.js?t=1759504318" defer></script>
+	<script src="Shared/src/battles/gemUpgrades.js?t=1759504318" defer></script>
+	<script src="Shared/src/pit/Pit.js?t=1759504318" defer></script>
+	<script src="Shared/src/pit/PitConfig.js?t=1759504318" defer></script>
+	<script src="Shared/src/reactorbuildings/reactor.js?t=1765402268" defer></script>
 
-	<script src="Shared/src/util/Reward.js?t=1768598228"></script>
-	<script src="Shared/src/chest/ChestRewards.js?t=1759504318"></script>
-	<script src="Shared/src/chest/Chest.js?t=1759504318"></script>
-	<script src="Shared/src/chest/ChestService.js?t=1764195643"></script>
-	<script src="Shared/src/chest/ChestCompressor.js?t=1765402268"></script>
+	<script src="Shared/src/util/Reward.js?t=1768598228" defer></script>
+	<script src="Shared/src/chest/ChestRewards.js?t=1759504318" defer></script>
+	<script src="Shared/src/chest/Chest.js?t=1759504318" defer></script>
+	<script src="Shared/src/chest/ChestService.js?t=1764195643" defer></script>
+	<script src="Shared/src/chest/ChestCompressor.js?t=1765402268" defer></script>
 
-	<script src="Shared/src/battles/battle.js?t=1759504318"></script>
-	<script src="Shared/src/battles/monster.js?t=1759504318"></script>
-	<script src="Shared/src/battles/monsters.js?t=1759504318"></script>
-	<script src="Shared/src/battles/battleEquip.js?t=1759504318"></script>
-	<script src="Shared/src/battles/battleReward.js?t=1759504318"></script>
-	<script src="Shared/src/battles/battleStorage.js?t=1759504318"></script>
+	<script src="Shared/src/battles/battle.js?t=1759504318" defer></script>
+	<script src="Shared/src/battles/monster.js?t=1759504318" defer></script>
+	<script src="Shared/src/battles/monsters.js?t=1759504318" defer></script>
+	<script src="Shared/src/battles/battleEquip.js?t=1759504318" defer></script>
+	<script src="Shared/src/battles/battleReward.js?t=1759504318" defer></script>
+	<script src="Shared/src/battles/battleStorage.js?t=1759504318" defer></script>
 
-	<script src="Shared/src/caves/cavenode.js?t=1759504318"></script>
-	<script src="Shared/src/caves/caveobstacle.js?t=1759504318"></script>
-	<script src="Shared/src/caves/cavereward.js?t=1759504318"></script>
-	<script src="Shared/src/caves/treasurestorage.js?t=1759504318"></script>
-	<script src="Shared/src/caves/caveconfig.js?t=1759504318"></script>
-	<script src="Shared/src/caves/cavesystem.js?t=1759504318"></script>
-	<script src="Shared/src/caves/drone.js?t=1768417381"></script>
-	<script src="Shared/src/caves/caves.js?t=1759504318"></script>
-	<script src="Shared/src/caves/droneblueprints.js?t=1759504318"></script>
+	<script src="Shared/src/caves/cavenode.js?t=1759504318" defer></script>
+	<script src="Shared/src/caves/caveobstacle.js?t=1759504318" defer></script>
+	<script src="Shared/src/caves/cavereward.js?t=1759504318" defer></script>
+	<script src="Shared/src/caves/treasurestorage.js?t=1759504318" defer></script>
+	<script src="Shared/src/caves/caveconfig.js?t=1759504318" defer></script>
+	<script src="Shared/src/caves/cavesystem.js?t=1759504318" defer></script>
+	<script src="Shared/src/caves/drone.js?t=1768417381" defer></script>
+	<script src="Shared/src/caves/caves.js?t=1759504318" defer></script>
+	<script src="Shared/src/caves/droneblueprints.js?t=1759504318" defer></script>
 
-	<script src="Shared/bufflab.js?t=1759504317"></script>
-	<script src="Shared/LimitedTimeEventManager.js?t=1766178590"></script>
-	<script src="Shared/pinnedBlueprints.js?t=1759504318"></script>
-	<script src="Shared/shop.js?t=1765402268"></script>
-	<script src="Shared/RewardedChestStorage.js?t=1759504317"></script>
-	<script src="Shared/OfferManager.js?t=1765402265"></script>
+	<script src="Shared/bufflab.js?t=1759504317" defer></script>
+	<script src="Shared/LimitedTimeEventManager.js?t=1766178590" defer></script>
+	<script src="Shared/pinnedBlueprints.js?t=1759504318" defer></script>
+	<script src="Shared/shop.js?t=1765402268" defer></script>
+	<script src="Shared/RewardedChestStorage.js?t=1759504317" defer></script>
+	<script src="Shared/OfferManager.js?t=1765402265" defer></script>
 
-	<script src="popups/AccountWindow.js?t=1768598228"></script>
-	<script src="popups/BackpackWindow.js?t=1759503872"></script>
-	<script src="popups/BattleWindow.js?t=1759503872"></script>
-	<script src="popups/ChestWindow.js?t=1759503872"></script>
-	<script src="popups/ChestCollectorWindow.js?t=1765402264"></script>
-	<script src="popups/DialogueWindow.js?t=1759503872"></script>
-	<script src="popups/CraftingWindow.js?t=1768598228"></script>
-	<script src="popups/HireWindow.js?t=1759503872"></script>
-	<script src="popups/OfflineProgressWindow.js?t=1759503872"></script>
-	<script src="popups/OilPumpWindow.js?t=1759503872"></script>
-	<script src="popups/DrillUpgradeWindow.js?t=1759503872"></script>
-	<script src="popups/AnnouncementWindow.js?t=1759505874"></script>
-	<script src="popups/PromoWindow.js?t=1759503872"></script>
-	<script src="popups/PurchaseWindow.js?t=1765392034"></script>
-	<script src="popups/EventPurchaseWindow.js?t=1759503872"></script>
-	<script src="popups/ExcavationChoiceWindow.js?t=1759503872"></script>
-	<script src="popups/ScientistsWindow.js?t=1765402264"></script>
-	<script src="popups/SellWindow.js?t=1768598228"></script>
-	<script src="popups/SettingsWindow.js?t=1768598228"></script>
-	<script src="popups/GemForgeWindow.js?t=1759503872"></script>
-	<script src="popups/PitWindow.js?t=1759503872"></script>
-	<script src="popups/equips/EquipsWindow.js?t=1759503873"></script>
-	<script src="popups/equips/EquipWindow.js?t=1759503873"></script>
-	<script src="popups/equips/EquipSelectorWindow.js?t=1759503873"></script>
-	<script src="popups/equips/EquipBlackWindow.js?t=1759503873"></script>
-	<script src="popups/ReactorWindow.js?t=1759503872"></script>
-	<script src="popups/TradeWindow.js?t=1759503872"></script>
-	<script src="popups/BuffLabWindow.js?t=1759503872"></script>
-	<script src="popups/QuestWindow.js?t=1768598228"></script>
-	<script src="popups/TranslationHelpWindow.js?t=1759503872"></script>
-	<script src="popups/UpgradeLevelsWindow.js?t=1759503873"></script>
-	<script src="popups/CaveWindow.js?t=1765402264"></script>
-	<script src="popups/CaveManagementWindow.js?t=1759503872"></script>
-	<script src="popups/superminers/SuperMinerSelectorWindow.js?t=1759503873"></script>
-	<script src="popups/superminers/SuperMinerBaseWindow.js?t=1759503873"></script>
-	<script src="popups/superminers/SuperMinerBlackWindow.js?t=1759503873"></script>
-	<script src="popups/superminers/SuperSellerWindow.js?t=1759503873"></script>
-	<script src="popups/superminers/SuperMinersPoolWindow.js?t=1759503873"></script>
-	<script src="popups/superminers/SuperMinersWindow.js?t=1759503873"></script>
-	<script src="popups/superminers/SuperMinerWindow.js?t=1759503873"></script>
-	<script src="Shared/statstracking.js?t=1759504319"></script>
-	<script src="popups/confirmationLayer.js?t=1759503873"></script>
-	<script src="popups/OfferWindow.js?t=1759503872"></script>
-	<script src="popups/OfferChestWindow.js?t=1759503872"></script>
+	<script src="popups/AccountWindow.js?t=1768598228" defer></script>
+	<script src="popups/BackpackWindow.js?t=1759503872" defer></script>
+	<script src="popups/BattleWindow.js?t=1759503872" defer></script>
+	<script src="popups/ChestWindow.js?t=1759503872" defer></script>
+	<script src="popups/ChestCollectorWindow.js?t=1765402264" defer></script>
+	<script src="popups/DialogueWindow.js?t=1759503872" defer></script>
+	<script src="popups/CraftingWindow.js?t=1768598228" defer></script>
+	<script src="popups/HireWindow.js?t=1759503872" defer></script>
+	<script src="popups/OfflineProgressWindow.js?t=1759503872" defer></script>
+	<script src="popups/OilPumpWindow.js?t=1759503872" defer></script>
+	<script src="popups/DrillUpgradeWindow.js?t=1759503872" defer></script>
+	<script src="popups/AnnouncementWindow.js?t=1759505874" defer></script>
+	<script src="popups/PromoWindow.js?t=1759503872" defer></script>
+	<script src="popups/PurchaseWindow.js?t=1765392034" defer></script>
+	<script src="popups/EventPurchaseWindow.js?t=1759503872" defer></script>
+	<script src="popups/ExcavationChoiceWindow.js?t=1759503872" defer></script>
+	<script src="popups/ScientistsWindow.js?t=1765402264" defer></script>
+	<script src="popups/SellWindow.js?t=1768598228" defer></script>
+	<script src="popups/SettingsWindow.js?t=1768598228" defer></script>
+	<script src="popups/GemForgeWindow.js?t=1759503872" defer></script>
+	<script src="popups/PitWindow.js?t=1759503872" defer></script>
+	<script src="popups/equips/EquipsWindow.js?t=1759503873" defer></script>
+	<script src="popups/equips/EquipWindow.js?t=1759503873" defer></script>
+	<script src="popups/equips/EquipSelectorWindow.js?t=1759503873" defer></script>
+	<script src="popups/equips/EquipBlackWindow.js?t=1759503873" defer></script>
+	<script src="popups/ReactorWindow.js?t=1759503872" defer></script>
+	<script src="popups/TradeWindow.js?t=1759503872" defer></script>
+	<script src="popups/BuffLabWindow.js?t=1759503872" defer></script>
+	<script src="popups/QuestWindow.js?t=1768598228" defer></script>
+	<script src="popups/TranslationHelpWindow.js?t=1759503872" defer></script>
+	<script src="popups/UpgradeLevelsWindow.js?t=1759503873" defer></script>
+	<script src="popups/CaveWindow.js?t=1765402264" defer></script>
+	<script src="popups/CaveManagementWindow.js?t=1759503872" defer></script>
+	<script src="popups/superminers/SuperMinerSelectorWindow.js?t=1759503873" defer></script>
+	<script src="popups/superminers/SuperMinerBaseWindow.js?t=1759503873" defer></script>
+	<script src="popups/superminers/SuperMinerBlackWindow.js?t=1759503873" defer></script>
+	<script src="popups/superminers/SuperSellerWindow.js?t=1759503873" defer></script>
+	<script src="popups/superminers/SuperMinersPoolWindow.js?t=1759503873" defer></script>
+	<script src="popups/superminers/SuperMinersWindow.js?t=1759503873" defer></script>
+	<script src="popups/superminers/SuperMinerWindow.js?t=1759503873" defer></script>
+	<script src="Shared/statstracking.js?t=1759504319" defer></script>
+	<script src="popups/confirmationLayer.js?t=1759503873" defer></script>
+	<script src="popups/OfferWindow.js?t=1759503872" defer></script>
+	<script src="popups/OfferChestWindow.js?t=1759503872" defer></script>
 
-	<!-- <script src="branches/MineralUpgrade.js?t=1768834435"></script> -->
+	<!-- <script src="branches/MineralUpgrade.js?t=1768834435" defer></script> -->
 
-	<script src="Shared/savemanager.js?t=1768598228"></script>
+	<script src="Shared/savemanager.js?t=1768598228" defer></script>
 	<noscript>
 		<img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1658647427735318&ev=PageView&noscript=1" />
 	</noscript>
