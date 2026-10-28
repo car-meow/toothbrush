@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <title>New Tab</title>
-<link rel="stylesheet" href="style.css?v=68">
+<link rel="stylesheet" href="style.css?v=83">
     <script src="bgm-manager.js?v=64"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
@@ -96,7 +96,7 @@ body {
     justify-content: center;
     min-width: 5.5em;
     padding: clamp(7px, 0.8vw, 11px) clamp(12px, 1.25vw, 18px);
-    border: 1px solid rgba(255,255,255,0.18);
+    border: 2px solid #3c393d;
     border-radius: 999px;
     background: rgba(18, 18, 18, 0.58);
     color: #fff;
@@ -110,8 +110,8 @@ body {
     pointer-events: none;
 }
 html.light-mode .online-users-bubble {
-    border-color: rgba(0,0,0,0.12);
-    background: rgba(255,255,255,0.62);
+    border-color: #3c393d;
+    background: #fff;
     color: #171717;
     box-shadow: 0 4px 18px rgba(0,0,0,0.12);
 }
@@ -210,83 +210,128 @@ html.light-mode .online-users-bubble {
 </div>
 
 <div class="nexus-version-container" style="pointer-events: auto !important;">
-    <span class="nexus-version-tag" style="pointer-events: auto !important; background: transparent !important; color: var(--version-color) !important; opacity: 1 !important;">v4.45.5</span>
-    <div class="nexus-update-card" style="pointer-events: auto !important;">
-        <div class="nexus-update-title">GROUP CHAT UPDATE!</div>
-        <div class="nexus-update-body">
-            Oh yeah, there's so much to get into. Optimizations, to new settings, to fixed games, to new features. Read all about it by pressing the (aptly named) button below!
-        </div>
-        <div class="nexus-update-footer">
-            <button id="nexus-read-more-btn" class="nexus-read-more-btn">Read More</button>
-            <a href="https://docs.google.com/forms/d/e/1FAIpQLSdcKa51l2lPC8BYXKA164MJe2ilxPSmkIT_C87REfbhtdri3g/viewform?usp=dialog" target="_blank" class="nexus-request-btn" style="pointer-events: auto !important;">Requests/Concerns</a>
-        </div>
-    </div>
+    <button id="nexus-updates-button" class="nexus-version-tag nexus-updates-button" type="button" aria-label="Nexus Updates" aria-haspopup="dialog" aria-controls="nexus-updates-overlay" aria-expanded="false">
+        <span class="nexus-version-label">v4.45.18</span>
+        <b id="nexus-updates-badge" class="nexus-updates-badge" aria-hidden="true" hidden></b>
+    </button>
 </div>
 
-<!-- ========== EXPANDED PATCH NOTES MODAL ========== -->
-<div id="nexus-patchnotes-overlay" class="nexus-patchnotes-overlay" style="display: none;">
-    <div class="nexus-patchnotes-modal">
-        <div class="nexus-patchnotes-header">
-            <div class="nexus-patchnotes-title">Patch Notes</div>
+<div id="nexus-updates-overlay" class="nexus-updates-overlay" role="presentation" aria-hidden="true" hidden>
+    <section class="nexus-updates-modal" role="dialog" aria-modal="true" aria-labelledby="nexus-updates-title" tabindex="-1">
+        <header class="nexus-updates-header">
+            <div class="nexus-updates-brand">
+                <h2 id="nexus-updates-title">Nexus</h2>
+                <span id="nexus-updates-header-version" class="nexus-updates-header-version"></span>
+            </div>
+            <div class="nexus-updates-tabbar" role="tablist" aria-label="Update categories">
+                <button class="nexus-updates-tab" id="nexus-updates-tab-games" style="--expanded-width: 96px;" type="button" role="tab" aria-label="Games" title="Games" aria-selected="false" aria-controls="nexus-updates-panel-games" data-update-tab="games"><img src="Assets/nexus-game.svg" alt=""><span>Games</span><b class="nexus-updates-tab-badge" aria-hidden="true" hidden></b></button>
+                <button class="nexus-updates-tab" id="nexus-updates-tab-ai" style="--expanded-width: 72px;" type="button" role="tab" aria-label="AI" title="AI" aria-selected="false" aria-controls="nexus-updates-panel-ai" data-update-tab="ai"><img src="Assets/nexus-ai.svg" alt=""><span>AI</span><b class="nexus-updates-tab-badge" aria-hidden="true" hidden></b></button>
+                <button class="nexus-updates-tab" id="nexus-updates-tab-proxy" style="--expanded-width: 92px;" type="button" role="tab" aria-label="Proxy" title="Proxy" aria-selected="false" aria-controls="nexus-updates-panel-proxy" data-update-tab="proxy"><img src="Assets/nexus-proxy.svg" alt=""><span>Proxy</span><b class="nexus-updates-tab-badge" aria-hidden="true" hidden></b></button>
+                <button class="nexus-updates-tab" id="nexus-updates-tab-chat" style="--expanded-width: 86px;" type="button" role="tab" aria-label="Chat" title="Chat" aria-selected="false" aria-controls="nexus-updates-panel-chat" data-update-tab="chat"><img src="Assets/nexus-chat.svg" alt=""><span>Chat</span><b class="nexus-updates-tab-badge" aria-hidden="true" hidden></b></button>
+                <button class="nexus-updates-tab" id="nexus-updates-tab-media" style="--expanded-width: 94px;" type="button" role="tab" aria-label="Media" title="Media" aria-selected="false" aria-controls="nexus-updates-panel-media" data-update-tab="media"><img src="Assets/nexus-media.svg" alt=""><span>Media</span><b class="nexus-updates-tab-badge" aria-hidden="true" hidden></b></button>
+                <button class="nexus-updates-tab" id="nexus-updates-tab-help" style="--expanded-width: 82px;" type="button" role="tab" aria-label="Help" title="Help" aria-selected="false" aria-controls="nexus-updates-panel-help" data-update-tab="help"><img src="Assets/help.svg" alt=""><span>Help</span><b class="nexus-updates-tab-badge" aria-hidden="true" hidden></b></button>
+                <button class="nexus-updates-tab" id="nexus-updates-tab-misc" style="--expanded-width: 138px;" type="button" role="tab" aria-label="Settings/Misc" title="Settings/Misc" aria-selected="false" aria-controls="nexus-updates-panel-misc" data-update-tab="misc"><img src="Assets/nexus-settings.svg" alt=""><span>Settings/Misc</span><b class="nexus-updates-tab-badge" aria-hidden="true" hidden></b></button>
+            </div>
+            <div class="nexus-updates-header-actions">
+                <a class="nexus-updates-request" href="https://docs.google.com/forms/d/e/1FAIpQLSdcKa51l2lPC8BYXKA164MJe2ilxPSmkIT_C87REfbhtdri3g/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Requests/Concerns</a>
+                <button id="nexus-updates-close" class="nexus-updates-close" type="button" aria-label="Close updates">&times;</button>
+            </div>
+        </header>
+        <div class="nexus-updates-panels">
+            <section id="nexus-updates-panel-games" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-games" data-update-panel="games" hidden>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.6</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry" data-update-notification="v4.45.6-games-mrmine"><div class="nexus-update-entry-heading"><h3>Mr. Mine loading recovery</h3><span class="nexus-update-category-label is-potential-fix">POTENTIAL FIX</span></div><p>Stalled or failed game assets can retry through alternate CDN routes, and ordered scripts download in parallel to cut startup time.</p></li>
+                    </ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.0</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry"><div class="nexus-update-entry-heading"><h3>Games and the Stash</h3><span class="nexus-update-category-label is-bugfix">BUGFIX</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>The Stash was localized and made easier to use. Game loading, Unity compatibility, search, saving, backups, and performance received major improvements.</p></li>
+                    </ul>
+                </div>
+            </section>
+            <section id="nexus-updates-panel-ai" class="nexus-updates-panel nexus-updates-empty" role="tabpanel" aria-labelledby="nexus-updates-tab-ai" data-update-panel="ai" hidden>No updates in this section yet.</section>
+            <section id="nexus-updates-panel-proxy" class="nexus-updates-panel nexus-updates-empty" role="tabpanel" aria-labelledby="nexus-updates-tab-proxy" data-update-panel="proxy" hidden>No updates in this section yet.</section>
+            <section id="nexus-updates-panel-chat" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-chat" data-update-panel="chat" hidden>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.5</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry"><div class="nexus-update-entry-heading"><h3>Group chats</h3><span class="nexus-update-category-label is-new-feature">NEW FEATURE</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Create or join group chats and keep message history saved.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.0</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry"><div class="nexus-update-entry-heading"><h3>Group chat launch</h3><span class="nexus-update-category-label is-new-feature">NEW FEATURE</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Added group chats with saved history.</p></li></ul>
+                </div>
+            </section>
+            <section id="nexus-updates-panel-media" class="nexus-updates-panel nexus-updates-empty" role="tabpanel" aria-labelledby="nexus-updates-tab-media" data-update-panel="media" hidden>No updates in this section yet.</section>
+            <section id="nexus-updates-panel-help" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-help" data-update-panel="help" hidden>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.6</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.45.6-help-nexus-updates"><div class="nexus-update-entry-heading"><h3>Nexus Updates</h3><span class="nexus-update-category-label is-new-feature">NEW FEATURE</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Release notes are now organized by home-screen section, with unread counts that take you directly to the relevant updates.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.0</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry"><div class="nexus-update-entry-heading"><h3>Tutorial and help</h3><span class="nexus-update-category-label is-new-feature">NEW FEATURE</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Added a new tutorial menu and began building the Help section.</p></li></ul>
+                </div>
+            </section>
+            <section id="nexus-updates-panel-misc" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-misc" data-update-panel="misc" hidden>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.18</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.45.18-misc-pill-outline-color"><div class="nexus-update-entry-heading"><h3>Status pill outline color</h3><span class="nexus-update-category-label is-style">STYLE</span></div><p>Matched the version, active-user, time, and date pill outlines to #3c393d.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.17</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.45.17-misc-home-pills"><div class="nexus-update-entry-heading"><h3>Home-screen pills and settings</h3><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span><span class="nexus-update-category-label is-style">STYLE</span></div><p>Kept update notifications on the version pill, matched the time and active-user pill outlines, added individual time and date pills, removed the Dev Mode dot and Live User Tracking controls, and consolidated Settings to one Performance Mode toggle.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.16</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.45.16-misc-selected-tab-expand"><div class="nexus-update-entry-heading"><h3>Expandable section tabs</h3><span class="nexus-update-category-label is-style">STYLE</span></div><p>Kept tab icons at full brightness, expanded the selected tab to show its name, added Nexus with the current version to the header, and moved the Updates launcher into the bottom-right version pill.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.15</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.45.15-misc-uppercase-badge-labels"><div class="nexus-update-entry-heading"><h3>Badge label capitalization</h3><span class="nexus-update-category-label is-style">STYLE</span></div><p>Changed New Feature and Potential Fix labels to all caps for consistency.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.14</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.45.14-misc-tab-outline-color"><div class="nexus-update-entry-heading"><h3>Inactive tab outline color</h3><span class="nexus-update-category-label is-style">STYLE</span></div><p>Set inactive Nexus Updates tab outlines to #8a8594 in both themes.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.13</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.45.13-misc-new-update-badges"><div class="nexus-update-entry-heading"><h3>New update badge types</h3><span class="nexus-update-category-label is-style">STYLE</span></div><p>Added New feature and Potential Fix badges to distinguish feature launches from tentative repairs.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.12</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.45.12-misc-header-contrast"><div class="nexus-update-entry-heading"><h3>Header icon outline and red accents</h3><span class="nexus-update-category-label is-style">STYLE</span></div><p>Darkened inactive tab outlines and matched the NEW and Requests/Concerns red to notification badges.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.11</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.45.11-misc-update-categories"><div class="nexus-update-entry-heading"><h3>Update note labels</h3><span class="nexus-update-category-label is-style">STYLE</span></div><p>Added concise bugfix, quality-of-life, and style badges to update notes, and refined the NEW and Requests/Concerns pills.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.10</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.45.10-misc-update-interactions"><div class="nexus-update-entry-heading"><h3>Updates panel interactions</h3><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span><span class="nexus-update-category-label is-style">STYLE</span></div><p>Added icon hover and press motion, stronger selected-tab contrast, and automatic NEW labels for recent releases.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.9</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.45.9-misc-request-link"><div class="nexus-update-entry-heading"><h3>Requests/Concerns link</h3><span class="nexus-update-category-label is-style">STYLE</span></div><p>Made the form link red in both themes and slightly larger for easier reading.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.45.8</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.45.8-misc-updates-theme"><div class="nexus-update-entry-heading"><h3>Nexus Updates visual refresh</h3><span class="nexus-update-category-label is-style">STYLE</span></div><p>Unified the panel colors, strengthened the theme-matched outline, and moved icon-only section tabs into the centered header.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.0</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry"><div class="nexus-update-entry-heading"><h3>Settings and quality-of-life</h3><span class="nexus-update-category-label is-new-feature">NEW FEATURE</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Added Performance Mode, expanded Light Mode, improved save and restore tools, added Dev Mode and the online-user count, and preserved sidebar order and game colors.</p></li>
+                    </ul>
+                </div>
+            </section>
         </div>
-        <div class="nexus-patchnotes-body" id="nexus-patchnotes-expanded-text">4.0 is here! This update is a big one, and I can't wait for y'all to check it out.
-
-Let's do a quick overview. The Stash has been completely localized, meaning that old deprecated system is now only a fallback (you can enable it in settings if some games don't work, I'm still bugfixing). The Stash is now a lot more user-friendly, and the Games Tab has been updated to be more responsive and smooth. So has every single facet of this site; in fact, the amount of optimizations I had to make probably totals to ~150 hours. It should be a lot smoother now on those crappy Chromebooks (also known as E-waste).
-
-Some settings have been enabled by default, and a few new ones have been added to help with performance. If you have a low-end device, I highly recommend enabling Performance Mode in the Settings menu. It will make a world of difference. Also, settings have been removed to make it more user-friendly.
-
-Light Mode has been fully fleshed out with new backgrounds, and a more unified font.
-
-I added a brand-new tutorial menu and a Help menu in the works!
-
-The Stash has been updated as the font is now unified, saving and loading got a major revamp since you can now choose individually what games you want to save and load, and there's a (not fully done) saving manager where you can delete save files for specific games.
-
-I fixed tons of bugs, and when I say TONS, I mean it. Here's some of them, categorized from HUGE to SMALL but still impactful!
-
-MAJOR:
-I've added GROUP CHATS! Join one or create one. Your chat history saves! Yay!
-White-screen bug and loading bug is FINALLY fixed after over 4 months! Now all the games in the Stash should work perfectly, especially Unity games.
-Saving used to only work if the Nexus tab was open, now it works regardless of if it's open or just the game! Autosaving is also super reliable now. 
-I expanded the backup and restore system to save entire libraries of games, not just saves, including color, save data, and order of all the games. 
-Added general loading and response improvements by reducing redundant prefetching and background work. Also greatly increased performance gain when Performance Mode is turned on.
-Movies and TV stuff not loading.
-Search functionality is pretty much instant now.
-Added Vus Unblocked Tools, a one stop shop (not made by me) which has an insane amount of stuff. Located in the Game Stash, go check it out!
-NEW: Feature where you cannot open more than one game at a time so computer resources are used less, and so... more performance! The cool part is that when the tab is in the background, it uses less RAM than a literal new tab. (New tab uses 100mb, Nexus uses 55-75mb!)
-
-MEDIUM:
-Rolled out some potential fixes for Mr. Mine game, which couldn't load well for some devices. If it still doesn't work, please report in the Requests/Concerns form.
-Fixed some games getting stuck on "Adding..." in the sidebar, and moved the newly added games to the top.
-Fixed outdated IndexedDB version issues, which caused a rare bug that made adding games fail.
-Fixed deleted games not being re-addeable in the Stash until you refreshed it.
-Crossy Road's loading issue has been fixed.
-Added dev mode.
-Added online users statistic that can be disabled in Settings.
-Cloaking fixed for when it was broken, new tab cloak works better now
-Sidebar games will now never lose their order when you refresh the page, and will always be in the order you set them to. They will also keep their color.
-
-Kinda SMALL:
-Search layouts in the Game Stash were fixed, removing those annoying gaps in Search.
-New tab favicon added instead of a blank one.
-Fonts should now read properly on Chromebook, bundling the .ttf files locally instead of relying on Google Fonts.
-General polish update as per usual.
-Added version numbers for regular updates that work fr
-
-And stuff that's currently IN THE WORKS for 4.0 (coming to Chromebooks near you!):
-- More games-- they will definitely be more high quality than the current ones-- and more features and UI updates for the Stash, think pictures!
-- Updated media providers so some issues with media blockage will be solved
-- AI chatbot not working sometimes due to "server full" issues, will be fixed with a new backend if I can figure it out and definitely less waiting times
-- More polish and bugfixes, as always, and more performance improvements
-
-Aaaaand that's all, folks. 4.0 is here, but that doesn't mean that we're done with Nexus! I'm definitely going to hold off on any more major updates for now, since I need to pass my classes, but if you have any "Requests/Concerns" click that button and fill it out, and I should try and do something about it in a day or two. I'll catch you later, dev OUT!</div>
-        <div class="nexus-patchnotes-footer">
-            <button id="nexus-close-patchnotes-btn" class="nexus-close-patchnotes-btn">Cool! Close</button>
-        </div>
-    </div>
+    </section>
 </div>
-
 <!-- ========== JAVASCRIPT ========== -->
-<script src="site-core.js?v=5"></script>
+<script src="site-core.js?v=11"></script>
 <script src="tutorial-engine.js?v=2"></script>
 <script src="nexus-profile.js?v=4"></script>
 <script src="nexus-welcome.js?v=19"></script>

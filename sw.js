@@ -52,6 +52,7 @@ const ASSETS_TO_CACHE = [
     './Assets/Saves.svg',
     './Assets/Settings.svg',
     './Assets/media-back-arrow.svg',
+    './Assets/newFeature.svg',
     './Assets/nexus-ai.svg',
     './Assets/nexus-chat.svg',
     './Assets/nexus-drag.svg',

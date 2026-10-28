@@ -299,24 +299,34 @@ body:not(.media-bg) .rename-done-btn:hover {
 }
 
 .nexus-version-tag {
-    font-size: 11px;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.5em;
+    padding: clamp(7px, 0.8vw, 11px) clamp(12px, 1.25vw, 18px);
+    border: 2px solid #3c393d !important;
+    border-radius: 999px;
+    background: rgba(18, 18, 18, .58) !important;
     color: #ffffff !important;
-    font-family: var(--app-font);
-    font-weight: 700;
+    font: 700 clamp(12px, 1.15vw, 16px)/1 var(--app-font, sans-serif);
     cursor: pointer;
     user-select: none;
-    padding: 0;
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
     white-space: nowrap;
     opacity: 1 !important;
     pointer-events: auto !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .18);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    transition: transform .2s ease, background .2s ease, box-shadow .2s ease;
 }
 
-.nexus-version-container:hover .nexus-version-tag {
-    color: #2196F3 !important;
+.nexus-version-tag:hover,
+.nexus-version-tag:focus-visible {
+    color: #fff !important;
+    background: rgba(18, 18, 18, .72) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 7px 22px rgba(0, 0, 0, .28);
 }
 
 .nexus-update-card {
@@ -390,15 +400,42 @@ body.home-screen .nexus-update-card:hover {
     z-index: 20;
     top: clamp(10px, 2.2vw, 30px);
     right: clamp(12px, 2.2vw, 30px);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
     color: #fff;
     text-align: right;
-    text-shadow: 0 2px 6px #000;
+    text-shadow: none;
     font-weight: 700;
     pointer-events: none;
 }
-#nexus-local-time { font-size: clamp(18px, 2.4vw, 30px); }
-#nexus-local-date { font-size: clamp(11px, 1.2vw, 15px); opacity: .88; }
-html.light-mode .nexus-home-clock { color: #171717; text-shadow: 0 1px 5px rgba(255,255,255,.9); }
+#nexus-local-time,
+#nexus-local-date {
+    display: block;
+    padding: clamp(6px, .7vw, 9px) clamp(11px, 1.1vw, 16px);
+    border: 2px solid #3c393d;
+    border-radius: 999px;
+    background: rgba(18, 18, 18, .58);
+    color: inherit;
+    white-space: nowrap;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .18);
+}
+#nexus-local-time {
+    padding: clamp(8px, .85vw, 11px) clamp(13px, 1.3vw, 18px);
+    font-size: clamp(18px, 2.4vw, 30px);
+    line-height: 1;
+}
+#nexus-local-date { font-size: clamp(11px, 1.2vw, 15px); line-height: 1; }
+html.light-mode .nexus-home-clock { color: #171717; }
+html.light-mode #nexus-local-time,
+html.light-mode #nexus-local-date {
+    border-color: #3c393d;
+    background: #fff;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .12);
+}
 @media (max-width: 520px) {
     .nexus-greeting-opening { font-size: clamp(16px, 5vw, 22px); }
     .nexus-greeting-name { font-size: clamp(17px, 5vw, 24px); }
@@ -2669,7 +2706,16 @@ html.light-mode .status-text {
 }
 
 html.light-mode .nexus-version-tag {
-    color: var(--version-color) !important;
+    border-color: #3c393d !important;
+    background: rgba(255, 255, 255, .62) !important;
+    color: #171717 !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .12);
+}
+
+html.light-mode .nexus-version-tag:hover,
+html.light-mode .nexus-version-tag:focus-visible {
+    background: rgba(255, 255, 255, .82) !important;
+    color: #171717 !important;
 }
 
 html.light-mode .nexus-update-card {
@@ -2903,20 +2949,6 @@ html.light-mode .home-btn span {
     font-size: 13px;
     letter-spacing: 0.5px;
     text-transform: uppercase;
-}
-
-.dev-mode-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: #f44336;
-    box-shadow: 0 0 8px #f44336;
-    transition: background-color 0.2s, box-shadow 0.2s;
-}
-
-#nexus-dev-mode-widget.dev-active .dev-mode-dot {
-    background-color: #ff1744;
-    box-shadow: 0 0 12px #ff1744;
 }
 
 /* Red Toggle Switch */
@@ -4744,5 +4776,625 @@ html.light-mode .chat-msg.chat-msg-deleted {
     html.performance-mode-lite.nexus-rainbow-home.nexus-rainbow-active {
         --nexus-rainbow-position: 50%;
         animation: none !important;
+    }
+}
+
+/* Home-screen Nexus Updates pill and release notes */
+.nexus-updates-button {
+    pointer-events: auto !important;
+    overflow: visible !important;
+}
+
+html.performance-mode .nexus-updates-overlay,
+html.performance-mode-lite .nexus-updates-overlay {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+.nexus-updates-badge,
+.nexus-updates-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    background: #e53935;
+    color: #fff;
+    font: 800 11px/1 var(--app-font, sans-serif);
+    box-sizing: border-box;
+    box-shadow: 0 2px 7px rgba(0, 0, 0, .35);
+    pointer-events: none;
+}
+
+.nexus-updates-badge[hidden],
+.nexus-updates-tab-badge[hidden] {
+    display: none !important;
+}
+
+.nexus-updates-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 22px;
+    height: 22px;
+    font-size: 12px;
+}
+
+.nexus-updates-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, .68);
+    -webkit-backdrop-filter: blur(7px);
+    backdrop-filter: blur(7px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .18s ease, visibility .18s ease;
+}
+
+.nexus-updates-overlay[hidden] {
+    display: none !important;
+}
+
+.nexus-updates-overlay.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.nexus-updates-modal {
+    display: flex;
+    flex-direction: column;
+    width: min(96vw, 1400px);
+    height: min(92vh, 960px);
+    height: min(92dvh, 960px);
+    max-height: calc(100vh - 28px);
+    max-height: calc(100dvh - 28px);
+    overflow: hidden;
+    border: 2px solid var(--white-outline, #fff);
+    border-radius: 18px;
+    background: var(--modal-bg, #18102b);
+    color: var(--text-color, #e2dcf0);
+    box-shadow: 0 18px 70px rgba(0, 0, 0, .56);
+    font-family: var(--app-font, sans-serif);
+    transform: scale(.992);
+    transition: transform .18s ease;
+}
+
+.nexus-updates-overlay.is-open .nexus-updates-modal {
+    transform: scale(1);
+}
+
+.nexus-updates-tabbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.nexus-updates-brand {
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
+    gap: 9px;
+}
+
+.nexus-updates-header-version {
+    flex: 0 0 auto;
+    color: var(--text-color, #e2dcf0);
+    font-size: 13px;
+    font-weight: 700;
+    opacity: .72;
+}
+
+.nexus-updates-tab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 38px;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    min-height: 38px;
+    padding: 0;
+    border: 1px solid #8a8594;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-color, #e2dcf0);
+    cursor: pointer;
+    transition:
+        width .35s cubic-bezier(.2, 0, 0, 1),
+        min-width .35s cubic-bezier(.2, 0, 0, 1),
+        flex-basis .35s cubic-bezier(.2, 0, 0, 1),
+        gap .35s cubic-bezier(.2, 0, 0, 1),
+        padding .35s cubic-bezier(.2, 0, 0, 1),
+        transform .2s cubic-bezier(.2, 0, 0, 1),
+        border-color .15s ease,
+        box-shadow .15s ease;
+    animation: none !important;
+}
+
+.nexus-updates-tab:hover,
+.nexus-updates-tab:focus-visible {
+    outline: 1px solid var(--white-outline, #fff);
+    outline-offset: 1px;
+    border-color: var(--white-outline, #fff);
+    background: transparent;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, .24);
+}
+
+.nexus-updates-tab:active {
+    transform: translateY(1px) scale(.95);
+    box-shadow: none;
+}
+
+.nexus-updates-tab[aria-selected="true"] {
+    flex-basis: var(--expanded-width);
+    width: var(--expanded-width);
+    min-width: var(--expanded-width);
+    gap: 8px;
+    padding: 0 10px;
+    border-width: 2px;
+    border-color: var(--white-outline, #fff);
+    background: transparent;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .24);
+}
+
+.nexus-updates-tab > span {
+    display: inline-block;
+    max-width: 0;
+    overflow: hidden;
+    color: inherit;
+    font: 700 12px/1 var(--app-font, sans-serif);
+    opacity: 0;
+    text-align: left;
+    white-space: nowrap;
+    transition:
+        opacity .12s ease,
+        max-width .35s cubic-bezier(.2, 0, 0, 1) .12s;
+}
+
+.nexus-updates-tab[aria-selected="true"] > span {
+    max-width: 112px;
+    opacity: 1;
+    transition:
+        opacity .2s ease .15s,
+        max-width .35s cubic-bezier(.2, 0, 0, 1);
+}
+
+.nexus-updates-tab img {
+    display: block;
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    filter: var(--icon-filter, brightness(0) invert(1));
+    opacity: 1;
+}
+
+.nexus-updates-tab-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-width: 1px;
+    font-size: 9px;
+}
+
+.nexus-updates-header {
+    display: grid;
+    grid-template-columns: minmax(150px, 1fr) auto minmax(190px, 1fr);
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, .32);
+}
+
+.nexus-updates-header h2 {
+    margin: 0;
+    color: var(--text-color, #e2dcf0);
+    font-size: clamp(20px, 2.3vw, 28px);
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+}
+
+.nexus-updates-brand h2 {
+    flex: 0 1 auto;
+}
+
+.nexus-updates-header > .nexus-updates-tabbar {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.nexus-updates-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    grid-column: 3;
+    grid-row: 1;
+}
+
+.nexus-updates-request {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 12px;
+    border: 0;
+    border-radius: 999px;
+    background: #e53935;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    line-height: 1.2;
+}
+
+.nexus-updates-request:hover,
+.nexus-updates-request:focus-visible {
+    background: #c62828;
+    color: #fff;
+}
+
+.nexus-updates-close {
+    display: inline-flex;
+    flex: 0 0 38px;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0 0 3px;
+    border: 1px solid var(--white-outline, #fff);
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    font: 400 28px/1 var(--app-font, sans-serif);
+    cursor: pointer;
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+.nexus-updates-close:hover,
+.nexus-updates-close:focus-visible {
+    outline: 1px solid var(--white-outline, #fff);
+    outline-offset: 2px;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, .24);
+}
+
+.nexus-updates-close:active {
+    transform: translateY(1px) scale(.95);
+    box-shadow: none;
+}
+
+.nexus-updates-panels {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0 14px 14px;
+}
+
+.nexus-updates-panel {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: auto;
+    padding: clamp(16px, 2.5vw, 30px);
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-color, #e2dcf0);
+    overscroll-behavior: contain;
+}
+
+.nexus-updates-panel[hidden] {
+    display: none !important;
+}
+
+.nexus-updates-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted-text, #9e93b8);
+    font-size: 15px;
+}
+
+.nexus-update-release + .nexus-update-release {
+    margin-top: 28px;
+}
+
+.nexus-update-version {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    color: var(--text-color, #e2dcf0);
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.nexus-update-new-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 7px;
+    border: 0;
+    border-radius: 999px;
+    background: #e53935;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    line-height: 1;
+}
+
+.nexus-update-entry-heading {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 9px;
+    margin-bottom: 5px;
+}
+
+.nexus-update-category-label {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 7px;
+    border: 0;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: .06em;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.nexus-update-category-label.is-bugfix {
+    background: #ffdf70;
+    color: #3d2b00;
+}
+
+.nexus-update-category-label.is-new-feature {
+    background: #f6a8d0;
+    color: #4b1635;
+}
+
+.nexus-update-category-label.is-quality-of-life {
+    background: #83e1a0;
+    color: #103821;
+}
+
+.nexus-update-category-label.is-style {
+    background: #9dccff;
+    color: #102343;
+}
+
+.nexus-update-category-label.is-potential-fix {
+    background: #4b5563;
+    color: #f3f4f6;
+}
+
+.nexus-update-version-rule {
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--white-outline, #fff);
+    opacity: .38;
+}
+
+.nexus-update-list {
+    display: grid;
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.nexus-update-entry h3 {
+    margin: 0;
+    color: var(--text-color, #e2dcf0);
+    font-size: 16px;
+}
+
+.nexus-update-entry p {
+    margin: 0;
+    color: var(--text-color, #e2dcf0);
+    opacity: .82;
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+html.light-mode .nexus-updates-modal {
+    border-color: var(--white-outline, #140d24);
+    background: var(--modal-bg, #f9f7fd);
+    color: #211a2b;
+}
+
+html.light-mode .nexus-updates-tabbar {
+    border: 0;
+    background: transparent;
+}
+
+html.light-mode .nexus-updates-tab {
+    border-color: #8a8594;
+    color: var(--text-color, #140d24);
+}
+
+html.light-mode .nexus-updates-tab[aria-selected="true"] {
+    border-color: var(--white-outline, #140d24);
+    background: transparent;
+    box-shadow: 0 0 0 1px rgba(20, 13, 36, .2);
+}
+
+html.light-mode .nexus-updates-tab:hover,
+html.light-mode .nexus-updates-tab:focus-visible {
+    border-color: var(--white-outline, #140d24);
+    background: transparent;
+}
+
+html.light-mode .nexus-updates-header-version {
+    color: var(--text-color, #140d24);
+}
+
+html.light-mode .nexus-updates-header h2,
+html.light-mode .nexus-update-version {
+    color: var(--text-color, #140d24);
+}
+
+html.light-mode .nexus-updates-request {
+    background: #fff;
+    color: #e53935;
+}
+
+html.light-mode .nexus-updates-request:hover,
+html.light-mode .nexus-updates-request:focus-visible {
+    background: #f0e7e8;
+    color: #e53935;
+}
+
+html.light-mode .nexus-updates-close {
+    border-color: var(--white-outline, #140d24);
+    background: transparent;
+}
+
+html.light-mode .nexus-updates-panel {
+    background: transparent;
+    color: var(--text-color, #140d24);
+}
+
+html.light-mode .nexus-updates-empty,
+html.light-mode .nexus-update-entry p {
+    color: var(--text-color, #140d24);
+}
+
+html.light-mode .nexus-update-entry h3 {
+    color: var(--text-color, #140d24);
+}
+
+html.light-mode .nexus-update-entry p,
+html.light-mode .nexus-updates-empty {
+    opacity: .78;
+}
+
+html.light-mode .nexus-update-version-rule {
+    background: var(--white-outline, #140d24);
+}
+
+html.light-mode .nexus-update-new-label {
+    background: #fff;
+    color: #e53935;
+}
+
+html.light-mode .nexus-update-category-label.is-bugfix {
+    background: #684900;
+    color: #fff0b3;
+}
+
+html.light-mode .nexus-update-category-label.is-new-feature {
+    background: #831843;
+    color: #fbcfe8;
+}
+
+html.light-mode .nexus-update-category-label.is-quality-of-life {
+    background: #14552d;
+    color: #c8ffd8;
+}
+
+html.light-mode .nexus-update-category-label.is-style {
+    background: #184b83;
+    color: #d4eaff;
+}
+
+html.light-mode .nexus-update-category-label.is-potential-fix {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+html.light-mode .nexus-updates-header {
+    border-bottom-color: rgba(20, 13, 36, .32);
+}
+
+@media (max-width: 850px) {
+    .nexus-updates-header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px 12px;
+    }
+    .nexus-updates-header > .nexus-updates-tabbar {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        justify-self: center;
+    }
+    .nexus-updates-header-actions {
+        grid-column: 2;
+        grid-row: 1;
+    }
+}
+
+@media (max-width: 540px) {
+    .nexus-updates-overlay { padding: 7px; }
+    .nexus-updates-modal {
+        width: 98vw;
+        height: 94vh;
+        height: 94dvh;
+        max-height: calc(100vh - 14px);
+        max-height: calc(100dvh - 14px);
+        border-radius: 13px;
+    }
+    .nexus-updates-tabbar {
+        width: 100%;
+        max-width: 100%;
+        gap: 3px;
+        justify-content: flex-start;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+    }
+    .nexus-updates-tabbar::-webkit-scrollbar { display: none; }
+    .nexus-updates-tab { width: 34px; min-width: 34px; height: 34px; min-height: 34px; flex-basis: 34px; padding: 0; }
+    .nexus-updates-tab[aria-selected="true"] { flex-basis: var(--expanded-width); width: var(--expanded-width); min-width: var(--expanded-width); }
+    .nexus-updates-tab img { width: 18px; height: 18px; }
+    .nexus-updates-tab-badge { top: 0; right: 0; min-width: 15px; height: 15px; font-size: 8px; }
+    .nexus-updates-header { padding: 12px 14px; }
+    .nexus-updates-brand { gap: 5px; }
+    .nexus-updates-header h2 { font-size: 17px; }
+    .nexus-updates-header-version { font-size: 11px; }
+    .nexus-updates-header-actions { gap: 6px; }
+    .nexus-updates-request { padding: 5px 7px; font-size: 10px; }
+    .nexus-updates-close { width: 34px; height: 34px; flex-basis: 34px; font-size: 26px; }
+    .nexus-updates-panels { padding: 0 8px 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nexus-updates-overlay,
+    .nexus-updates-modal,
+    .nexus-updates-tab,
+    .nexus-updates-tab img,
+    .nexus-updates-close {
+        transition-duration: .01ms !important;
+    }
+
+    .nexus-updates-tab:hover,
+    .nexus-updates-tab:focus-visible,
+    .nexus-updates-tab:active,
+    .nexus-updates-close:hover,
+    .nexus-updates-close:focus-visible,
+    .nexus-updates-close:active {
+        transform: none;
     }
 }

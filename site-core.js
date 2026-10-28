@@ -193,77 +193,186 @@
             };
         }
 
-        // Version card hover setup
-        const verContainer = document.querySelector('.nexus-version-container');
-        const updateCard = document.querySelector('.nexus-update-card');
-        if (verContainer && updateCard) {
-            let hideTimer = null;
-            function showCard() {
-                clearTimeout(hideTimer);
-                updateCard.style.opacity = '1';
-                updateCard.style.visibility = 'visible';
-                updateCard.style.transform = 'translateY(0) translateX(0)';
-                updateCard.style.pointerEvents = 'auto';
-            }
-            function hideCard() {
-                hideTimer = setTimeout(() => {
-                    updateCard.style.opacity = '0';
-                    updateCard.style.visibility = 'hidden';
-                    updateCard.style.transform = 'translateY(6px) translateX(6px)';
-                    updateCard.style.pointerEvents = 'none';
-                }, 200);
-            }
-            verContainer.addEventListener('mouseenter', showCard);
-            verContainer.addEventListener('mouseleave', hideCard);
-            updateCard.addEventListener('mouseenter', showCard);
-            updateCard.addEventListener('mouseleave', hideCard);
+        // Nexus Updates panel and per-section unread notifications
+        const updatesButton = document.getElementById('nexus-updates-button');
+        const updatesBadge = document.getElementById('nexus-updates-badge');
+        const updatesOverlay = document.getElementById('nexus-updates-overlay');
+        const updatesCloseButton = document.getElementById('nexus-updates-close');
+        const updatesHeaderVersion = document.getElementById('nexus-updates-header-version');
+        const currentVersionLabel = document.querySelector('.nexus-version-label')?.textContent.trim();
+        if (updatesHeaderVersion && currentVersionLabel) updatesHeaderVersion.textContent = currentVersionLabel;
+        const updateTabs = Array.from(document.querySelectorAll('[data-update-tab]'));
+        const updatePanels = Array.from(document.querySelectorAll('[data-update-panel]'));
+        const updateSectionLabels = {
+            games: 'Games',
+            ai: 'AI',
+            proxy: 'Proxy',
+            chat: 'Chat',
+            media: 'Media',
+            help: 'Help',
+            misc: 'Settings/Misc'
+        };
+        const updatesStorage = window.nexusStorage || window.localStorage;
+        const updatesReadStorageKey = 'nexus-updates-read-v1';
+        let readUpdateIds = new Set();
+        let updatesCloseTimer = null;
+        let activeUpdateSection = 'games';
+        let previouslyFocusedElement = null;
+
+        try {
+            const savedReadIds = JSON.parse(updatesStorage.getItem(updatesReadStorageKey) || '[]');
+            if (Array.isArray(savedReadIds)) readUpdateIds = new Set(savedReadIds.map(String));
+        } catch (error) {}
+
+        function getUnreadUpdates(sectionId) {
+            return Array.from(document.querySelectorAll('[data-update-notification]')).filter(entry => {
+                const panel = entry.closest('[data-update-panel]');
+                const id = entry.getAttribute('data-update-notification');
+                return panel && panel.dataset.updatePanel === sectionId && id && !readUpdateIds.has(id);
+            });
         }
 
-        // Expanded Patch Notes Modal Handlers
-        const readMoreBtn = document.getElementById('nexus-read-more-btn');
-        const closePatchnotesBtn = document.getElementById('nexus-close-patchnotes-btn');
-        const patchnotesOverlay = document.getElementById('nexus-patchnotes-overlay');
+        function setBadge(badge, count) {
+            if (!badge) return;
+            badge.textContent = count > 99 ? '99+' : String(count);
+            badge.hidden = count <= 0;
+        }
 
-        if (readMoreBtn && patchnotesOverlay) {
-            readMoreBtn.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (updateCard) {
-                    updateCard.style.opacity = '0';
-                    updateCard.style.visibility = 'hidden';
-                    updateCard.style.pointerEvents = 'none';
+        function refreshUpdateBadges() {
+            let totalUnread = 0;
+            updateTabs.forEach(tab => {
+                const sectionId = tab.dataset.updateTab;
+                const count = getUnreadUpdates(sectionId).length;
+                totalUnread += count;
+                setBadge(tab.querySelector('.nexus-updates-tab-badge'), count);
+                const sectionLabel = updateSectionLabels[sectionId] || 'Updates';
+                tab.setAttribute('aria-label', count ? `${sectionLabel}, ${count} unread update${count === 1 ? '' : 's'}` : sectionLabel);
+            });
+            setBadge(updatesBadge, totalUnread);
+            if (updatesButton) updatesButton.setAttribute('aria-label', totalUnread ? `Nexus Updates, ${totalUnread} unread update${totalUnread === 1 ? '' : 's'}` : 'Nexus Updates');
+        }
+
+        function parseSemanticVersion(value) {
+            const match = String(value || '').match(/(\d+)\.(\d+)\.(\d+)/);
+            return match ? match.slice(1).map(Number) : null;
+        }
+
+        function refreshNewReleaseLabels() {
+            const currentVersion = parseSemanticVersion(document.querySelector('.nexus-version-label')?.textContent);
+            if (!currentVersion) return;
+            document.querySelectorAll('.nexus-update-version').forEach(release => {
+                const versionText = release.querySelector('span:first-child');
+                if (!versionText) return;
+                const releaseVersion = parseSemanticVersion(versionText.textContent);
+                const isLatestRelease = releaseVersion &&
+                    releaseVersion.every((part, index) => part === currentVersion[index]);
+                let newLabel = release.querySelector('.nexus-update-new-label');
+                if (isLatestRelease && !newLabel) {
+                    newLabel = document.createElement('span');
+                    newLabel.className = 'nexus-update-new-label';
+                    newLabel.textContent = 'NEW';
+                    versionText.insertAdjacentElement('afterend', newLabel);
+                } else if (!isLatestRelease && newLabel) {
+                    newLabel.remove();
                 }
-                patchnotesOverlay.style.display = 'flex';
-            };
+            });
         }
 
-        function closePatchnotesModal() {
-            if (patchnotesOverlay) {
-                patchnotesOverlay.style.display = 'none';
+        function markSectionRead(sectionId) {
+            getUnreadUpdates(sectionId).forEach(entry => readUpdateIds.add(entry.getAttribute('data-update-notification')));
+            try { updatesStorage.setItem(updatesReadStorageKey, JSON.stringify(Array.from(readUpdateIds))); } catch (error) {}
+            refreshUpdateBadges();
+        }
+
+        function selectUpdateSection(sectionId, markRead = true) {
+            const selectedTab = updateTabs.find(tab => tab.dataset.updateTab === sectionId);
+            if (!selectedTab) return;
+            activeUpdateSection = sectionId;
+            updateTabs.forEach(tab => {
+                const selected = tab === selectedTab;
+                tab.setAttribute('aria-selected', String(selected));
+                tab.tabIndex = selected ? 0 : -1;
+            });
+            updatePanels.forEach(panel => { panel.hidden = panel.dataset.updatePanel !== sectionId; });
+            selectedTab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            if (markRead) markSectionRead(sectionId);
+        }
+
+        function openUpdates() {
+            if (!updatesOverlay || !updatesButton) return;
+            clearTimeout(updatesCloseTimer);
+            previouslyFocusedElement = document.activeElement;
+            updatesOverlay.hidden = false;
+            updatesOverlay.setAttribute('aria-hidden', 'false');
+            updatesButton.setAttribute('aria-expanded', 'true');
+            const firstUnreadTab = updateTabs.find(tab => getUnreadUpdates(tab.dataset.updateTab).length > 0);
+            const sectionId = firstUnreadTab ? firstUnreadTab.dataset.updateTab : activeUpdateSection;
+            selectUpdateSection(sectionId);
+            requestAnimationFrame(() => {
+                updatesOverlay.classList.add('is-open');
+                if (updatesCloseButton) updatesCloseButton.focus();
+            });
+        }
+
+        function closeUpdates() {
+            if (!updatesOverlay || updatesOverlay.hidden) return;
+            updatesOverlay.classList.remove('is-open');
+            updatesOverlay.setAttribute('aria-hidden', 'true');
+            if (updatesButton) updatesButton.setAttribute('aria-expanded', 'false');
+            clearTimeout(updatesCloseTimer);
+            updatesCloseTimer = setTimeout(() => {
+                if (!updatesOverlay.classList.contains('is-open')) updatesOverlay.hidden = true;
+            }, 210);
+            if (previouslyFocusedElement && typeof previouslyFocusedElement.focus === 'function') previouslyFocusedElement.focus();
+            else if (updatesButton) updatesButton.focus();
+        }
+
+        if (updatesButton && updatesOverlay) updatesButton.addEventListener('click', openUpdates);
+        if (updatesCloseButton) updatesCloseButton.addEventListener('click', closeUpdates);
+        updateTabs.forEach((tab, index) => {
+            tab.addEventListener('click', () => selectUpdateSection(tab.dataset.updateTab));
+            tab.addEventListener('keydown', event => {
+                let nextIndex = index;
+                if (event.key === 'ArrowRight') nextIndex = (index + 1) % updateTabs.length;
+                else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + updateTabs.length) % updateTabs.length;
+                else if (event.key === 'Home') nextIndex = 0;
+                else if (event.key === 'End') nextIndex = updateTabs.length - 1;
+                else return;
+                event.preventDefault();
+                updateTabs[nextIndex].focus();
+                selectUpdateSection(updateTabs[nextIndex].dataset.updateTab);
+            });
+        });
+
+        if (updatesOverlay) {
+            updatesOverlay.addEventListener('click', event => {
+                if (event.target === updatesOverlay) closeUpdates();
+            });
+        }
+
+        document.addEventListener('keydown', event => {
+            if (!updatesOverlay || updatesOverlay.hidden) return;
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeUpdates();
+                return;
             }
-        }
-
-        if (closePatchnotesBtn) {
-            closePatchnotesBtn.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                closePatchnotesModal();
-            };
-        }
-
-        if (patchnotesOverlay) {
-            patchnotesOverlay.onclick = (e) => {
-                if (e.target === patchnotesOverlay) {
-                    closePatchnotesModal();
-                }
-            };
-        }
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && patchnotesOverlay && patchnotesOverlay.style.display === 'flex') {
-                closePatchnotesModal();
+            if (event.key !== 'Tab') return;
+            const focusable = Array.from(updatesOverlay.querySelectorAll('button:not([disabled]):not([tabindex="-1"])'));
+            if (!focusable.length) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
             }
         });
+
+        refreshUpdateBadges();
+        refreshNewReleaseLabels();
 
         // Launch in-app tutorial engine
         if (window.TutorialEngine && typeof window.TutorialEngine.initHome === 'function') {

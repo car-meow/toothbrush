@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Settings - Nexus</title>
-    <link rel="stylesheet" href="style.css?v=61">
+    <link rel="stylesheet" href="style.css?v=63">
     <script src="bgm-manager.js?v=64"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
@@ -46,7 +46,7 @@
             gap: 14px; margin-bottom: 16px;
         }
         .settings-columns {
-            display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+            display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
             align-items: start; gap: 14px;
         }
         .settings-column {
@@ -128,7 +128,6 @@
     <!-- Hidden bottom-left Dev Mode Trigger & Toggle Widget -->
     <div id="nexus-dev-mode-trigger"></div>
     <div id="nexus-dev-mode-widget" aria-label="Developer Mode Widget">
-        <span class="dev-mode-dot"></span>
         <span class="dev-mode-tag">Dev Mode</span>
         <label class="dev-mode-switch" title="Toggle Developer Mode">
             <input type="checkbox" id="dev-mode-checkbox">
@@ -181,44 +180,10 @@
 
             <div class="settings-columns">
                 <section class="settings-column">
-                    <div class="setting-section-title">Live User Tracking</div>
-                    <div class="setting-row">
-                        <div class="setting-label-group">
-                            <span class="setting-label">Enable Active Users Count</span>
-                            <span class="setting-hint">If having performance issues, turn OFF. Shows the count on Home and refreshes about once a minute.</span>
-                        </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="toggle-online-users-count">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="setting-row">
-                        <div class="setting-label-group">
-                            <span class="setting-label">Keep me Counted while Playing</span>
-                            <span class="setting-hint">Enabled by default, leave on if unsure. Disabling allows for more precise user tracking.</span>
-                        </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="toggle-presence-while-playing">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </section>
-
-                <section class="settings-column">
                     <div class="setting-section-title">Performance</div>
                     <div class="setting-row">
                         <div class="setting-label-group">
                             <span class="setting-label">Performance Mode</span>
-                            <span class="setting-hint">Cuts animations and some background activity to improve performance.</span>
-                        </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="toggle-performance-mode">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="setting-row">
-                        <div class="setting-label-group">
-                            <span class="setting-label">Performance Mode Lite</span>
                             <span class="setting-hint">Improves performance with fewer visual changes.</span>
                         </div>
                         <label class="toggle-switch">
@@ -455,28 +420,9 @@
             }
         });
 
-        // Performance Mode & Performance Mode Lite
-        const togglePerf = document.getElementById('toggle-performance-mode');
+        // Keep the existing Lite behavior as the single Performance Mode setting.
         const togglePerfLite = document.getElementById('toggle-performance-mode-lite');
         const storage = window.nexusStorage || window.localStorage;
-
-        const toggleOnlineUsersCount = document.getElementById('toggle-online-users-count');
-        if (toggleOnlineUsersCount) {
-            toggleOnlineUsersCount.checked = storage.getItem('tb_online_count_enabled') !== 'false';
-            toggleOnlineUsersCount.addEventListener('change', (event) => {
-                storage.setItem('tb_online_count_enabled', event.target.checked ? 'true' : 'false');
-                window.dispatchEvent(new Event('nexus-online-count-preference-change'));
-            });
-        }
-
-        const togglePresenceWhilePlaying = document.getElementById('toggle-presence-while-playing');
-        if (togglePresenceWhilePlaying) {
-            togglePresenceWhilePlaying.checked = storage.getItem('tb_presence_keep_counted_while_playing') !== 'false';
-            togglePresenceWhilePlaying.addEventListener('change', (event) => {
-                storage.setItem('tb_presence_keep_counted_while_playing', event.target.checked ? 'true' : 'false');
-                window.dispatchEvent(new Event('nexus-online-count-preference-change'));
-            });
-        }
 
         // Local file-based Game Stash launching remains the default.
         const toggleLocalGameFiles = document.getElementById('toggle-local-game-files');
@@ -487,39 +433,14 @@
             });
         }
 
-        if (togglePerf) {
-            togglePerf.checked = storage.getItem('tb_performance_mode') === 'true';
-            togglePerf.addEventListener('change', (e) => {
-                const enabled = e.target.checked;
-                storage.setItem('tb_performance_mode', enabled ? 'true' : 'false');
-                if (enabled) {
-                    document.documentElement.classList.add('performance-mode');
-                    if (togglePerfLite && togglePerfLite.checked) {
-                        togglePerfLite.checked = false;
-                        storage.setItem('tb_performance_mode_lite', 'false');
-                        document.documentElement.classList.remove('performance-mode-lite');
-                    }
-                } else {
-                    document.documentElement.classList.remove('performance-mode');
-                }
-            });
-        }
-
         if (togglePerfLite) {
-            togglePerfLite.checked = storage.getItem('tb_performance_mode_lite') === 'true';
+            togglePerfLite.checked = storage.getItem('tb_performance_mode_lite') === 'true' || storage.getItem('tb_performance_mode') === 'true';
             togglePerfLite.addEventListener('change', (e) => {
                 const enabled = e.target.checked;
                 storage.setItem('tb_performance_mode_lite', enabled ? 'true' : 'false');
-                if (enabled) {
-                    document.documentElement.classList.add('performance-mode-lite');
-                    if (togglePerf && togglePerf.checked) {
-                        togglePerf.checked = false;
-                        storage.setItem('tb_performance_mode', 'false');
-                        document.documentElement.classList.remove('performance-mode');
-                    }
-                } else {
-                    document.documentElement.classList.remove('performance-mode-lite');
-                }
+                storage.setItem('tb_performance_mode', 'false');
+                document.documentElement.classList.remove('performance-mode');
+                document.documentElement.classList.toggle('performance-mode-lite', enabled);
             });
         }
 
@@ -719,10 +640,8 @@
             if (devModeSection) {
                 devModeSection.style.display = isDev ? 'block' : 'none';
             }
-            const widget = document.getElementById('nexus-dev-mode-widget');
             const checkbox = document.getElementById('dev-mode-checkbox');
             if (checkbox) checkbox.checked = isDev;
-            if (widget) widget.classList.toggle('dev-active', isDev);
 
             const count = getReportedGamesList().length;
             if (devReportedCountEl) devReportedCountEl.textContent = String(count);
