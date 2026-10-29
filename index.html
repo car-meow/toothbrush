@@ -1,10 +1,11 @@
-<!-- nexus-version: 4.45.5 -->
+<!-- nexus-version: 4.46.21 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>New Tab</title>
-<link rel="stylesheet" href="style.css?v=85">
+<link rel="stylesheet" href="style.css?v=88">
+<link rel="stylesheet" href="home-widgets.css?v=11">
     <script src="bgm-manager.js?v=64"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
@@ -211,7 +212,7 @@ html.light-mode .online-users-bubble {
 
 <div class="nexus-version-container" style="pointer-events: auto !important;">
     <button id="nexus-updates-button" class="nexus-version-tag nexus-updates-button" type="button" aria-label="Nexus Updates" aria-haspopup="dialog" aria-controls="nexus-updates-overlay" aria-expanded="false">
-        <span class="nexus-version-label">v4.45.20</span>
+        <span class="nexus-version-label">v4.46.21</span>
         <b id="nexus-updates-badge" class="nexus-updates-badge" aria-hidden="true" hidden></b>
     </button>
 </div>
@@ -242,7 +243,7 @@ html.light-mode .online-users-bubble {
                 <div class="nexus-update-release">
                     <div class="nexus-update-version"><span>v4.45.6</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
                     <ul class="nexus-update-list">
-                        <li class="nexus-update-entry" data-update-notification="v4.45.6-games-mrmine"><div class="nexus-update-entry-heading"><h3>Mr. Mine loading recovery</h3><span class="nexus-update-category-label is-potential-fix">POTENTIAL FIX</span></div><p>Stalled or failed game assets can retry through alternate CDN routes, and ordered scripts download in parallel to cut startup time.</p></li>
+                        <li class="nexus-update-entry" data-update-notification="v4.45.6-games-mrmine"><div class="nexus-update-entry-heading"><h3>Mr. Mine loading recovery</h3><span class="nexus-update-category-label is-potential-fix">POTENTIAL FIX</span></div><p>Stalled or failed game assets can retry through alternate CDN routes, and ordered scripts download in parallel to cut startup time. Essentially, it should HOPEFULLY work...</p></li>
                     </ul>
                 </div>
                 <div class="nexus-update-release">
@@ -276,6 +277,10 @@ html.light-mode .online-users-bubble {
                 </div>
             </section>
             <section id="nexus-updates-panel-misc" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-misc" data-update-panel="misc" hidden>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.46.21</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.46.21-misc-home-widgets"><div class="nexus-update-entry-heading"><h3>Homescreen widgets</h3><span class="nexus-update-category-label is-new-feature">NEW FEATURE</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Added a snap-to-grid widget editor with movable homescreen pills, a Performance Mode toggle, and an animated theme toggle.</p></li></ul>
+                </div>
                 <div class="nexus-update-release">
                     <div class="nexus-update-version"><span>v4.45.20</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
                     <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.45.20-misc-updates-glass-effect"><div class="nexus-update-entry-heading"><h3>Updates panel glass effect</h3><span class="nexus-update-category-label is-style">STYLE</span></div><p>Added a subtle blur behind the Nexus Updates panel and increased its transparency in both themes.</p></li></ul>
@@ -343,6 +348,7 @@ html.light-mode .online-users-bubble {
 <script src="tutorial-engine.js?v=2"></script>
 <script src="nexus-profile.js?v=4"></script>
 <script src="nexus-welcome.js?v=19"></script>
-<script src="online-presence.js?v=4" defer></script>
+<script src="online-presence.js?v=6" defer></script>
+<script src="home-widgets.js?v=7" defer></script>
 </body>
 </html>

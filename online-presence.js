@@ -1,8 +1,9 @@
-// nexus-version: 4.45.5
+// nexus-version: 4.46.21
 (function () {
     'use strict';
 
     const PREFERENCE_KEY = 'tb_online_count_enabled';
+    const WIDGETS_KEY = 'tb_home_widgets_v1';
     const WORKER_URL = 'online-presence-worker.js?v=4';
     const WORKER_NAME = 'nexus-online-presence-v4';
     let worker = null;
@@ -33,7 +34,11 @@
     function preferenceEnabled() {
         try {
             const storage = window.nexusStorage || window.localStorage;
-            return storage.getItem(PREFERENCE_KEY) !== 'false';
+            if (storage.getItem(PREFERENCE_KEY) === 'false') return false;
+            const saved = storage.getItem(WIDGETS_KEY);
+            if (!saved) return true;
+            const config = JSON.parse(saved);
+            return !!(config && config.widgets && config.widgets['active-users']);
         } catch (_) {
             return true;
         }
@@ -122,8 +127,9 @@
     else updateHomeBubble({ type: 'disabled' });
 
     window.addEventListener('storage', event => {
-        if (event.key === PREFERENCE_KEY || event.key === 'tb_presence_keep_counted_while_playing') applyPreference();
+        if (event.key === PREFERENCE_KEY || event.key === WIDGETS_KEY || event.key === 'tb_presence_keep_counted_while_playing') applyPreference();
     });
     window.addEventListener('nexus-online-count-preference-change', applyPreference);
+    window.addEventListener('nexus-online-count-widget-change', applyPreference);
     window.addEventListener('pagehide', () => stopWorkerPort(false), { once: true });
 })();

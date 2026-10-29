@@ -1,4 +1,4 @@
-/* nexus-version: 4.45.5 */
+/* nexus-version: 4.46.21 */
 @font-face {
     font-family: 'Google Sans Flex';
     src: url('Assets/GoogleSansFlex-VariableFont_ROND,opsz,slnt,wdth,wght.ttf') format('truetype');
@@ -264,6 +264,8 @@ body:not(.media-bg) .rename-done-btn:hover {
     object-fit: cover;
     z-index: 0;
     pointer-events: none;
+    /* Keep fullscreen Chromebook video in the composited page so glass controls can sample it. */
+    filter: brightness(1.001);
 }
 
 .home-screen::before {
@@ -680,25 +682,21 @@ html.light-mode .nexus-patchnotes-body {
     min-width: 52px;
     padding: 0 !important;
     border-radius: 9999px;
+    position: relative;
+    isolation: isolate;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0;
     overflow: hidden;
-    background: var(--accent-btn-bg);
     border: 2.5px solid var(--accent-btn-border);
     color: var(--accent-btn-text);
-    transform: translateZ(0);
-    backface-visibility: hidden;
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    background: transparent;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
     cursor: pointer;
     vertical-align: middle;
     pointer-events: auto !important;
     z-index: 10002 !important;
-    contain: layout paint;
-    will-change: transform, width;
     /* Unhover: text collapses and fades first, then width smoothly slides back */
     transition:
         width 0.35s cubic-bezier(0.2, 0, 0, 1) 0.12s,
@@ -709,6 +707,21 @@ html.light-mode .nexus-patchnotes-body {
         box-shadow 0.2s ease;
 }
 
+.material-nav-btn::before {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--accent-btn-bg);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    content: "";
+    pointer-events: none;
+    transition: background .2s ease;
+}
+
+.material-nav-btn > * { position: relative; z-index: 1; }
+
 .material-nav-btn:hover,
 .material-nav-btn:focus-visible {
     /* Expanded: smoothly slides to expanded width */
@@ -716,7 +729,7 @@ html.light-mode .nexus-patchnotes-body {
     padding: 0 16px !important;
     gap: 10px;
     justify-content: center;
-    background: var(--accent-btn-bg-hover);
+    background: transparent;
     border: 2.5px solid var(--accent-btn-border-hover);
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
@@ -729,6 +742,9 @@ html.light-mode .nexus-patchnotes-body {
         transform 0.2s cubic-bezier(0.2, 0, 0, 1),
         box-shadow 0.2s ease;
 }
+
+.material-nav-btn:hover::before,
+.material-nav-btn:focus-visible::before { background: var(--accent-btn-bg-hover); }
 
 .material-nav-btn img {
     width: 24px;
@@ -2406,6 +2422,7 @@ html.performance-mode #bg-video {
 
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
     .material-nav-btn,
+    .material-nav-btn::before,
     .nexus-update-card,
     .tutorial-popup,
     #nexus-red-confirm-overlay,
@@ -2420,6 +2437,8 @@ html.performance-mode #bg-video {
         background: rgba(24, 16, 43, 0.94) !important;
     }
 
+    .material-nav-btn::before { background: rgba(24, 16, 43, 0.94) !important; }
+
     #nexus-red-confirm-overlay,
     #nexus-dev-mode-widget {
         background: rgba(18, 6, 6, 0.94) !important;
@@ -2430,6 +2449,8 @@ html.performance-mode #bg-video {
     html.light-mode .tutorial-popup {
         background: rgba(249, 247, 253, 0.96) !important;
     }
+
+    html.light-mode .home-screen .material-nav-btn::before { background: rgba(249, 247, 253, 0.96) !important; }
 
     html.light-mode #nexus-red-confirm-overlay,
     html.light-mode #nexus-dev-mode-widget {
@@ -2504,16 +2525,30 @@ html.performance-mode-lite body.chat-bg {
 html.performance-mode .material-nav-btn {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
-    background: rgba(40, 30, 60, 0.95) !important;
+    background: transparent !important;
+}
+
+html.performance-mode .material-nav-btn::before,
+html.performance-mode-lite .material-nav-btn::before {
+    -webkit-backdrop-filter: blur(10px) !important;
+    backdrop-filter: blur(10px) !important;
+    background: var(--accent-btn-bg) !important;
 }
 
 html.light-mode.performance-mode .material-nav-btn,
 html.light-mode.performance-mode .home-btn.material-nav-btn {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
-    background: #ded6eb !important;
+    background: transparent !important;
     border: 2.5px solid #140d24 !important;
     color: #140d24 !important;
+}
+
+html.light-mode.performance-mode .material-nav-btn::before,
+html.light-mode.performance-mode-lite .material-nav-btn::before {
+    -webkit-backdrop-filter: blur(10px) !important;
+    backdrop-filter: blur(10px) !important;
+    background: var(--accent-btn-bg) !important;
 }
 
 html.performance-mode .nexus-update-card {
@@ -2865,21 +2900,29 @@ html.light-mode .message {
 /* Material Nav & Main Menu Buttons Light Mode */
 html.light-mode .material-nav-btn,
 html.light-mode .home-btn.material-nav-btn {
-    background: rgba(20, 13, 36, 0.08) !important;
+    background: transparent !important;
     border: 2.5px solid #140d24 !important;
     color: #140d24 !important;
     box-shadow: 0 4px 14px rgba(20, 13, 36, 0.15) !important;
 }
 
+html.light-mode .material-nav-btn::before,
+html.light-mode .home-btn.material-nav-btn::before { background: var(--accent-btn-bg) !important; }
+
 html.light-mode .material-nav-btn:hover,
 html.light-mode .material-nav-btn:focus-visible,
 html.light-mode .home-btn.material-nav-btn:hover,
 html.light-mode .home-btn.material-nav-btn:focus-visible {
-    background: rgba(20, 13, 36, 0.16) !important;
+    background: transparent !important;
     border: 2.5px solid #000000 !important;
     color: #000000 !important;
     box-shadow: 0 6px 20px rgba(20, 13, 36, 0.22) !important;
 }
+
+html.light-mode .material-nav-btn:hover::before,
+html.light-mode .material-nav-btn:focus-visible::before,
+html.light-mode .home-btn.material-nav-btn:hover::before,
+html.light-mode .home-btn.material-nav-btn:focus-visible::before { background: var(--accent-btn-bg-hover) !important; }
 
 html.light-mode .material-nav-btn img,
 html.light-mode .home-btn img,

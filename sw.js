@@ -1,5 +1,5 @@
-// nexus-version: 4.45.5
-const CACHE_NAME = 'nexus-cache-v27';
+// nexus-version: 4.46.21
+const CACHE_NAME = 'nexus-cache-v39';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -22,6 +22,10 @@ const ASSETS_TO_CACHE = [
     './SpaceflightSimulator/TemplateData/style.css',
     './SpaceflightSimulator/TemplateData/favicon.ico',
     './style.css',
+    './style.css?v=88',
+    './home-widgets.css?v=11',
+    './home-widgets.js?v=7',
+    './online-presence.js?v=6',
     './app.js',
     './bgm-manager.js',
     './game-title-utils.js',
