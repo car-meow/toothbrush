@@ -1,5 +1,5 @@
-// nexus-version: 4.46.21
-const CACHE_NAME = 'nexus-cache-v39';
+// nexus-version: 4.46.22
+const CACHE_NAME = 'nexus-cache-v40';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',

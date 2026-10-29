@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.46.21 -->
+<!-- nexus-version: 4.46.22 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -212,7 +212,7 @@ html.light-mode .online-users-bubble {
 
 <div class="nexus-version-container" style="pointer-events: auto !important;">
     <button id="nexus-updates-button" class="nexus-version-tag nexus-updates-button" type="button" aria-label="Nexus Updates" aria-haspopup="dialog" aria-controls="nexus-updates-overlay" aria-expanded="false">
-        <span class="nexus-version-label">v4.46.21</span>
+        <span class="nexus-version-label">v4.46.22</span>
         <b id="nexus-updates-badge" class="nexus-updates-badge" aria-hidden="true" hidden></b>
     </button>
 </div>
@@ -240,6 +240,12 @@ html.light-mode .online-users-bubble {
         </header>
         <div class="nexus-updates-panels">
             <section id="nexus-updates-panel-games" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-games" data-update-panel="games" hidden>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.46.22</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry" data-update-notification="v4.46.22-games-mrmine"><div class="nexus-update-entry-heading"><h3>Mr. Mine asset loading</h3><span class="nexus-update-category-label is-bugfix">BUGFIX</span></div><p>Slow Chromebook image requests now get more time to finish before retrying. Failed assets can also load from an independent GitHub mirror.</p></li>
+                    </ul>
+                </div>
                 <div class="nexus-update-release">
                     <div class="nexus-update-version"><span>v4.45.6</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
                     <ul class="nexus-update-list">
@@ -348,7 +354,7 @@ html.light-mode .online-users-bubble {
 <script src="tutorial-engine.js?v=2"></script>
 <script src="nexus-profile.js?v=4"></script>
 <script src="nexus-welcome.js?v=19"></script>
-<script src="online-presence.js?v=6" defer></script>
-<script src="home-widgets.js?v=7" defer></script>
+<script src="online-presence.js?v=7" defer></script>
+<script src="home-widgets.js?v=8" defer></script>
 </body>
 </html>

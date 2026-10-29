@@ -1,4 +1,4 @@
-// nexus-version: 4.46.21
+// nexus-version: 4.46.22
 const appStorage = window.nexusStorage || window.localStorage;
 // Game Stash is always available during a Games visit. Release its frame only
 // while the lightweight game standby screen is active.
@@ -1882,11 +1882,15 @@ function isMrMineGame(game) {
 }
 
 function getMrMineMirrorHtml(html, attempt) {
-    const mirrorHosts = ['fastly.jsdelivr.net', 'gcore.jsdelivr.net'];
-    const mirrorHost = mirrorHosts[attempt];
-    if (!html || !mirrorHost) return null;
-    const basePattern = /https:\/\/(?:cdn|fastly|gcore)\.jsdelivr\.net\/gh\/bubbls\/UGS-Assets@main\/mr-mine\//ig;
-    const mirroredHtml = String(html).replace(basePattern, `https://${mirrorHost}/gh/bubbls/UGS-Assets@main/mr-mine/`);
+    const mirrorBases = [
+        'https://fastly.jsdelivr.net/gh/bubbls/UGS-Assets@main/mr-mine/',
+        'https://gcore.jsdelivr.net/gh/bubbls/UGS-Assets@main/mr-mine/',
+        'https://raw.githubusercontent.com/bubbls/UGS-Assets/main/mr-mine/'
+    ];
+    const mirrorBase = mirrorBases[attempt];
+    if (!html || !mirrorBase) return null;
+    const basePattern = /https:\/\/(?:cdn|fastly|gcore)\.jsdelivr\.net\/gh\/bubbls\/UGS-Assets@main\/mr-mine\/|https:\/\/raw\.githubusercontent\.com\/bubbls\/UGS-Assets\/main\/mr-mine\//ig;
+    const mirroredHtml = String(html).replace(basePattern, mirrorBase);
     return mirroredHtml === html ? null : mirroredHtml;
 }
 
@@ -1915,6 +1919,7 @@ function getGameLaunchDiagnostics(gameId, loadToken, options = {}) {
         var loadToken=${Number(loadToken) || 0};
         var captureMrMineAssets=${Boolean(options.captureMrMineAssets)};
         var reported=false;
+        var mrMineAssetFailureReported=false;
         var gameReady=false;
         window.addEventListener('nexus-game-ready',function(){gameReady=true;});
         window.addEventListener('load',function(){setTimeout(function(){gameReady=true;},30000);},{once:true});
@@ -1924,7 +1929,20 @@ function getGameLaunchDiagnostics(gameId, loadToken, options = {}) {
             try{window.parent.postMessage({type:'nexus-game-launch-error',gameId:gameId,loadToken:loadToken,kind:kind,message:String(message||'Game startup failed').slice(0,500)},'*');}catch(e){}
         }
         function isMrMineAssetUrl(url){
-            return /https:\\/\\/(?:cdn|fastly|gcore)\\.jsdelivr\\.net\\/gh\\/bubbls\\/UGS-Assets@main\\/mr-mine\\//i.test(String(url||''));
+            try{
+                var parsed=new URL(String(url||''),document.baseURI);
+                var host=parsed.hostname.toLowerCase();
+                var supportedHost=host==='cdn.jsdelivr.net'||host==='fastly.jsdelivr.net'||host==='gcore.jsdelivr.net'||host==='raw.githubusercontent.com';
+                return supportedHost&&parsed.pathname.toLowerCase().indexOf('/mr-mine/')!==-1;
+            }catch(e){return false;}
+        }
+        if(captureMrMineAssets){
+            window.__nexusReportMrMineAssetFailure=function(url,reason){
+                if(mrMineAssetFailureReported)return;
+                mrMineAssetFailureReported=true;
+                var message='Required Mr. Mine asset failed after all mirror attempts: '+String(url||'unknown asset')+(reason?' ('+String(reason)+')':'');
+                try{window.parent.postMessage({type:'nexus-game-launch-error',gameId:gameId,loadToken:loadToken,kind:'resource-exhausted',message:message.slice(0,500)},'*');}catch(e){}
+            };
         }
         if(captureMrMineAssets&&window.MutationObserver){
             var trackedAssets=new WeakSet();
@@ -2184,15 +2202,30 @@ function launchGameFullscreen(game) {
         let directFallbackUrl = null;
         let unmodifiedHtml = null;
         let mrMineMirrorAttempt = 0;
-        const showPopupLoadError = () => {
+        const showPopupLoadError = (detail = '') => {
             if (!win.document || !win.document.body) return;
             let panel = win.document.getElementById('nexus-game-load-error');
+            if (panel && detail && isMrMineGame(game)) {
+                const label = panel.firstElementChild;
+                const match = String(detail).match(/https?:\/\/([^/\s)]+)/i);
+                if (label) {
+                    label.textContent = 'Mr. Mine graphics failed (' + (match ? match[1] : 'asset CDN') + ').';
+                    label.title = String(detail).slice(0, 500);
+                }
+                return;
+            }
             if (!panel) {
                 panel = win.document.createElement('div');
                 panel.id = 'nexus-game-load-error';
                 panel.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#10131c;color:#fff;font:600 16px system-ui;text-align:center;padding:24px;box-sizing:border-box';
                 const label = win.document.createElement('div');
-                label.textContent = 'This game could not start.';
+                if (detail && isMrMineGame(game)) {
+                    const match = String(detail).match(/https?:\/\/([^/\s)]+)/i);
+                    label.textContent = 'Mr. Mine graphics failed (' + (match ? match[1] : 'asset CDN') + ').';
+                    label.title = String(detail).slice(0, 500);
+                } else {
+                    label.textContent = 'This game could not start.';
+                }
                 const retry = win.document.createElement('button');
                 retry.textContent = 'Retry game';
                 retry.style.cssText = 'padding:10px 22px;border:0;border-radius:8px;background:#fff;color:#111;font:700 15px system-ui;cursor:pointer';
@@ -2218,7 +2251,10 @@ function launchGameFullscreen(game) {
                     launchFrame.srcdoc = mirrorHtml;
                     return;
                 }
-                if (mrMineMirrorAttempt > 0 || detail.kind === 'resource' || detail.kind === 'resource-timeout') return;
+                if (detail.kind === 'resource' || detail.kind === 'resource-timeout' || detail.kind === 'resource-exhausted') {
+                    showPopupLoadError(detail.message);
+                    return;
+                }
             }
             if (injectedLaunch && !directFallbackTried && launchFrame) {
                 directFallbackTried = true;
@@ -3187,7 +3223,11 @@ window.addEventListener('message', event => {
             frame.srcdoc = mirrorHtml;
             return;
         }
-        if ((activeGameLaunch.mrMineMirrorAttempt || 0) > 0 || detail.kind === 'resource' || detail.kind === 'resource-timeout') return;
+        if (detail.kind === 'resource' || detail.kind === 'resource-timeout' || detail.kind === 'resource-exhausted') {
+            completeHostLoader();
+            showGameLoadError(activeGameLaunch.game, frame, detail.message);
+            return;
+        }
     }
 
     if (activeGameLaunch.injected && !activeGameLaunch.directFallbackTried) {
@@ -3273,14 +3313,22 @@ function updateGameStatusUI(state) {
     }
 }
 
-function showGameLoadError(game, frame) {
+function showGameLoadError(game, frame, detail = '') {
     const container = document.getElementById('game-status-container');
     const icon = document.getElementById('game-status-icon');
     const text = document.getElementById('game-status-text');
     if (!container || !icon || !text) return;
     if (gameStatusFadeTimer) clearTimeout(gameStatusFadeTimer);
     icon.src = 'Assets/Delete.svg';
-    text.textContent = 'Load failed - Retry';
+    if (detail && isMrMineGame(game)) {
+        const match = String(detail).match(/https?:\/\/([^/\s)]+)/i);
+        const host = match ? match[1] : 'asset CDN';
+        text.textContent = 'Mr. Mine graphics failed (' + host + ') - Retry';
+        text.title = String(detail).slice(0, 500);
+    } else {
+        text.textContent = 'Load failed - Retry';
+        text.removeAttribute('title');
+    }
     container.style.opacity = '1';
     container.style.visibility = 'visible';
     container.classList.add('active');

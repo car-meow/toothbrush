@@ -11,24 +11,37 @@
 
 <head>
 <script>
-// Retry stalled Mr. Mine images through another jsDelivr route before using
-// an empty image, so one filtered or stuck CDN request cannot hold up startup.
+// Give slower devices time to finish large sprites before changing their URL.
+// If the CDN actually fails, retry through independent asset mirrors.
 (function () {
 	var fallbackImage = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
-	var retryDelayMs = 12000;
+	var retryDelayMs = 30000;
 	var imageStates = new WeakMap();
+	function isMrMineAssetUrl(url) {
+		try {
+			var parsed = new URL(url, document.baseURI);
+			var host = parsed.hostname.toLowerCase();
+			var supportedHost = host === 'cdn.jsdelivr.net' || host === 'fastly.jsdelivr.net' ||
+				host === 'gcore.jsdelivr.net' || host === 'raw.githubusercontent.com';
+			return supportedHost && parsed.pathname.toLowerCase().indexOf('/mr-mine/') !== -1;
+		} catch (e) { return false; }
+	}
 	function getMirrorUrl(url) {
 		try {
 			var parsed = new URL(url, document.baseURI);
 			if (parsed.hostname === 'cdn.jsdelivr.net') parsed.hostname = 'fastly.jsdelivr.net';
 			else if (parsed.hostname === 'fastly.jsdelivr.net') parsed.hostname = 'gcore.jsdelivr.net';
+			else if (parsed.hostname === 'gcore.jsdelivr.net') {
+				parsed.hostname = 'raw.githubusercontent.com';
+				parsed.pathname = parsed.pathname.replace(/^\/gh\/bubbls\/UGS-Assets@main\//i, '/bubbls/UGS-Assets/main/');
+			}
 			else return null;
 			return parsed.href;
 		} catch (e) { return null; }
 	}
 	function watchImage(image) {
 		var requestUrl = image.src;
-		if (!requestUrl || requestUrl.indexOf('data:') === 0 || requestUrl.indexOf('blob:') === 0) return;
+		if (!requestUrl || requestUrl.indexOf('data:') === 0 || requestUrl.indexOf('blob:') === 0 || !isMrMineAssetUrl(requestUrl)) return;
 		var previous = imageStates.get(image);
 		if (previous && previous.url === requestUrl) return;
 		if (previous && previous.timer) clearTimeout(previous.timer);
@@ -44,7 +57,12 @@
 		var retryOrFallback = function () {
 			if (imageStates.get(image) !== state || image.src !== requestUrl) return;
 			clearTimer();
+			if (image.complete && image.naturalWidth > 0) return;
 			var mirrorUrl = getMirrorUrl(requestUrl);
+			if (!mirrorUrl && window.__nexusReportMrMineAssetFailure) {
+				window.__nexusReportMrMineAssetFailure(requestUrl, 'network request failed or exceeded 30 seconds');
+			}
+			if (mirrorUrl && mirrorUrl.indexOf('https://raw.githubusercontent.com/') === 0) image.crossOrigin = 'anonymous';
 			image.src = mirrorUrl || fallbackImage;
 		};
 		state.timer = setTimeout(retryOrFallback, retryDelayMs);

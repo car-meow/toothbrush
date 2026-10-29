@@ -80,8 +80,6 @@
         try { storage.setItem(key, value); } catch (_) {}
     }
 
-    function presenceEnabled() { return readStorage('tb_online_count_enabled') !== 'false'; }
-
     function defaultState() {
         const widgets = {};
         const candidates = [
@@ -91,7 +89,6 @@
             ['version', Math.max(0, columns - 2), Math.max(0, rows - 1)]
         ];
         candidates.forEach(([id, col, row]) => {
-            if (id === 'active-users' && !presenceEnabled()) return;
             const location = findPlacement(id, { col, row }, widgets);
             if (location) widgets[id] = location;
         });
@@ -150,9 +147,7 @@
         bubble.setAttribute('role', 'status');
         bubble.setAttribute('aria-live', 'polite');
         bubble.setAttribute('aria-label', 'Active Nexus users');
-        bubble.innerHTML = presenceEnabled()
-            ? '<span id="online-users-count">—</span>&nbsp;online'
-            : '<span id="online-users-count">Online count off</span>';
+        bubble.innerHTML = '<span id="online-users-count">—</span>&nbsp;online';
         return bubble;
     }
 
@@ -802,5 +797,6 @@
         themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
         sanitizePositions();
         if (!readStorage(STORAGE_KEY)) saveState();
+        notifyOnlineWidgetChange();
     }, { once: true });
 })();
