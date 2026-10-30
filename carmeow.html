@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>New Tab</title>
-    <link rel="stylesheet" href="style.css?v=61">
+    <link rel="stylesheet" href="style.css?v=64">
     <script src="bgm-manager.js?v=64"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
@@ -111,15 +111,25 @@
 
     <!-- Saves Selection Overlay -->
     <div id="saves-select-overlay" class="overlay" style="display:none; z-index:32000;">
-        <div class="modal-box saves-modal-box" style="width: 520px; max-width: 92vw; text-align: left;">
-            <h2 id="saves-select-title" class="saves-modal-title">Clear Game Saves</h2>
-            <p id="saves-select-hint" class="saves-modal-hint">Select saves to clear. Dashed icons mark games that are no longer in your sidebar.</p>
-            <div style="display:flex; gap:8px; margin-bottom:12px;">
-                <button id="saves-select-all" class="backup-modal-btn saves-btn-all">Select All</button>
-                <button id="saves-select-none" class="backup-modal-btn saves-btn-none">Select None</button>
+        <div class="modal-box saves-modal-box" style="width: 780px; max-width: 95vw; text-align: left;">
+            <h2 id="saves-select-title" class="saves-modal-title">Nexus Game Saves Manager</h2>
+            <div id="saves-game-list" class="saves-game-columns">
+                <section class="saves-game-column" data-saves-column="sidebar">
+                    <div class="saves-game-column-header">
+                        <h3 class="saves-game-column-title"><img src="Assets/yesAdded.png" alt="">Games on Sidebar</h3>
+                        <button id="saves-sidebar-select-all" class="backup-modal-btn saves-btn-all saves-column-select-all" type="button">Select All</button>
+                    </div>
+                    <div id="saves-sidebar-games" class="saves-game-column-list"></div>
+                </section>
+                <section class="saves-game-column" data-saves-column="off-sidebar">
+                    <div class="saves-game-column-header">
+                        <h3 class="saves-game-column-title"><img src="Assets/notAdded.png?v=1" alt="">Games Not on Sidebar:</h3>
+                        <button id="saves-off-sidebar-select-all" class="backup-modal-btn saves-btn-all saves-column-select-all" type="button">Select All</button>
+                    </div>
+                    <div id="saves-off-sidebar-games" class="saves-game-column-list"></div>
+                </section>
             </div>
-            <div id="saves-game-list" style="max-height: 38vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;"></div>
-            <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <div class="saves-modal-actions">
                 <button id="saves-select-cancel" class="backup-modal-btn saves-cancel-btn">Cancel</button>
                 <button id="saves-select-confirm" class="backup-modal-btn saves-clear-btn">Clear Saves</button>
             </div>
@@ -128,7 +138,7 @@
 
     <script src="tutorial-engine.js?v=2"></script>
     <script src="game-title-utils.js?v=48"></script>
-    <script src="app.js?v=67"></script>
+    <script src="app.js?v=68"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (window.TutorialEngine) TutorialEngine.initGames();

@@ -1641,24 +1641,28 @@ iframe {
 }
 
 #backup-game-list::-webkit-scrollbar,
-#saves-game-list::-webkit-scrollbar {
+#saves-game-list::-webkit-scrollbar,
+.saves-game-column-list::-webkit-scrollbar {
     width: 6px;
 }
 
 #backup-game-list::-webkit-scrollbar-track,
-#saves-game-list::-webkit-scrollbar-track {
+#saves-game-list::-webkit-scrollbar-track,
+.saves-game-column-list::-webkit-scrollbar-track {
     background: var(--input-bg);
     border-radius: 4px;
 }
 
 #backup-game-list::-webkit-scrollbar-thumb,
-#saves-game-list::-webkit-scrollbar-thumb {
+#saves-game-list::-webkit-scrollbar-thumb,
+.saves-game-column-list::-webkit-scrollbar-thumb {
     background: var(--border-color);
     border-radius: 4px;
 }
 
 #backup-game-list::-webkit-scrollbar-thumb:hover,
-#saves-game-list::-webkit-scrollbar-thumb:hover {
+#saves-game-list::-webkit-scrollbar-thumb:hover,
+.saves-game-column-list::-webkit-scrollbar-thumb:hover {
     background: #ffffff;
 }
 
@@ -1667,10 +1671,18 @@ iframe {
    ========================================= */
 .saves-modal-title {
     color: var(--title-color, #ffffff);
+    text-align: center;
     margin-top: 0;
     margin-bottom: 6px;
+    padding-bottom: 12px;
     font-size: 22px;
     font-weight: 700;
+}
+
+.saves-modal-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
 }
 
 .saves-modal-hint {
@@ -1679,13 +1691,76 @@ iframe {
     margin-bottom: 14px;
 }
 
-.saves-list-section-title {
-    color: var(--muted-text, #9e93b8);
-    font-size: 12px;
+.saves-game-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    max-height: 55vh;
+    min-height: 250px;
+    margin-bottom: 16px;
+}
+
+.saves-game-column {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+.saves-game-column-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 40px;
+}
+
+.saves-game-column-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    margin: 0;
+    color: var(--title-color, #ffffff);
+    font-size: 15px;
     font-weight: 700;
-    letter-spacing: 0.04em;
-    padding: 4px 2px 0;
-    text-transform: uppercase;
+}
+
+.saves-game-column-title img {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+}
+
+.saves-column-select-all {
+    flex: 0 0 auto;
+    padding: 8px 11px !important;
+    font-size: 12px !important;
+    white-space: nowrap;
+}
+
+.saves-column-select-all:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.saves-game-column-list {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 180px;
+    max-height: 42vh;
+    overflow-y: auto;
+    padding: 2px 4px 2px 0;
+}
+
+.saves-list-empty {
+    padding: 16px 10px;
+    color: var(--muted-text, #9e93b8);
+    font-size: 13px;
+    text-align: center;
 }
 
 .saves-list-error {
@@ -1720,27 +1795,41 @@ iframe {
     backface-visibility: hidden;
 }
 
-.saves-item-icon-frame {
-    align-items: center;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+.saves-item-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.saves-item-delete-toggle {
     display: inline-flex;
-    flex: 0 0 32px;
-    height: 32px;
+    flex: 0 0 34px;
+    align-items: center;
     justify-content: center;
-    width: 32px;
+    width: 34px;
+    height: 34px;
+    margin-left: auto;
+    padding: 4px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.12s ease;
 }
 
-.saves-item-icon-frame.is-off-sidebar {
-    border-style: dashed;
-    border-color: var(--muted-text, #9e93b8);
+.saves-item-delete-toggle:hover,
+.saves-item-delete-toggle:focus-visible {
+    background: rgba(255, 255, 255, 0.1);
 }
 
-.saves-item-icon {
+.saves-item-delete-toggle:active {
+    transform: scale(0.94);
+}
+
+.saves-item-delete-toggle img {
     filter: var(--icon-filter);
-    height: 21px;
-    width: 21px;
+    width: 22px;
+    height: 22px;
 }
 
 .saves-item-label:hover {
@@ -1756,19 +1845,6 @@ iframe {
 .saves-item-label.saves-selected .saves-item-text {
     color: #ff6b6b !important;
     font-weight: 700 !important;
-}
-
-.saves-item-checkbox {
-    width: 17px;
-    height: 17px;
-    cursor: pointer;
-    accent-color: #ffffff;
-    flex-shrink: 0;
-    transition: accent-color 0.15s;
-}
-
-.saves-item-label.saves-selected .saves-item-checkbox {
-    accent-color: #ff3333 !important;
 }
 
 .saves-clear-btn {
@@ -1793,6 +1869,19 @@ iframe {
     background: #5d4a82 !important;
 }
 
+@media (max-width: 700px) {
+    .saves-game-columns {
+        grid-template-columns: minmax(0, 1fr);
+        max-height: none;
+        min-height: 0;
+    }
+
+    .saves-game-column-list {
+        min-height: 120px;
+        max-height: 28vh;
+    }
+}
+
 /* Light mode adaptations for Saves modal */
 html.light-mode .saves-modal-title {
     color: var(--title-color, #140d24) !important;
@@ -1800,6 +1889,14 @@ html.light-mode .saves-modal-title {
 
 html.light-mode .saves-modal-hint {
     color: var(--muted-text, #4a3c66) !important;
+}
+
+html.light-mode .saves-game-column-title {
+    color: var(--title-color, #140d24);
+}
+
+html.light-mode .saves-list-empty {
+    color: var(--muted-text, #4a3c66);
 }
 
 html.light-mode .saves-list-error {
@@ -1813,16 +1910,6 @@ html.light-mode .saves-btn-all {
 
 html.light-mode .saves-btn-all:hover {
     background: #2a1b4e !important;
-}
-
-html.light-mode .saves-btn-none {
-    background: #ded4eb !important;
-    color: #140d24 !important;
-    border: 1px solid var(--border-color, #4a366e) !important;
-}
-
-html.light-mode .saves-btn-none:hover {
-    background: #cfc1e3 !important;
 }
 
 html.light-mode .saves-item-label {
@@ -1843,10 +1930,6 @@ html.light-mode .saves-item-label.saves-selected {
 html.light-mode .saves-item-label.saves-selected .saves-item-text {
     color: #b71c1c !important;
     font-weight: 700 !important;
-}
-
-html.light-mode .saves-item-label.saves-selected .saves-item-checkbox {
-    accent-color: #c62828 !important;
 }
 
 html.light-mode .saves-clear-btn {

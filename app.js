@@ -4156,76 +4156,97 @@ async function clearGameSaves(gameIds) {
 
 function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError = null) {
     const overlay = document.getElementById('saves-select-overlay');
-    const list = document.getElementById('saves-game-list');
-    if (!overlay || !list) return Promise.resolve(null);
-    list.innerHTML = '';
+    const sidebarList = document.getElementById('saves-sidebar-games');
+    const offSidebarList = document.getElementById('saves-off-sidebar-games');
+    if (!overlay || !sidebarList || !offSidebarList) return Promise.resolve(null);
+    sidebarList.innerHTML = '';
+    offSidebarList.innerHTML = '';
 
     const sidebarItems = gameList || [];
     const offSidebarItems = offSidebarGames || [];
     const aliasesById = new Map();
-    const appendSection = (title, items, offSidebar = false) => {
-        if (!items.length) return;
-        const heading = document.createElement('div');
-        heading.className = 'saves-list-section-title';
-        heading.textContent = title;
-        list.appendChild(heading);
+    const refreshColumnToggle = column => {
+        const button = column.querySelector('.saves-column-select-all');
+        const toggles = Array.from(column.querySelectorAll('.saves-item-delete-toggle'));
+        const allSelected = toggles.length > 0 && toggles.every(toggle => toggle.getAttribute('aria-checked') === 'true');
+        if (button) {
+            button.textContent = allSelected ? 'Deselect All' : 'Select All';
+            button.disabled = toggles.length === 0;
+        }
+    };
+    const setSelected = (toggle, selected) => {
+        const isSelected = Boolean(selected);
+        const row = toggle.closest('.saves-item-label');
+        const gameTitle = toggle.dataset.gameTitle || 'game';
+        toggle.setAttribute('aria-checked', String(isSelected));
+        toggle.setAttribute('aria-label', isSelected
+            ? `Remove ${gameTitle} from the delete selection`
+            : `Select ${gameTitle} for deletion`);
+        row?.classList.toggle('saves-selected', isSelected);
+        const column = toggle.closest('.saves-game-column');
+        if (column) refreshColumnToggle(column);
+    };
+    const appendItems = (container, items, emptyText) => {
+        if (!items.length) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'saves-list-empty';
+            emptyMsg.textContent = emptyText;
+            container.appendChild(emptyMsg);
+            return;
+        }
 
         items.forEach(game => {
-            const label = document.createElement('label');
-            label.className = 'saves-item-label';
-            if (offSidebar || game.offSidebar) label.classList.add('saves-item-off-sidebar');
+            const row = document.createElement('div');
+            row.className = 'saves-item-label';
 
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.className = 'saves-item-checkbox';
-            checkbox.value = String(game.id);
-            checkbox.checked = false;
-            aliasesById.set(checkbox.value, game.offSidebar
+            const gameId = String(game.id);
+            const gameTitle = (typeof getSidebarTitle === 'function' ? getSidebarTitle(game) : '') || game.title || game.id;
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'saves-item-delete-toggle';
+            toggle.value = gameId;
+            toggle.dataset.gameTitle = String(gameTitle);
+            toggle.setAttribute('role', 'checkbox');
+            toggle.setAttribute('aria-checked', 'false');
+            toggle.setAttribute('aria-label', `Select ${gameTitle} for deletion`);
+
+            const icon = document.createElement('img');
+            icon.src = 'Assets/Delete.svg';
+            icon.alt = '';
+            icon.draggable = false;
+            toggle.appendChild(icon);
+
+            aliasesById.set(gameId, game.offSidebar
                 ? (game.aliases || [game.id]).map(String)
                 : [String(game.id)]);
 
-            const iconFrame = document.createElement('span');
-            iconFrame.className = 'saves-item-icon-frame';
-            if (offSidebar || game.offSidebar) {
-                iconFrame.classList.add('is-off-sidebar');
-                iconFrame.title = 'Saved on this device, but not in your sidebar';
-            }
-
-            const icon = document.createElement('img');
-            icon.className = 'saves-item-icon';
-            icon.src = 'Assets/Game.svg';
-            icon.alt = '';
-            iconFrame.appendChild(icon);
-
             const text = document.createElement('span');
             text.className = 'saves-item-text';
-            text.textContent = (typeof getSidebarTitle === 'function' ? getSidebarTitle(game) : '') || game.title || game.id;
+            text.textContent = gameTitle;
 
-            const updateVisual = () => {
-                label.classList.toggle('saves-selected', checkbox.checked);
-            };
-            checkbox.addEventListener('change', updateVisual);
-            label.append(checkbox, iconFrame, text);
-            list.appendChild(label);
+            toggle.addEventListener('click', () => {
+                setSelected(toggle, toggle.getAttribute('aria-checked') !== 'true');
+            });
+            row.addEventListener('click', event => {
+                if (event.target.closest('button')) return;
+                setSelected(toggle, toggle.getAttribute('aria-checked') !== 'true');
+            });
+            row.append(text, toggle);
+            container.appendChild(row);
         });
     };
 
+    appendItems(sidebarList, sidebarItems, 'No games on the sidebar.');
     if (offSidebarReadError) {
         const errorMessage = document.createElement('div');
         errorMessage.className = 'saves-list-error';
         errorMessage.textContent = 'Saved games outside the sidebar could not be listed: ' + offSidebarReadError.message;
-        list.appendChild(errorMessage);
+        offSidebarList.appendChild(errorMessage);
+    } else {
+        appendItems(offSidebarList, offSidebarItems, 'No saved games outside the sidebar.');
     }
 
-    if (sidebarItems.length === 0 && offSidebarItems.length === 0 && !offSidebarReadError) {
-        const emptyMsg = document.createElement('div');
-        emptyMsg.style.cssText = 'padding: 16px; text-align: center; color: var(--muted-text, #9e93b8); font-size: 14px;';
-        emptyMsg.textContent = 'No saved games were found on this device.';
-        list.appendChild(emptyMsg);
-    } else {
-        appendSection('Games in your sidebar', sidebarItems);
-        appendSection('Saves for games not in your sidebar', offSidebarItems, true);
-    }
+    document.querySelectorAll('.saves-game-column').forEach(refreshColumnToggle);
 
     overlay.style.display = 'flex';
     if (window.setGamePopupState) window.setGamePopupState('saves-select-overlay', true);
@@ -4237,25 +4258,15 @@ function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError 
             resolve(value);
         };
 
-        const selectAllBtn = document.getElementById('saves-select-all');
-        if (selectAllBtn) {
-            selectAllBtn.onclick = () => {
-                list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-                    cb.checked = true;
-                    cb.closest('.saves-item-label')?.classList.add('saves-selected');
-                });
+        document.querySelectorAll('.saves-game-column').forEach(column => {
+            const button = column.querySelector('.saves-column-select-all');
+            if (!button) return;
+            button.onclick = () => {
+                const toggles = Array.from(column.querySelectorAll('.saves-item-delete-toggle'));
+                const allSelected = toggles.length > 0 && toggles.every(toggle => toggle.getAttribute('aria-checked') === 'true');
+                toggles.forEach(toggle => setSelected(toggle, !allSelected));
             };
-        }
-
-        const selectNoneBtn = document.getElementById('saves-select-none');
-        if (selectNoneBtn) {
-            selectNoneBtn.onclick = () => {
-                list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-                    cb.checked = false;
-                    cb.closest('.saves-item-label')?.classList.remove('saves-selected');
-                });
-            };
-        }
+        });
 
         const cancelBtn = document.getElementById('saves-select-cancel');
         if (cancelBtn) cancelBtn.onclick = () => finish(null);
@@ -4263,8 +4274,8 @@ function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError 
         const confirmBtn = document.getElementById('saves-select-confirm');
         if (confirmBtn) {
             confirmBtn.onclick = () => {
-                const checked = Array.from(list.querySelectorAll('input[type="checkbox"]:checked'));
-                const selectedAliases = checked.flatMap(cb => aliasesById.get(cb.value) || [cb.value]);
+                const selectedToggles = Array.from(overlay.querySelectorAll('.saves-item-delete-toggle[aria-checked="true"]'));
+                const selectedAliases = selectedToggles.flatMap(toggle => aliasesById.get(toggle.value) || [toggle.value]);
                 finish(Array.from(new Set(selectedAliases)));
             };
         }

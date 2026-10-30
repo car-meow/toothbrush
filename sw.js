@@ -1,5 +1,5 @@
 // nexus-version: 4.46.24
-const CACHE_NAME = 'nexus-cache-v43';
+const CACHE_NAME = 'nexus-cache-v47';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -22,13 +22,13 @@ const ASSETS_TO_CACHE = [
     './SpaceflightSimulator/TemplateData/style.css',
     './SpaceflightSimulator/TemplateData/favicon.ico',
     './style.css',
-    './style.css?v=61',
-    './style.css?v=89',
+    './style.css?v=64',
+    './style.css?v=92',
     './home-widgets.css?v=11',
     './home-widgets.js?v=7',
     './online-presence.js?v=6',
     './app.js',
-    './app.js?v=67',
+    './app.js?v=68',
     './bgm-manager.js',
     './game-title-utils.js',
     './tutorial-engine.js',
@@ -73,9 +73,11 @@ const ASSETS_TO_CACHE = [
     './Assets/drive_cloak.png',
     './Assets/loadingRoll.gif',
     './Assets/mediaP.png',
+    './Assets/notAdded.png?v=1',
     './Assets/nexusLogo.png',
     './Assets/photoIcon.png',
     './Assets/pop.gif',
+    './Assets/yesAdded.png',
     './Assets/tutorial.pdf',
     './Assets/performanceBG.jpg',
     './Assets/performanceBGlight.jpg'
