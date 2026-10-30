@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.46.21 -->
+<!-- nexus-version: 4.46.24 -->
 <!doctype html>
 <html lang="en-us">
 <head>
@@ -547,14 +547,6 @@
                 }
 
                 var savedAt = incomingSavedAt;
-                var history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
-                if (existing && existing.localStorage) {
-                  history.push({
-                    localStorage: existing.localStorage,
-                    savedAt: existing.savedAt || savedAt
-                  });
-                }
-
                 gameAliases.forEach(function(targetId) {
                   if (!targetId) return;
                   var record = {
@@ -562,8 +554,7 @@
                     localStorage: lsToSave,
                     fsData: fsToSave,
                     idbData: idbToSave,
-                    savedAt: savedAt,
-                    history: history
+                    savedAt: savedAt
                   };
                   try { store.put(record); } catch(err) {}
                 });

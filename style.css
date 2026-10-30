@@ -1679,6 +1679,22 @@ iframe {
     margin-bottom: 14px;
 }
 
+.saves-list-section-title {
+    color: var(--muted-text, #9e93b8);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 4px 2px 0;
+    text-transform: uppercase;
+}
+
+.saves-list-error {
+    color: #ffb4ab;
+    font-size: 13px;
+    line-height: 1.4;
+    padding: 10px 12px;
+}
+
 .saves-btn-all {
     background: #ffffff;
     color: #0b0713;
@@ -1702,6 +1718,29 @@ iframe {
     user-select: none;
     transform: translateZ(0);
     backface-visibility: hidden;
+}
+
+.saves-item-icon-frame {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    display: inline-flex;
+    flex: 0 0 32px;
+    height: 32px;
+    justify-content: center;
+    width: 32px;
+}
+
+.saves-item-icon-frame.is-off-sidebar {
+    border-style: dashed;
+    border-color: var(--muted-text, #9e93b8);
+}
+
+.saves-item-icon {
+    filter: var(--icon-filter);
+    height: 21px;
+    width: 21px;
 }
 
 .saves-item-label:hover {
@@ -1761,6 +1800,10 @@ html.light-mode .saves-modal-title {
 
 html.light-mode .saves-modal-hint {
     color: var(--muted-text, #4a3c66) !important;
+}
+
+html.light-mode .saves-list-error {
+    color: #9c332a;
 }
 
 html.light-mode .saves-btn-all {
@@ -5236,6 +5279,11 @@ html.performance-mode-lite .nexus-updates-overlay {
     color: #f3f4f6;
 }
 
+.nexus-update-category-label.is-major {
+    background: #a84300;
+    color: #fff4e5;
+}
+
 .nexus-update-version-rule {
     flex: 1 1 auto;
     height: 1px;
@@ -5369,6 +5417,11 @@ html.light-mode .nexus-update-category-label.is-style {
 html.light-mode .nexus-update-category-label.is-potential-fix {
     background: #e5e7eb;
     color: #374151;
+}
+
+html.light-mode .nexus-update-category-label.is-major {
+    background: #a84300;
+    color: #fff4e5;
 }
 
 html.light-mode .nexus-updates-header {

@@ -1,4 +1,4 @@
-// nexus-version: 4.46.22
+// nexus-version: 4.46.24
 const appStorage = window.nexusStorage || window.localStorage;
 // Game Stash is always available during a Games visit. Release its frame only
 // while the lightweight game standby screen is active.
@@ -679,6 +679,137 @@ async function getGameSnapshot(gameId) {
     });
 }
 
+function getSaveManagerSnapshotIdentity(gameId) {
+    const id = String(gameId || '');
+    let decoded = id;
+    if (id.toLowerCase().startsWith('bookmark_')) {
+        try { decoded = decodeURIComponent(id.slice('bookmark_'.length)); } catch (error) {}
+    }
+
+    let sourceKey = null;
+    let sourceFile = null;
+    if (decoded.toLowerCase().startsWith('stash:')) {
+        sourceKey = decoded;
+        sourceFile = decoded.slice(decoded.indexOf(':') + 1);
+    } else if (id.toLowerCase().startsWith('stash:')) {
+        sourceKey = id;
+        sourceFile = id.slice(id.indexOf(':') + 1);
+    } else if (decoded.includes('/') || /\.html?$/i.test(decoded)) {
+        sourceFile = decoded;
+        sourceKey = `stash:${decoded.toLowerCase()}`;
+    }
+
+    const aliases = new Set([id]);
+    if (!sourceFile) {
+        const title = typeof humanizeBookmarkDisplayName === 'function'
+            ? humanizeBookmarkDisplayName(id, true) || id
+            : id;
+        return { key: `id:${id.toLowerCase()}`, title, aliases };
+    }
+
+    sourceFile = sourceFile.replace(/\\/g, '/').replace(/^\/+/, '');
+    const sourceBase = sourceFile.replace(/\.html?$/i, '');
+    sourceKey = sourceKey || `stash:${sourceFile.toLowerCase()}`;
+    aliases.add(decoded);
+    aliases.add(sourceKey);
+    aliases.add(sourceFile);
+    aliases.add(sourceBase);
+    aliases.add(`bookmark_${encodeURIComponent(sourceKey)}`);
+
+    const leaf = sourceFile.split('/').pop() || sourceFile;
+    let title = leaf.replace(/\.html?$/i, '');
+    if (typeof humanizeBookmarkDisplayName === 'function') {
+        title = humanizeBookmarkDisplayName(leaf, true) || title;
+    }
+    return { key: `stash:${sourceFile.toLowerCase()}`, title, aliases };
+}
+
+async function getSavedGamesOutsideSidebar(sidebarGames) {
+    await initDB();
+    const snapshotIds = await new Promise((resolve, reject) => {
+        try {
+            const tx = db.transaction('gameSnapshots', 'readonly');
+            const req = tx.objectStore('gameSnapshots').openKeyCursor();
+            const ids = [];
+            req.onsuccess = event => {
+                const cursor = event.target.result;
+                if (!cursor) return resolve(ids);
+                ids.push(String(cursor.key));
+                cursor.continue();
+            };
+            req.onerror = () => reject(req.error || new Error('Could not read saved game names.'));
+            tx.onabort = () => reject(tx.error || new Error('Could not read saved game names.'));
+        } catch (error) {
+            reject(error);
+        }
+    });
+
+    const savedIdSet = new Set(snapshotIds);
+    const journalPrefix = 'tb_nexus_game_autosave:';
+    try {
+        const storage = window.nexusStorage || window.localStorage;
+        for (let i = 0; i < storage.length; i++) {
+            const key = storage.key(i);
+            if (!key || !key.startsWith(journalPrefix)) continue;
+            const encodedId = key.slice(journalPrefix.length);
+            try { savedIdSet.add(decodeURIComponent(encodedId)); } catch (error) { savedIdSet.add(encodedId); }
+        }
+    } catch (error) {}
+
+    const allSavedIds = Array.from(savedIdSet);
+    const idsByLowercase = new Map(allSavedIds.map(id => [id.toLowerCase(), id]));
+    const parents = new Map(allSavedIds.map(id => [id, id]));
+    const findRoot = id => {
+        let root = id;
+        while (parents.get(root) !== root) root = parents.get(root);
+        while (parents.get(id) !== id) {
+            const next = parents.get(id);
+            parents.set(id, root);
+            id = next;
+        }
+        return root;
+    };
+    const join = (left, right) => {
+        const leftRoot = findRoot(left);
+        const rightRoot = findRoot(right);
+        if (leftRoot !== rightRoot) parents.set(rightRoot, leftRoot);
+    };
+    const identities = new Map(allSavedIds.map(id => [id, getSaveManagerSnapshotIdentity(id)]));
+
+    allSavedIds.forEach(id => {
+        identities.get(id).aliases.forEach(alias => {
+            const matchingId = idsByLowercase.get(String(alias).toLowerCase());
+            if (matchingId) join(id, matchingId);
+        });
+    });
+
+    const groups = new Map();
+    allSavedIds.forEach(id => {
+        const root = findRoot(id);
+        let group = groups.get(root);
+        if (!group) {
+            group = { id, title: '', aliases: new Set() };
+            groups.set(root, group);
+        }
+        const identity = identities.get(id);
+        if (!group.title || identity.title.length > group.title.length) group.title = identity.title;
+        identity.aliases.forEach(alias => group.aliases.add(String(alias)));
+        group.aliases.add(id);
+    });
+
+    return Array.from(groups.values())
+        .filter(group => !Array.from(group.aliases).some(id =>
+            (sidebarGames || []).some(game => doesSnapshotBelongToGame({ gameId: id }, game))
+        ))
+        .map(group => ({
+            id: group.id,
+            title: group.title || group.id,
+            aliases: Array.from(group.aliases),
+            offSidebar: true
+        }))
+        .sort((a, b) => a.title.localeCompare(b.title));
+}
+
 async function saveGameSnapshot(gameId, payload, skipMirror = false) {
     if (!gameId || !payload || typeof payload !== 'object') return;
     if (!ownsGameSaveSession(gameId, payload.saveSessionId)) return;
@@ -785,21 +916,12 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
                 if (snapshotHashes.get(gameId) === sig && existing && Number(existing.savedAt) >= incomingSavedAt) return;
 
                 const savedAt = incomingSavedAt;
-                const history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
-                if (existing && existing.localStorage) {
-                    history.push({
-                        localStorage: existing.localStorage,
-                        savedAt: existing.savedAt || savedAt
-                    });
-                }
-
                 snapshotRecord = {
                     gameId,
                     localStorage: lsToSave,
                     fsData: fsToSave,
                     idbData: idbToSave,
-                    savedAt,
-                    history
+                    savedAt
                 };
                 signature = sig;
                 didSave = true;
@@ -1580,21 +1702,12 @@ function getUniversalAutosaveBridge(gameId, saveSessionId = null) {
                         }
 
                         var savedAt = incomingSavedAt;
-                        var history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
-                        if (existing && existing.localStorage) {
-                            history.push({
-                                localStorage: existing.localStorage,
-                                savedAt: existing.savedAt || savedAt
-                            });
-                        }
-
                         var record = {
                             gameId: targetId,
                             localStorage: lsToSave,
                             fsData: fsToSave,
                             idbData: idbToSave,
-                            savedAt: savedAt,
-                            history: history
+                            savedAt: savedAt
                         };
                         try { store.put(record); } catch(err) {}
                     };
@@ -2645,14 +2758,6 @@ function launchGameFullscreen(game) {
                                         }
 
                                         var savedAt = incomingSavedAt;
-                                        var history = Array.isArray(existing && existing.history) ? existing.history.slice(-2) : [];
-                                        if (existing && existing.localStorage) {
-                                            history.push({
-                                                localStorage: existing.localStorage,
-                                                savedAt: existing.savedAt || savedAt
-                                            });
-                                        }
-
                                         ids.forEach(function(targetId) {
                                             if (!targetId) return;
                                             var record = {
@@ -2660,8 +2765,7 @@ function launchGameFullscreen(game) {
                                                 localStorage: lsToSave,
                                                 fsData: fsToSave,
                                                 idbData: idbToSave,
-                                                savedAt: savedAt,
-                                                history: history
+                                                savedAt: savedAt
                                             };
                                             try { store.put(record); } catch(err) {}
                                         });
@@ -3887,12 +3991,17 @@ async function clearGameSaves(gameIds) {
         }
     });
 
-    // 1. Immediately disarm autosaves and issue wipe commands to active iframe and popups
+    const matchesSelectedGameId = gameId => {
+        const id = String(gameId || '');
+        return allAliases.has(id) || selectedGames.some(game => doesSnapshotBelongToGame({ gameId: id }, game));
+    };
+
+    // 1. Disarm and wipe only game contexts selected for clearing.
     const disarmMsg = { type: 'nexus-disarm-autosave' };
     const wipeMsg = { type: 'nexus-wipe-game-storage' };
 
     const frame = document.getElementById('game-frame');
-    if (frame && frame.contentWindow) {
+    if (frame && frame.contentWindow && currentGame && matchesSelectedGameId(currentGame.id)) {
         try {
             frame.contentWindow.postMessage(disarmMsg, '*');
             frame.contentWindow.postMessage(wipeMsg, '*');
@@ -3901,7 +4010,7 @@ async function clearGameSaves(gameIds) {
 
     activeGameSessions.forEach(session => {
         const win = session.win;
-        if (win && !win.closed) {
+        if (win && !win.closed && matchesSelectedGameId(session.gameId)) {
             try {
                 win.postMessage(disarmMsg, '*');
                 win.postMessage(wipeMsg, '*');
@@ -3917,7 +4026,7 @@ async function clearGameSaves(gameIds) {
     const idbDatabasesToWipe = new Set();
 
     // Check specific known game candidates
-    const isBalatro = selectedGames.some(g => {
+    const isBalatro = Array.from(allAliases).some(id => String(id).toLowerCase().includes('balatro')) || selectedGames.some(g => {
         const str = ((g.id || '') + ' ' + (g.title || '') + ' ' + (g.sourceFile || '')).toLowerCase();
         return str.includes('balatro');
     });
@@ -3987,6 +4096,7 @@ async function clearGameSaves(gameIds) {
     try {
         const ls = window.nexusStorage || window.localStorage;
         allAliases.forEach(alias => {
+            ls.removeItem(`tb_nexus_game_autosave:${encodeURIComponent(alias)}`);
             ls.removeItem(`tb_snap_${alias}`);
             ls.removeItem(`nexus_save_${alias}`);
             ls.removeItem(`save_${alias}`);
@@ -4004,12 +4114,7 @@ async function clearGameSaves(gameIds) {
     }
 
     // 7. If currently loaded game in main frame was cleared, wipe iframe local storage and reload fresh
-    const isCurrentGameCleared = currentGame && (
-        allAliases.has(String(currentGame.id)) ||
-        (currentGame.sourceKey && allAliases.has(String(currentGame.sourceKey))) ||
-        (currentGame.sourceFile && allAliases.has(String(currentGame.sourceFile))) ||
-        selectedGames.some(g => g.id === currentGame.id)
-    );
+    const isCurrentGameCleared = currentGame && matchesSelectedGameId(currentGame.id);
 
     if (isCurrentGameCleared && frame) {
         try {
@@ -4030,7 +4135,7 @@ async function clearGameSaves(gameIds) {
     activeGameSessions.forEach(session => {
         const win = session.win;
         const gameId = session.gameId;
-        if (win && !win.closed && (allAliases.has(String(gameId)) || selectedGames.some(g => String(g.id) === String(gameId)))) {
+        if (win && !win.closed && matchesSelectedGameId(gameId)) {
             try {
                 if (win.localStorage) {
                     const subLs = win.localStorage;
@@ -4049,45 +4154,77 @@ async function clearGameSaves(gameIds) {
     });
 }
 
-function openSavesSelection(gameList) {
+function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError = null) {
     const overlay = document.getElementById('saves-select-overlay');
     const list = document.getElementById('saves-game-list');
     if (!overlay || !list) return Promise.resolve(null);
     list.innerHTML = '';
 
-    if (!gameList || gameList.length === 0) {
-        const emptyMsg = document.createElement('div');
-        emptyMsg.style.cssText = 'padding: 16px; text-align: center; color: var(--muted-text, #9e93b8); font-size: 14px;';
-        emptyMsg.textContent = 'No games in your sidebar.';
-        list.appendChild(emptyMsg);
-    } else {
-        gameList.forEach(game => {
+    const sidebarItems = gameList || [];
+    const offSidebarItems = offSidebarGames || [];
+    const aliasesById = new Map();
+    const appendSection = (title, items, offSidebar = false) => {
+        if (!items.length) return;
+        const heading = document.createElement('div');
+        heading.className = 'saves-list-section-title';
+        heading.textContent = title;
+        list.appendChild(heading);
+
+        items.forEach(game => {
             const label = document.createElement('label');
             label.className = 'saves-item-label';
+            if (offSidebar || game.offSidebar) label.classList.add('saves-item-off-sidebar');
 
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.className = 'saves-item-checkbox';
-            checkbox.value = game.id;
+            checkbox.value = String(game.id);
             checkbox.checked = false;
+            aliasesById.set(checkbox.value, game.offSidebar
+                ? (game.aliases || [game.id]).map(String)
+                : [String(game.id)]);
+
+            const iconFrame = document.createElement('span');
+            iconFrame.className = 'saves-item-icon-frame';
+            if (offSidebar || game.offSidebar) {
+                iconFrame.classList.add('is-off-sidebar');
+                iconFrame.title = 'Saved on this device, but not in your sidebar';
+            }
+
+            const icon = document.createElement('img');
+            icon.className = 'saves-item-icon';
+            icon.src = 'Assets/Game.svg';
+            icon.alt = '';
+            iconFrame.appendChild(icon);
 
             const text = document.createElement('span');
             text.className = 'saves-item-text';
             text.textContent = (typeof getSidebarTitle === 'function' ? getSidebarTitle(game) : '') || game.title || game.id;
 
             const updateVisual = () => {
-                if (checkbox.checked) {
-                    label.classList.add('saves-selected');
-                } else {
-                    label.classList.remove('saves-selected');
-                }
+                label.classList.toggle('saves-selected', checkbox.checked);
             };
-
             checkbox.addEventListener('change', updateVisual);
-
-            label.append(checkbox, text);
+            label.append(checkbox, iconFrame, text);
             list.appendChild(label);
         });
+    };
+
+    if (offSidebarReadError) {
+        const errorMessage = document.createElement('div');
+        errorMessage.className = 'saves-list-error';
+        errorMessage.textContent = 'Saved games outside the sidebar could not be listed: ' + offSidebarReadError.message;
+        list.appendChild(errorMessage);
+    }
+
+    if (sidebarItems.length === 0 && offSidebarItems.length === 0 && !offSidebarReadError) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.style.cssText = 'padding: 16px; text-align: center; color: var(--muted-text, #9e93b8); font-size: 14px;';
+        emptyMsg.textContent = 'No saved games were found on this device.';
+        list.appendChild(emptyMsg);
+    } else {
+        appendSection('Games in your sidebar', sidebarItems);
+        appendSection('Saves for games not in your sidebar', offSidebarItems, true);
     }
 
     overlay.style.display = 'flex';
@@ -4127,7 +4264,8 @@ function openSavesSelection(gameList) {
         if (confirmBtn) {
             confirmBtn.onclick = () => {
                 const checked = Array.from(list.querySelectorAll('input[type="checkbox"]:checked'));
-                finish(checked.map(cb => cb.value));
+                const selectedAliases = checked.flatMap(cb => aliasesById.get(cb.value) || [cb.value]);
+                finish(Array.from(new Set(selectedAliases)));
             };
         }
     });
@@ -4208,7 +4346,15 @@ if (savesBtn) {
     savesBtn.onclick = async () => {
         // List games in the user's sidebar (excluding Game Stash)
         const sidebarGames = games.filter(g => g && g.id !== 'ugs-stash');
-        const selectedIds = await openSavesSelection(sidebarGames);
+        let offSidebarGames = [];
+        let offSidebarReadError = null;
+        try {
+            // Use the indexed key cursor so listing saves does not load large save values into memory.
+            offSidebarGames = await getSavedGamesOutsideSidebar(games);
+        } catch (error) {
+            offSidebarReadError = error;
+        }
+        const selectedIds = await openSavesSelection(sidebarGames, offSidebarGames, offSidebarReadError);
         if (!selectedIds || selectedIds.length === 0) return;
 
         // Show red popup confirmation dialog

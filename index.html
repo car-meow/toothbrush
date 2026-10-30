@@ -1,10 +1,10 @@
-<!-- nexus-version: 4.46.22 -->
+<!-- nexus-version: 4.46.24 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>New Tab</title>
-<link rel="stylesheet" href="style.css?v=88">
+<link rel="stylesheet" href="style.css?v=89">
 <link rel="stylesheet" href="home-widgets.css?v=11">
     <script src="bgm-manager.js?v=64"></script>
     <script src="nexus-transition.js?v=1"></script>
@@ -212,7 +212,7 @@ html.light-mode .online-users-bubble {
 
 <div class="nexus-version-container" style="pointer-events: auto !important;">
     <button id="nexus-updates-button" class="nexus-version-tag nexus-updates-button" type="button" aria-label="Nexus Updates" aria-haspopup="dialog" aria-controls="nexus-updates-overlay" aria-expanded="false">
-        <span class="nexus-version-label">v4.46.22</span>
+        <span class="nexus-version-label">v4.46.24</span>
         <b id="nexus-updates-badge" class="nexus-updates-badge" aria-hidden="true" hidden></b>
     </button>
 </div>
@@ -241,9 +241,16 @@ html.light-mode .online-users-bubble {
         <div class="nexus-updates-panels">
             <section id="nexus-updates-panel-games" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-games" data-update-panel="games" hidden>
                 <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.46.24</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry" data-update-notification="v4.46.24-games-save-manager"><div class="nexus-update-entry-heading"><h3>Save management and storage</h3><span class="nexus-update-category-label is-major">MAJOR</span><span class="nexus-update-category-label is-bugfix">BUGFIX</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>The Saves manager now lists saves for games that are no longer in the sidebar with dashed icons. Clearing a game removes its saved snapshots and autosave journal without wiping other open games. New saves also stop retaining two unused older localStorage snapshots, freeing space as games save again.</p></li>
+                    </ul>
+                </div>
+                <div class="nexus-update-release">
                     <div class="nexus-update-version"><span>v4.46.22</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
                     <ul class="nexus-update-list">
                         <li class="nexus-update-entry" data-update-notification="v4.46.22-games-mrmine"><div class="nexus-update-entry-heading"><h3>Mr. Mine asset loading</h3><span class="nexus-update-category-label is-bugfix">BUGFIX</span></div><p>Slow Chromebook image requests now get more time to finish before retrying. Failed assets can also load from an independent GitHub mirror.</p></li>
+                        <li class="nexus-update-entry" data-update-notification="v4.46.22-games-mrmine-textures"><div class="nexus-update-entry-heading"><h3>Mr. Mine texture loading</h3><span class="nexus-update-category-label is-potential-fix">POTENTIAL FIX</span></div><p>Mr. Mine textures (buttons and sprites) refused to load on some Chromebooks, so I bumped up the loading wait time and added some other buffers to hopefully let it load.</p></li>
                     </ul>
                 </div>
                 <div class="nexus-update-release">
@@ -263,8 +270,12 @@ html.light-mode .online-users-bubble {
             <section id="nexus-updates-panel-proxy" class="nexus-updates-panel nexus-updates-empty" role="tabpanel" aria-labelledby="nexus-updates-tab-proxy" data-update-panel="proxy" hidden>No updates in this section yet.</section>
             <section id="nexus-updates-panel-chat" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-chat" data-update-panel="chat" hidden>
                 <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.46.22</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.46.22-chat-message-loading-limits"><div class="nexus-update-entry-heading"><h3>Group message loading limits</h3><span class="nexus-update-category-label is-bugfix">BUGFIX</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Added message loading limits to decrease the amount of messages loaded at once in a group. Allows for faster loading.</p></li></ul>
+                </div>
+                <div class="nexus-update-release">
                     <div class="nexus-update-version"><span>v4.45.5</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
-                    <ul class="nexus-update-list"><li class="nexus-update-entry"><div class="nexus-update-entry-heading"><h3>Group chats</h3><span class="nexus-update-category-label is-new-feature">NEW FEATURE</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Create or join group chats and keep message history saved.</p></li></ul>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry"><div class="nexus-update-entry-heading"><h3>Group chats</h3><span class="nexus-update-category-label is-major">MAJOR</span><span class="nexus-update-category-label is-new-feature">NEW FEATURE</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Create or join group chats and keep message history saved.</p></li></ul>
                 </div>
                 <div class="nexus-update-release">
                     <div class="nexus-update-version"><span>v4.0</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
@@ -283,6 +294,10 @@ html.light-mode .online-users-bubble {
                 </div>
             </section>
             <section id="nexus-updates-panel-misc" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-misc" data-update-panel="misc" hidden>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.46.22</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.46.22-misc-online-users-widget"><div class="nexus-update-entry-heading"><h3>Online Users widget</h3><span class="nexus-update-category-label is-bugfix">BUGFIX</span></div><p>Fixed a rare bug where Online Users widget using computer resources when it wasn't even on screen, and not working when it was on screen.</p></li></ul>
+                </div>
                 <div class="nexus-update-release">
                     <div class="nexus-update-version"><span>v4.46.21</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
                     <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.46.21-misc-home-widgets"><div class="nexus-update-entry-heading"><h3>Homescreen widgets</h3><span class="nexus-update-category-label is-new-feature">NEW FEATURE</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Added a snap-to-grid widget editor with movable homescreen pills, a Performance Mode toggle, and an animated theme toggle.</p></li></ul>

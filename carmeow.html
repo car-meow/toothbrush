@@ -1,10 +1,10 @@
-<!-- nexus-version: 4.46.21 -->
+<!-- nexus-version: 4.46.24 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>New Tab</title>
-    <link rel="stylesheet" href="style.css?v=59">
+    <link rel="stylesheet" href="style.css?v=61">
     <script src="bgm-manager.js?v=64"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
@@ -113,7 +113,7 @@
     <div id="saves-select-overlay" class="overlay" style="display:none; z-index:32000;">
         <div class="modal-box saves-modal-box" style="width: 520px; max-width: 92vw; text-align: left;">
             <h2 id="saves-select-title" class="saves-modal-title">Clear Game Saves</h2>
-            <p id="saves-select-hint" class="saves-modal-hint">Select games to clear save data for.</p>
+            <p id="saves-select-hint" class="saves-modal-hint">Select saves to clear. Dashed icons mark games that are no longer in your sidebar.</p>
             <div style="display:flex; gap:8px; margin-bottom:12px;">
                 <button id="saves-select-all" class="backup-modal-btn saves-btn-all">Select All</button>
                 <button id="saves-select-none" class="backup-modal-btn saves-btn-none">Select None</button>
@@ -128,7 +128,7 @@
 
     <script src="tutorial-engine.js?v=2"></script>
     <script src="game-title-utils.js?v=48"></script>
-    <script src="app.js?v=66"></script>
+    <script src="app.js?v=67"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (window.TutorialEngine) TutorialEngine.initGames();
