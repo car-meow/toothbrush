@@ -1994,17 +1994,8 @@ function isMrMineGame(game) {
     return /clmrmine(?:\.html)?/.test(identity);
 }
 
-function getMrMineMirrorHtml(html, attempt) {
-    const mirrorBases = [
-        'https://fastly.jsdelivr.net/gh/bubbls/UGS-Assets@main/mr-mine/',
-        'https://gcore.jsdelivr.net/gh/bubbls/UGS-Assets@main/mr-mine/',
-        'https://raw.githubusercontent.com/bubbls/UGS-Assets/main/mr-mine/'
-    ];
-    const mirrorBase = mirrorBases[attempt];
-    if (!html || !mirrorBase) return null;
-    const basePattern = /https:\/\/(?:cdn|fastly|gcore)\.jsdelivr\.net\/gh\/bubbls\/UGS-Assets@main\/mr-mine\/|https:\/\/raw\.githubusercontent\.com\/bubbls\/UGS-Assets\/main\/mr-mine\//ig;
-    const mirroredHtml = String(html).replace(basePattern, mirrorBase);
-    return mirroredHtml === html ? null : mirroredHtml;
+function getMrMineLocalAssetBaseUrl() {
+    return new URL('singlefile-bubbls/UGS-Files/mr-mine/', getAppBaseUrl()).href;
 }
 
 function shouldInjectGamePersistence(game, url) {
@@ -2044,16 +2035,14 @@ function getGameLaunchDiagnostics(gameId, loadToken, options = {}) {
         function isMrMineAssetUrl(url){
             try{
                 var parsed=new URL(String(url||''),document.baseURI);
-                var host=parsed.hostname.toLowerCase();
-                var supportedHost=host==='cdn.jsdelivr.net'||host==='fastly.jsdelivr.net'||host==='gcore.jsdelivr.net'||host==='raw.githubusercontent.com';
-                return supportedHost&&parsed.pathname.toLowerCase().indexOf('/mr-mine/')!==-1;
+                return parsed.origin===window.location.origin&&parsed.pathname.toLowerCase().indexOf('/singlefile-bubbls/ugs-files/mr-mine/')!==-1;
             }catch(e){return false;}
         }
         if(captureMrMineAssets){
             window.__nexusReportMrMineAssetFailure=function(url,reason){
                 if(mrMineAssetFailureReported)return;
                 mrMineAssetFailureReported=true;
-                var message='Required Mr. Mine asset failed after all mirror attempts: '+String(url||'unknown asset')+(reason?' ('+String(reason)+')':'');
+                var message='Required local Mr. Mine file failed to load: '+String(url||'unknown asset')+(reason?' ('+String(reason)+')':'');
                 try{window.parent.postMessage({type:'nexus-game-launch-error',gameId:gameId,loadToken:loadToken,kind:'resource-exhausted',message:message.slice(0,500)},'*');}catch(e){}
             };
         }
@@ -2131,7 +2120,9 @@ async function fetchExternalGameHtml(url, bootstrap = '', options = {}) {
 
     // jsDelivr may serve HTML files as text/plain. Build a real HTML document
     // and resolve its relative resources from the directory that served it.
-    const baseHref = new URL('.', new URL(url, window.location.href)).href
+    const sourceUrl = new URL(url, window.location.href);
+    const isLocalMrMineDocument = isMrMineGame({ url });
+    const baseHref = (isLocalMrMineDocument ? getMrMineLocalAssetBaseUrl() : new URL('.', sourceUrl).href)
         .replace(/&/g, '&amp;')
         .replace(/"/g, '&quot;');
     const baseTag = '<base href="' + baseHref + '">';
@@ -2140,7 +2131,9 @@ async function fetchExternalGameHtml(url, bootstrap = '', options = {}) {
     // A page may deliberately host its assets from a different base path.
     // Preserve that declared path; use the source document directory only
     // when the HTML does not specify a base URL.
-    if (!existingBase.test(documentHtml)) {
+    if (isLocalMrMineDocument && existingBase.test(documentHtml)) {
+        documentHtml = documentHtml.replace(existingBase, baseTag);
+    } else if (!existingBase.test(documentHtml)) {
         if (/<head(?:\s[^>]*)?>/i.test(documentHtml)) {
             documentHtml = documentHtml.replace(/<head(?:\s[^>]*)?>/i, head => head + baseTag);
         } else {
@@ -2254,7 +2247,7 @@ async function resolveGameUrl(game) {
 }
 
 function applyGameRunMode(game) {
-    if (!game || !game.sourceFile) return game;
+    if (!game || isMrMineGame(game) || !game.sourceFile) return game;
     // Standalone Nexus pages registered as extra stash entries already have
     // their own local URL and must not be rewritten to the UGS CDN.
     if (game.nexusKeepLocalUrl) return game;
@@ -2314,7 +2307,6 @@ function launchGameFullscreen(game) {
         let directFallbackTried = false;
         let directFallbackUrl = null;
         let unmodifiedHtml = null;
-        let mrMineMirrorAttempt = 0;
         const showPopupLoadError = (detail = '') => {
             if (!win.document || !win.document.body) return;
             let panel = win.document.getElementById('nexus-game-load-error');
@@ -2322,7 +2314,7 @@ function launchGameFullscreen(game) {
                 const label = panel.firstElementChild;
                 const match = String(detail).match(/https?:\/\/([^/\s)]+)/i);
                 if (label) {
-                    label.textContent = 'Mr. Mine graphics failed (' + (match ? match[1] : 'asset CDN') + ').';
+                    label.textContent = 'Mr. Mine local files failed to load (' + (match ? match[1] : 'local assets') + ').';
                     label.title = String(detail).slice(0, 500);
                 }
                 return;
@@ -2334,7 +2326,7 @@ function launchGameFullscreen(game) {
                 const label = win.document.createElement('div');
                 if (detail && isMrMineGame(game)) {
                     const match = String(detail).match(/https?:\/\/([^/\s)]+)/i);
-                    label.textContent = 'Mr. Mine graphics failed (' + (match ? match[1] : 'asset CDN') + ').';
+                    label.textContent = 'Mr. Mine local files failed to load (' + (match ? match[1] : 'local assets') + ').';
                     label.title = String(detail).slice(0, 500);
                 } else {
                     label.textContent = 'This game could not start.';
@@ -2356,14 +2348,6 @@ function launchGameFullscreen(game) {
             const detail = event.data;
             if (!detail || detail.type !== 'nexus-game-launch-error' || String(detail.gameId) !== String(game.id) || Number(detail.loadToken) !== launchToken) return;
             if (isMrMineGame(game)) {
-                const mirrorHtml = getMrMineMirrorHtml(unmodifiedHtml, mrMineMirrorAttempt);
-                if (mirrorHtml && launchFrame) {
-                    mrMineMirrorAttempt += 1;
-                    console.warn('Mr. Mine startup hit an asset error; retrying on an alternate asset route:', detail.message);
-                    launchFrame.removeAttribute('src');
-                    launchFrame.srcdoc = mirrorHtml;
-                    return;
-                }
                 if (detail.kind === 'resource' || detail.kind === 'resource-timeout' || detail.kind === 'resource-exhausted') {
                     showPopupLoadError(detail.message);
                     return;
@@ -3319,14 +3303,6 @@ window.addEventListener('message', event => {
     if (!frame || activeGameLaunch.loadToken !== gameLoadToken) return;
 
     if (isMrMineGame(activeGameLaunch.game)) {
-        const mirrorHtml = getMrMineMirrorHtml(activeGameLaunch.bootstrapHtml || frame.srcdoc, activeGameLaunch.mrMineMirrorAttempt || 0);
-        if (mirrorHtml) {
-            activeGameLaunch.mrMineMirrorAttempt = (activeGameLaunch.mrMineMirrorAttempt || 0) + 1;
-            console.warn('Mr. Mine startup hit an asset error; retrying on an alternate asset route:', detail.message);
-            frame.removeAttribute('src');
-            frame.srcdoc = mirrorHtml;
-            return;
-        }
         if (detail.kind === 'resource' || detail.kind === 'resource-timeout' || detail.kind === 'resource-exhausted') {
             completeHostLoader();
             showGameLoadError(activeGameLaunch.game, frame, detail.message);
@@ -3426,8 +3402,8 @@ function showGameLoadError(game, frame, detail = '') {
     icon.src = 'Assets/Delete.svg';
     if (detail && isMrMineGame(game)) {
         const match = String(detail).match(/https?:\/\/([^/\s)]+)/i);
-        const host = match ? match[1] : 'asset CDN';
-        text.textContent = 'Mr. Mine graphics failed (' + host + ') - Retry';
+        const host = match ? match[1] : 'local assets';
+        text.textContent = 'Mr. Mine local files failed to load (' + host + ') - Retry';
         text.title = String(detail).slice(0, 500);
     } else {
         text.textContent = 'Load failed - Retry';
@@ -3582,7 +3558,6 @@ async function loadGame(game, forceInternal = false, options = {}) {
             url: resolvedGameUrl,
             injected: false,
             directFallbackTried: false,
-            mrMineMirrorAttempt: 0,
             bootstrapHtml: null
         };
         frame.style.setProperty('display', 'block', 'important');
