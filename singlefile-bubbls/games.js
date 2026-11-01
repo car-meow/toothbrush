@@ -2140,7 +2140,6 @@ let files = [
 "clsnowdrift",
 "clsnowrid",
 "clsnowrideee",
-"clsnowrider",
 "clsnowridergoodygumdrops",
 "clsnowriderrrr",
 "clsnowroad",

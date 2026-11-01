@@ -1,4 +1,4 @@
-// nexus-version: 4.46.25
+// nexus-version: 4.46.26
 const appStorage = window.nexusStorage || window.localStorage;
 // Game Stash is always available during a Games visit. Release its frame only
 // while the lightweight game standby screen is active.
@@ -1986,6 +1986,16 @@ function isBrotatoGame(game) {
     return fileName === 'clbrotato.html' || fileName.endsWith('/clbrotato.html') || gameId.includes('brotato');
 }
 
+function isSnowRiderGame(game) {
+    const sourceFile = String(game && (game.sourceFile || game.url) || '').replace(/\\/g, '/').toLowerCase();
+    const fileName = sourceFile.split(/[?#]/, 1)[0].split('/').pop().replace(/\.html?$/, '');
+    const identity = [game && game.id, game && game.sourceKey, game && game.sourceFile, game && game.url]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+    return fileName === 'clsnowriderrrr' || identity.includes('clsnowriderrrr');
+}
+
 function isMrMineGame(game) {
     const identity = [game && game.id, game && game.sourceKey, game && game.sourceFile, game && game.url]
         .filter(Boolean)
@@ -2000,6 +2010,10 @@ function getMrMineLocalAssetBaseUrl() {
 
 function shouldInjectGamePersistence(game, url) {
     if (!game || !url) return false;
+    // This Unity WebGL build relies on its real document URL during startup.
+    // Wrapping it in about:srcdoc makes its runtime requests resolve against
+    // the Nexus page and leaves the canvas black, so preserve its native URL.
+    if (isSnowRiderGame(game)) return false;
     // Brotato installs a cross-origin-isolation service worker. Keep its real
     // document URL so the worker and Godot's large PCK request load natively.
     if (isBrotatoGame(game)) return false;

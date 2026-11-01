@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.46.25 -->
+<!-- nexus-version: 4.46.26 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -212,7 +212,7 @@ html.light-mode .online-users-bubble {
 
 <div class="nexus-version-container" style="pointer-events: auto !important;">
     <button id="nexus-updates-button" class="nexus-version-tag nexus-updates-button" type="button" aria-label="Nexus Updates" aria-haspopup="dialog" aria-controls="nexus-updates-overlay" aria-expanded="false">
-        <span class="nexus-version-label">v4.46.25</span>
+        <span class="nexus-version-label">v4.46.26</span>
         <b id="nexus-updates-badge" class="nexus-updates-badge" aria-hidden="true" hidden></b>
     </button>
 </div>
@@ -240,6 +240,12 @@ html.light-mode .online-users-bubble {
         </header>
         <div class="nexus-updates-panels">
             <section id="nexus-updates-panel-games" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-games" data-update-panel="games" hidden>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.46.26</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry" data-update-notification="v4.46.26-games-snow-rider-launch"><div class="nexus-update-entry-heading"><h3>Snow Rider Unity startup</h3><span class="nexus-update-category-label is-bugfix">BUGFIX</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Snow Rider now launches from its original game page instead of Nexus's injected srcdoc wrapper, preserving the document URL its Unity runtime needs and preventing the black screen.</p></li>
+                    </ul>
+                </div>
                 <div class="nexus-update-release">
                     <div class="nexus-update-version"><span>v4.46.24</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
                     <ul class="nexus-update-list">
