@@ -8,7 +8,7 @@
     let worker = null;
     let port = null;
     let enabled = true;
-    let gameActive = false;
+    let gameActive = !!document.body.classList.contains('game-standby-active');
 
     function keepCountedWhilePlayingPreference() {
         try {

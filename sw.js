@@ -1,5 +1,5 @@
 // nexus-version: 4.46.25
-const CACHE_NAME = 'nexus-cache-v48';
+const CACHE_NAME = 'nexus-cache-v49';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -26,7 +26,7 @@ const ASSETS_TO_CACHE = [
     './style.css?v=92',
     './home-widgets.css?v=11',
     './home-widgets.js?v=9',
-    './online-presence.js?v=8',
+    './online-presence.js?v=9',
     './app.js',
     './app.js?v=68',
     './bgm-manager.js',
