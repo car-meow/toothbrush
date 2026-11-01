@@ -284,6 +284,15 @@
             refreshUpdateBadges();
         }
 
+        function markAllUpdatesRead() {
+            document.querySelectorAll('[data-update-notification]').forEach(entry => {
+                const id = entry.getAttribute('data-update-notification');
+                if (id) readUpdateIds.add(id);
+            });
+            try { updatesStorage.setItem(updatesReadStorageKey, JSON.stringify(Array.from(readUpdateIds))); } catch (error) {}
+            refreshUpdateBadges();
+        }
+
         function selectUpdateSection(sectionId, markRead = true) {
             const selectedTab = updateTabs.find(tab => tab.dataset.updateTab === sectionId);
             if (!selectedTab) return;
@@ -316,6 +325,7 @@
 
         function closeUpdates() {
             if (!updatesOverlay || updatesOverlay.hidden) return;
+            markAllUpdatesRead();
             updatesOverlay.classList.remove('is-open');
             updatesOverlay.setAttribute('aria-hidden', 'true');
             if (updatesButton) updatesButton.setAttribute('aria-expanded', 'false');

@@ -605,11 +605,17 @@ setInterval(function ()
             expectedNextRepaintTime = currentTime() + animationInterval;
             updateUpdatingTooltip();
         }
-        else if(!isGameLoaded)
+
+		var assetsStillLoading = typeof assetLoader !== "undefined" && assetLoader &&
+			(assetLoader.assetsLoaded < assetLoader.totalAssets ||
+				(assetLoader.assetQueue && assetLoader.assetQueue.length > 0) ||
+				assetLoader.activeAssetLoads > 0);
+		if(!isGameLoaded || assetsStillLoading)
         {
             document.getElementById("LoadingText").innerHTML = _("Loading...");
-            document.getElementById("LoadingPercent").innerHTML = Math.floor(getPageLoadPercent() * 100) + "%";
-            document.getElementById("LoadingBar").style.width = Math.floor(getPageLoadPercent() * 100) + "%";
+			var loadPercent = Math.floor(getPageLoadPercent() * 100);
+			document.getElementById("LoadingPercent").innerHTML = loadPercent + "%";
+			document.getElementById("LoadingBar").style.width = loadPercent + "%";
         }
     }
 }, 17);

@@ -1771,12 +1771,21 @@ function getStandardDeviation(array) {
 function getPageLoadPercent() {
 	var imgs = document.getElementsByTagName("img");
 	var numLoaded = 0;
+	var totalToLoad = imgs.length;
 	for (var i = 0; i < imgs.length; i++) {
-		if (imgs[i].complete && typeof imgs[i].naturalWidth != 'undefined' && imgs[i].naturalWidth != 0) {
+		var imageSource = imgs[i].currentSrc || imgs[i].getAttribute("src");
+		if (imageSource && imgs[i].complete) {
 			numLoaded++;
 		}
 	}
-	return numLoaded / imgs.length;
+	if (typeof assetLoader !== "undefined" && assetLoader) {
+		var totalAssets = Math.max(0, Number(assetLoader.totalAssets) || 0);
+		var loadedAssets = Math.max(0, Math.min(totalAssets, Number(assetLoader.assetsLoaded) || 0));
+		totalToLoad += totalAssets;
+		numLoaded += loadedAssets;
+	}
+	if (totalToLoad === 0) return 1;
+	return Math.max(0, Math.min(1, numLoaded / totalToLoad));
 }
 
 function duplicate2dArray(array) {
