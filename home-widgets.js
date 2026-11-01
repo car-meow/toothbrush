@@ -1,4 +1,4 @@
-// nexus-version: 4.46.21
+// nexus-version: 4.46.25
 (function () {
     'use strict';
 
@@ -105,13 +105,58 @@
             WIDGETS.forEach(widget => {
                 const pos = saved.widgets[widget.id];
                 if (!pos || !Number.isInteger(pos.col) || !Number.isInteger(pos.row)) return;
-                widgets[widget.id] = { col: pos.col, row: pos.row };
+                let x = pos.x;
+                let y = pos.y;
+                if (!Number.isFinite(x) && Number.isInteger(saved.columns)) {
+                    x = pos.col / Math.max(1, saved.columns - widget.columns);
+                }
+                if (!Number.isFinite(y) && Number.isInteger(saved.rows)) {
+                    y = pos.row / Math.max(1, saved.rows - widget.rows);
+                }
+                widgets[widget.id] = {
+                    col: pos.col,
+                    row: pos.row,
+                    ...(Number.isFinite(x) ? { x: clamp(x, 0, 1) } : {}),
+                    ...(Number.isFinite(y) ? { y: clamp(y, 0, 1) } : {})
+                };
             });
             return { widgets };
         } catch (_) { return defaultState(); }
     }
 
     function saveState() { writeStorage(STORAGE_KEY, JSON.stringify(state)); }
+
+    function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+    }
+
+    function anchorPosition(id, pos) {
+        const widget = widgetById.get(id);
+        if (!widget || !pos) return pos;
+        const maxCol = Math.max(0, columns - widget.columns);
+        const maxRow = Math.max(0, rows - widget.rows);
+        return {
+            ...pos,
+            x: maxCol ? clamp(pos.col / maxCol, 0, 1) : (Number.isFinite(pos.x) ? clamp(pos.x, 0, 1) : 0),
+            y: maxRow ? clamp(pos.row / maxRow, 0, 1) : (Number.isFinite(pos.y) ? clamp(pos.y, 0, 1) : 0)
+        };
+    }
+
+    function positionForCurrentGrid(id, pos) {
+        const widget = widgetById.get(id);
+        if (!widget || !pos) return pos;
+        const maxCol = Math.max(0, columns - widget.columns);
+        const maxRow = Math.max(0, rows - widget.rows);
+        // Older saved layouts only have grid cells. Clamp them first so a
+        // position beyond a smaller viewport stays attached to that edge.
+        const x = Number.isFinite(pos.x)
+            ? clamp(pos.x, 0, 1)
+            : (maxCol ? clamp(pos.col, 0, maxCol) / maxCol : 0);
+        const y = Number.isFinite(pos.y)
+            ? clamp(pos.y, 0, 1)
+            : (maxRow ? clamp(pos.row, 0, maxRow) / maxRow : 0);
+        return { col: Math.round(x * maxCol), row: Math.round(y * maxRow), x, y };
+    }
 
     function getNativeContent() {
         const clock = document.querySelector('.nexus-home-clock');
@@ -514,7 +559,7 @@
             return;
         }
         managerStatus.textContent = '';
-        state.widgets[id] = pos;
+        state.widgets[id] = anchorPosition(id, pos);
         saveState();
         renderWidgets();
         if (id === 'active-users') notifyOnlineWidgetChange();
@@ -668,13 +713,14 @@
     function finishWidgetDrag(event) {
         if (!dragState || (event && event.pointerId !== dragState.pointerId)) return;
         const { id, shell, pointerId, col, row, originCol, originRow } = dragState;
+        const origin = state.widgets[id];
         shell.removeEventListener('pointermove', moveWidgetDrag);
         try { if (shell.hasPointerCapture(pointerId)) shell.releasePointerCapture(pointerId); } catch (_) {}
         const widget = widgetById.get(id);
         const valid = fits(widget, col, row) && !overlaps(col, row, widget, state.widgets, id);
         shell.classList.remove('is-dragging');
-        if (valid) state.widgets[id] = { col, row };
-        else state.widgets[id] = { col: originCol, row: originRow };
+        if (valid) state.widgets[id] = anchorPosition(id, { col, row });
+        else state.widgets[id] = origin || anchorPosition(id, { col: originCol, row: originRow });
         positionShell(id, state.widgets[id]);
         const footprint = footprints.get(id);
         if (footprint) footprint.classList.remove('is-invalid-drop');
@@ -683,17 +729,18 @@
         suppressClickUntil = performance.now() + 350;
     }
 
-    function sanitizePositions() {
+    function sanitizePositions(persist = true) {
         const placed = {};
         WIDGETS.forEach(widget => {
             const old = state.widgets[widget.id];
             if (!old) return;
-            const pos = findPlacement(widget.id, old, placed);
-            if (pos) placed[widget.id] = pos;
+            const preferred = positionForCurrentGrid(widget.id, old);
+            const pos = findPlacement(widget.id, preferred, placed);
+            if (pos) placed[widget.id] = anchorPosition(widget.id, { ...pos, x: preferred.x, y: preferred.y });
             else delete state.widgets[widget.id];
         });
         state.widgets = placed;
-        saveState();
+        if (persist) saveState();
         renderWidgets();
     }
 
@@ -766,7 +813,7 @@
     window.addEventListener('storage', event => {
         if (event.key === STORAGE_KEY && state) {
             state = loadState();
-            renderWidgets();
+            sanitizePositions(false);
         }
         if (event.key === 'tb_theme') {
             document.documentElement.classList.toggle('light-mode', readStorage('tb_theme') === 'light');

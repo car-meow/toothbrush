@@ -1,4 +1,4 @@
-// nexus-version: 4.46.21
+// nexus-version: 4.46.25
 (function () {
     'use strict';
 
@@ -31,7 +31,6 @@
     }
 
     function preferenceEnabled() {
-        if (!isHomePage()) return false;
         try {
             const storage = window.nexusStorage || window.localStorage;
             const saved = storage.getItem(WIDGETS_KEY);

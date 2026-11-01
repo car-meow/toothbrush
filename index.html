@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.46.24 -->
+<!-- nexus-version: 4.46.25 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -212,7 +212,7 @@ html.light-mode .online-users-bubble {
 
 <div class="nexus-version-container" style="pointer-events: auto !important;">
     <button id="nexus-updates-button" class="nexus-version-tag nexus-updates-button" type="button" aria-label="Nexus Updates" aria-haspopup="dialog" aria-controls="nexus-updates-overlay" aria-expanded="false">
-        <span class="nexus-version-label">v4.46.24</span>
+        <span class="nexus-version-label">v4.46.25</span>
         <b id="nexus-updates-badge" class="nexus-updates-badge" aria-hidden="true" hidden></b>
     </button>
 </div>
@@ -296,6 +296,13 @@ html.light-mode .online-users-bubble {
             </section>
             <section id="nexus-updates-panel-misc" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-misc" data-update-panel="misc" hidden>
                 <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.46.25</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry" data-update-notification="v4.46.25-misc-widget-resize-positions"><div class="nexus-update-entry-heading"><h3>Widget positions on resize</h3><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Kept widgets anchored to their saved positions when the browser window is resized or toggled between fullscreen and windowed mode.</p></li>
+                        <li class="nexus-update-entry" data-update-notification="v4.46.25-misc-online-users-all-pages"><div class="nexus-update-entry-heading"><h3>Online user count coverage</h3><span class="nexus-update-category-label is-bugfix">BUGFIX</span></div><p>Counted users while they browse any Nexus page when the Active Users widget is enabled.</p></li>
+                    </ul>
+                </div>
+                <div class="nexus-update-release">
                     <div class="nexus-update-version"><span>v4.46.22</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
                     <ul class="nexus-update-list"><li class="nexus-update-entry" data-update-notification="v4.46.22-misc-online-users-widget"><div class="nexus-update-entry-heading"><h3>Online Users widget</h3><span class="nexus-update-category-label is-bugfix">BUGFIX</span></div><p>Fixed a rare bug where Online Users widget using computer resources when it wasn't even on screen, and not working when it was on screen.</p></li></ul>
                 </div>
@@ -370,7 +377,7 @@ html.light-mode .online-users-bubble {
 <script src="tutorial-engine.js?v=2"></script>
 <script src="nexus-profile.js?v=4"></script>
 <script src="nexus-welcome.js?v=19"></script>
-<script src="online-presence.js?v=7" defer></script>
-<script src="home-widgets.js?v=8" defer></script>
+<script src="online-presence.js?v=8" defer></script>
+<script src="home-widgets.js?v=9" defer></script>
 </body>
 </html>
