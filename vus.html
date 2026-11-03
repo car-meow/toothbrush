@@ -393,6 +393,7 @@ function openQA() {
 }
 const closeQA = () => { $("qaOv").classList.remove("open"); $("qaBtn").focus(); };
 $("qaBtn").onclick = openQA; $("qaX").onclick = closeQA;
+$("qaOv").addEventListener("click", e => { if (e.target === $("qaOv")) closeQA(); });
 
 // ---------- Settings modal ----------
 function group(wrap, opts, get, set) {
@@ -417,6 +418,7 @@ function buildSettingsUI() {
 function openSettings() { draft = { ...cur }; buildSettingsUI(); $("setOv").classList.add("open"); $("setX").focus(); }
 function closeSettings() { disarmClear(); $("setOv").classList.remove("open"); $("settingsBtn").focus(); }
 $("settingsBtn").onclick = openSettings; $("setX").onclick = closeSettings;
+$("setOv").addEventListener("click", e => { if (e.target === $("setOv")) closeSettings(); });
 $("sColor").addEventListener("input", e => draft.backgroundColor = e.target.value);
 $("sReset").onclick = () => { draft = { ...DEF }; buildSettingsUI(); };
 $("sSave").onclick = () => {

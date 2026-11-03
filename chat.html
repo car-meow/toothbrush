@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <title>Nexus Chat</title>
     <link rel="stylesheet" href="style.css?v=63">
-    <script src="bgm-manager.js?v=65"></script>
+    <script src="bgm-manager.js?v=66"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
         (function() {
@@ -364,7 +364,7 @@
         </div>
     </div>
 
-    <script src="nexus-profile.js?v=4"></script>
+    <script src="nexus-profile.js?v=5"></script>
     <script>
         const localStorage = window.nexusStorage || window.localStorage;
         document.addEventListener('DOMContentLoaded', async () => {
@@ -1706,6 +1706,13 @@
             });
             modal.style.display = 'block';
         }
+
+        document.addEventListener('click', event => {
+            const modal = document.getElementById('user-list-modal');
+            if (modal && modal.style.display === 'block' && !modal.contains(event.target)) {
+                modal.style.display = 'none';
+            }
+        });
 
         function refreshModalIfOpen() {
             if (document.getElementById('user-list-modal').style.display === 'block') openUserModal(isModalAdmin);
@@ -4276,7 +4283,7 @@
 
     });
     </script>
-    <script src="tutorial-engine.js?v=2"></script>
+    <script src="tutorial-engine.js?v=3"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (window.TutorialEngine) TutorialEngine.initChat();

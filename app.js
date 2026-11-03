@@ -1,4 +1,4 @@
-// nexus-version: 4.46.26
+// nexus-version: 4.47.3
 const appStorage = window.nexusStorage || window.localStorage;
 // Game Stash is always available during a Games visit. Release its frame only
 // while the lightweight game standby screen is active.
@@ -296,6 +296,16 @@ if (typeof BroadcastChannel === 'function') {
     try {
         const sessionChannel = new BroadcastChannel('nexus-game-session');
         sessionChannel.addEventListener('message', event => {
+            if (event.data && event.data.type === 'nexus-game-storage-quota-error') {
+                const matchesActiveSession = Array.from(activeGameSessions.values()).some(session =>
+                    session.gameId === String(event.data.gameId || '') &&
+                    (!event.data.saveSessionId || String(session.sessionId) === String(event.data.saveSessionId))
+                );
+                if (matchesActiveSession) {
+                    handleSavesStorageQuotaFailure(String(event.data.storageType || 'browser storage'), event.data.gameId);
+                }
+                return;
+            }
             if (event.data && event.data.type === 'nexus-popup-closed' && activeGameSessions.size) {
                 for (const [sid, sess] of activeGameSessions.entries()) {
                     if (!event.data.gameId || sess.gameId === String(event.data.gameId)) {
@@ -353,6 +363,26 @@ async function initDB() {
     return dbReadyPromise;
 }
 
+const HIDDEN_SIDEBAR_GAMES_KEY = 'tb_hidden_sidebar_game_ids';
+
+function getHiddenSidebarGameIds(storage = window.nexusStorage || window.localStorage) {
+    try {
+        const parsed = JSON.parse(storage.getItem(HIDDEN_SIDEBAR_GAMES_KEY) || '[]');
+        return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+    } catch (error) {
+        return new Set();
+    }
+}
+
+function writeHiddenSidebarGameIds(gameIds, storage = window.nexusStorage || window.localStorage) {
+    try {
+        storage.setItem(HIDDEN_SIDEBAR_GAMES_KEY, JSON.stringify(Array.from(gameIds, String)));
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
 async function loadGames() {
     const localStorage = window.nexusStorage || window.localStorage;
     const stashPreloadOnEntry = ensureStashPreloaded();
@@ -385,6 +415,9 @@ async function loadGames() {
         games = [...defaults, ...activeCustom];
     } catch { games = [...activeCustom]; }
 
+    const hiddenSidebarGameIds = getHiddenSidebarGameIds(localStorage);
+    games = games.filter(game => game && (String(game.id) === 'ugs-stash' || !hiddenSidebarGameIds.has(String(game.id))));
+
     // Apply saved order
     if (savedOrder) {
         const gameMap = new Map();
@@ -410,9 +443,11 @@ async function loadGames() {
     saveGameOrder();
     renderGameList();
     const initialGameLoad = openDefaultGame();
-    Promise.all([stashPreloadOnEntry, initialGameLoad]).catch(() => {}).finally(() => {
+    Promise.all([stashPreloadOnEntry, initialGameLoad]).catch(() => {}).finally(async () => {
         if (typeof window.nexusFinishPageTransition === 'function') window.nexusFinishPageTransition();
         else hideTransitionOverlay();
+        const storageStatus = await refreshSavesStorageMeter();
+        showSavesStorageWarningOnPageEntry(storageStatus);
     });
 
     initCarmeowTutorial();
@@ -563,6 +598,8 @@ window.addStashGameToSidebar = async function(game) {
     if (!game || !game.id) throw new Error('Invalid game record');
 
     await saveGameRecord(game);
+    const hiddenGameIds = getHiddenSidebarGameIds();
+    if (hiddenGameIds.delete(String(game.id))) writeHiddenSidebarGameIds(hiddenGameIds);
 
     // Keep the sidebar lightweight: retrieve a game's HTML only when it is opened.
     const sidebarGame = { ...game };
@@ -810,6 +847,105 @@ async function getSavedGamesOutsideSidebar(sidebarGames) {
         .sort((a, b) => a.title.localeCompare(b.title));
 }
 
+function estimateSavePayloadBytes(value) {
+    try {
+        const serialized = JSON.stringify(value);
+        if (typeof serialized !== 'string') return 0;
+        return typeof Blob === 'function' ? new Blob([serialized]).size : serialized.length * 2;
+    } catch (error) {
+        return null;
+    }
+}
+
+function getSaveManagerGameAliases(game) {
+    const aliases = new Set();
+    if (!game) return aliases;
+    const candidates = [game.id, game.sourceKey, game.sourceFile, game.title].filter(Boolean).map(String);
+    candidates.forEach(candidate => {
+        aliases.add(candidate.toLowerCase());
+        const identity = getSaveManagerSnapshotIdentity(candidate);
+        identity.aliases.forEach(alias => aliases.add(String(alias).toLowerCase()));
+    });
+    if (game.sourceFile) {
+        const sourceFile = String(game.sourceFile).replace(/\\/g, '/').replace(/^\/+/, '');
+        aliases.add(sourceFile.toLowerCase());
+        aliases.add(sourceFile.replace(/\.html?$/i, '').toLowerCase());
+        const leaf = sourceFile.split('/').pop() || sourceFile;
+        aliases.add(leaf.toLowerCase());
+        aliases.add(leaf.replace(/\.html?$/i, '').toLowerCase());
+    }
+    if (game.sourceKey) {
+        const sourceKey = String(game.sourceKey);
+        aliases.add(`bookmark_${sourceKey}`.toLowerCase());
+        aliases.add(`bookmark_${encodeURIComponent(sourceKey)}`.toLowerCase());
+    }
+    return aliases;
+}
+
+async function getSaveManagerSizeEstimates(sidebarGames, offSidebarGames) {
+    await initDB();
+    const bytesById = await new Promise((resolve, reject) => {
+        const sizes = new Map();
+        try {
+            const tx = db.transaction('gameSnapshots', 'readonly');
+            const request = tx.objectStore('gameSnapshots').openCursor();
+            request.onsuccess = event => {
+                const cursor = event.target.result;
+                if (!cursor) return resolve(sizes);
+
+                const gameId = String(cursor.key || (cursor.value && cursor.value.gameId) || '');
+                const bytes = estimateSavePayloadBytes(cursor.value);
+                if (gameId && bytes !== null) {
+                    const key = gameId.toLowerCase();
+                    sizes.set(key, (sizes.get(key) || 0) + bytes);
+                }
+                cursor.continue();
+            };
+            request.onerror = () => reject(request.error || tx.error || new Error('Could not estimate saved game sizes.'));
+            tx.onabort = () => reject(tx.error || new Error('Could not estimate saved game sizes.'));
+        } catch (error) {
+            reject(error);
+        }
+    });
+
+    const journalPrefix = 'tb_nexus_game_autosave:';
+    try {
+        const storage = window.nexusStorage || window.localStorage;
+        for (let index = 0; index < storage.length; index++) {
+            const key = storage.key(index);
+            if (!key || !key.startsWith(journalPrefix)) continue;
+            let gameId = key.slice(journalPrefix.length);
+            try { gameId = decodeURIComponent(gameId); } catch (error) {}
+            const value = storage.getItem(key) || '';
+            const bytes = estimateSavePayloadBytes({ key, value });
+            if (bytes === null) continue;
+            const normalizedId = String(gameId).toLowerCase();
+            bytesById.set(normalizedId, (bytesById.get(normalizedId) || 0) + bytes);
+        }
+    } catch (error) {}
+
+    const estimates = new Map();
+    (sidebarGames || []).forEach(game => {
+        const aliases = getSaveManagerGameAliases(game);
+        let total = 0;
+        bytesById.forEach((bytes, gameId) => {
+            const identityAliases = getSaveManagerSnapshotIdentity(gameId).aliases;
+            if (aliases.has(gameId) || doesSnapshotBelongToGame({ gameId }, game) ||
+                Array.from(identityAliases).some(alias => aliases.has(String(alias).toLowerCase()))) total += bytes;
+        });
+        estimates.set(String(game.id), total);
+    });
+    (offSidebarGames || []).forEach(game => {
+        const aliases = new Set([String(game.id), ...(game.aliases || []).map(String)].map(id => id.toLowerCase()));
+        let total = 0;
+        bytesById.forEach((bytes, gameId) => {
+            if (aliases.has(gameId)) total += bytes;
+        });
+        estimates.set(String(game.id), total);
+    });
+    return estimates;
+}
+
 async function saveGameSnapshot(gameId, payload, skipMirror = false) {
     if (!gameId || !payload || typeof payload !== 'object') return;
     if (!ownsGameSaveSession(gameId, payload.saveSessionId)) return;
@@ -931,6 +1067,7 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
             tx.oncomplete = () => {
                 if (didSave) {
                     snapshotHashes.set(gameId, signature);
+                    refreshSavesStorageMeter();
 
                     // IndexedDB is the durable source of truth. Avoid retaining these full
                     // filesystem/IndexedDB snapshots in a page-level cache after the write;
@@ -944,7 +1081,9 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
                                 idbData: snapshotRecord.idbData,
                                 savedAt: snapshotRecord.savedAt,
                                 saveSessionId: payload.saveSessionId
-                            }, true).catch(() => {});
+                            }, true).catch(error => {
+                                if (isStorageQuotaError(error)) handleSavesStorageQuotaFailure('indexedDB', matched.id);
+                            });
                         }
                     }
                 }
@@ -1011,6 +1150,13 @@ window.addEventListener('message', event => {
     const originSafe = !event.origin || event.origin === 'null' || event.origin === window.location.origin || window.location.protocol === 'file:';
     if (!originSafe && !isEmbeddedGame && !isKnownPopup) return;
 
+    if (message.type === 'nexus-game-storage-quota-error') {
+        const gameId = String(message.gameId || '');
+        if (!gameId || !ownsGameSaveSession(gameId, message.saveSessionId)) return;
+        handleSavesStorageQuotaFailure(String(message.storageType || 'browser storage'), gameId);
+        return;
+    }
+
     if (message.type === 'nexus-game-save') {
         const gameId = message.gameId || (currentGame && currentGame.id ? currentGame.id : null);
         if (gameId && (message.localStorage || message.fsData || message.idbData)) {
@@ -1020,7 +1166,9 @@ window.addEventListener('message', event => {
                 idbData: message.idbData,
                 savedAt: message.savedAt,
                 saveSessionId: message.saveSessionId
-            }).catch(() => {});
+            }).catch(error => {
+                if (isStorageQuotaError(error)) handleSavesStorageQuotaFailure('indexedDB', gameId);
+            });
         }
     } else if (message.type === 'nexus-request-game-restore') {
         const gameId = message.gameId || (currentGame && currentGame.id ? currentGame.id : null);
@@ -1607,7 +1755,7 @@ function createNexusLoadingOverlay(parentDoc = document, customBgUrl = 'Assets/l
     }
 }
 
-function getGameRestoreScript(gameId, snapshot = {}) {
+function getGameRestoreScript(gameId, snapshot = {}, saveSessionId = null) {
     const savedStorage = snapshot && snapshot.localStorage && typeof snapshot.localStorage === 'object'
         ? snapshot.localStorage
         : snapshot;
@@ -1615,6 +1763,8 @@ function getGameRestoreScript(gameId, snapshot = {}) {
     const journalKey = `tb_nexus_game_autosave:${encodeURIComponent(String(gameId))}`;
     const snapshotSavedAt = Number(snapshot && snapshot.savedAt) || 0;
     return `<script>(function(){try{
+        var gameId=${JSON.stringify(String(gameId))};
+        function reportQuotaFailure(error){if(!error||!(error.name==='QuotaExceededError'||error.code===22||error.code===1014||/quota exceeded|storage full|disk full/i.test(String(error.message||''))))return;var message={type:'nexus-game-storage-quota-error',gameId:gameId,saveSessionId:${JSON.stringify(saveSessionId)},storageType:'localStorage'};try{if(window.parent&&window.parent!==window)window.parent.postMessage(message,'*');}catch(e){}try{if(window.opener)window.opener.postMessage(message,'*');}catch(e){}}
         var saved=${snapshotJson};
         var snapshotSavedAt=${snapshotSavedAt};
         var journal=null;
@@ -1623,9 +1773,13 @@ function getGameRestoreScript(gameId, snapshot = {}) {
             // The journal is written synchronously by the game itself, so it
             // always wins over an older asynchronous IndexedDB snapshot.
             saved=Object.assign({},saved,journal.localStorage);
+        }else if(journal&&snapshotSavedAt>0&&Number(journal.savedAt)<=snapshotSavedAt){
+            // The parent already has this journal (or a newer save) in its
+            // committed snapshot, so this duplicate can be safely reclaimed.
+            try{localStorage.removeItem(${JSON.stringify(journalKey)});}catch(e){}
         }
         Object.keys(saved).forEach(function(k){
-            if(k.indexOf('tb_')!==0&&k!=='sidebar-game-order'&&k!=='sidebar-game-order-updated-at')localStorage.setItem(k,saved[k]);
+            if(k.indexOf('tb_')!==0&&k!=='sidebar-game-order'&&k!=='sidebar-game-order-updated-at')try{localStorage.setItem(k,saved[k]);}catch(e){reportQuotaFailure(e);}
         });
     }catch(e){}})();<\/script>`;
 }
@@ -1654,8 +1808,63 @@ function getUniversalAutosaveBridge(gameId, saveSessionId = null) {
         } catch(e) { return true; }
     }
 
-    function saveSnapshotDirectToDB(targetId, snapshotData) {
-        if (autosaveDisarmed || !isCurrentSession() || !snapshotData || !targetId) return;
+    function isQuotaError(error) {
+        return !!error && (error.name === 'QuotaExceededError' || error.code === 22 || error.code === 1014 || /quota exceeded|storage full|disk full/i.test(String(error.message || '')));
+    }
+
+    function reportQuotaFailure(storageType, error) {
+        if (!isCurrentSession() || !isQuotaError(error)) return;
+        var message = {
+            type: 'nexus-game-storage-quota-error',
+            gameId: gameId,
+            saveSessionId: saveSessionId,
+            storageType: storageType,
+            errorName: error && error.name || 'QuotaExceededError'
+        };
+        try { if (window.parent && window.parent !== window) window.parent.postMessage(message, '*'); } catch(e) {}
+        try {
+            var opener = (window.parent && window.parent.opener) || window.opener;
+            if (opener) opener.postMessage(message, '*');
+        } catch(e) {}
+    }
+
+    try {
+        var originalTransaction = IDBDatabase.prototype.transaction;
+        if (!originalTransaction._nexusQuotaHooked) {
+            var hookedTransaction = function() {
+                var transaction;
+                try {
+                    transaction = originalTransaction.apply(this, arguments);
+                } catch(error) {
+                    reportQuotaFailure('indexedDB', error);
+                    throw error;
+                }
+                var isNexusSnapshotTransaction = this.name === 'GameStorageDB' &&
+                    transaction && transaction.objectStoreNames && transaction.objectStoreNames.contains('gameSnapshots');
+                if (!isNexusSnapshotTransaction && transaction && typeof transaction.addEventListener === 'function') {
+                    transaction.addEventListener('error', function(event) {
+                        reportQuotaFailure('indexedDB', event.target && event.target.error || transaction.error);
+                    }, true);
+                }
+                return transaction;
+            };
+            hookedTransaction._nexusQuotaHooked = true;
+            IDBDatabase.prototype.transaction = hookedTransaction;
+        }
+    } catch(e) {}
+
+    function saveSnapshotDirectToDB(targetId, snapshotData, onComplete) {
+        var completed = false;
+        function finish(success, error) {
+            if (completed) return;
+            completed = true;
+            if (error) reportQuotaFailure('indexedDB', error);
+            if (typeof onComplete === 'function') onComplete(success, error || null);
+        }
+        if (autosaveDisarmed || !isCurrentSession() || !snapshotData || !targetId) {
+            finish(false);
+            return;
+        }
         var incomingLs = snapshotData.localStorage || {};
         var incomingFs = snapshotData.fsData || null;
         var incomingIdb = snapshotData.idbData || null;
@@ -1668,14 +1877,22 @@ function getUniversalAutosaveBridge(gameId, saveSessionId = null) {
                 if (!d.objectStoreNames.contains('customGames')) d.createObjectStore('customGames', { keyPath: 'id' });
                 if (!d.objectStoreNames.contains('gameSnapshots')) d.createObjectStore('gameSnapshots', { keyPath: 'gameId' });
             };
+            req.onerror = function() { finish(false, req.error); };
             req.onsuccess = function(e) {
                 var db = e.target.result;
                 db.onversionchange = function() { try { db.close(); } catch(err) {} };
                 try {
-                    if (autosaveDisarmed || !isCurrentSession() || !db.objectStoreNames.contains('gameSnapshots')) return;
+                    if (autosaveDisarmed || !isCurrentSession() || !db.objectStoreNames.contains('gameSnapshots')) {
+                        finish(false);
+                        return;
+                    }
                     var tx = db.transaction('gameSnapshots', 'readwrite');
                     var store = tx.objectStore('gameSnapshots');
+                    tx.oncomplete = function() { finish(true); };
+                    tx.onerror = function(event) { finish(false, event.target && event.target.error || tx.error); };
+                    tx.onabort = function(event) { finish(false, event.target && event.target.error || tx.error); };
                     var getReq = store.get(targetId);
+                    getReq.onerror = function() { finish(false, getReq.error); };
                     getReq.onsuccess = function() {
                         if (autosaveDisarmed || !isCurrentSession()) return;
                         var existing = getReq.result || null;
@@ -1709,11 +1926,11 @@ function getUniversalAutosaveBridge(gameId, saveSessionId = null) {
                             idbData: idbToSave,
                             savedAt: savedAt
                         };
-                        try { store.put(record); } catch(err) {}
+                        try { store.put(record); } catch(err) { finish(false, err); }
                     };
-                } catch(txErr) {}
+                } catch(txErr) { finish(false, txErr); }
             };
-        } catch(err) {}
+        } catch(err) { finish(false, err); }
     }
 
     function getStorageSnapshot() {
@@ -1734,6 +1951,21 @@ function getUniversalAutosaveBridge(gameId, saveSessionId = null) {
         // tab shutdown, including when the Nexus tab is no longer open.
         try {
             localStorage.setItem(journalKey, JSON.stringify({ version: 1, savedAt: savedAt, localStorage: data }));
+            return true;
+        } catch(e) {
+            // This journal is a temporary write-ahead copy. A failed journal
+            // write alone does not mean the game's save failed; the IndexedDB
+            // snapshot and parent mirror are still attempted below.
+            return false;
+        }
+    }
+
+    function clearCommittedJournal(savedAt) {
+        try {
+            var journal = JSON.parse(localStorage.getItem(journalKey) || 'null');
+            if (journal && Number(journal.savedAt) <= Number(savedAt)) {
+                localStorage.removeItem(journalKey);
+            }
         } catch(e) {}
     }
 
@@ -1743,13 +1975,15 @@ function getUniversalAutosaveBridge(gameId, saveSessionId = null) {
             var data = getStorageSnapshot();
             var currentHash = JSON.stringify(data);
             if (!immediate && currentHash === lastSavedHash) return;
-            lastSavedHash = currentHash;
             var savedAt = Math.max(Date.now(), lastSavedAt + 1);
             lastSavedAt = savedAt;
             writeJournal(data, savedAt);
 
             var msg = { type: 'nexus-game-save', gameId: gameId, localStorage: data, savedAt: savedAt, saveSessionId: saveSessionId };
-            saveSnapshotDirectToDB(gameId, msg);
+            saveSnapshotDirectToDB(gameId, msg, function(success) {
+                if (success) clearCommittedJournal(savedAt);
+                lastSavedHash = success ? currentHash : '';
+            });
             if (window.parent && window.parent !== window) {
                 try { window.parent.postMessage(msg, '*'); } catch(e) {}
             }
@@ -1782,6 +2016,10 @@ function getUniversalAutosaveBridge(gameId, saveSessionId = null) {
             var fs = window.FS || (window.Module && window.Module.FS);
             if (fs && typeof fs.syncfs === 'function') {
                 fs.syncfs(false, function() {
+                    var err = arguments[0];
+                    if (err && /quota|storage full|disk full|no space/i.test(String(err.message || err))) {
+                        reportQuotaFailure('game filesystem', err.name ? err : { name: 'QuotaExceededError', message: String(err) });
+                    }
                     finishSync();
                 });
                 return;
@@ -1803,7 +2041,13 @@ function getUniversalAutosaveBridge(gameId, saveSessionId = null) {
     try {
         var origSetItem = Storage.prototype.setItem;
         Storage.prototype.setItem = function(k, v) {
-            var res = origSetItem.apply(this, arguments);
+            var res;
+            try {
+                res = origSetItem.apply(this, arguments);
+            } catch(err) {
+                if (this === localStorage && k && k.indexOf('tb_') !== 0) reportQuotaFailure('localStorage', err);
+                throw err;
+            }
             if (!autosaveDisarmed && isCurrentSession() && this === localStorage && k && k.indexOf('tb_') !== 0) {
                 debounceSync(300);
             }
@@ -1879,7 +2123,10 @@ function getUniversalAutosaveBridge(gameId, saveSessionId = null) {
             // A late parent restore should only fill absent values; replacing
             // existing values here can undo progress made while a tab loads.
             try { Object.keys(e.data.localStorage).forEach(function(k) {
-                if (k.indexOf('tb_') !== 0 && localStorage.getItem(k) === null) localStorage.setItem(k, e.data.localStorage[k]);
+                if (k.indexOf('tb_') !== 0 && localStorage.getItem(k) === null) {
+                    try { localStorage.setItem(k, e.data.localStorage[k]); }
+                    catch(err) { reportQuotaFailure('localStorage', err); }
+                }
             }); } catch(err) {}
         }
         if (e.data.type === 'nexus-request-game-save') {
@@ -2028,7 +2275,7 @@ function shouldInjectGamePersistence(game, url) {
 }
 
 function getGamePersistenceBootstrap(gameId, snapshot = {}, saveSessionId = null) {
-    return getGameRestoreScript(gameId, snapshot) + getUniversalAutosaveBridge(gameId, saveSessionId);
+    return getGameRestoreScript(gameId, snapshot, saveSessionId) + getUniversalAutosaveBridge(gameId, saveSessionId);
 }
 
 function getGameLaunchDiagnostics(gameId, loadToken, options = {}) {
@@ -2503,7 +2750,7 @@ function launchGameFullscreen(game) {
                     ? `<script>(function(){var nativeAlert=window.alert;window.alert=function(message){var text=String(message||'');if(text.indexOf('timestamp.getTime is not a function')!==-1){console.warn('Ignored Unity IndexedDB timestamp warning.');return;}return nativeAlert.apply(this,arguments);};})();<\/script>`
                     : '';
                 const popupBridge = getUniversalAutosaveBridge(game.id, gameSession.sessionId);
-                const popupRestore = getGameRestoreScript(game.id, latestSnapshot);
+                const popupRestore = getGameRestoreScript(game.id, latestSnapshot, gameSession.sessionId);
                 const autoFocusScript = `<script>
                 (function(){
                     function triggerClickFocus() {
@@ -2620,6 +2867,18 @@ function launchGameFullscreen(game) {
                     function isCurrentSession() {
                         try { return localStorage.getItem(saveSessionKey) === String(saveSessionId); } catch(err) { return true; }
                     }
+                    function reportQuotaFailure(storageType, error) {
+                        if (!error || !(error.name === 'QuotaExceededError' || error.code === 22 || error.code === 1014 || /quota exceeded|storage full|disk full/i.test(String(error.message || '')))) return;
+                        var message = { type: 'nexus-game-storage-quota-error', gameId: primaryGameId, saveSessionId: saveSessionId, storageType: storageType };
+                        try {
+                            if (typeof BroadcastChannel === 'function') {
+                                var quotaChannel = new BroadcastChannel('nexus-game-session');
+                                quotaChannel.postMessage(message);
+                                quotaChannel.close();
+                            }
+                        } catch(err) {}
+                        try { if (window.opener && !window.opener.closed) window.opener.postMessage(message, '*'); } catch(err) {}
+                    }
                     var blankFavicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E";
                     function syncTitle() {
                         var titleEl = document.querySelector('title');
@@ -2723,6 +2982,7 @@ function launchGameFullscreen(game) {
                                 if (!d.objectStoreNames.contains('customGames')) d.createObjectStore('customGames', { keyPath: 'id' });
                                 if (!d.objectStoreNames.contains('gameSnapshots')) d.createObjectStore('gameSnapshots', { keyPath: 'gameId' });
                             };
+                            req.onerror = function() { reportQuotaFailure('indexedDB', req.error); };
                             req.onsuccess = function(e) {
                                 var db = e.target.result;
                                 db.onversionchange = function() { try { db.close(); } catch(err) {} };
@@ -2730,7 +2990,10 @@ function launchGameFullscreen(game) {
                                     if (!db.objectStoreNames.contains('gameSnapshots')) return;
                                     var tx = db.transaction('gameSnapshots', 'readwrite');
                                     var store = tx.objectStore('gameSnapshots');
+                                    tx.onerror = function(event) { reportQuotaFailure('indexedDB', event.target && event.target.error || tx.error); };
+                                    tx.onabort = function(event) { reportQuotaFailure('indexedDB', event.target && event.target.error || tx.error); };
                                     var getReq = store.get(ids[0]);
+                                    getReq.onerror = function() { reportQuotaFailure('indexedDB', getReq.error); };
                                     getReq.onsuccess = function() {
                                         var existing = getReq.result || null;
                                         if (existing && Number(existing.savedAt) > incomingSavedAt) return;
@@ -2765,12 +3028,12 @@ function launchGameFullscreen(game) {
                                                 idbData: idbToSave,
                                                 savedAt: savedAt
                                             };
-                                            try { store.put(record); } catch(err) {}
+                                            try { store.put(record); } catch(err) { reportQuotaFailure('indexedDB', err); }
                                         });
                                     };
-                                } catch(txErr) {}
+                                } catch(txErr) { reportQuotaFailure('indexedDB', txErr); }
                             };
-                        } catch(err) {}
+                        } catch(err) { reportQuotaFailure('indexedDB', err); }
                     }
 
                     function loadFromIDB(callback) {
@@ -2823,7 +3086,18 @@ function launchGameFullscreen(game) {
                     // Autonomous Message Bus: persists even if opener tab was closed
                     window.addEventListener('message', function(e) {
                         if (!e.data) return;
-                        if (e.data.type === 'nexus-game-save' && isCurrentSession() && String(e.data.saveSessionId) === String(saveSessionId)) {
+                        if (e.data.type === 'nexus-game-storage-quota-error' && isCurrentSession() && String(e.data.saveSessionId) === String(saveSessionId)) {
+                            try {
+                                if (typeof BroadcastChannel === 'function') {
+                                    var quotaChannel = new BroadcastChannel('nexus-game-session');
+                                    quotaChannel.postMessage(e.data);
+                                    quotaChannel.close();
+                                }
+                            } catch(err) {}
+                            try {
+                                if (window.opener && !window.opener.closed) window.opener.postMessage(e.data, '*');
+                            } catch(err) {}
+                        } else if (e.data.type === 'nexus-game-save' && isCurrentSession() && String(e.data.saveSessionId) === String(saveSessionId)) {
                             saveToIDB(e.data);
                             try {
                                 if (window.opener && !window.opener.closed) {
@@ -3747,6 +4021,61 @@ async function deleteGame(id, index) {
     if (stash) loadGame(stash);
 }
 
+async function removeSidebarGamesFromSaveManager(gameIds) {
+    const selectedIds = new Set((gameIds || []).map(String));
+    if (selectedIds.size === 0) return [];
+
+    const removedGames = games.filter(game => game && selectedIds.has(String(game.id)));
+    if (!removedGames.length) return [];
+
+    await initDB();
+    const hiddenGameIds = getHiddenSidebarGameIds();
+    removedGames.forEach(game => hiddenGameIds.add(String(game.id)));
+    writeHiddenSidebarGameIds(hiddenGameIds);
+
+    try {
+        const tx = db.transaction('customGames', 'readwrite');
+        const store = tx.objectStore('customGames');
+        removedGames.forEach(game => store.delete(game.id));
+        await new Promise((resolve, reject) => {
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error || new Error('Could not remove selected games from the sidebar.'));
+            tx.onabort = () => reject(tx.error || new Error('Could not remove selected games from the sidebar.'));
+        });
+    } catch (error) {
+        console.warn('A removed sidebar game could not be erased from its custom game record.', error);
+    }
+
+    const removedCurrentGame = currentGame && selectedIds.has(String(currentGame.id));
+    if (removedCurrentGame) {
+        gameLoadToken += 1;
+        const frame = document.getElementById('game-frame');
+        if (frame) {
+            try {
+                if (frame.src && frame.src.startsWith('blob:')) URL.revokeObjectURL(frame.src);
+            } catch (error) {}
+            frame.removeAttribute('src');
+            frame.removeAttribute('srcdoc');
+        }
+        currentGame = null;
+    }
+
+    removedGames.forEach(game => {
+        if (game.content) game.content = null;
+    });
+    games = games.filter(game => !selectedIds.has(String(game.id)));
+    saveGameOrder();
+    renderGameList();
+    notifyStashBookmarkAvailability();
+
+    if (removedCurrentGame) {
+        const fallbackGame = games.find(game => game.id === 'ugs-stash') || games[0];
+        if (fallbackGame) loadGame(fallbackGame, true);
+    }
+
+    return removedGames;
+}
+
 let renameTargetId = null;
 
 function buildRenameSwatches(game) {
@@ -3794,6 +4123,14 @@ function openRenamePrompt(game) {
     const overlay = document.getElementById('rename-overlay');
     const input = document.getElementById('rename-app-title');
     if (!overlay || !input) return;
+
+    if (!overlay.dataset.outsideDismissBound) {
+        overlay.addEventListener('nexus:backdrop-dismiss', (event) => {
+            event.preventDefault();
+            closeRenamePrompt();
+        });
+        overlay.dataset.outsideDismissBound = 'true';
+    }
 
     renameTargetId = game.id;
     input.value = game.title;
@@ -4143,6 +4480,24 @@ async function clearGameSaves(gameIds) {
     });
 }
 
+let saveManagerSizeToken = 0;
+
+function setSaveManagerSizeLabel(element, bytes) {
+    if (!Number.isFinite(bytes)) {
+        element.textContent = 'Size unavailable';
+        element.title = 'Estimated saved data size is unavailable';
+        return;
+    }
+    if (bytes <= 0) {
+        element.textContent = 'No save data';
+        element.title = 'No saved data found';
+        return;
+    }
+    const formattedSize = formatSavesStorageSize(bytes);
+    element.textContent = `≈ ${formattedSize}`;
+    element.title = `Estimated saved data size: ${formattedSize}`;
+}
+
 function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError = null) {
     const overlay = document.getElementById('saves-select-overlay');
     const sidebarList = document.getElementById('saves-sidebar-games');
@@ -4174,6 +4529,10 @@ function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError 
         row?.classList.toggle('saves-selected', isSelected);
         const column = toggle.closest('.saves-game-column');
         if (column) refreshColumnToggle(column);
+        const confirmButton = document.getElementById('saves-select-confirm');
+        if (confirmButton) {
+            confirmButton.disabled = !overlay.querySelector('.saves-item-delete-toggle[aria-checked="true"]');
+        }
     };
     const appendItems = (container, items, emptyText) => {
         if (!items.length) {
@@ -4195,6 +4554,7 @@ function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError 
             toggle.className = 'saves-item-delete-toggle';
             toggle.value = gameId;
             toggle.dataset.gameTitle = String(gameTitle);
+            toggle.dataset.sidebarGame = String(!game.offSidebar);
             toggle.setAttribute('role', 'checkbox');
             toggle.setAttribute('aria-checked', 'false');
             toggle.setAttribute('aria-label', `Select ${gameTitle} for deletion`);
@@ -4213,6 +4573,11 @@ function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError 
             text.className = 'saves-item-text';
             text.textContent = gameTitle;
 
+            const size = document.createElement('span');
+            size.className = 'saves-item-size';
+            size.dataset.gameId = gameId;
+            size.textContent = 'Calculating…';
+
             toggle.addEventListener('click', () => {
                 setSelected(toggle, toggle.getAttribute('aria-checked') !== 'true');
             });
@@ -4220,7 +4585,7 @@ function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError 
                 if (event.target.closest('button')) return;
                 setSelected(toggle, toggle.getAttribute('aria-checked') !== 'true');
             });
-            row.append(text, toggle);
+            row.append(text, size, toggle);
             container.appendChild(row);
         });
     };
@@ -4238,11 +4603,67 @@ function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError 
     document.querySelectorAll('.saves-game-column').forEach(refreshColumnToggle);
 
     overlay.style.display = 'flex';
+    updateSavesMeterDebugControls();
+    updateSavesManagerStorageLock(savesStorageStatus.tier);
+    setSavesMeterForeground(true);
     if (window.setGamePopupState) window.setGamePopupState('saves-select-overlay', true);
 
+    if (!overlay.dataset.storageBackdropGuardBound) {
+        overlay.addEventListener('nexus:backdrop-dismiss', event => {
+            if (overlay.dataset.storageLocked === 'true') {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+            }
+        });
+        overlay.addEventListener('click', event => {
+            if (event.target === overlay && overlay.dataset.storageLocked === 'true') {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        });
+        overlay.dataset.storageBackdropGuardBound = 'true';
+    }
+
+    const sizeToken = ++saveManagerSizeToken;
+    getSaveManagerSizeEstimates(sidebarItems, offSidebarItems).then(sizeEstimates => {
+        if (sizeToken !== saveManagerSizeToken || overlay.style.display !== 'flex') return;
+        overlay.querySelectorAll('.saves-item-size').forEach(element => {
+            setSaveManagerSizeLabel(element, sizeEstimates.get(element.dataset.gameId));
+        });
+    }).catch(() => {
+        if (sizeToken !== saveManagerSizeToken || overlay.style.display !== 'flex') return;
+        overlay.querySelectorAll('.saves-item-size').forEach(element => setSaveManagerSizeLabel(element, null));
+    });
+
     return new Promise(resolve => {
+        const lockedKeyHandler = event => {
+            if (overlay.style.display !== 'flex' || savesStorageStatus.tier !== 'red') return;
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                return;
+            }
+            if (event.key === 'Tab') {
+                const focusable = Array.from(overlay.querySelectorAll('button:not([disabled]):not([hidden])'));
+                if (!focusable.length) return;
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            }
+        };
+        document.addEventListener('keydown', lockedKeyHandler, true);
         const finish = value => {
             overlay.style.display = 'none';
+            document.removeEventListener('keydown', lockedKeyHandler, true);
+            saveManagerSizeToken += 1;
+        updateSavesMeterDebugControls();
+            setSavesMeterForeground(false);
             if (window.setGamePopupState) window.setGamePopupState('saves-select-overlay', false);
             resolve(value);
         };
@@ -4258,16 +4679,31 @@ function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError 
         });
 
         const cancelBtn = document.getElementById('saves-select-cancel');
-        if (cancelBtn) cancelBtn.onclick = () => finish(null);
+        if (cancelBtn) cancelBtn.onclick = () => {
+            if (savesStorageStatus.tier === 'red') return;
+            finish(null);
+        };
 
         const confirmBtn = document.getElementById('saves-select-confirm');
         if (confirmBtn) {
+            confirmBtn.disabled = true;
             confirmBtn.onclick = () => {
                 const selectedToggles = Array.from(overlay.querySelectorAll('.saves-item-delete-toggle[aria-checked="true"]'));
+                if (selectedToggles.length === 0) return;
                 const selectedAliases = selectedToggles.flatMap(toggle => aliasesById.get(toggle.value) || [toggle.value]);
-                finish(Array.from(new Set(selectedAliases)));
+                const selectedSidebarIds = selectedToggles
+                    .filter(toggle => toggle.dataset.sidebarGame === 'true')
+                    .map(toggle => toggle.value);
+                finish({
+                    saveIds: Array.from(new Set(selectedAliases)),
+                    sidebarGameIds: Array.from(new Set(selectedSidebarIds))
+                });
             };
         }
+        window.setTimeout(() => {
+            const firstSelectable = overlay.querySelector('.saves-item-delete-toggle:not([disabled])');
+            if (firstSelectable && savesStorageStatus.tier === 'red') firstSelectable.focus();
+        }, 0);
     });
 }
 
@@ -4341,9 +4777,488 @@ function showRedConfirmDialog(message, options = {}) {
     });
 }
 
+let savesStorageEstimateRequest = 0;
+
+const SAVES_STORAGE_LOCAL_LIMIT_BYTES = 5 * 1024 * 1024;
+const SAVES_STORAGE_YELLOW_AT = 70;
+const SAVES_STORAGE_ORANGE_AT = 85;
+const SAVES_STORAGE_RED_AT = 95;
+const SAVES_STORAGE_FAILURE_KEY = 'tb_nexus_save_quota_failure';
+const SAVES_STORAGE_FAILURE_MIN_RELEASE_BYTES = 32 * 1024;
+let savesStorageQuotaFailure = false;
+let savesStorageFailureBaseline = null;
+let savesStorageStatus = { tier: 'unknown', pressurePercent: null };
+let savesGamesPageReady = false;
+let savesOrangeWarningShown = false;
+let savesRedWarningShown = false;
+let savesStorageWarningOpen = false;
+let savesManagerOpening = false;
+let savesStorageDebugTier = null;
+
+try {
+    const savedFailure = JSON.parse(window.sessionStorage.getItem(SAVES_STORAGE_FAILURE_KEY) || 'null');
+    if (savedFailure && typeof savedFailure === 'object') {
+        savesStorageQuotaFailure = true;
+        savesStorageFailureBaseline = savedFailure;
+    }
+} catch (error) {}
+
+function formatSavesStorageSize(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 0) return 'unavailable';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let amount = bytes;
+    let unitIndex = 0;
+    while (amount >= 1000 && unitIndex < units.length - 1) {
+        amount /= 1000;
+        unitIndex += 1;
+    }
+    const digits = unitIndex === 0 || amount >= 10 ? 0 : 1;
+    return `${amount.toFixed(digits)} ${units[unitIndex]}`;
+}
+
+function updateSavesStorageMeterDescription() {
+    const control = document.getElementById('saves-btn');
+    if (!control) return;
+
+    const status = savesStorageStatus;
+    const sourceDescription = status.limitingStore === 'localStorage'
+        ? 'localStorage estimate' : status.limitingStore === 'origin' ? 'whole-origin storage estimate' : 'storage pressure unavailable';
+    control.title = `The bar fill and warning tier indicate storage pressure based on the limiting estimate: ${sourceDescription}.`;
+    control.setAttribute('aria-label', `Open Save Manager. The bar indicates ${status.tier} storage pressure based on ${sourceDescription}.`);
+}
+
+function isSavesDevModeActive() {
+    try {
+        return (window.nexusStorage || window.localStorage).getItem('tb_dev_mode') === 'true';
+    } catch (error) {
+        return false;
+    }
+}
+
+function renderSavesStorageMeterStatus(status = savesStorageStatus) {
+    const control = document.getElementById('saves-btn');
+    const fill = document.getElementById('saves-storage-fill');
+    if (!control || !fill) return;
+
+    if (!Number.isFinite(status.pressurePercent)) {
+        fill.style.width = '0%';
+        fill.style.minWidth = '0';
+    } else {
+        const visiblePressure = Math.max(0, Math.min(100, status.pressurePercent));
+        fill.style.width = `${visiblePressure}%`;
+        fill.style.minWidth = '0';
+    }
+    control.dataset.storageTier = status.tier;
+    control.dataset.storageSource = status.limitingStore || 'unknown';
+    control.removeAttribute('data-storage-debug-tier');
+    updateSavesManagerStorageLock(status.tier);
+    updateSavesStorageMeterDescription();
+}
+
+function applySavesStorageMeterDebugPreview() {
+    const control = document.getElementById('saves-btn');
+    const fill = document.getElementById('saves-storage-fill');
+    const previews = {
+        white: { tier: 'normal', percent: 45 },
+        yellow: { tier: 'yellow', percent: SAVES_STORAGE_YELLOW_AT },
+        orange: { tier: 'orange', percent: SAVES_STORAGE_ORANGE_AT },
+        red: { tier: 'red', percent: SAVES_STORAGE_RED_AT }
+    };
+    const preview = previews[savesStorageDebugTier];
+    if (!control || !fill || !preview) return;
+
+    control.dataset.storageTier = preview.tier;
+    control.dataset.storageDebugTier = savesStorageDebugTier;
+    fill.style.width = `${preview.percent}%`;
+    fill.style.minWidth = '0';
+}
+
+function updateSavesMeterDebugControls() {
+    const overlay = document.getElementById('saves-select-overlay');
+    const controls = document.getElementById('saves-meter-debug-controls');
+    if (!overlay || !controls) return;
+
+    const isVisible = overlay.style.display === 'flex' && isSavesDevModeActive();
+    controls.hidden = !isVisible;
+
+    if (!controls.dataset.bound) {
+        controls.addEventListener('click', event => {
+            const button = event.target.closest('[data-saves-debug-tier]');
+            if (!button || controls.hidden || !isSavesDevModeActive()) return;
+            savesStorageDebugTier = button.dataset.savesDebugTier;
+            controls.querySelectorAll('[data-saves-debug-tier]').forEach(item => {
+                item.setAttribute('aria-pressed', String(item === button));
+            });
+            applySavesStorageMeterDebugPreview();
+        });
+        controls.dataset.bound = 'true';
+    }
+
+    if (!isVisible) {
+        if (savesStorageDebugTier !== null) {
+            savesStorageDebugTier = null;
+            controls.querySelectorAll('[data-saves-debug-tier]').forEach(item => item.setAttribute('aria-pressed', 'false'));
+            renderSavesStorageMeterStatus();
+        }
+        return;
+    }
+
+    if (savesStorageDebugTier !== null) applySavesStorageMeterDebugPreview();
+}
+
+window.addEventListener('storage', event => {
+    if (event.key && event.key !== 'tb_dev_mode') return;
+    updateSavesMeterDebugControls();
+});
+
+function getLocalStorageUsageEstimateBytes() {
+    try {
+        const nativeStorage = window.localStorage;
+        let measured = 0;
+        for (let index = 0; index < nativeStorage.length; index++) {
+            const key = nativeStorage.key(index);
+            if (key === null) continue;
+            const value = nativeStorage.getItem(key) || '';
+            // DOM Storage implementations commonly budget strings as UTF-16.
+            measured += (String(key).length + String(value).length) * 2;
+        }
+        return measured;
+    } catch (error) {
+        return null;
+    }
+}
+
+function isStorageQuotaError(error) {
+    return Boolean(error && (
+        error.name === 'QuotaExceededError' ||
+        error.code === 22 ||
+        error.code === 1014 ||
+        /quota exceeded|storage full|disk full/i.test(String(error.message || ''))
+    ));
+}
+
+function handleSavesStorageQuotaFailure(storageType, gameId = '') {
+    savesStorageQuotaFailure = true;
+    savesStorageFailureBaseline = {
+        localStorageUsage: getLocalStorageUsageEstimateBytes(),
+        originUsage: null,
+        storageType,
+        gameId: String(gameId || ''),
+        failedAt: Date.now()
+    };
+    try { window.sessionStorage.setItem(SAVES_STORAGE_FAILURE_KEY, JSON.stringify(savesStorageFailureBaseline)); } catch (error) {}
+
+    refreshSavesStorageMeter().then(status => {
+        if (savesGamesPageReady && status.tier === 'red' && !savesRedWarningShown && !savesManagerOpening) {
+            showSavesStorageWarning('red');
+        }
+    });
+}
+
+function updateSavesManagerStorageLock(tier = savesStorageStatus.tier) {
+    const overlay = document.getElementById('saves-select-overlay');
+    if (!overlay || overlay.style.display !== 'flex') return;
+    const locked = tier === 'red';
+    overlay.dataset.storageLocked = String(locked);
+    const cancelButton = document.getElementById('saves-select-cancel');
+    if (cancelButton) {
+        cancelButton.hidden = locked;
+        cancelButton.disabled = locked;
+    }
+}
+
+function showSavesStorageWarning(tier) {
+    const warningOverlay = document.getElementById('saves-storage-warning-overlay');
+    const title = document.getElementById('saves-storage-warning-title');
+    const message = document.getElementById('saves-storage-warning-message');
+    const okButton = document.getElementById('saves-storage-warning-ok');
+    const notNowButton = document.getElementById('saves-storage-warning-not-now');
+    const continueButton = document.getElementById('saves-storage-warning-continue');
+    if (!warningOverlay || !title || !message || !okButton || !notNowButton || !continueButton) return;
+
+    const isRed = tier === 'red';
+    if (savesStorageWarningOpen) {
+        if (isRed && warningOverlay.dataset.storageTier !== 'red') {
+            savesRedWarningShown = true;
+            title.textContent = 'Time to clean out your storage!';
+            message.textContent = 'Your save storage is critically full. Clear saves now or game progress may not load properly.';
+            okButton.hidden = true;
+            notNowButton.hidden = true;
+            continueButton.hidden = false;
+            warningOverlay.dataset.storageTier = 'red';
+            continueButton.focus();
+        }
+        return Promise.resolve(true);
+    }
+    if (isRed) savesRedWarningShown = true;
+    else savesOrangeWarningShown = true;
+
+    title.textContent = isRed ? 'Time to clean out your storage!' : 'Your game storage is getting low';
+    message.textContent = isRed
+        ? 'Your save storage is critically full. Clear saves now or game progress may not load properly.'
+        : 'Clear some saves soon, or game progress may not load properly.';
+    okButton.hidden = isRed;
+    notNowButton.hidden = isRed;
+    continueButton.hidden = !isRed;
+    warningOverlay.dataset.storageTier = isRed ? 'red' : 'orange';
+    warningOverlay.style.display = 'flex';
+    if (window.setGamePopupState) window.setGamePopupState('saves-storage-warning-overlay', true);
+    savesStorageWarningOpen = true;
+
+    return new Promise(resolve => {
+        let finished = false;
+        const cleanup = () => {
+            if (finished) return;
+            finished = true;
+            warningOverlay.style.display = 'none';
+            document.removeEventListener('keydown', keyHandler, true);
+            okButton.onclick = null;
+            notNowButton.onclick = null;
+            continueButton.onclick = null;
+            if (window.setGamePopupState) window.setGamePopupState('saves-storage-warning-overlay', false);
+            savesStorageWarningOpen = false;
+        };
+        const enterManager = () => {
+            cleanup();
+            resolve(true);
+            openSavesManager();
+        };
+        const dismiss = () => {
+            if (warningOverlay.dataset.storageTier === 'red') return;
+            cleanup();
+            resolve(false);
+        };
+        const keyHandler = event => {
+            if (warningOverlay.style.display !== 'flex') return;
+            if (event.key === 'Escape' && warningOverlay.dataset.storageTier === 'red') {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                return;
+            }
+            if (event.key === 'Tab') {
+                const visibleButtons = [okButton, notNowButton, continueButton].filter(button => !button.hidden && !button.disabled);
+                if (!visibleButtons.length) return;
+                const first = visibleButtons[0];
+                const last = visibleButtons[visibleButtons.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            }
+        };
+
+        document.addEventListener('keydown', keyHandler, true);
+        okButton.onclick = enterManager;
+        continueButton.onclick = enterManager;
+        notNowButton.onclick = dismiss;
+        window.setTimeout(() => (isRed ? continueButton : okButton).focus(), 0);
+    });
+}
+
+function showSavesStorageWarningOnPageEntry(status) {
+    savesGamesPageReady = true;
+    if (!status) return;
+    if (status.tier === 'red' && !savesRedWarningShown) {
+        showSavesStorageWarning('red');
+    } else if (status.tier === 'orange' && !savesOrangeWarningShown) {
+        showSavesStorageWarning('orange');
+    }
+}
+
+async function refreshSavesStorageMeter({ allowQuotaFailureReset = false } = {}) {
+    const control = document.getElementById('saves-btn');
+    const fill = document.getElementById('saves-storage-fill');
+    if (!control || !fill) return savesStorageStatus;
+
+    const requestId = ++savesStorageEstimateRequest;
+    const storageManager = navigator.storage;
+    let originUsage = null;
+    let originQuota = null;
+    try {
+        if (storageManager && typeof storageManager.estimate === 'function') {
+            const estimate = await storageManager.estimate();
+            const usage = Number(estimate.usage);
+            const quota = Number(estimate.quota);
+            if (Number.isFinite(usage) && usage >= 0) originUsage = usage;
+            if (Number.isFinite(quota) && quota > 0) originQuota = quota;
+        }
+    } catch (error) {}
+    if (requestId !== savesStorageEstimateRequest) return savesStorageStatus;
+
+    const localStorageUsage = getLocalStorageUsageEstimateBytes();
+
+    const candidates = [];
+    if (localStorageUsage !== null) {
+        candidates.push({
+            type: 'localStorage',
+            usage: localStorageUsage,
+            quota: SAVES_STORAGE_LOCAL_LIMIT_BYTES,
+            percent: localStorageUsage / SAVES_STORAGE_LOCAL_LIMIT_BYTES * 100
+        });
+    }
+    if (originUsage !== null && originQuota !== null) {
+        candidates.push({
+            type: 'origin',
+            usage: originUsage,
+            quota: originQuota,
+            percent: originUsage / originQuota * 100
+        });
+    }
+
+    const limitingStore = candidates.sort((left, right) => right.percent - left.percent)[0] || null;
+    const measuredPressure = limitingStore ? Math.max(0, limitingStore.percent) : null;
+    let failureBaselineUpdated = false;
+    if (savesStorageQuotaFailure && savesStorageFailureBaseline) {
+        if (!Number.isFinite(savesStorageFailureBaseline.localStorageUsage) && localStorageUsage !== null) {
+            savesStorageFailureBaseline.localStorageUsage = localStorageUsage;
+            failureBaselineUpdated = true;
+        }
+        if (!Number.isFinite(savesStorageFailureBaseline.originUsage) && originUsage !== null) {
+            savesStorageFailureBaseline.originUsage = originUsage;
+            failureBaselineUpdated = true;
+        }
+        if (failureBaselineUpdated) {
+            try { window.sessionStorage.setItem(SAVES_STORAGE_FAILURE_KEY, JSON.stringify(savesStorageFailureBaseline)); } catch (error) {}
+        }
+    }
+    if (savesStorageQuotaFailure && limitingStore && measuredPressure < SAVES_STORAGE_RED_AT && savesStorageFailureBaseline) {
+        const localStorageFreed = Number.isFinite(savesStorageFailureBaseline.localStorageUsage) &&
+            localStorageUsage !== null &&
+            savesStorageFailureBaseline.localStorageUsage - localStorageUsage >= SAVES_STORAGE_FAILURE_MIN_RELEASE_BYTES;
+        const originStorageFreed = Number.isFinite(savesStorageFailureBaseline.originUsage) &&
+            originUsage !== null &&
+            savesStorageFailureBaseline.originUsage - originUsage >= SAVES_STORAGE_FAILURE_MIN_RELEASE_BYTES;
+        if (allowQuotaFailureReset || localStorageFreed || originStorageFreed) {
+            savesStorageQuotaFailure = false;
+            savesStorageFailureBaseline = null;
+            try { window.sessionStorage.removeItem(SAVES_STORAGE_FAILURE_KEY); } catch (error) {}
+        }
+    }
+
+    const pressurePercent = measuredPressure === null
+        ? (savesStorageQuotaFailure ? 100 : null)
+        : Math.max(measuredPressure, savesStorageQuotaFailure ? SAVES_STORAGE_RED_AT : 0);
+    const tier = pressurePercent === null ? 'unknown'
+        : pressurePercent >= SAVES_STORAGE_RED_AT ? 'red'
+        : pressurePercent >= SAVES_STORAGE_ORANGE_AT ? 'orange'
+        : pressurePercent >= SAVES_STORAGE_YELLOW_AT ? 'yellow'
+        : 'normal';
+    const status = {
+        tier,
+        pressurePercent,
+        usage: limitingStore ? limitingStore.usage : null,
+        quota: limitingStore ? limitingStore.quota : null,
+        limitingStore: limitingStore ? limitingStore.type : null,
+        localStorageUsage,
+        originUsage,
+        originQuota,
+        quotaFailure: savesStorageQuotaFailure
+    };
+    savesStorageStatus = status;
+    renderSavesStorageMeterStatus(status);
+    if (savesStorageDebugTier !== null) applySavesStorageMeterDebugPreview();
+
+    if (savesGamesPageReady && tier === 'red' && !savesRedWarningShown && !savesStorageWarningOpen && !savesManagerOpening) {
+        showSavesStorageWarning('red');
+    }
+    return status;
+}
+
+let savesMeterOriginRect = null;
+let savesMeterReturnTimer = null;
+
+function moveSavesMeterAboveManager() {
+    const control = document.getElementById('saves-btn');
+    const overlay = document.getElementById('saves-select-overlay');
+    const modal = overlay && overlay.querySelector('.saves-modal-box');
+    if (!control || !modal || control.getAttribute('aria-expanded') !== 'true') return;
+
+    const modalRect = modal.getBoundingClientRect();
+    const width = savesMeterOriginRect ? savesMeterOriginRect.width : control.getBoundingClientRect().width;
+    const height = savesMeterOriginRect ? savesMeterOriginRect.height : control.getBoundingClientRect().height;
+    const minLeft = 12;
+    const maxLeft = Math.max(minLeft, window.innerWidth - width - 12);
+    const centeredLeft = modalRect.left + (modalRect.width - width) / 2;
+    const targetLeft = Math.min(maxLeft, Math.max(minLeft, centeredLeft));
+    const targetTop = Math.max(8, modalRect.top - height - 26);
+
+    control.style.setProperty('--saves-meter-left', `${targetLeft}px`);
+    control.style.setProperty('--saves-meter-top', `${targetTop}px`);
+}
+
+function setSavesMeterForeground(isForeground) {
+    const control = document.getElementById('saves-btn');
+    if (!control) return;
+
+    if (isForeground) {
+        if (savesMeterReturnTimer) {
+            clearTimeout(savesMeterReturnTimer);
+            savesMeterReturnTimer = null;
+        }
+
+        if (!control.classList.contains('saves-storage-foreground')) {
+            const rect = control.getBoundingClientRect();
+            savesMeterOriginRect = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+            control.style.setProperty('--saves-meter-left', `${rect.left}px`);
+            control.style.setProperty('--saves-meter-top', `${rect.top}px`);
+            control.style.setProperty('--saves-meter-width', `${rect.width}px`);
+            control.style.setProperty('--saves-meter-height', `${rect.height}px`);
+            control.classList.add('saves-storage-foreground');
+            control.getBoundingClientRect();
+        }
+
+        control.setAttribute('aria-expanded', 'true');
+        requestAnimationFrame(moveSavesMeterAboveManager);
+        return;
+    }
+
+    control.setAttribute('aria-expanded', 'false');
+    if (!control.classList.contains('saves-storage-foreground')) return;
+
+    if (savesMeterOriginRect) {
+        control.style.setProperty('--saves-meter-left', `${savesMeterOriginRect.left}px`);
+        control.style.setProperty('--saves-meter-top', `${savesMeterOriginRect.top}px`);
+    }
+
+    if (savesMeterReturnTimer) clearTimeout(savesMeterReturnTimer);
+    savesMeterReturnTimer = window.setTimeout(() => {
+        if (control.getAttribute('aria-expanded') === 'true') return;
+        control.classList.remove('saves-storage-foreground');
+        control.style.removeProperty('--saves-meter-left');
+        control.style.removeProperty('--saves-meter-top');
+        control.style.removeProperty('--saves-meter-width');
+        control.style.removeProperty('--saves-meter-height');
+        savesMeterOriginRect = null;
+        savesMeterReturnTimer = null;
+    }, 280);
+}
+
+window.addEventListener('resize', () => {
+    const control = document.getElementById('saves-btn');
+    if (!control || !control.classList.contains('saves-storage-foreground')) return;
+    control.classList.remove('saves-storage-foreground');
+    const rect = control.getBoundingClientRect();
+    savesMeterOriginRect = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    control.style.setProperty('--saves-meter-left', `${rect.left}px`);
+    control.style.setProperty('--saves-meter-top', `${rect.top}px`);
+    control.style.setProperty('--saves-meter-width', `${rect.width}px`);
+    control.style.setProperty('--saves-meter-height', `${rect.height}px`);
+    control.classList.add('saves-storage-foreground');
+    control.getBoundingClientRect();
+    if (control.getAttribute('aria-expanded') === 'true') requestAnimationFrame(moveSavesMeterAboveManager);
+});
+
 const savesBtn = document.getElementById('saves-btn');
-if (savesBtn) {
-    savesBtn.onclick = async () => {
+async function openSavesManager() {
+    const savesOverlay = document.getElementById('saves-select-overlay');
+    if (savesManagerOpening || (savesOverlay && savesOverlay.style.display === 'flex')) return;
+    savesManagerOpening = true;
+    let reopenLockedManager = false;
+    try {
+        await refreshSavesStorageMeter();
         // List games in the user's sidebar (excluding Game Stash)
         const sidebarGames = games.filter(g => g && g.id !== 'ugs-stash');
         let offSidebarGames = [];
@@ -4354,20 +5269,67 @@ if (savesBtn) {
         } catch (error) {
             offSidebarReadError = error;
         }
-        const selectedIds = await openSavesSelection(sidebarGames, offSidebarGames, offSidebarReadError);
-        if (!selectedIds || selectedIds.length === 0) return;
+        const selection = await openSavesSelection(sidebarGames, offSidebarGames, offSidebarReadError);
+        if (!selection || !selection.saveIds || selection.saveIds.length === 0) {
+            reopenLockedManager = savesStorageStatus.tier === 'red';
+            return;
+        }
 
         // Show red popup confirmation dialog
+        const sidebarRemovalNotice = selection.sidebarGameIds.length
+            ? '\n\nSelected games on the sidebar will also be removed from the sidebar.'
+            : '';
         const confirmed = await showRedConfirmDialog(
-            "Hold up, these games' saves will be deleted forever (A long time!) Are you sure you want to proceed?"
+            "Hold up, these games' saves will be deleted forever (A long time!) Are you sure you want to proceed?" + sidebarRemovalNotice
         );
 
-        if (!confirmed) return;
+        if (!confirmed) {
+            reopenLockedManager = savesStorageStatus.tier === 'red';
+            return;
+        }
 
-        await clearGameSaves(selectedIds);
-        nexusAlert("Selected games' saves have been cleared.");
-    };
+        await clearGameSaves(selection.saveIds);
+        const removedSidebarGames = await removeSidebarGamesFromSaveManager(selection.sidebarGameIds);
+        const updatedStatus = await refreshSavesStorageMeter({ allowQuotaFailureReset: true });
+        if (updatedStatus.tier === 'red') {
+            reopenLockedManager = true;
+            return;
+        }
+        nexusAlert(removedSidebarGames.length
+            ? "Selected saves have been cleared, and those games were removed from the sidebar."
+            : "Selected games' saves have been cleared.");
+    } catch (error) {
+        console.error('The Save Manager could not complete its storage operation.', error);
+        if (savesStorageStatus.tier === 'red') reopenLockedManager = true;
+    } finally {
+        savesManagerOpening = false;
+        if (reopenLockedManager && savesStorageStatus.tier === 'red') {
+            window.setTimeout(openSavesManager, 0);
+        }
+    }
 }
+
+if (savesBtn) {
+    refreshSavesStorageMeter();
+    window.setInterval(refreshSavesStorageMeter, 60000);
+    savesBtn.onclick = openSavesManager;
+}
+
+window.addEventListener('pageshow', event => {
+    if (!event.persisted) return;
+    savesOrangeWarningShown = false;
+    savesRedWarningShown = false;
+    refreshSavesStorageMeter().then(showSavesStorageWarningOnPageEntry);
+});
+
+window.addEventListener('focus', () => {
+    refreshSavesStorageMeter();
+});
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        refreshSavesStorageMeter();
+    }
+});
 
 const proxyBtn = document.getElementById('proxy-btn');
 if (proxyBtn) {
@@ -4412,6 +5374,13 @@ function initCarmeowTutorial() {
         overlay.id = 'tutorial-overlay';
         overlay.className = 'tutorial-overlay';
         document.body.appendChild(overlay);
+    }
+    if (!overlay.dataset.outsideDismissBound) {
+        overlay.addEventListener('nexus:backdrop-dismiss', (event) => {
+            event.preventDefault();
+            endCarmeowTutorial();
+        });
+        overlay.dataset.outsideDismissBound = 'true';
     }
     overlay.style.display = 'block';
     document.body.classList.add('tutorial-active');
@@ -4642,6 +5611,12 @@ if (window.MutationObserver) {
         overlay.querySelector('.surprise-close').addEventListener('click', closeMachine);
         overlay.querySelector('.surprise-spin-button').addEventListener('click', pullLever);
         overlay.addEventListener('click', e => {
+            if (e.target === overlay) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeMachine();
+                return;
+            }
             if (phase !== 'result-wait' || devModeSession) return;
             e.preventDefault();
             e.stopPropagation();

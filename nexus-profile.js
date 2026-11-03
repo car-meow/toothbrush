@@ -46,6 +46,10 @@
         overlay.className = 'nexus-legolooper-overlay';
         overlay.setAttribute('role', 'dialog');
         overlay.setAttribute('aria-modal', 'true');
+        overlay.addEventListener('nexus:backdrop-dismiss', event => {
+            event.preventDefault();
+            closeEasterEggPrompt(overlay);
+        });
 
         const panel = doc.createElement('div');
         panel.className = 'nexus-legolooper-panel';

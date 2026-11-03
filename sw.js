@@ -1,5 +1,5 @@
-// nexus-version: 4.46.25
-const CACHE_NAME = 'nexus-cache-v49';
+// nexus-version: 4.47.4
+const CACHE_NAME = 'nexus-cache-v55';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -24,11 +24,23 @@ const ASSETS_TO_CACHE = [
     './style.css',
     './style.css?v=64',
     './style.css?v=92',
+    './style.css?v=93',
+    './style.css?v=94',
+    './style.css?v=68',
+    './style.css?v=69',
+    './style.css?v=70',
     './home-widgets.css?v=11',
     './home-widgets.js?v=9',
     './online-presence.js?v=9',
     './app.js',
     './app.js?v=68',
+    './app.js?v=74',
+    './app.js?v=75',
+    './app.js?v=76',
+    './app.js?v=77',
+    './app.js?v=78',
+    './app.js?v=79',
+    './app.js?v=80',
     './bgm-manager.js',
     './game-title-utils.js',
     './tutorial-engine.js',

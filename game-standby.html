@@ -73,6 +73,9 @@
             document.getElementById('nexus-red-confirm-cancel').addEventListener('click', function () {
                 confirmOverlay.style.display = 'none';
             });
+            confirmOverlay.addEventListener('click', function (event) {
+                if (event.target === confirmOverlay) confirmOverlay.style.display = 'none';
+            });
             document.addEventListener('keydown', function (event) {
                 if (confirmOverlay.style.display !== 'flex') return;
                 if (event.key === 'Enter') {

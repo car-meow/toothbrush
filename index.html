@@ -1,12 +1,12 @@
-<!-- nexus-version: 4.46.26 -->
+<!-- nexus-version: 4.47.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>New Tab</title>
-<link rel="stylesheet" href="style.css?v=92">
+<link rel="stylesheet" href="style.css?v=94">
 <link rel="stylesheet" href="home-widgets.css?v=11">
-    <script src="bgm-manager.js?v=64"></script>
+    <script src="bgm-manager.js?v=66"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
         (function() {
@@ -212,7 +212,7 @@ html.light-mode .online-users-bubble {
 
 <div class="nexus-version-container" style="pointer-events: auto !important;">
     <button id="nexus-updates-button" class="nexus-version-tag nexus-updates-button" type="button" aria-label="Nexus Updates" aria-haspopup="dialog" aria-controls="nexus-updates-overlay" aria-expanded="false">
-        <span class="nexus-version-label">v4.46.26</span>
+        <span class="nexus-version-label">v4.47.4</span>
         <b id="nexus-updates-badge" class="nexus-updates-badge" aria-hidden="true" hidden></b>
     </button>
 </div>
@@ -240,6 +240,36 @@ html.light-mode .online-users-bubble {
         </header>
         <div class="nexus-updates-panels">
             <section id="nexus-updates-panel-games" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-games" data-update-panel="games" hidden>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.47.4</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry" data-update-notification="v4.47.4-games-save-meter-contrast"><div class="nexus-update-entry-heading"><h3>Save meter contrast</h3><span class="nexus-update-category-label is-style">STYLE</span></div><p>The used portion stays white over the colored threshold bands, and the save icon matches the meter's active urgency color.</p></li>
+                    </ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.47.3</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry" data-update-notification="v4.47.3-games-save-meter-preview"><div class="nexus-update-entry-heading"><h3>Storage meter previews</h3><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span><span class="nexus-update-category-label is-style">STYLE</span></div><p>Removed the aggregate number from the Games header so the meter alone shows storage pressure. Per-game size estimates remain in Save Manager. Dev Mode adds white, yellow, orange, and red meter previews while Save Manager is open; previews do not change real storage status or warning behavior.</p></li>
+                    </ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.47.2</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry" data-update-notification="v4.47.2-games-save-total"><div class="nexus-update-entry-heading"><h3>Save total matches per-game estimates</h3><span class="nexus-update-category-label is-bugfix">BUGFIX</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>The header now shows the sum of the same per-game save-size estimates shown in Save Manager. The bar fill and urgency still track whichever storage limit is tighter; its tooltip explains the separate pressure figure, since game snapshots may live in IndexedDB even when localStorage is the limiting store.</p></li>
+                    </ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.47.1</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry" data-update-notification="v4.47.1-games-storage-total-units"><div class="nexus-update-entry-heading"><h3>Storage sizes in KB/MB</h3><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Storage sizes now use decimal KB/MB units. The bar's fill and urgency follow the tighter localStorage or whole-origin quota estimate, and browser values remain approximate.</p></li>
+                    </ul>
+                </div>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.47.0</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry" data-update-notification="v4.47.0-games-save-storage-health"><div class="nexus-update-entry-heading"><h3>Game save storage health</h3><span class="nexus-update-category-label is-new-feature">NEW FEATURE</span><span class="nexus-update-category-label is-bugfix">BUGFIX</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Added a centered, clickable storage meter with per-save size estimates; clicking it glides above Save Manager. The fill and urgency follow whichever storage limit is tighter, and actual failed save writes trigger critical status. Its yellow border pulses gently with no prompt; orange pulses faster and warns on Games page entry; red pulses fastest and keeps Save Manager open until pressure drops below critical. Deleting a game's save also removes its sidebar entry. Redundant autosave journals are reclaimed after IndexedDB confirms a save.</p></li>
+                    </ul>
+                </div>
                 <div class="nexus-update-release">
                     <div class="nexus-update-version"><span>v4.46.26</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
                     <ul class="nexus-update-list">
@@ -380,8 +410,8 @@ html.light-mode .online-users-bubble {
 </div>
 <!-- ========== JAVASCRIPT ========== -->
 <script src="site-core.js?v=11"></script>
-<script src="tutorial-engine.js?v=2"></script>
-<script src="nexus-profile.js?v=4"></script>
+<script src="tutorial-engine.js?v=3"></script>
+<script src="nexus-profile.js?v=5"></script>
 <script src="nexus-welcome.js?v=19"></script>
 <script src="online-presence.js?v=9" defer></script>
 <script src="home-widgets.js?v=9" defer></script>

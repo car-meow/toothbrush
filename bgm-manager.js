@@ -10,17 +10,59 @@ if ('serviceWorker' in navigator) {
 
 // Nexus Custom Storage Wrapper (for URL cloaking storage proxy support)
 (function() {
+    const WINDOW_NAME_FALLBACK_KEY = '__nexusStorageFallbackV1';
     let mockStore = null;
     let useProxy = false;
+    let isWindowNameFallback = false;
+    let fallbackOriginalWindowName = '';
     let fallbackStore = {};
 
     try {
-        if (window.name && window.name.startsWith('{') && window.name.includes('tb_')) {
-            mockStore = JSON.parse(window.name);
-            useProxy = true;
-            console.log('Nexus Storage initialized from window.name');
+        if (window.name && window.name.startsWith('{')) {
+            const parsedWindowName = JSON.parse(window.name);
+            const fallbackEnvelope = parsedWindowName && parsedWindowName[WINDOW_NAME_FALLBACK_KEY];
+            if (fallbackEnvelope && fallbackEnvelope.values && typeof fallbackEnvelope.values === 'object') {
+                mockStore = fallbackEnvelope.values;
+                fallbackStore = mockStore;
+                fallbackOriginalWindowName = String(fallbackEnvelope.originalWindowName || '');
+                useProxy = true;
+                isWindowNameFallback = true;
+                console.log('Nexus Storage initialized from persistent window.name fallback');
+            } else if (window.name.includes('tb_')) {
+                mockStore = parsedWindowName;
+                useProxy = true;
+                console.log('Nexus Storage initialized from window.name');
+            }
         }
     } catch(e) {}
+
+    function serializeWindowNameStore() {
+        if (isWindowNameFallback) {
+            return JSON.stringify({
+                [WINDOW_NAME_FALLBACK_KEY]: {
+                    values: mockStore || fallbackStore,
+                    originalWindowName: fallbackOriginalWindowName
+                }
+            });
+        }
+        return JSON.stringify(mockStore);
+    }
+
+    function persistFallbackStore() {
+        try {
+            // The old fallback lived only in this page's memory, so values
+            // such as read-update IDs disappeared on refresh when localStorage
+            // was blocked or full. Keep that fallback in the browsing context.
+            if (!isWindowNameFallback) fallbackOriginalWindowName = window.name || '';
+            mockStore = fallbackStore;
+            useProxy = true;
+            isWindowNameFallback = true;
+            window.name = serializeWindowNameStore();
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
 
     let nativeStorage = null;
     try {
@@ -33,7 +75,10 @@ if ('serviceWorker' in navigator) {
         getItem: function(key) {
             if (useProxy && mockStore) return mockStore[key] !== undefined ? mockStore[key] : null;
             if (nativeStorage) {
-                try { return nativeStorage.getItem(key); } catch(e) {}
+                try {
+                    const value = nativeStorage.getItem(key);
+                    if (value !== null) return value;
+                } catch(e) {}
             }
             return fallbackStore[key] !== undefined ? fallbackStore[key] : null;
         },
@@ -41,30 +86,44 @@ if ('serviceWorker' in navigator) {
             const strVal = String(val);
             if (useProxy && mockStore) {
                 mockStore[key] = strVal;
-                window.name = JSON.stringify(mockStore);
-                try {
-                    window.parent.postMessage({ type: 'nexus-storage-save', key: key, value: strVal }, '*');
-                } catch(e) {}
+                try { window.name = serializeWindowNameStore(); } catch(e) {}
+                if (!isWindowNameFallback) {
+                    try {
+                        window.parent.postMessage({ type: 'nexus-storage-save', key: key, value: strVal }, '*');
+                    } catch(e) {}
+                }
                 return;
             }
             if (nativeStorage) {
-                try { nativeStorage.setItem(key, strVal); return; } catch(e) {}
+                try {
+                    nativeStorage.setItem(key, strVal);
+                    delete fallbackStore[key];
+                    return;
+                } catch(e) {}
             }
             fallbackStore[key] = strVal;
+            persistFallbackStore();
         },
         removeItem: function(key) {
             if (useProxy && mockStore) {
                 delete mockStore[key];
-                window.name = JSON.stringify(mockStore);
-                try {
-                    window.parent.postMessage({ type: 'nexus-storage-delete', key: key }, '*');
-                } catch(e) {}
+                try { window.name = serializeWindowNameStore(); } catch(e) {}
+                if (!isWindowNameFallback) {
+                    try {
+                        window.parent.postMessage({ type: 'nexus-storage-delete', key: key }, '*');
+                    } catch(e) {}
+                }
                 return;
             }
             if (nativeStorage) {
-                try { nativeStorage.removeItem(key); } catch(e) {}
+                try {
+                    nativeStorage.removeItem(key);
+                    delete fallbackStore[key];
+                    return;
+                } catch(e) {}
             }
             delete fallbackStore[key];
+            persistFallbackStore();
         },
         key: function(i) {
             if (useProxy && mockStore) return Object.keys(mockStore)[i] || null;
@@ -76,16 +135,24 @@ if ('serviceWorker' in navigator) {
         clear: function() {
             if (useProxy && mockStore) {
                 mockStore = {};
-                window.name = JSON.stringify(mockStore);
-                try {
-                    window.parent.postMessage({ type: 'nexus-storage-clear' }, '*');
-                } catch(e) {}
+                fallbackStore = mockStore;
+                try { window.name = serializeWindowNameStore(); } catch(e) {}
+                if (!isWindowNameFallback) {
+                    try {
+                        window.parent.postMessage({ type: 'nexus-storage-clear' }, '*');
+                    } catch(e) {}
+                }
                 return;
             }
             if (nativeStorage) {
-                try { nativeStorage.clear(); return; } catch(e) {}
+                try {
+                    nativeStorage.clear();
+                    fallbackStore = {};
+                    return;
+                } catch(e) {}
             }
             fallbackStore = {};
+            persistFallbackStore();
         }
     };
 
@@ -330,10 +397,17 @@ window.BGMManager = {
                 els.okBtn.onclick = null;
                 els.cancelBtn.onclick = null;
                 els.errorToggle.onclick = null;
+                els.overlay.removeEventListener('click', backdropHandler);
                 document.removeEventListener('keydown', keyHandler);
                 if (restoreTarget && typeof restoreTarget.focus === 'function') {
                     setTimeout(() => restoreTarget.focus(), 0);
                 }
+            };
+
+            const backdropHandler = (e) => {
+                if (e.target !== els.overlay) return;
+                cleanup();
+                resolve(isPrompt ? null : (isConfirm ? false : undefined));
             };
 
             const keyHandler = (e) => {
@@ -349,6 +423,7 @@ window.BGMManager = {
             };
 
             document.addEventListener('keydown', keyHandler);
+            els.overlay.addEventListener('click', backdropHandler);
 
             els.okBtn.onclick = (e) => {
                 e.preventDefault();
@@ -363,6 +438,36 @@ window.BGMManager = {
             };
         });
     }
+
+    // Most Nexus pages use .overlay (or an explicit dialog overlay) for modal
+    // prompts. Treat a backdrop click like the visible Cancel/Close control so
+    // page-specific cleanup and promise resolution still run.
+    document.addEventListener('click', (event) => {
+        const overlay = event.target;
+        if (!(overlay instanceof Element) || !overlay.matches('.overlay, .nexus-legolooper-overlay, [id$="-overlay"]')) return;
+        if (overlay.id === 'page-fade-overlay' || overlay.id === 'nexus-loading-screen' || overlay.id === 'waiting-overlay') return;
+        if (overlay.hidden) return;
+        const computed = window.getComputedStyle(overlay);
+        if (computed.display === 'none' || computed.visibility === 'hidden') return;
+
+        const dismissEvent = new CustomEvent('nexus:backdrop-dismiss', { cancelable: true });
+        overlay.dispatchEvent(dismissEvent);
+        if (dismissEvent.defaultPrevented) return;
+
+        const closeButton = Array.from(overlay.querySelectorAll('button:not([disabled])')).find((button) => {
+            const buttonStyle = window.getComputedStyle(button);
+            if (button.hidden || buttonStyle.display === 'none' || buttonStyle.visibility === 'hidden') return false;
+            const label = `${button.textContent || ''} ${button.getAttribute('aria-label') || ''} ${button.title || ''}`.trim();
+            return button.matches('.cancel-modal-btn, .saves-cancel-btn, .red-dialog-cancel-btn') || /\b(cancel|back|close|dismiss|no)\b/i.test(label);
+        });
+        if (closeButton) {
+            closeButton.click();
+        } else if (overlay.classList.contains('active')) {
+            overlay.classList.remove('active');
+        } else {
+            overlay.style.display = 'none';
+        }
+    });
 
     window.nexusAlert = function(msg, title) {
         return showDialog({ message: String(msg), title: title || 'Nexus', isConfirm: false });

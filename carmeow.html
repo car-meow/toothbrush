@@ -1,11 +1,11 @@
-<!-- nexus-version: 4.46.26 -->
+<!-- nexus-version: 4.47.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>New Tab</title>
-    <link rel="stylesheet" href="style.css?v=64">
-    <script src="bgm-manager.js?v=64"></script>
+    <link rel="stylesheet" href="style.css?v=70">
+    <script src="bgm-manager.js?v=65"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
         (function() {
@@ -20,7 +20,7 @@
 </head>
 <body>
     <div id="page-fade-overlay" class="is-loading"><div class="nexus-transition-content"><img src="Assets/loadingRoll.gif" alt=""><span class="nexus-transition-label">loading Games...</span></div></div>
-    <header>
+    <header class="games-header">
         <div class="header-left-group" style="display: flex; align-items: center; gap: 16px; flex-shrink: 0;">
             <h1 onclick="navigateWithFade('index.html')" style="margin: 0; cursor: pointer; white-space: nowrap;">Nexus Games</h1>
             <div id="game-status-container" class="status-header">
@@ -28,13 +28,24 @@
                 <span id="game-status-text" class="status-text">Loading...</span>
             </div>
         </div>
-		
+        <button id="saves-btn" class="saves-storage-control" type="button"
+                aria-label="Open Save Manager. The bar indicates current save storage pressure."
+                aria-haspopup="dialog" aria-controls="saves-select-overlay" aria-expanded="false"
+                title="The bar indicates storage pressure based on the limiting storage estimate.">
+            <span class="saves-storage-icon" aria-hidden="true"></span>
+            <span class="saves-storage-meter" aria-hidden="true">
+                <span id="saves-storage-fill" class="saves-storage-fill"></span>
+                <span class="saves-storage-zones">
+                    <span class="saves-storage-zone saves-storage-zone-yellow"></span>
+                    <span class="saves-storage-zone saves-storage-zone-orange"></span>
+                    <span class="saves-storage-zone saves-storage-zone-red"></span>
+                </span>
+            </span>
+        </button>
+
         <div class="controls">
             <button id="cloak-btn" class="material-nav-btn" style="--expanded-width: 165px; display: none;">
                 <img src="Assets/Fullscreen.svg" alt=""><span>Fullscreen</span>
-            </button>
-            <button id="saves-btn" class="material-nav-btn" style="--expanded-width: 125px;">
-                <img src="Assets/Saves.svg" alt=""><span>Saves</span>
             </button>
             <button id="custom-app-btn" class="material-nav-btn" style="--expanded-width: 140px;">
                 <img src="Assets/Custom.svg" alt=""><span>Custom</span>
@@ -109,10 +120,23 @@
         </div>
     </div>
 
+    <div id="saves-storage-warning-overlay" class="overlay" style="display:none; z-index:33000;" role="alertdialog" aria-modal="true" aria-labelledby="saves-storage-warning-title" aria-describedby="saves-storage-warning-message">
+        <div class="modal-box saves-storage-warning-box">
+            <h2 id="saves-storage-warning-title"></h2>
+            <p id="saves-storage-warning-message"></p>
+            <div class="saves-storage-warning-actions">
+                <button id="saves-storage-warning-ok" class="backup-modal-btn" type="button">OK</button>
+                <button id="saves-storage-warning-not-now" class="backup-modal-btn" type="button">Not now</button>
+                <button id="saves-storage-warning-continue" class="backup-modal-btn saves-clear-btn" type="button" hidden>Continue</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Saves Selection Overlay -->
     <div id="saves-select-overlay" class="overlay" style="display:none; z-index:32000;">
         <div class="modal-box saves-modal-box" style="width: 780px; max-width: 95vw; text-align: left;">
             <h2 id="saves-select-title" class="saves-modal-title">Nexus Game Saves Manager</h2>
+            <p class="saves-modal-hint">Select all games "not on sidebar" to clear some space in a pinch. These actions cannot be undone.</p>
             <div id="saves-game-list" class="saves-game-columns">
                 <section class="saves-game-column" data-saves-column="sidebar">
                     <div class="saves-game-column-header">
@@ -134,11 +158,17 @@
                 <button id="saves-select-confirm" class="backup-modal-btn saves-clear-btn">Clear Saves</button>
             </div>
         </div>
+        <div id="saves-meter-debug-controls" class="saves-meter-debug-controls" role="group" aria-label="Storage meter preview controls" hidden>
+            <button type="button" data-saves-debug-tier="white" aria-label="Preview white, normal storage" aria-pressed="false" title="Preview normal storage pressure"></button>
+            <button type="button" data-saves-debug-tier="yellow" aria-label="Preview yellow storage pressure" aria-pressed="false" title="Preview yellow storage pressure"></button>
+            <button type="button" data-saves-debug-tier="orange" aria-label="Preview orange storage pressure" aria-pressed="false" title="Preview orange storage pressure"></button>
+            <button type="button" data-saves-debug-tier="red" aria-label="Preview red storage pressure" aria-pressed="false" title="Preview red storage pressure"></button>
+        </div>
     </div>
 
-    <script src="tutorial-engine.js?v=2"></script>
+    <script src="tutorial-engine.js?v=3"></script>
     <script src="game-title-utils.js?v=48"></script>
-    <script src="app.js?v=69"></script>
+    <script src="app.js?v=80"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (window.TutorialEngine) TutorialEngine.initGames();

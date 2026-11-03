@@ -56,6 +56,13 @@
             overlayEl.className = 'tutorial-overlay';
             document.body.appendChild(overlayEl);
         }
+        if (!overlayEl.dataset.outsideDismissBound) {
+            overlayEl.addEventListener('nexus:backdrop-dismiss', (event) => {
+                event.preventDefault();
+                skip();
+            });
+            overlayEl.dataset.outsideDismissBound = 'true';
+        }
         overlayEl.style.display = 'block';
         document.body.classList.add('tutorial-active');
     }
