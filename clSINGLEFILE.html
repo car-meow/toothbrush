@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.47.7 -->
+<!-- nexus-version: 4.47.12 -->
 <!DOCTYPE html>
 <html>
 
@@ -374,6 +374,7 @@
         }
 
         .stash-list-game-button.bookmarked { opacity: .7; }
+        #featured-lists-container .stash-list-game-button.bookmarked { opacity: 1; }
 
         .stash-list-rank {
             position: absolute;
@@ -405,6 +406,8 @@
         #featured-lists-container .stash-list-card.rank-silver .stash-list-game-button:hover { background: #aeb5c3 !important; color: #252a34 !important; }
         #featured-lists-container .stash-list-card.rank-bronze .stash-list-game-button,
         #featured-lists-container .stash-list-card.rank-bronze .stash-list-game-button:hover { background: #b87345 !important; color: #351b0b !important; }
+        #featured-lists-container .stash-list-card.rank-gray .stash-list-game-button,
+        #featured-lists-container .stash-list-card.rank-gray .stash-list-game-button:hover { background: #2f343b !important; color: var(--text-color) !important; }
         .stash-list-card.rank-gold .stash-list-rank { background: #edc64b; color: #382600; }
         .stash-list-card.rank-silver .stash-list-rank { background: #c8cfda; color: #2a3039; }
         .stash-list-card.rank-bronze .stash-list-rank { background: #c47a49; color: #351b0b; }
@@ -581,6 +584,7 @@
             },
             popular: { title: 'What Users are Playing', icon: 'Assets/popular.svg', source: 'popularity' }
         };
+        const FEATURED_LIST_LIMIT = 20;
         const searchResultsContainer = document.createElement('div');
         searchResultsContainer.id = 'search-results-container';
         searchResultsContainer.className = 'search-results-container';
@@ -820,7 +824,9 @@
                 manualMode: false,
                 dragging: false,
                 dragged: false,
-                suppressClickUntil: 0
+                suppressClickUntil: 0,
+                flyAnimationFrame: 0,
+                flyCleanupTimer: 0
             };
         }
 
@@ -829,9 +835,10 @@
             card.className = 'stash-list-card';
             card.dataset.gameId = game.id;
             card.dataset.gameOrder = String(rank - 1);
-            if (listKey === 'popular' && rank > 0) {
-                card.classList.add(`rank-${rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'regular'}`);
-                if (rank <= 3) card.classList.add('has-shine');
+            if (rank > 0 && rank <= 3) {
+                card.classList.add(`rank-${rank === 1 ? 'gold' : rank === 2 ? 'silver' : 'bronze'}`, 'has-shine');
+            } else if (rank <= 10) {
+                card.classList.add('rank-gray');
             }
 
             const button = document.createElement('button');
@@ -860,10 +867,12 @@
 
         function fillFeaturedList(list, games) {
             const track = list.track;
+            clearFeaturedCardFly(list);
             track.replaceChildren();
-            list.games = games.slice();
+            track.style.paddingLeft = '';
+            list.games = games.slice(0, FEATURED_LIST_LIMIT);
             if (list.emptyMessage) list.emptyMessage.hidden = games.length > 0 || !list.emptyMessage.textContent;
-            list.originalCards = games.map((game, index) => makeFeaturedCard(game, index + 1, list.listKey, list));
+            list.originalCards = list.games.map((game, index) => makeFeaturedCard(game, index + 1, list.listKey, list));
             list.originalCards.forEach(card => track.appendChild(card));
             list.offset = 0;
             list.velocity = 0;
@@ -875,6 +884,7 @@
             const track = list.track;
             list.bufferCards = [];
             list.loopWidth = 0;
+            track.style.paddingLeft = '';
             track.replaceChildren(...list.originalCards);
             if (!list.originalCards.length) return;
 
@@ -907,6 +917,8 @@
                 const bufferCard = sourceCard.cloneNode(true);
                 bufferCard.classList.add('is-buffer-card');
                 bufferCard.setAttribute('aria-hidden', 'true');
+                bufferCard.style.transition = '';
+                bufferCard.style.transform = '';
                 bufferCard.querySelectorAll('button').forEach(button => { button.tabIndex = -1; });
                 track.appendChild(bufferCard);
                 list.bufferCards.push(bufferCard);
@@ -917,18 +929,102 @@
             list.loopWidth = firstBuffer ? firstBuffer.getBoundingClientRect().left - sourceLeft : 0;
         }
 
+        function clearFeaturedCardFly(list) {
+            if (list.flyAnimationFrame) {
+                cancelAnimationFrame(list.flyAnimationFrame);
+                list.flyAnimationFrame = 0;
+            }
+            if (list.flyCleanupTimer) {
+                clearTimeout(list.flyCleanupTimer);
+                list.flyCleanupTimer = 0;
+            }
+            list.originalCards.forEach(card => {
+                card.style.transition = '';
+                card.style.transform = '';
+            });
+        }
+
+        function animateFeaturedCardsToRankedOrder(list, sourceRects, viewportRect) {
+            const track = list.track;
+            const duration = 420;
+            const animations = [];
+            list.originalCards.forEach(card => {
+                const order = Number(card.dataset.gameOrder);
+                const candidates = sourceRects.get(order) || [];
+                if (!candidates.length) return;
+                const targetRect = card.getBoundingClientRect();
+                const sourceRect = candidates.slice().sort((a, b) => {
+                    const distance = rect => rect.right < viewportRect.left
+                        ? viewportRect.left - rect.right
+                        : rect.left > viewportRect.right
+                            ? rect.left - viewportRect.right
+                            : 0;
+                    return distance(a) - distance(b);
+                })[0];
+                const startsOnscreen = sourceRect.right > viewportRect.left && sourceRect.left < viewportRect.right;
+                const endsOnscreen = targetRect.right > viewportRect.left && targetRect.left < viewportRect.right;
+                const deltaX = sourceRect.left - targetRect.left;
+                if ((!startsOnscreen && !endsOnscreen) || Math.abs(deltaX) < 1) return;
+                card.style.transition = 'none';
+                card.style.transform = `translateX(${deltaX}px)`;
+                animations.push(card);
+            });
+            if (!animations.length || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                animations.forEach(card => {
+                    card.style.transition = '';
+                    card.style.transform = '';
+                });
+                return;
+            }
+            void track.offsetWidth;
+            list.flyAnimationFrame = requestAnimationFrame(() => {
+                list.flyAnimationFrame = 0;
+                animations.forEach(card => {
+                    card.style.transition = `transform ${duration}ms cubic-bezier(.22, 1, .36, 1)`;
+                    card.style.transform = 'translateX(0px)';
+                });
+                list.flyCleanupTimer = setTimeout(() => clearFeaturedCardFly(list), duration + 80);
+            });
+        }
+
         function setFeaturedListManualMode(list, manual) {
             if (list.manualMode === manual) return;
             list.manualMode = manual;
             list.velocity = 0;
             list.viewport.classList.toggle('is-interactive', manual);
             if (manual) {
+                const viewportRect = list.viewport.getBoundingClientRect();
+                const sourceCards = list.originalCards.concat(list.bufferCards);
+                const sourceRects = new Map();
+                sourceCards.forEach(card => {
+                    const order = Number(card.dataset.gameOrder);
+                    const rect = card.getBoundingClientRect();
+                    if (!sourceRects.has(order)) sourceRects.set(order, []);
+                    sourceRects.get(order).push(rect);
+                });
+                const hasVisibleBufferCard = list.bufferCards.some(card => {
+                    const rect = card.getBoundingClientRect();
+                    return rect.right > viewportRect.left && rect.left < viewportRect.right;
+                });
+                clearFeaturedCardFly(list);
+                const gamesById = new Map(list.games.map(game => [String(game.id), game]));
+                list.originalCards.sort((a, b) => Number(a.dataset.gameOrder) - Number(b.dataset.gameOrder));
+                list.games = list.originalCards.map(card => gamesById.get(card.dataset.gameId)).filter(Boolean);
+                list.track.style.paddingLeft = '';
                 list.track.replaceChildren(...list.originalCards);
                 list.bufferCards = [];
-                list.loopWidth = 0;
-                list.offset = 0;
-                list.track.style.transform = 'translate3d(0, 0, 0)';
+                if (hasVisibleBufferCard) {
+                    list.offset = 0;
+                    list.loopWidth = 0;
+                    list.track.style.transform = 'translate3d(0, 0, 0)';
+                    animateFeaturedCardsToRankedOrder(list, sourceRects, viewportRect);
+                } else {
+                    list.track.style.transform = `translate3d(${-list.offset}px, 0, 0)`;
+                    list.loopWidth = 0;
+                }
             } else {
+                clearFeaturedCardFly(list);
+                list.track.style.paddingLeft = '';
                 buildFeaturedAutoBuffer(list);
             }
         }
@@ -1099,7 +1195,8 @@
                 if (config.source === 'popularity') return;
                 const rowGames = (config.gameIds || [])
                     .map(id => catalog.get(normalizeBookmarkFileName(id).toLowerCase()))
-                    .filter(Boolean);
+                    .filter(Boolean)
+                    .slice(0, FEATURED_LIST_LIMIT);
                 fillFeaturedList(lists[key], rowGames);
             });
             if (FEATURED_LISTS.popular?.source === 'popularity') refreshPopularFeaturedList();
@@ -1125,7 +1222,7 @@
                     })
                     .filter(Boolean)
                     .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title))
-                    .slice(0, 10);
+                    .slice(0, FEATURED_LIST_LIMIT);
                 fillFeaturedList(list, rankedGames);
                 refreshBookmarkAvailability();
             } catch (error) {
