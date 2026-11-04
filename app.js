@@ -1,4 +1,4 @@
-// nexus-version: 4.47.12
+// nexus-version: 4.47.13
 const appStorage = window.nexusStorage || window.localStorage;
 // Game Stash is always available during a Games visit. Release its frame only
 // while the lightweight game standby screen is active.

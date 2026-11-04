@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.47.12 -->
+<!-- nexus-version: 4.47.13 -->
 <!DOCTYPE html>
 <html>
 
@@ -535,7 +535,7 @@
         </div>
     </div>
 
-    <script src="game-title-utils.js?v=48"></script>
+    <script src="game-title-utils.js?v=49"></script>
     <script>
         // --- INTERCEPT NEW TABS: Keep games inside the platform ---
         window.open = function(url) {
@@ -741,11 +741,11 @@
             });
         }
 
-        function getStashDisplayName(name, stripExtension = false) {
+        function getStashDisplayName(name, stripExtension = true) {
             const normalizedFile = normalizeBookmarkFileName(name).toLowerCase();
             const manifestItem = stashManifestMap.get(normalizedFile) ||
                                  stashManifestMap.get(normalizedFile.replace(/\.html$/, ''));
-            if (manifestItem && manifestItem.title) return manifestItem.title;
+            if (manifestItem && manifestItem.title) return humanizeBookmarkDisplayName(manifestItem.title, false);
             return humanizeBookmarkDisplayName(name, stripExtension);
         }
 
@@ -1247,7 +1247,7 @@
             resetSearchStyles();
 
             const sections = getLetterSections();
-            const query = searchInput.value.trim().toLowerCase();
+            const query = normalizeGameTitleForSearch(searchInput.value.trim());
             if (!query) {
                 document.body.classList.remove('stash-searching');
                 noResultsMessage.style.display = 'none';
@@ -1266,7 +1266,7 @@
                 for (let i = 0; i < wrappers.length; i++) {
                     const wrapper = wrappers[i];
                     const btn = wrapper.firstElementChild;
-                    const searchName = btn ? (btn.dataset.searchName || btn.value.toLowerCase()) : '';
+                    const searchName = btn ? (btn.dataset.searchName || normalizeGameTitleForSearch(btn.value)) : '';
                     const isMatch = searchName.includes(query);
                     wrapper.style.display = isMatch ? '' : 'none';
 
@@ -1613,12 +1613,29 @@
             "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
             "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "#"
         ];
+        const HIDE_WHEN_EMPTY_STASH_SECTIONS = new Set(["0", "7"]);
 
         function buildStashInterface(manifestGames) {
             const filesByChar = new Map();
             STASH_SECTIONS.forEach(c => filesByChar.set(c, []));
 
+            const titleVocabularyGames = manifestGames.concat(EXTRA_STASH_APPS.map(extra => ({
+                title: extra.displayName,
+                raw: extra.sourceFile,
+                file: extra.sourceFile
+            })));
+            configureGameTitleVocabulary(titleVocabularyGames);
+            try {
+                if (window.parent !== window && typeof window.parent.configureGameTitleVocabulary === 'function') {
+                    window.parent.configureGameTitleVocabulary(titleVocabularyGames);
+                }
+            } catch (error) {
+                // The Stash remains usable if it is opened outside its normal same-origin frame.
+            }
+
             manifestGames.forEach(item => {
+                const titleIsDerivedFromFile = !item.title;
+                item.title = humanizeBookmarkDisplayName(item.title || item.raw || item.file, titleIsDerivedFromFile);
                 stashManifestMap.set(item.file.toLowerCase(), item);
                 stashManifestMap.set(item.raw.toLowerCase(), item);
                 const baseName = item.file.replace(/\.html$/, '').toLowerCase();
@@ -1635,7 +1652,7 @@
                 filesByChar.get(char).push({
                     file: extra.sourceFile,
                     raw: extra.sourceFile,
-                    title: extra.displayName,
+                    title: humanizeBookmarkDisplayName(extra.displayName, false),
                     letter: char,
                     isLocal: true,
                     isExtra: true,
@@ -1689,7 +1706,7 @@
                     btn.dataset.originalValue = raw;
                     btn.dataset.stashFile = game.file;
                     btn.dataset.stashId = uniqueId;
-                    btn.dataset.searchName = `${game.title} ${raw}`.toLowerCase();
+                    btn.dataset.searchName = normalizeGameTitleForSearch(`${game.title} ${raw}`);
                     btn.dataset.sourceKey = buildBookmarkSourceKey(raw);
                     if (game.isLocal !== undefined) btn.dataset.isLocal = String(game.isLocal);
                     if (isExtra && game.externalUrl) {
@@ -1716,6 +1733,8 @@
                     emptyMsg.textContent = 'No files';
                     container.appendChild(emptyMsg);
                 }
+                const hideEmptySection = HIDE_WHEN_EMPTY_STASH_SECTIONS.has(char) && renderedCount === 0;
+                section.hidden = hideEmptySection;
 
                 section.appendChild(container);
                 fragment.appendChild(section);
@@ -1724,6 +1743,7 @@
                     const sidebarBtn = document.createElement('button');
                     sidebarBtn.className = 'sidebar-btn';
                     sidebarBtn.textContent = char;
+                    sidebarBtn.hidden = hideEmptySection;
                     if (renderedCount === 0) {
                         sidebarBtn.classList.add('empty');
                     } else {
