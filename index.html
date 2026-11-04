@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.47.6 -->
+<!-- nexus-version: 4.47.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -212,7 +212,7 @@ html.light-mode .online-users-bubble {
 
 <div class="nexus-version-container" style="pointer-events: auto !important;">
     <button id="nexus-updates-button" class="nexus-version-tag nexus-updates-button" type="button" aria-label="Nexus Updates" aria-haspopup="dialog" aria-controls="nexus-updates-overlay" aria-expanded="false">
-        <span class="nexus-version-label">v4.47.6</span>
+        <span class="nexus-version-label">v4.47.7</span>
         <b id="nexus-updates-badge" class="nexus-updates-badge" aria-hidden="true" hidden></b>
     </button>
 </div>
@@ -240,6 +240,12 @@ html.light-mode .online-users-bubble {
         </header>
         <div class="nexus-updates-panels">
             <section id="nexus-updates-panel-games" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-games" data-update-panel="games" hidden>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.47.7</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry" data-update-notification="v4.47.7-games-hidden-stash-memory"><div class="nexus-update-entry-heading"><h3>Fixed a large RAM spike when opening Games</h3><span class="nexus-update-category-label is-bugfix">BUGFIX</span></div><p>The hidden preloaded Stash no longer creates carousel cards while they have zero layout size. Its card buffer is bounded and builds when the Stash becomes visible.</p></li>
+                    </ul>
+                </div>
                 <div class="nexus-update-release">
                     <div class="nexus-update-version"><span>v4.47.6</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
                     <ul class="nexus-update-list">

@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.46.21 -->
+<!-- nexus-version: 4.47.7 -->
 <!DOCTYPE html>
 <html>
 
@@ -879,15 +879,30 @@
             if (!list.originalCards.length) return;
 
             const firstOriginal = list.originalCards[0];
-            const firstAdvance = firstOriginal.getBoundingClientRect().width + (parseFloat(getComputedStyle(track).columnGap) || 0);
-            const visibleBufferWidth = list.viewport.clientWidth + firstAdvance;
+            const firstCardRect = firstOriginal.getBoundingClientRect();
+            const viewportWidth = list.viewport.clientWidth;
+            const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
+            const firstAdvance = firstCardRect.width + gap;
+            // The Stash is intentionally preloaded in a display:none iframe.
+            // Its cards then measure as zero width while the flex gap remains
+            // nonzero; trying to fill the offscreen buffer in that state never
+            // converges and can allocate DOM nodes until the tab exhausts RAM.
+            if (!Number.isFinite(viewportWidth) || viewportWidth <= 0 ||
+                !Number.isFinite(firstCardRect.width) || firstCardRect.width <= 0 ||
+                !Number.isFinite(firstAdvance) || firstAdvance <= 0) {
+                list.offset = 0;
+                track.style.transform = 'translate3d(0, 0, 0)';
+                return;
+            }
+            const visibleBufferWidth = viewportWidth + firstAdvance;
             const sourceLeft = firstOriginal.getBoundingClientRect().left;
             let firstBuffer = null;
             let lastBufferRight = 0;
             let index = 0;
+            const maxBufferCards = Math.min(64, Math.max(1, Math.ceil(visibleBufferWidth / firstAdvance) + 1));
 
             // Preload past the visible edge by one whole card so the right side never reveals a late card.
-            while (lastBufferRight - (firstBuffer ? firstBuffer.getBoundingClientRect().left : 0) < visibleBufferWidth) {
+            while (index < maxBufferCards && lastBufferRight - (firstBuffer ? firstBuffer.getBoundingClientRect().left : 0) < visibleBufferWidth) {
                 const sourceCard = list.originalCards[index % list.originalCards.length];
                 const bufferCard = sourceCard.cloneNode(true);
                 bufferCard.classList.add('is-buffer-card');
@@ -899,7 +914,7 @@
                 lastBufferRight = bufferCard.getBoundingClientRect().right;
                 index++;
             }
-            list.loopWidth = firstBuffer.getBoundingClientRect().left - sourceLeft;
+            list.loopWidth = firstBuffer ? firstBuffer.getBoundingClientRect().left - sourceLeft : 0;
         }
 
         function setFeaturedListManualMode(list, manual) {
