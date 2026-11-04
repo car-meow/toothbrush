@@ -1209,6 +1209,24 @@ main {
     --li-bg: var(--zigzag-line);  /* gradient color matches button bg */
 }
 
+#game-list li.sidebar-already-added-highlight {
+    outline: 4px solid #ffffff !important;
+    outline-offset: 1px;
+    z-index: 2;
+    animation: sidebarAlreadyAddedFlash 0.5s ease-in-out 4;
+}
+
+@keyframes sidebarAlreadyAddedFlash {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.16); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #game-list li.sidebar-already-added-highlight {
+        animation: none;
+    }
+}
+
 #game-list li:hover {
     background-color: var(--panel-bg-alt);
     transform: translateX(5px);

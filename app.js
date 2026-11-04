@@ -678,6 +678,32 @@ async function saveGameRecord(game) {
 
 // Called by Game Stash after it has fetched a game. Keeping the write in the
 // parent page avoids competing IndexedDB versions between the iframe and app.
+const sidebarExistingHighlightTimeouts = new WeakMap();
+
+window.highlightSidebarGame = function(gameId) {
+    const list = document.getElementById('game-list');
+    if (!list) return false;
+
+    const target = Array.from(list.querySelectorAll('li[data-game-id]'))
+        .find(item => item.dataset.gameId === String(gameId));
+    if (!target) return false;
+
+    target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+
+    const previousTimeout = sidebarExistingHighlightTimeouts.get(target);
+    if (previousTimeout) clearTimeout(previousTimeout);
+    target.classList.remove('sidebar-already-added-highlight');
+    void target.offsetWidth;
+    target.classList.add('sidebar-already-added-highlight');
+
+    const timeout = setTimeout(() => {
+        target.classList.remove('sidebar-already-added-highlight');
+        sidebarExistingHighlightTimeouts.delete(target);
+    }, 2000);
+    sidebarExistingHighlightTimeouts.set(target, timeout);
+    return true;
+};
+
 window.addStashGameToSidebar = async function(game) {
     if (!game || !game.id) throw new Error('Invalid game record');
 
@@ -694,6 +720,7 @@ window.addStashGameToSidebar = async function(game) {
         // Game already exists on the sidebar; preserve its existing position!
         games[existingIndex] = { ...games[existingIndex], ...sidebarGame };
         renderGameList();
+        window.highlightSidebarGame(sidebarGame.id);
         notifyStashBookmarkAvailability();
         queueStashSidebarPopularitySync();
         return;
@@ -5123,7 +5150,7 @@ function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError 
 
     return new Promise(resolve => {
         const lockedKeyHandler = event => {
-            if (overlay.style.display !== 'flex' || savesStorageStatus.tier !== 'red') return;
+            if (overlay.style.display !== 'flex' || overlay.dataset.storageLocked !== 'true') return;
             if (event.key === 'Escape') {
                 event.preventDefault();
                 event.stopImmediatePropagation();
@@ -5166,7 +5193,7 @@ function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError 
 
         const cancelBtn = document.getElementById('saves-select-cancel');
         if (cancelBtn) cancelBtn.onclick = () => {
-            if (savesStorageStatus.tier === 'red') return;
+            if (overlay.dataset.storageLocked === 'true') return;
             finish(null);
         };
 
@@ -5188,7 +5215,7 @@ function openSavesSelection(gameList, offSidebarGames = [], offSidebarReadError 
         }
         window.setTimeout(() => {
             const firstSelectable = overlay.querySelector('.saves-item-delete-toggle:not([disabled])');
-            if (firstSelectable && savesStorageStatus.tier === 'red') firstSelectable.focus();
+            if (firstSelectable && overlay.dataset.storageLocked === 'true') firstSelectable.focus();
         }, 0);
     });
 }
@@ -5273,6 +5300,7 @@ const SAVES_STORAGE_RED_AT = 95;
 const SAVES_STORAGE_FAILURE_KEY = 'tb_nexus_save_quota_failure_v2';
 const SAVES_STORAGE_FAILURE_LEGACY_KEY = 'tb_nexus_save_quota_failure';
 const SAVES_STORAGE_FAILURE_MIN_RELEASE_BYTES = 32 * 1024;
+const SAVES_RED_CLEANUP_ACK_KEY = 'tb_nexus_red_storage_cleanup_acknowledged';
 let savesStorageQuotaFailure = false;
 let savesStorageFailureBaseline = null;
 let savesStorageStatus = { tier: 'unknown', pressurePercent: null };
@@ -5283,6 +5311,21 @@ let savesRedWarningShown = false;
 let savesStorageWarningOpen = false;
 let savesManagerOpening = false;
 let savesStorageDebugTier = null;
+let savesRedCleanupAcknowledged = false;
+
+try { savesRedCleanupAcknowledged = window.sessionStorage.getItem(SAVES_RED_CLEANUP_ACK_KEY) === 'true'; } catch (error) {}
+
+function acknowledgeRedStorageCleanup() {
+    savesRedCleanupAcknowledged = true;
+    savesRedWarningShown = true;
+    try { window.sessionStorage.setItem(SAVES_RED_CLEANUP_ACK_KEY, 'true'); } catch (error) {}
+}
+
+function resetRedStorageCleanupAcknowledgement() {
+    savesRedCleanupAcknowledged = false;
+    savesRedWarningShown = false;
+    try { window.sessionStorage.removeItem(SAVES_RED_CLEANUP_ACK_KEY); } catch (error) {}
+}
 
 try {
     window.sessionStorage.removeItem(SAVES_STORAGE_FAILURE_LEGACY_KEY);
@@ -5525,7 +5568,7 @@ function handleSavesStorageQuotaFailure(storageType, gameId = '') {
     try { window.sessionStorage.setItem(SAVES_STORAGE_FAILURE_KEY, JSON.stringify(savesStorageFailureBaseline)); } catch (error) {}
 
     refreshSavesStorageMeter().then(status => {
-        if (savesGamesPageReady && status.tier === 'red' && !savesRedWarningShown && !savesManagerOpening) {
+        if (savesGamesPageReady && status.tier === 'red' && !savesRedWarningShown && !savesRedCleanupAcknowledged && !savesManagerOpening) {
             showSavesStorageWarning('red');
         }
     });
@@ -5534,7 +5577,7 @@ function handleSavesStorageQuotaFailure(storageType, gameId = '') {
 function updateSavesManagerStorageLock(tier = savesStorageStatus.tier) {
     const overlay = document.getElementById('saves-select-overlay');
     if (!overlay || overlay.style.display !== 'flex') return;
-    const locked = tier === 'red';
+    const locked = tier === 'red' && !savesRedCleanupAcknowledged;
     overlay.dataset.storageLocked = String(locked);
     const cancelButton = document.getElementById('saves-select-cancel');
     if (cancelButton) {
@@ -5553,6 +5596,10 @@ function showSavesStorageWarning(tier) {
     if (!warningOverlay || !title || !message || !okButton || !notNowButton || !continueButton) return;
 
     const isRed = tier === 'red';
+    if (isRed && savesRedCleanupAcknowledged) {
+        savesRedWarningShown = true;
+        return Promise.resolve(true);
+    }
     if (savesStorageWarningOpen) {
         if (isRed && warningOverlay.dataset.storageTier !== 'red') {
             savesRedWarningShown = true;
@@ -5637,7 +5684,7 @@ function showSavesStorageWarning(tier) {
 function showSavesStorageWarningOnPageEntry(status) {
     savesGamesPageReady = true;
     if (!status) return;
-    if (status.tier === 'red' && !savesRedWarningShown) {
+    if (status.tier === 'red' && !savesRedWarningShown && !savesRedCleanupAcknowledged) {
         showSavesStorageWarning('red');
     } else if (status.tier === 'orange' && !savesOrangeWarningShown) {
         showSavesStorageWarning('orange');
@@ -5739,7 +5786,8 @@ async function refreshSavesStorageMeter({ allowQuotaFailureReset = false } = {})
     renderSavesStorageMeterStatus(status);
     if (savesStorageDebugTier !== null) applySavesStorageMeterDebugPreview();
 
-    if (savesGamesPageReady && tier === 'red' && !savesRedWarningShown && !savesStorageWarningOpen && !savesManagerOpening) {
+    if (tier !== 'red' && savesRedCleanupAcknowledged) resetRedStorageCleanupAcknowledgement();
+    if (tier === 'red' && !savesRedCleanupAcknowledged && !savesRedWarningShown && !savesStorageWarningOpen && !savesManagerOpening) {
         showSavesStorageWarning('red');
     }
     return status;
@@ -5849,7 +5897,7 @@ async function openSavesManager() {
         }
         const selection = await openSavesSelection(sidebarGames, offSidebarGames, offSidebarReadError);
         if (!selection || !selection.saveIds || selection.saveIds.length === 0) {
-            reopenLockedManager = savesStorageStatus.tier === 'red';
+            reopenLockedManager = savesStorageStatus.tier === 'red' && !savesRedCleanupAcknowledged;
             return;
         }
 
@@ -5862,16 +5910,16 @@ async function openSavesManager() {
         );
 
         if (!confirmed) {
-            reopenLockedManager = savesStorageStatus.tier === 'red';
+            reopenLockedManager = savesStorageStatus.tier === 'red' && !savesRedCleanupAcknowledged;
             return;
         }
 
         await clearGameSaves(selection.saveIds);
         const removedSidebarGames = await removeSidebarGamesFromSaveManager(selection.sidebarGameIds);
+        acknowledgeRedStorageCleanup();
         const updatedStatus = await refreshSavesStorageMeter({ allowQuotaFailureReset: true });
         if (updatedStatus.tier === 'red') {
-            reopenLockedManager = true;
-            return;
+            updateSavesManagerStorageLock(updatedStatus.tier);
         }
         nexusAlert(removedSidebarGames.length
             ? "Selected saves have been cleared, and those games were removed from the sidebar."
@@ -5881,7 +5929,7 @@ async function openSavesManager() {
         try {
             await nexusAlert(error && error.message ? error.message : 'The selected game storage could not be cleared.');
         } catch (alertError) {}
-        if (savesStorageStatus.tier === 'red') reopenLockedManager = true;
+        if (savesStorageStatus.tier === 'red' && !savesRedCleanupAcknowledged) reopenLockedManager = true;
     } finally {
         savesManagerOpening = false;
         if (reopenLockedManager && savesStorageStatus.tier === 'red') {

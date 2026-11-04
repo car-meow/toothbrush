@@ -1247,14 +1247,16 @@
 
             // Single authoritative source of truth is window.parent.games
             let isAlreadyAdded = false;
+            let existingSidebarGame = null;
             if (window.parent && Array.isArray(window.parent.games)) {
-                isAlreadyAdded = window.parent.games.some(g =>
+                existingSidebarGame = window.parent.games.find(g =>
                     g && (
                         String(g.id).toLowerCase() === bookmarkId.toLowerCase() ||
                         (g.sourceKey && String(g.sourceKey).toLowerCase() === sourceKey.toLowerCase()) ||
                         (g.sourceFile && String(g.sourceFile).toLowerCase() === sourceFile.toLowerCase())
                     )
                 );
+                isAlreadyAdded = Boolean(existingSidebarGame);
                 // Purge any stale local cache entry if parent games does not contain this game
                 if (!isAlreadyAdded) {
                     bookmarkedSourceKeys.delete(sourceKey.toLowerCase());
@@ -1286,7 +1288,12 @@
                 setTimeout(() => floating.remove(), isAlreadyAdded ? 2000 : 1000);
             }
 
-            if (isAlreadyAdded) return;
+            if (isAlreadyAdded) {
+                if (window.parent && typeof window.parent.highlightSidebarGame === 'function') {
+                    window.parent.highlightSidebarGame(existingSidebarGame ? existingSidebarGame.id : bookmarkId);
+                }
+                return;
+            }
 
             // Immediately mark locally so subsequent clicks recognize it instantly
             bookmarkedSourceKeys.add(sourceKey.toLowerCase());
