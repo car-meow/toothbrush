@@ -880,6 +880,17 @@ body:not(.media-bg) button#saves-btn.saves-storage-control:focus-visible {
     pointer-events: none;
 }
 
+.saves-storage-dev-readout {
+    flex: 0 0 auto;
+    color: currentColor;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    opacity: 0.84;
+    pointer-events: none;
+}
+
 .saves-storage-fill {
     display: block;
     position: absolute;
@@ -1050,6 +1061,10 @@ html.performance-mode-lite .saves-storage-control.saves-storage-foreground {
         height: 40px;
         gap: 10px;
         padding: 0 12px;
+    }
+
+    .saves-storage-dev-readout {
+        font-size: 10px;
     }
 
     .saves-storage-control > .saves-storage-icon {

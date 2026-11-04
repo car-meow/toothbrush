@@ -4,11 +4,12 @@
 
 <head>
     <title>Nexus Files</title>
-    <link rel="stylesheet" href="style.css?v=56">
+    <link rel="stylesheet" href="style.css?v=95">
     <script>
         (function() {
             const theme = localStorage.getItem('tb_theme') || 'dark';
             if (theme === 'light') document.documentElement.classList.add('light-mode');
+            if (localStorage.getItem('tb_font_choice') === 'space-grotesk') document.documentElement.setAttribute('data-font', 'space-grotesk');
             if (localStorage.getItem('tb_performance_mode') === 'true') document.documentElement.classList.add('performance-mode');
             else if (localStorage.getItem('tb_performance_mode_lite') === 'true') document.documentElement.classList.add('performance-mode-lite');
             if (localStorage.getItem('tb_dev_mode') === 'true') document.documentElement.classList.add('dev-mode');
@@ -41,7 +42,7 @@
         }
 
         body, input, button, select, textarea {
-            font-family: 'Space Grotesk', sans-serif;
+            font-family: var(--app-font, 'Google Sans Flex', sans-serif);
         }
 
         body {
@@ -130,7 +131,7 @@
         .main-content > h1,
         .main-content > h2,
         .main-content > header,
-        .main-content > div:not(#search-container):not(#sections-container):not(#search-results-container) {
+        .main-content > div:not(#search-container):not(#featured-lists-container):not(#sections-container):not(#search-results-container) {
             display: none !important;
         }
 
@@ -244,10 +245,177 @@
             padding: 20px;
         }
 
+        #featured-lists-container {
+            width: 100%;
+            max-width: none;
+            margin: -16px 0 28px;
+            padding: 0 16px;
+            box-sizing: border-box;
+        }
+
+        .stash-featured-list {
+            margin: 0 0 18px;
+        }
+
+        .stash-featured-heading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0 0 8px 2px;
+            color: var(--text-color);
+            font-family: var(--app-font, 'Google Sans Flex', sans-serif);
+            font-size: 17px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .stash-featured-heading img {
+            width: 19px;
+            height: 19px;
+            object-fit: contain;
+        }
+
+        .stash-featured-viewport {
+            position: relative;
+            overflow: hidden;
+            scrollbar-width: none;
+            overscroll-behavior-x: contain;
+            touch-action: pan-y;
+            border-radius: 10px;
+            -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+            cursor: default;
+        }
+
+        .stash-featured-viewport::-webkit-scrollbar { display: none; }
+        .stash-featured-viewport.is-interactive {
+            cursor: grab;
+            -webkit-mask-image: none;
+            mask-image: none;
+        }
+        .stash-featured-viewport.is-dragging { cursor: grabbing; }
+
+        .stash-featured-track {
+            display: flex;
+            align-items: stretch;
+            gap: 10px;
+            width: max-content;
+            min-height: 74px;
+            box-sizing: border-box;
+            padding: 4px 5px 9px;
+            will-change: transform;
+        }
+
+        .stash-list-card {
+            position: relative;
+            flex: 0 0 174px;
+            width: 174px;
+            isolation: isolate;
+        }
+
+        .stash-list-card.is-buffer-card { pointer-events: none; }
+
+        .stash-list-game-button {
+            position: relative;
+            display: block;
+            overflow: hidden;
+            width: 100%;
+            height: 58px;
+            padding: 9px 27px 9px 12px;
+            border: 0;
+            border-radius: 9px;
+            background: var(--btn-bg);
+            color: var(--text-color);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, .18);
+            font: 600 13px/1.25 var(--app-font, 'Google Sans Flex', sans-serif);
+            text-align: left;
+            text-overflow: ellipsis;
+            cursor: pointer;
+            transition: transform .2s ease, background .2s ease, box-shadow .2s ease;
+        }
+
+        #featured-lists-container .stash-list-game-button {
+            background: var(--btn-bg) !important;
+            border: 0 !important;
+            border-radius: 9px !important;
+            color: var(--text-color) !important;
+            text-shadow: none !important;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, .18) !important;
+        }
+
+        .stash-list-game-button:hover {
+            transform: translateY(-2px);
+            background: var(--btn-bg-hover);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, .24);
+        }
+
+        #featured-lists-container .stash-list-game-button:hover {
+            background: var(--btn-bg-hover) !important;
+            border: 0 !important;
+            border-radius: 9px !important;
+            color: var(--text-color) !important;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, .24) !important;
+        }
+
+        .stash-list-game-button.bookmarked { opacity: .7; }
+
+        .stash-list-rank {
+            position: absolute;
+            z-index: 3;
+            top: -3px;
+            right: -2px;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 0;
+            border-radius: 4px;
+            background: #55505f;
+            color: #fff;
+            font-size: 10px;
+            font-family: var(--app-font, 'Google Sans Flex', sans-serif);
+            font-weight: 900;
+            line-height: 1;
+            transform: rotate(10deg);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, .3);
+            pointer-events: none;
+        }
+
+        #featured-lists-container .stash-list-card.rank-gold .stash-list-game-button,
+        #featured-lists-container .stash-list-card.rank-gold .stash-list-game-button:hover { background: #d6ad43 !important; color: #352500 !important; }
+        #featured-lists-container .stash-list-card.rank-silver .stash-list-game-button,
+        #featured-lists-container .stash-list-card.rank-silver .stash-list-game-button:hover { background: #aeb5c3 !important; color: #252a34 !important; }
+        #featured-lists-container .stash-list-card.rank-bronze .stash-list-game-button,
+        #featured-lists-container .stash-list-card.rank-bronze .stash-list-game-button:hover { background: #b87345 !important; color: #351b0b !important; }
+        .stash-list-card.rank-gold .stash-list-rank { background: #edc64b; color: #382600; }
+        .stash-list-card.rank-silver .stash-list-rank { background: #c8cfda; color: #2a3039; }
+        .stash-list-card.rank-bronze .stash-list-rank { background: #c47a49; color: #351b0b; }
+
+        .stash-list-card.has-shine .stash-list-game-button::after {
+            content: '';
+            position: absolute;
+            z-index: 2;
+            top: -12%;
+            bottom: -12%;
+            left: 21%;
+            width: 30%;
+            background: rgba(255, 255, 255, .12);
+            transform: skewX(-35deg);
+            pointer-events: none;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .stash-list-game-button { transition: none; }
+        }
+
         body.stash-searching .main-content > h1,
         body.stash-searching .main-content > h2 {
             display: none;
         }
+
+        body.stash-searching #featured-lists-container { display: none; }
 
         body.stash-searching #search-container {
             margin-bottom: 15px !important;
@@ -340,6 +508,7 @@
             </button>
         </div>
 
+        <div id="featured-lists-container" aria-label="Game lists"></div>
 
         <div id="sections-container">
         </div>
@@ -385,6 +554,12 @@
         let searchQueueTimer = null;
         let bookmarkRefreshTimer = null;
         let bookmarkRefreshInFlight = false;
+        let popularListRefreshInFlight = false;
+        let popularListRefreshQueued = false;
+        const FEATURED_LISTS = {
+            curated: { title: 'Curated By Nexus', icon: 'Assets/curated.svg', gameIds: [] },
+            popular: { title: 'What Users are Playing', icon: 'Assets/popular.svg', source: 'popularity' }
+        };
         const searchResultsContainer = document.createElement('div');
         searchResultsContainer.id = 'search-results-container';
         searchResultsContainer.className = 'search-results-container';
@@ -578,6 +753,351 @@
                 });
         }
 
+        function createFeaturedList(listKey) {
+            const config = FEATURED_LISTS[listKey];
+            const section = document.createElement('section');
+            section.className = 'stash-featured-list';
+            section.dataset.listKey = listKey;
+
+            const heading = document.createElement('h2');
+            heading.className = 'stash-featured-heading';
+            const icon = document.createElement('img');
+            icon.src = config.icon;
+            icon.alt = '';
+            const title = document.createElement('span');
+            title.textContent = config.title;
+            heading.append(icon, title);
+
+            const viewport = document.createElement('div');
+            viewport.className = 'stash-featured-viewport';
+            viewport.setAttribute('role', 'region');
+            viewport.setAttribute('aria-label', `${config.title} games`);
+            viewport.tabIndex = 0;
+
+            const track = document.createElement('div');
+            track.className = 'stash-featured-track';
+            viewport.appendChild(track);
+            section.append(heading, viewport);
+            return {
+                section,
+                viewport,
+                track,
+                listKey,
+                games: [],
+                originalCards: [],
+                bufferCards: [],
+                loopWidth: 0,
+                offset: 0,
+                velocity: 0,
+                pointerInside: false,
+                focusInside: false,
+                manualMode: false,
+                dragging: false,
+                dragged: false,
+                suppressClickUntil: 0
+            };
+        }
+
+        function makeFeaturedCard(game, rank, listKey, list) {
+            const card = document.createElement('div');
+            card.className = 'stash-list-card';
+            card.dataset.gameId = game.id;
+            card.dataset.gameOrder = String(rank - 1);
+            if (listKey === 'popular' && rank > 0) {
+                card.classList.add(`rank-${rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'regular'}`);
+                if (rank <= 3) card.classList.add('has-shine');
+            }
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'stash-list-game-button';
+            button.textContent = game.title;
+            button.dataset.originalValue = game.raw;
+            button.dataset.sourceKey = buildBookmarkSourceKey(game.raw);
+            button.title = `Add ${game.title} to your sidebar`;
+            button.addEventListener('click', event => {
+                event.preventDefault();
+                if (performance.now() < list.suppressClickUntil) return;
+                addBookmarkToSidebar(game.raw, event);
+            });
+            card.appendChild(button);
+
+            if (listKey === 'popular') {
+                const badge = document.createElement('span');
+                badge.className = 'stash-list-rank';
+                badge.textContent = String(rank);
+                badge.setAttribute('aria-label', `Rank ${rank}`);
+                card.appendChild(badge);
+            }
+            return card;
+        }
+
+        function fillFeaturedList(list, games) {
+            const track = list.track;
+            track.replaceChildren();
+            list.games = games.slice();
+            list.originalCards = games.map((game, index) => makeFeaturedCard(game, index + 1, list.listKey, list));
+            list.originalCards.forEach(card => track.appendChild(card));
+            list.offset = 0;
+            list.velocity = 0;
+            track.style.transform = 'translate3d(0, 0, 0)';
+            if (!list.manualMode) buildFeaturedAutoBuffer(list);
+        }
+
+        function buildFeaturedAutoBuffer(list) {
+            const track = list.track;
+            list.bufferCards = [];
+            list.loopWidth = 0;
+            track.replaceChildren(...list.originalCards);
+            if (!list.originalCards.length) return;
+
+            const firstOriginal = list.originalCards[0];
+            const firstAdvance = firstOriginal.getBoundingClientRect().width + (parseFloat(getComputedStyle(track).columnGap) || 0);
+            const visibleBufferWidth = list.viewport.clientWidth + firstAdvance;
+            const sourceLeft = firstOriginal.getBoundingClientRect().left;
+            let firstBuffer = null;
+            let lastBufferRight = 0;
+            let index = 0;
+
+            // Preload past the visible edge by one whole card so the right side never reveals a late card.
+            while (lastBufferRight - (firstBuffer ? firstBuffer.getBoundingClientRect().left : 0) < visibleBufferWidth) {
+                const sourceCard = list.originalCards[index % list.originalCards.length];
+                const bufferCard = sourceCard.cloneNode(true);
+                bufferCard.classList.add('is-buffer-card');
+                bufferCard.setAttribute('aria-hidden', 'true');
+                bufferCard.querySelectorAll('button').forEach(button => { button.tabIndex = -1; });
+                track.appendChild(bufferCard);
+                list.bufferCards.push(bufferCard);
+                if (!firstBuffer) firstBuffer = bufferCard;
+                lastBufferRight = bufferCard.getBoundingClientRect().right;
+                index++;
+            }
+            list.loopWidth = firstBuffer.getBoundingClientRect().left - sourceLeft;
+        }
+
+        function setFeaturedListManualMode(list, manual) {
+            if (list.manualMode === manual) return;
+            list.manualMode = manual;
+            list.velocity = 0;
+            list.viewport.classList.toggle('is-interactive', manual);
+            if (manual) {
+                list.track.replaceChildren(...list.originalCards);
+                list.bufferCards = [];
+                list.loopWidth = 0;
+                list.offset = 0;
+                list.track.style.transform = 'translate3d(0, 0, 0)';
+            } else {
+                buildFeaturedAutoBuffer(list);
+            }
+        }
+
+        function getFeaturedListMaxOffset(list) {
+            return Math.max(0, list.track.scrollWidth - list.viewport.clientWidth);
+        }
+
+        function setFeaturedListOffset(list, offset) {
+            const maxOffset = list.manualMode ? getFeaturedListMaxOffset(list) : Number.POSITIVE_INFINITY;
+            list.offset = Math.max(0, Math.min(maxOffset, offset));
+            list.track.style.transform = `translate3d(${-list.offset}px, 0, 0)`;
+        }
+
+        function startFeaturedListMotion(list) {
+            const viewport = list.viewport;
+            let previousTime = 0;
+            let lastPointerX = 0;
+            let lastPointerTime = 0;
+            let pointerStartX = 0;
+
+            if (typeof ResizeObserver === 'function') {
+                const resizeObserver = new ResizeObserver(() => {
+                    if (!list.manualMode) buildFeaturedAutoBuffer(list);
+                });
+                resizeObserver.observe(viewport);
+            }
+
+            const updateManualState = () => setFeaturedListManualMode(list, list.pointerInside || list.focusInside);
+            viewport.addEventListener('pointerenter', () => {
+                list.pointerInside = true;
+                updateManualState();
+            });
+            viewport.addEventListener('pointerleave', () => {
+                list.pointerInside = false;
+                updateManualState();
+            });
+            viewport.addEventListener('focusin', () => {
+                list.focusInside = true;
+                updateManualState();
+            });
+            viewport.addEventListener('focusout', event => {
+                if (!viewport.contains(event.relatedTarget)) {
+                    list.focusInside = false;
+                    updateManualState();
+                }
+            });
+            viewport.addEventListener('wheel', event => {
+                if (!list.manualMode) {
+                    list.pointerInside = true;
+                    updateManualState();
+                }
+                const delta = event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)
+                    ? (event.deltaX || event.deltaY)
+                    : event.deltaY;
+                if (delta && getFeaturedListMaxOffset(list) > 0) {
+                    list.velocity = Math.max(-50, Math.min(50, list.velocity + delta * 0.18));
+                    event.preventDefault();
+                }
+            }, { passive: false });
+            viewport.addEventListener('keydown', event => {
+                const step = (list.track.firstElementChild?.getBoundingClientRect().width || 174) +
+                    (parseFloat(getComputedStyle(list.track).columnGap) || 0);
+                let nextOffset = null;
+                if (event.key === 'ArrowRight' || event.key === 'PageDown') nextOffset = list.offset + step;
+                else if (event.key === 'ArrowLeft' || event.key === 'PageUp') nextOffset = list.offset - step;
+                else if (event.key === 'Home') nextOffset = 0;
+                else if (event.key === 'End') nextOffset = getFeaturedListMaxOffset(list);
+                if (nextOffset !== null) {
+                    list.velocity = 0;
+                    setFeaturedListOffset(list, nextOffset);
+                    event.preventDefault();
+                }
+            });
+
+            viewport.addEventListener('pointerdown', event => {
+                if (event.pointerType === 'mouse' && event.button !== 0) return;
+                if (!list.manualMode) {
+                    list.pointerInside = true;
+                    updateManualState();
+                }
+                if (getFeaturedListMaxOffset(list) <= 0) return;
+                list.dragging = true;
+                list.dragged = false;
+                list.velocity = 0;
+                pointerStartX = lastPointerX = event.clientX;
+                lastPointerTime = performance.now();
+            });
+            viewport.addEventListener('pointermove', event => {
+                if (!list.dragging) return;
+                const now = performance.now();
+                const dx = lastPointerX - event.clientX;
+                if (Math.abs(event.clientX - pointerStartX) > 5) {
+                    list.dragged = true;
+                    viewport.classList.add('is-dragging');
+                    try { viewport.setPointerCapture(event.pointerId); } catch (error) {}
+                }
+                if (list.dragged) {
+                    const elapsed = Math.max(1, now - lastPointerTime);
+                    setFeaturedListOffset(list, list.offset + dx);
+                    list.velocity = Math.max(-60, Math.min(60, dx * 16.67 / elapsed));
+                    event.preventDefault();
+                }
+                lastPointerX = event.clientX;
+                lastPointerTime = now;
+            });
+            const finishPointer = event => {
+                if (!list.dragging) return;
+                list.dragging = false;
+                viewport.classList.remove('is-dragging');
+                if (list.dragged) list.suppressClickUntil = performance.now() + 300;
+                else list.velocity = 0;
+                list.dragged = false;
+                try { viewport.releasePointerCapture(event.pointerId); } catch (error) {}
+            };
+            viewport.addEventListener('pointerup', finishPointer);
+            viewport.addEventListener('pointercancel', event => {
+                finishPointer(event);
+                list.velocity = 0;
+            });
+
+            const animate = time => {
+                const elapsed = previousTime ? Math.min(time - previousTime, 50) : 0;
+                previousTime = time;
+                const frameScale = elapsed / 16.67;
+                const canLoop = list.loopWidth > 0;
+                if (!list.manualMode && !document.hidden && canLoop &&
+                    !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                    list.offset += elapsed * 0.02;
+                    if (list.offset >= list.loopWidth) list.offset -= list.loopWidth;
+                    list.track.style.transform = `translate3d(${-list.offset}px, 0, 0)`;
+                } else if (list.manualMode && !list.dragging && Math.abs(list.velocity) > 0.08) {
+                    const maxOffset = getFeaturedListMaxOffset(list);
+                    const nextOffset = list.offset + list.velocity * frameScale;
+                    if (nextOffset <= 0 || nextOffset >= maxOffset) {
+                        setFeaturedListOffset(list, nextOffset);
+                        list.velocity = 0;
+                    } else {
+                        setFeaturedListOffset(list, nextOffset);
+                        list.velocity *= Math.pow(0.91, frameScale);
+                    }
+                }
+                requestAnimationFrame(animate);
+            };
+            requestAnimationFrame(animate);
+        }
+
+        function buildFeaturedRows() {
+            const container = document.getElementById('featured-lists-container');
+            if (!container) return;
+            container.replaceChildren();
+            const lists = Object.fromEntries(Object.keys(FEATURED_LISTS).map(key => [key, createFeaturedList(key)]));
+            container.append(...Object.values(lists).map(list => list.section));
+            window.featuredStashLists = lists;
+            Object.values(lists).forEach(startFeaturedListMotion);
+
+            const catalog = new Map();
+            document.querySelectorAll('#sections-container input[data-original-value]').forEach(button => {
+                const id = normalizeBookmarkFileName(button.dataset.originalValue).toLowerCase();
+                if (!catalog.has(id)) catalog.set(id, {
+                    id,
+                    title: button.value,
+                    raw: button.dataset.originalValue
+                });
+            });
+            window.featuredStashCatalog = catalog;
+            Object.entries(FEATURED_LISTS).forEach(([key, config]) => {
+                if (config.source === 'popularity') return;
+                const rowGames = (config.gameIds || [])
+                    .map(id => catalog.get(normalizeBookmarkFileName(id).toLowerCase()))
+                    .filter(Boolean);
+                fillFeaturedList(lists[key], rowGames);
+            });
+            if (FEATURED_LISTS.popular?.source === 'popularity') refreshPopularFeaturedList();
+        }
+
+        async function refreshPopularFeaturedList() {
+            const list = window.featuredStashLists?.popular;
+            const catalog = window.featuredStashCatalog;
+            if (!list || !catalog) return;
+            if (popularListRefreshInFlight) {
+                popularListRefreshQueued = true;
+                return;
+            }
+            popularListRefreshInFlight = true;
+            try {
+                const popularity = window.parent && typeof window.parent.getStashSidebarPopularity === 'function'
+                    ? await window.parent.getStashSidebarPopularity()
+                    : [];
+                const rankedGames = (Array.isArray(popularity) ? popularity : [])
+                    .map(item => {
+                        const game = catalog.get(normalizeBookmarkFileName(item.game_id).toLowerCase());
+                        return game ? { ...game, count: Number(item.user_count) || 0 } : null;
+                    })
+                    .filter(Boolean)
+                    .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title))
+                    .slice(0, 10);
+                fillFeaturedList(list, rankedGames);
+                refreshBookmarkAvailability();
+            } catch (error) {
+                console.warn('Popular Stash games could not be loaded:', error);
+                fillFeaturedList(list, []);
+            } finally {
+                popularListRefreshInFlight = false;
+                if (popularListRefreshQueued) {
+                    popularListRefreshQueued = false;
+                    setTimeout(refreshPopularFeaturedList, 0);
+                }
+            }
+        }
+
         function applyStashSearch() {
             searchLayoutIsUpdating = true;
             rememberSectionOrder();
@@ -699,7 +1219,7 @@
                     });
                 }
 
-                document.querySelectorAll('#sections-container input[type="button"], #search-results-container input[type="button"]').forEach(btn => {
+                document.querySelectorAll('#sections-container input[type="button"], #search-results-container input[type="button"], #featured-lists-container .stash-list-game-button').forEach(btn => {
                     const originalVal = btn.dataset.originalValue || btn.value;
                     const sourceKey = buildBookmarkSourceKey(originalVal);
                     btn.dataset.sourceKey = sourceKey;
@@ -902,6 +1422,7 @@
         // Parent-side sidebar renders may request this frequently. Coalesce those requests
         window.refreshBookmarkAvailability = refreshBookmarkAvailability;
         window.queueBookmarkAvailabilityRefresh = queueBookmarkAvailabilityRefresh;
+        window.refreshStashPopularGames = refreshPopularFeaturedList;
         window.addBookmarkToSidebar = addBookmarkToSidebar;
         window.getSurpriseGameTitles = function() {
             return Array.from(document.querySelectorAll('#sections-container input[data-original-value], #search-results-container input[data-original-value]'))
@@ -1076,6 +1597,7 @@
             sectionsContainer.appendChild(fragment);
             if (sidebar) sidebar.appendChild(sidebarFragment);
 
+            buildFeaturedRows();
             refreshBookmarkAvailability();
             refreshReportButtonsState();
             if (searchInput.value.trim() && !searchLayoutIsUpdating) queueStashSearch();
@@ -1098,6 +1620,10 @@
         window.addEventListener('storage', (e) => {
             if (e.key === 'tb_dev_reported_games') {
                 refreshReportButtonsState();
+            }
+            if (e.key === 'tb_font_choice') {
+                if (e.newValue === 'space-grotesk') document.documentElement.setAttribute('data-font', 'space-grotesk');
+                else document.documentElement.removeAttribute('data-font');
             }
             if (e.key === 'tb_dev_mode') {
                 const enabled = e.newValue === 'true';

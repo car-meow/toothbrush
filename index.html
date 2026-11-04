@@ -1,4 +1,4 @@
-<!-- nexus-version: 4.47.4 -->
+<!-- nexus-version: 4.47.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -212,7 +212,7 @@ html.light-mode .online-users-bubble {
 
 <div class="nexus-version-container" style="pointer-events: auto !important;">
     <button id="nexus-updates-button" class="nexus-version-tag nexus-updates-button" type="button" aria-label="Nexus Updates" aria-haspopup="dialog" aria-controls="nexus-updates-overlay" aria-expanded="false">
-        <span class="nexus-version-label">v4.47.4</span>
+        <span class="nexus-version-label">v4.47.5</span>
         <b id="nexus-updates-badge" class="nexus-updates-badge" aria-hidden="true" hidden></b>
     </button>
 </div>
@@ -240,6 +240,14 @@ html.light-mode .online-users-bubble {
         </header>
         <div class="nexus-updates-panels">
             <section id="nexus-updates-panel-games" class="nexus-updates-panel" role="tabpanel" aria-labelledby="nexus-updates-tab-games" data-update-panel="games" hidden>
+                <div class="nexus-update-release">
+                    <div class="nexus-update-version"><span>v4.47.5</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
+                    <ul class="nexus-update-list">
+                        <li class="nexus-update-entry" data-update-notification="v4.47.5-games-storage-accounting-backup"><div class="nexus-update-entry-heading"><h3>Storage estimates and backups</h3><span class="nexus-update-category-label is-bugfix">BUGFIX</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span></div><p>Storage pressure now reflects Chromium's localStorage sizing and the site's broader browser-storage quota. Save sizes handle large records more reliably, clearing waits for tracked game databases to finish deleting, and backups process IndexedDB records in smaller steps. Dev Mode shows estimated storage used and capacity beside the header meter.</p></li>
+                        <li class="nexus-update-entry" data-update-notification="v4.47.5-games-launch-restored"><div class="nexus-update-entry-heading"><h3>Games Tab launch restored</h3><span class="nexus-update-category-label is-bugfix">BUGFIX</span></div><p>Fixed the blank center view by restoring the Games Tab load path. The Stash and games now launch normally again.</p></li>
+                        <li class="nexus-update-entry" data-update-notification="v4.47.5-games-stash-featured-lists"><div class="nexus-update-entry-heading"><h3>Featured game lists in Game Stash</h3><span class="nexus-update-category-label is-new-feature">NEW FEATURE</span><span class="nexus-update-category-label is-quality-of-life">QUALITY OF LIFE</span><span class="nexus-update-category-label is-style">STYLE</span></div><p>Added an empty Curated By Nexus row and a What Users are Playing row ranked by sidebar additions. Popular uses saved Supabase counts and refreshes on Stash visits and sidebar changes, without a live feed. Rows auto-scroll continuously with a preloaded buffer; hover pauses the loop and enables smooth, finite scrolling through each unique list. They follow the selected app font, fade into the background at the edges outside hover, and give the top three Popular games gold, silver, and bronze cards with contained shine.</p></li>
+                    </ul>
+                </div>
                 <div class="nexus-update-release">
                     <div class="nexus-update-version"><span>v4.47.4</span><span class="nexus-update-version-rule" aria-hidden="true"></span></div>
                     <ul class="nexus-update-list">

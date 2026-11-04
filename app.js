@@ -1,10 +1,12 @@
-// nexus-version: 4.47.3
+// nexus-version: 4.47.5
 const appStorage = window.nexusStorage || window.localStorage;
 // Game Stash is always available during a Games visit. Release its frame only
 // while the lightweight game standby screen is active.
 appStorage.setItem('tb_preload_stash', 'true');
 
 const dbName = "GameStorageDB";
+const NEXUS_SHARED_DATABASE_NAMES = new Set(['GameStorageDB', 'AIChatDB', 'NexusSidebarSettings']);
+const NEXUS_GAME_SNAPSHOT_META_STORE = 'gameSnapshotMeta';
 let db, games =[], currentGame = null;
 // The same-origin Game Stash frame reads this list to avoid duplicate bookmarks.
 Object.defineProperty(window, 'games', { configurable: true, get: () => games });
@@ -347,7 +349,7 @@ async function initDB() {
     if (db) return db;
     if (dbReadyPromise) return dbReadyPromise;
     dbReadyPromise = new Promise((resolve, reject) => {
-        const req = indexedDB.open(dbName, 3);
+        const req = indexedDB.open(dbName, 4);
         req.onupgradeneeded = e => {
             const database = e.target.result;
             if (!database.objectStoreNames.contains('customGames')) {
@@ -355,6 +357,9 @@ async function initDB() {
             }
             if (!database.objectStoreNames.contains('gameSnapshots')) {
                 database.createObjectStore('gameSnapshots', { keyPath: 'gameId' });
+            }
+            if (!database.objectStoreNames.contains(NEXUS_GAME_SNAPSHOT_META_STORE)) {
+                database.createObjectStore(NEXUS_GAME_SNAPSHOT_META_STORE, { keyPath: 'gameId' });
             }
         };
         req.onsuccess = e => { db = e.target.result; db.onversionchange = () => db.close(); resolve(db); };
@@ -364,6 +369,84 @@ async function initDB() {
 }
 
 const HIDDEN_SIDEBAR_GAMES_KEY = 'tb_hidden_sidebar_game_ids';
+const STASH_POPULARITY_STORAGE_KEY = 'tb_stash_popularity_profile_id';
+const STASH_POPULARITY_SUPABASE_URL = 'https://lprpobjgkohwuzvbkmdh.supabase.co';
+const STASH_POPULARITY_SUPABASE_KEY = 'sb_publishable_nIWAou1a4B73EVVu3PqQcg_ZCcf3zCF';
+let stashPopularitySyncTimer = null;
+
+function getStashPopularityProfileId() {
+    const storage = window.nexusStorage || window.localStorage;
+    let id = '';
+    try { id = storage.getItem(STASH_POPULARITY_STORAGE_KEY) || ''; } catch (error) {}
+    if (!id) {
+        id = globalThis.crypto?.randomUUID
+            ? globalThis.crypto.randomUUID()
+            : `browser-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+        try { storage.setItem(STASH_POPULARITY_STORAGE_KEY, id); } catch (error) {}
+    }
+    return id;
+}
+
+function getStashPopularityGame(game) {
+    if (!game || String(game.id) === 'ugs-stash') return null;
+    let source = String(game.sourceFile || '').trim();
+    if (!source && String(game.sourceKey || '').toLowerCase().startsWith('stash:')) {
+        source = String(game.sourceKey).slice(6).trim();
+    }
+    if (!source) return null;
+    source = source.replace(/^\/+/, '').toLowerCase();
+    if (!source.includes('.')) source += '.html';
+    return { game_id: source, title: String(game.title || source) };
+}
+
+async function callStashPopularityRpc(functionName, payload = {}) {
+    const response = await fetch(`${STASH_POPULARITY_SUPABASE_URL}/rest/v1/rpc/${functionName}`, {
+        method: 'POST',
+        headers: {
+            apikey: STASH_POPULARITY_SUPABASE_KEY,
+            Authorization: `Bearer ${STASH_POPULARITY_SUPABASE_KEY}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`Supabase ${functionName} failed (${response.status}): ${await response.text()}`);
+    const responseText = await response.text();
+    return responseText ? JSON.parse(responseText) : null;
+}
+
+window.getStashSidebarPopularity = async function() {
+    return await callStashPopularityRpc('get_stash_sidebar_popularity');
+};
+
+async function syncStashSidebarPopularity() {
+    const uniqueGames = new Map();
+    games.forEach(game => {
+        const item = getStashPopularityGame(game);
+        if (item) uniqueGames.set(item.game_id, item);
+    });
+    await callStashPopularityRpc('sync_stash_sidebar_games', {
+        p_profile_id: getStashPopularityProfileId(),
+        p_games: Array.from(uniqueGames.values())
+    });
+
+    try {
+        const frame = document.getElementById('stash-frame');
+        if (frame?.contentWindow && typeof frame.contentWindow.refreshStashPopularGames === 'function') {
+            frame.contentWindow.refreshStashPopularGames();
+        }
+    } catch (error) {}
+}
+
+function queueStashSidebarPopularitySync() {
+    clearTimeout(stashPopularitySyncTimer);
+    stashPopularitySyncTimer = setTimeout(() => {
+        syncStashSidebarPopularity().catch(error => {
+            console.warn('Stash sidebar popularity could not be updated:', error);
+        });
+    }, 120);
+}
+
+window.addEventListener('online', queueStashSidebarPopularitySync);
 
 function getHiddenSidebarGameIds(storage = window.nexusStorage || window.localStorage) {
     try {
@@ -442,6 +525,7 @@ async function loadGames() {
     pinMasterStash();
     saveGameOrder();
     renderGameList();
+    queueStashSidebarPopularitySync();
     const initialGameLoad = openDefaultGame();
     Promise.all([stashPreloadOnEntry, initialGameLoad]).catch(() => {}).finally(async () => {
         if (typeof window.nexusFinishPageTransition === 'function') window.nexusFinishPageTransition();
@@ -611,6 +695,7 @@ window.addStashGameToSidebar = async function(game) {
         games[existingIndex] = { ...games[existingIndex], ...sidebarGame };
         renderGameList();
         notifyStashBookmarkAvailability();
+        queueStashSidebarPopularitySync();
         return;
     }
 
@@ -619,6 +704,7 @@ window.addStashGameToSidebar = async function(game) {
     saveGameOrder();
     renderGameList();
     notifyStashBookmarkAvailability();
+    queueStashSidebarPopularitySync();
 };
 
 function findGameByIdOrSource(idOrKey) {
@@ -695,6 +781,7 @@ async function getGameSnapshot(gameId) {
                                     localStorage: (res.localStorage && typeof res.localStorage === 'object') ? res.localStorage : {},
                                     fsData: (res.fsData && typeof res.fsData === 'object') ? res.fsData : null,
                                     idbData: (res.idbData && typeof res.idbData === 'object') ? res.idbData : null,
+                                    indexedDBNames: Array.isArray(res.indexedDBNames) ? res.indexedDBNames.slice() : [],
                                     savedAt
                                 };
                                 foundSavedAt = savedAt;
@@ -849,9 +936,61 @@ async function getSavedGamesOutsideSidebar(sidebarGames) {
 
 function estimateSavePayloadBytes(value) {
     try {
-        const serialized = JSON.stringify(value);
-        if (typeof serialized !== 'string') return 0;
-        return typeof Blob === 'function' ? new Blob([serialized]).size : serialized.length * 2;
+        const seen = new WeakSet();
+        let bytes = 0;
+        const add = item => {
+            if (item === null || item === undefined) {
+                bytes += 4;
+                return;
+            }
+            if (typeof item === 'string') {
+                bytes += estimateSavesLocalStorageStringBytes(item);
+                return;
+            }
+            if (typeof item === 'number' || typeof item === 'bigint') {
+                bytes += 8;
+                return;
+            }
+            if (typeof item === 'boolean') {
+                bytes += 4;
+                return;
+            }
+            if (typeof item !== 'object') return;
+            if (typeof Blob === 'function' && item instanceof Blob) {
+                bytes += item.size;
+                return;
+            }
+            if (item instanceof ArrayBuffer || ArrayBuffer.isView(item)) {
+                bytes += item.byteLength;
+                return;
+            }
+            if (item instanceof Date) {
+                bytes += 8;
+                return;
+            }
+            if (seen.has(item)) return;
+            seen.add(item);
+            if (item instanceof Map) {
+                item.forEach((entryValue, entryKey) => { add(entryKey); add(entryValue); });
+                return;
+            }
+            if (item instanceof Set) {
+                item.forEach(add);
+                return;
+            }
+            if (Array.isArray(item)) {
+                bytes += 8;
+                item.forEach(add);
+                return;
+            }
+            for (const key in item) {
+                if (!Object.prototype.hasOwnProperty.call(item, key)) continue;
+                bytes += estimateSavesLocalStorageStringBytes(key);
+                add(item[key]);
+            }
+        };
+        add(value);
+        return Number.isFinite(bytes) ? bytes : null;
     } catch (error) {
         return null;
     }
@@ -884,28 +1023,123 @@ function getSaveManagerGameAliases(game) {
 
 async function getSaveManagerSizeEstimates(sidebarGames, offSidebarGames) {
     await initDB();
-    const bytesById = await new Promise((resolve, reject) => {
-        const sizes = new Map();
+    const bytesById = new Map();
+    const metadataIds = new Set();
+    const metadataSizeIds = new Set();
+    const metadataNamesById = new Map();
+    const addSize = (gameId, bytes) => {
+        if (!gameId) return;
+        const key = String(gameId).toLowerCase();
+        if (!Number.isFinite(bytes) || bytes < 0) {
+            bytesById.set(key, null);
+            return;
+        }
+        if (bytesById.get(key) !== null) bytesById.set(key, (bytesById.get(key) || 0) + bytes);
+    };
+
+    // New saves keep a compact size/ownership index beside the full snapshot.
+    // This avoids cloning large save records just to display their sizes.
+    await new Promise((resolve, reject) => {
         try {
-            const tx = db.transaction('gameSnapshots', 'readonly');
-            const request = tx.objectStore('gameSnapshots').openCursor();
+            const tx = db.transaction(NEXUS_GAME_SNAPSHOT_META_STORE, 'readonly');
+            const request = tx.objectStore(NEXUS_GAME_SNAPSHOT_META_STORE).openCursor();
             request.onsuccess = event => {
                 const cursor = event.target.result;
-                if (!cursor) return resolve(sizes);
-
-                const gameId = String(cursor.key || (cursor.value && cursor.value.gameId) || '');
-                const bytes = estimateSavePayloadBytes(cursor.value);
-                if (gameId && bytes !== null) {
-                    const key = gameId.toLowerCase();
-                    sizes.set(key, (sizes.get(key) || 0) + bytes);
+                if (!cursor) return resolve();
+                const gameId = String(cursor.primaryKey || cursor.key || '');
+                metadataIds.add(gameId.toLowerCase());
+                const metadata = cursor.value || {};
+                metadataNamesById.set(gameId.toLowerCase(), Array.isArray(metadata.indexedDBNames) ? metadata.indexedDBNames.slice() : []);
+                const estimate = metadata.estimatedBytes === null || metadata.estimatedBytes === undefined
+                    ? null : Number(metadata.estimatedBytes);
+                if (Number.isFinite(estimate) && estimate >= 0) {
+                    metadataSizeIds.add(gameId.toLowerCase());
+                    addSize(gameId, estimate);
                 }
                 cursor.continue();
+            };
+            request.onerror = () => reject(request.error || tx.error || new Error('Could not read saved game size metadata.'));
+            tx.onabort = () => reject(tx.error || new Error('Could not read saved game size metadata.'));
+        } catch (error) {
+            reject(error);
+        }
+    });
+
+    // Legacy snapshots have no size index. Read one at a time as a migration
+    // fallback; a single unreadable record only affects that game's label.
+    const legacyMetadataToPersist = [];
+    await new Promise((resolve, reject) => {
+        try {
+            const tx = db.transaction('gameSnapshots', 'readonly');
+            const store = tx.objectStore('gameSnapshots');
+            const request = store.openKeyCursor();
+            request.onsuccess = event => {
+                const cursor = event.target.result;
+                if (!cursor) return resolve();
+                const gameId = String(cursor.primaryKey || cursor.key || '');
+                if (metadataSizeIds.has(gameId.toLowerCase())) {
+                    cursor.continue();
+                    return;
+                }
+                const valueRequest = store.get(cursor.primaryKey);
+                valueRequest.onsuccess = () => {
+                    const key = gameId.toLowerCase();
+                    const snapshot = valueRequest.result;
+                    const size = estimateSavePayloadBytes(snapshot);
+                    if (size !== null) {
+                        bytesById.delete(key);
+                        addSize(gameId, size);
+                        const databaseNames = new Set([
+                            ...(metadataNamesById.get(key) || []),
+                            ...(Array.isArray(snapshot && snapshot.indexedDBNames) ? snapshot.indexedDBNames : []),
+                            ...(snapshot && snapshot.idbData && typeof snapshot.idbData === 'object' ? Object.keys(snapshot.idbData) : [])
+                        ].map(String).filter(name => name && !NEXUS_SHARED_DATABASE_NAMES.has(name)));
+                        legacyMetadataToPersist.push({
+                            gameId,
+                            indexedDBNames: Array.from(databaseNames),
+                            estimatedBytes: size,
+                            savedAt: Number(snapshot && snapshot.savedAt) || 0
+                        });
+                    } else {
+                        addSize(gameId, null);
+                    }
+                    cursor.continue();
+                };
+                valueRequest.onerror = errorEvent => {
+                    // Keep one unmeasurable legacy record from making every
+                    // game's size unavailable.
+                    errorEvent.preventDefault();
+                    bytesById.delete(gameId.toLowerCase());
+                    addSize(gameId, null);
+                    cursor.continue();
+                };
             };
             request.onerror = () => reject(request.error || tx.error || new Error('Could not estimate saved game sizes.'));
             tx.onabort = () => reject(tx.error || new Error('Could not estimate saved game sizes.'));
         } catch (error) {
             reject(error);
         }
+    });
+    if (legacyMetadataToPersist.length) {
+        try {
+            await new Promise((resolve, reject) => {
+                try {
+                    const tx = db.transaction(NEXUS_GAME_SNAPSHOT_META_STORE, 'readwrite');
+                    const store = tx.objectStore(NEXUS_GAME_SNAPSHOT_META_STORE);
+                    legacyMetadataToPersist.forEach(metadata => store.put(metadata));
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error || new Error('Could not save legacy game size metadata.'));
+                    tx.onabort = () => reject(tx.error || new Error('Could not save legacy game size metadata.'));
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        } catch (error) {
+            console.warn('Legacy game size estimates could not be cached.', error);
+        }
+    }
+    metadataIds.forEach(gameId => {
+        if (!metadataSizeIds.has(gameId) && !bytesById.has(gameId)) bytesById.set(gameId, null);
     });
 
     const journalPrefix = 'tb_nexus_game_autosave:';
@@ -918,9 +1152,12 @@ async function getSaveManagerSizeEstimates(sidebarGames, offSidebarGames) {
             try { gameId = decodeURIComponent(gameId); } catch (error) {}
             const value = storage.getItem(key) || '';
             const bytes = estimateSavePayloadBytes({ key, value });
-            if (bytes === null) continue;
             const normalizedId = String(gameId).toLowerCase();
-            bytesById.set(normalizedId, (bytesById.get(normalizedId) || 0) + bytes);
+            if (bytes === null) {
+                bytesById.set(normalizedId, null);
+            } else if (bytesById.get(normalizedId) !== null) {
+                bytesById.set(normalizedId, (bytesById.get(normalizedId) || 0) + bytes);
+            }
         }
     } catch (error) {}
 
@@ -928,20 +1165,28 @@ async function getSaveManagerSizeEstimates(sidebarGames, offSidebarGames) {
     (sidebarGames || []).forEach(game => {
         const aliases = getSaveManagerGameAliases(game);
         let total = 0;
+        let unavailable = false;
         bytesById.forEach((bytes, gameId) => {
             const identityAliases = getSaveManagerSnapshotIdentity(gameId).aliases;
             if (aliases.has(gameId) || doesSnapshotBelongToGame({ gameId }, game) ||
-                Array.from(identityAliases).some(alias => aliases.has(String(alias).toLowerCase()))) total += bytes;
+                Array.from(identityAliases).some(alias => aliases.has(String(alias).toLowerCase()))) {
+                if (bytes === null) unavailable = true;
+                else total += bytes;
+            }
         });
-        estimates.set(String(game.id), total);
+        estimates.set(String(game.id), unavailable ? null : total);
     });
     (offSidebarGames || []).forEach(game => {
         const aliases = new Set([String(game.id), ...(game.aliases || []).map(String)].map(id => id.toLowerCase()));
         let total = 0;
+        let unavailable = false;
         bytesById.forEach((bytes, gameId) => {
-            if (aliases.has(gameId)) total += bytes;
+            if (aliases.has(gameId)) {
+                if (bytes === null) unavailable = true;
+                else total += bytes;
+            }
         });
-        estimates.set(String(game.id), total);
+        estimates.set(String(game.id), unavailable ? null : total);
     });
     return estimates;
 }
@@ -963,13 +1208,16 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
     let incomingFs = null;
     let incomingIdb = null;
 
-    if (payload.localStorage || payload.fsData || payload.idbData) {
+    if (payload.localStorage || payload.fsData || payload.idbData || payload.indexedDBNames) {
         incomingLs = (payload.localStorage && typeof payload.localStorage === 'object') ? payload.localStorage : {};
         incomingFs = (payload.fsData && typeof payload.fsData === 'object') ? payload.fsData : null;
         incomingIdb = (payload.idbData && typeof payload.idbData === 'object') ? payload.idbData : null;
     } else {
         incomingLs = payload;
     }
+    const incomingIndexedDBNames = Array.isArray(payload.indexedDBNames)
+        ? payload.indexedDBNames.map(name => String(name || '')).filter(name => name && name.length <= 120 && !NEXUS_SHARED_DATABASE_NAMES.has(name))
+        : [];
 
     // Read, compare, merge, and write in one readwrite transaction. Doing the
     // read in a separate transaction lets two concurrent saves both compare
@@ -980,8 +1228,10 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
         let didSave = false;
         let tx;
         try {
-            tx = db.transaction('gameSnapshots', 'readwrite');
+            tx = db.transaction(['gameSnapshots', NEXUS_GAME_SNAPSHOT_META_STORE], 'readwrite');
             const store = tx.objectStore('gameSnapshots');
+            const metaStore = tx.objectStore(NEXUS_GAME_SNAPSHOT_META_STORE);
+            const metaGetReq = metaStore.get(gameId);
             const getReq = store.get(gameId);
             getReq.onsuccess = () => {
                 if (!ownsGameSaveSession(gameId, payload.saveSessionId)) return;
@@ -1011,6 +1261,12 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
                 if (incomingIdb && Object.keys(incomingIdb).length > 0) {
                     idbToSave = { ...(idbToSave || {}), ...incomingIdb };
                 }
+                const existingMetadata = metaGetReq.result || null;
+                const indexedDBNames = Array.from(new Set([
+                    ...(Array.isArray(existing && existing.indexedDBNames) ? existing.indexedDBNames : []),
+                    ...(Array.isArray(existingMetadata && existingMetadata.indexedDBNames) ? existingMetadata.indexedDBNames : []),
+                    ...incomingIndexedDBNames
+                ]));
 
                 // Keep a real content signature. The previous length-only signature treated
                 // equally-sized progress values as unchanged, which silently skipped saves.
@@ -1049,6 +1305,9 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
                         sig += ':' + idbKeys[i] + '=' + signatureForValue(ent && ent.contents ? ent.contents : '');
                     }
                 }
+                if (indexedDBNames.length) {
+                    sig += '|D' + indexedDBNames.slice().sort().join(',');
+                }
                 if (snapshotHashes.get(gameId) === sig && existing && Number(existing.savedAt) >= incomingSavedAt) return;
 
                 const savedAt = incomingSavedAt;
@@ -1057,11 +1316,18 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
                     localStorage: lsToSave,
                     fsData: fsToSave,
                     idbData: idbToSave,
+                    indexedDBNames,
                     savedAt
                 };
                 signature = sig;
                 didSave = true;
                 store.put(snapshotRecord);
+                metaStore.put({
+                    gameId,
+                    indexedDBNames,
+                    estimatedBytes: estimateSavePayloadBytes(snapshotRecord),
+                    savedAt
+                });
             };
             getReq.onerror = () => reject(getReq.error || tx.error || new Error('Could not read the saved game snapshot.'));
             tx.oncomplete = () => {
@@ -1079,6 +1345,7 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
                                 localStorage: snapshotRecord.localStorage,
                                 fsData: snapshotRecord.fsData,
                                 idbData: snapshotRecord.idbData,
+                                indexedDBNames: snapshotRecord.indexedDBNames,
                                 savedAt: snapshotRecord.savedAt,
                                 saveSessionId: payload.saveSessionId
                             }, true).catch(error => {
@@ -1091,6 +1358,37 @@ async function saveGameSnapshot(gameId, payload, skipMirror = false) {
             };
             tx.onerror = () => reject(tx.error || new Error('Could not save the game snapshot.'));
             tx.onabort = () => reject(tx.error || new Error('Game snapshot save was interrupted.'));
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+async function recordGameIndexedDBUse(gameId, databaseName, saveSessionId = null) {
+    const name = String(databaseName || '');
+    if (!gameId || !name || name.length > 120 || NEXUS_SHARED_DATABASE_NAMES.has(name) || !ownsGameSaveSession(gameId, saveSessionId)) return;
+    await initDB();
+    return new Promise((resolve, reject) => {
+        let tx;
+        let didWrite = false;
+        try {
+            tx = db.transaction(NEXUS_GAME_SNAPSHOT_META_STORE, 'readwrite');
+            const store = tx.objectStore(NEXUS_GAME_SNAPSHOT_META_STORE);
+            const request = store.get(gameId);
+            request.onsuccess = () => {
+                if (!ownsGameSaveSession(gameId, saveSessionId)) return;
+                const metadata = request.result || { gameId, estimatedBytes: null };
+                const names = new Set(Array.isArray(metadata.indexedDBNames) ? metadata.indexedDBNames : []);
+                names.add(name);
+                metadata.indexedDBNames = Array.from(names);
+                if (!Number.isFinite(Number(metadata.savedAt))) metadata.savedAt = Date.now();
+                store.put(metadata);
+                didWrite = true;
+            };
+            request.onerror = () => reject(request.error || tx.error || new Error('Could not track the game database.'));
+            tx.oncomplete = () => resolve(didWrite);
+            tx.onerror = () => reject(tx.error || new Error('Could not track the game database.'));
+            tx.onabort = () => reject(tx.error || new Error('Could not track the game database.'));
         } catch (error) {
             reject(error);
         }
@@ -1157,13 +1455,23 @@ window.addEventListener('message', event => {
         return;
     }
 
+    if (message.type === 'nexus-game-database-use') {
+        const gameId = String(message.gameId || '');
+        if (!gameId || !ownsGameSaveSession(gameId, message.saveSessionId)) return;
+        recordGameIndexedDBUse(gameId, message.databaseName, message.saveSessionId).catch(error => {
+            if (isStorageQuotaError(error)) handleSavesStorageQuotaFailure('indexedDB', gameId);
+        });
+        return;
+    }
+
     if (message.type === 'nexus-game-save') {
         const gameId = message.gameId || (currentGame && currentGame.id ? currentGame.id : null);
-        if (gameId && (message.localStorage || message.fsData || message.idbData)) {
+        if (gameId && (message.localStorage || message.fsData || message.idbData || message.indexedDBNames)) {
             saveGameSnapshot(gameId, {
                 localStorage: message.localStorage,
                 fsData: message.fsData,
                 idbData: message.idbData,
+                indexedDBNames: message.indexedDBNames,
                 savedAt: message.savedAt,
                 saveSessionId: message.saveSessionId
             }).catch(error => {
@@ -1800,6 +2108,45 @@ function getUniversalAutosaveBridge(gameId, saveSessionId = null) {
     var journalKey = 'tb_nexus_game_autosave:' + encodeURIComponent(String(gameId));
     window.__nexusGameSaveSessionId = saveSessionId;
 
+    function reportIndexedDBUse(name) {
+        name = String(name || '');
+        if (!name || name.length > 120 || ['GameStorageDB', 'AIChatDB', 'NexusSidebarSettings'].indexOf(name) !== -1 || autosaveDisarmed || !isCurrentSession()) return;
+        var message = {
+            type: 'nexus-game-database-use',
+            gameId: gameId,
+            databaseName: name,
+            saveSessionId: saveSessionId
+        };
+        try { if (window.parent && window.parent !== window) window.parent.postMessage(message, '*'); } catch(e) {}
+        try { if (window.opener && !window.opener.closed) window.opener.postMessage(message, '*'); } catch(e) {}
+    }
+
+    try {
+        var idbFactoryPrototype = window.IDBFactory && IDBFactory.prototype;
+        var originalOpenDatabase = idbFactoryPrototype && idbFactoryPrototype.open;
+        if (originalOpenDatabase && !originalOpenDatabase._nexusGameDatabaseTracked) {
+            var trackedOpenDatabase = function(name) {
+                reportIndexedDBUse(name);
+                var request = originalOpenDatabase.apply(this, arguments);
+                if (request && typeof request.addEventListener === 'function') {
+                    request.addEventListener('success', function() {
+                        try {
+                            var openedDatabase = request.result;
+                            if (openedDatabase && typeof openedDatabase.addEventListener === 'function') {
+                                openedDatabase.addEventListener('versionchange', function() {
+                                    try { openedDatabase.close(); } catch(e) {}
+                                });
+                            }
+                        } catch(e) {}
+                    }, { once: true });
+                }
+                return request;
+            };
+            trackedOpenDatabase._nexusGameDatabaseTracked = true;
+            idbFactoryPrototype.open = trackedOpenDatabase;
+        }
+    } catch(e) {}
+
     function isCurrentSession() {
         if (!saveSessionId) return true;
         try {
@@ -1871,26 +2218,29 @@ function getUniversalAutosaveBridge(gameId, saveSessionId = null) {
         var payloadSavedAt = Number(snapshotData.savedAt);
         var incomingSavedAt = isFinite(payloadSavedAt) && payloadSavedAt > 0 ? payloadSavedAt : Date.now();
         try {
-            var req = indexedDB.open("GameStorageDB", 3);
+            var req = indexedDB.open("GameStorageDB", 4);
             req.onupgradeneeded = function(e) {
                 var d = e.target.result;
                 if (!d.objectStoreNames.contains('customGames')) d.createObjectStore('customGames', { keyPath: 'id' });
                 if (!d.objectStoreNames.contains('gameSnapshots')) d.createObjectStore('gameSnapshots', { keyPath: 'gameId' });
+                if (!d.objectStoreNames.contains('gameSnapshotMeta')) d.createObjectStore('gameSnapshotMeta', { keyPath: 'gameId' });
             };
             req.onerror = function() { finish(false, req.error); };
             req.onsuccess = function(e) {
                 var db = e.target.result;
                 db.onversionchange = function() { try { db.close(); } catch(err) {} };
                 try {
-                    if (autosaveDisarmed || !isCurrentSession() || !db.objectStoreNames.contains('gameSnapshots')) {
+                    if (autosaveDisarmed || !isCurrentSession() || !db.objectStoreNames.contains('gameSnapshots') || !db.objectStoreNames.contains('gameSnapshotMeta')) {
                         finish(false);
                         return;
                     }
-                    var tx = db.transaction('gameSnapshots', 'readwrite');
+                    var tx = db.transaction(['gameSnapshots', 'gameSnapshotMeta'], 'readwrite');
                     var store = tx.objectStore('gameSnapshots');
+                    var metaStore = tx.objectStore('gameSnapshotMeta');
                     tx.oncomplete = function() { finish(true); };
                     tx.onerror = function(event) { finish(false, event.target && event.target.error || tx.error); };
                     tx.onabort = function(event) { finish(false, event.target && event.target.error || tx.error); };
+                    var metaGetReq = metaStore.get(targetId);
                     var getReq = store.get(targetId);
                     getReq.onerror = function() { finish(false, getReq.error); };
                     getReq.onsuccess = function() {
@@ -1918,15 +2268,34 @@ function getUniversalAutosaveBridge(gameId, saveSessionId = null) {
                             idbToSave = Object.assign({}, idbToSave || {}, incomingIdb);
                         }
 
+                        var existingMetadata = metaGetReq.result || null;
+                        var indexedDBNames = Array.from(new Set([
+                            ...(Array.isArray(existing && existing.indexedDBNames) ? existing.indexedDBNames : []),
+                            ...(Array.isArray(existingMetadata && existingMetadata.indexedDBNames) ? existingMetadata.indexedDBNames : [])
+                        ]));
                         var savedAt = incomingSavedAt;
                         var record = {
                             gameId: targetId,
                             localStorage: lsToSave,
                             fsData: fsToSave,
                             idbData: idbToSave,
+                            indexedDBNames: indexedDBNames,
                             savedAt: savedAt
                         };
-                        try { store.put(record); } catch(err) { finish(false, err); }
+                        try {
+                            var putReq = store.put(record);
+                            putReq.onsuccess = function() {
+                                var metadata = metaGetReq.result || { gameId: targetId, indexedDBNames: [] };
+                                metadata.indexedDBNames = Array.from(new Set([
+                                    ...(Array.isArray(metadata.indexedDBNames) ? metadata.indexedDBNames : []),
+                                    ...indexedDBNames
+                                ]));
+                                metadata.estimatedBytes = null;
+                                metadata.savedAt = savedAt;
+                                metaStore.put(metadata);
+                            };
+                            putReq.onerror = function() { finish(false, putReq.error); };
+                        } catch(err) { finish(false, err); }
                     };
                 } catch(txErr) { finish(false, txErr); }
             };
@@ -2507,32 +2876,6 @@ async function resolveGameUrl(game) {
     }
 }
 
-function applyGameRunMode(game) {
-    if (!game || isMrMineGame(game) || !game.sourceFile) return game;
-    // Standalone Nexus pages registered as extra stash entries already have
-    // their own local URL and must not be rewritten to the UGS CDN.
-    if (game.nexusKeepLocalUrl) return game;
-
-    const storage = window.nexusStorage || window.localStorage;
-    if (storage.getItem('tb_game_run_mode') !== 'external') return game;
-
-    // Only Game Stash entries carry a sourceFile/sourceKey pair. Leave user-added
-    // URLs and local custom files on their existing launch paths.
-    if (!game.sourceKey && !String(game.id || '').startsWith('stash_')) return game;
-
-    const externalUrl = getVerifiedGameFallbackUrl(game);
-    if (!externalUrl) return game;
-    if (game.type === 'url' && game.url === externalUrl && game.nexusExternalSource) return game;
-
-    return {
-        ...game,
-        type: 'url',
-        url: externalUrl,
-        content: undefined,
-        nexusExternalSource: true
-    };
-}
-
 async function getLaunchSnapshot(gameId) {
     try {
         return await getGameSnapshot(gameId) || {};
@@ -2544,7 +2887,6 @@ async function getLaunchSnapshot(gameId) {
 }
 
 function launchGameFullscreen(game) {
-    game = applyGameRunMode(game);
     if (!game || game.id === "ugs-stash") return;
     const existingWindow = popupGameWindows.get(String(game.id));
     if (existingWindow && !existingWindow.closed) {
@@ -2964,6 +3306,45 @@ function launchGameFullscreen(game) {
                     window.addEventListener('pagehide', notifyGameClosed, { once: true });
 
                     // Standalone IndexedDB snapshot persistence engine for about:blank popup
+                    function recordGameDatabaseUse(data) {
+                        if (!data || !isCurrentSession() || String(data.saveSessionId) !== String(saveSessionId)) return;
+                        var databaseName = String(data.databaseName || '');
+                        if (!databaseName || databaseName.length > 120 || ['GameStorageDB', 'AIChatDB', 'NexusSidebarSettings'].indexOf(databaseName) !== -1) return;
+                        var ids = gameAliases.slice();
+                        if (data.gameId && ids.indexOf(data.gameId) === -1) ids.push(data.gameId);
+                        try {
+                            var req = indexedDB.open('GameStorageDB', 4);
+                            req.onupgradeneeded = function(e) {
+                                var d = e.target.result;
+                                if (!d.objectStoreNames.contains('customGames')) d.createObjectStore('customGames', { keyPath: 'id' });
+                                if (!d.objectStoreNames.contains('gameSnapshots')) d.createObjectStore('gameSnapshots', { keyPath: 'gameId' });
+                                if (!d.objectStoreNames.contains('gameSnapshotMeta')) d.createObjectStore('gameSnapshotMeta', { keyPath: 'gameId' });
+                            };
+                            req.onerror = function() { reportQuotaFailure('indexedDB', req.error); };
+                            req.onsuccess = function(e) {
+                                var database = e.target.result;
+                                database.onversionchange = function() { try { database.close(); } catch(err) {} };
+                                try {
+                                    var tx = database.transaction('gameSnapshotMeta', 'readwrite');
+                                    var store = tx.objectStore('gameSnapshotMeta');
+                                    tx.onerror = function(event) { reportQuotaFailure('indexedDB', event.target && event.target.error || tx.error); };
+                                    tx.onabort = function(event) { reportQuotaFailure('indexedDB', event.target && event.target.error || tx.error); };
+                                    ids.forEach(function(id) {
+                                        if (!id) return;
+                                        var getReq = store.get(id);
+                                        getReq.onsuccess = function() {
+                                            var metadata = getReq.result || { gameId: id, estimatedBytes: null };
+                                            var names = new Set(Array.isArray(metadata.indexedDBNames) ? metadata.indexedDBNames : []);
+                                            names.add(databaseName);
+                                            metadata.indexedDBNames = Array.from(names);
+                                            if (!isFinite(Number(metadata.savedAt))) metadata.savedAt = Date.now();
+                                            store.put(metadata);
+                                        };
+                                    });
+                                } catch(err) { reportQuotaFailure('indexedDB', err); }
+                            };
+                        } catch(err) { reportQuotaFailure('indexedDB', err); }
+                    }
                     function saveToIDB(incomingData) {
                         if (!incomingData || !isCurrentSession() || String(incomingData.saveSessionId) !== String(saveSessionId)) return;
                         var ids = gameAliases.slice();
@@ -2976,11 +3357,12 @@ function launchGameFullscreen(game) {
                         var payloadSavedAt = Number(incomingData.savedAt);
                         var incomingSavedAt = isFinite(payloadSavedAt) && payloadSavedAt > 0 ? payloadSavedAt : Date.now();
                         try {
-                            var req = indexedDB.open("GameStorageDB", 3);
+                            var req = indexedDB.open("GameStorageDB", 4);
                             req.onupgradeneeded = function(e) {
                                 var d = e.target.result;
                                 if (!d.objectStoreNames.contains('customGames')) d.createObjectStore('customGames', { keyPath: 'id' });
                                 if (!d.objectStoreNames.contains('gameSnapshots')) d.createObjectStore('gameSnapshots', { keyPath: 'gameId' });
+                                if (!d.objectStoreNames.contains('gameSnapshotMeta')) d.createObjectStore('gameSnapshotMeta', { keyPath: 'gameId' });
                             };
                             req.onerror = function() { reportQuotaFailure('indexedDB', req.error); };
                             req.onsuccess = function(e) {
@@ -2988,8 +3370,9 @@ function launchGameFullscreen(game) {
                                 db.onversionchange = function() { try { db.close(); } catch(err) {} };
                                 try {
                                     if (!db.objectStoreNames.contains('gameSnapshots')) return;
-                                    var tx = db.transaction('gameSnapshots', 'readwrite');
+                                    var tx = db.transaction(['gameSnapshots', 'gameSnapshotMeta'], 'readwrite');
                                     var store = tx.objectStore('gameSnapshots');
+                                    var metaStore = tx.objectStore('gameSnapshotMeta');
                                     tx.onerror = function(event) { reportQuotaFailure('indexedDB', event.target && event.target.error || tx.error); };
                                     tx.onabort = function(event) { reportQuotaFailure('indexedDB', event.target && event.target.error || tx.error); };
                                     var getReq = store.get(ids[0]);
@@ -3028,7 +3411,19 @@ function launchGameFullscreen(game) {
                                                 idbData: idbToSave,
                                                 savedAt: savedAt
                                             };
-                                            try { store.put(record); } catch(err) { reportQuotaFailure('indexedDB', err); }
+                                            try {
+                                                var putReq = store.put(record);
+                                                putReq.onsuccess = function() {
+                                                    var metaReq = metaStore.get(targetId);
+                                                    metaReq.onsuccess = function() {
+                                                        var metadata = metaReq.result || { gameId: targetId, indexedDBNames: [] };
+                                                        metadata.estimatedBytes = null;
+                                                        metadata.savedAt = savedAt;
+                                                        metaStore.put(metadata);
+                                                    };
+                                                };
+                                                putReq.onerror = function() { reportQuotaFailure('indexedDB', putReq.error); };
+                                            } catch(err) { reportQuotaFailure('indexedDB', err); }
                                         });
                                     };
                                 } catch(txErr) { reportQuotaFailure('indexedDB', txErr); }
@@ -3038,11 +3433,12 @@ function launchGameFullscreen(game) {
 
                     function loadFromIDB(callback) {
                         try {
-                            var req = indexedDB.open("GameStorageDB", 3);
+                            var req = indexedDB.open("GameStorageDB", 4);
                             req.onupgradeneeded = function(e) {
                                 var d = e.target.result;
                                 if (!d.objectStoreNames.contains('customGames')) d.createObjectStore('customGames', { keyPath: 'id' });
                                 if (!d.objectStoreNames.contains('gameSnapshots')) d.createObjectStore('gameSnapshots', { keyPath: 'gameId' });
+                                if (!d.objectStoreNames.contains('gameSnapshotMeta')) d.createObjectStore('gameSnapshotMeta', { keyPath: 'gameId' });
                             };
                             req.onsuccess = function(e) {
                                 var db = e.target.result;
@@ -3097,6 +3493,8 @@ function launchGameFullscreen(game) {
                             try {
                                 if (window.opener && !window.opener.closed) window.opener.postMessage(e.data, '*');
                             } catch(err) {}
+                        } else if (e.data.type === 'nexus-game-database-use' && isCurrentSession() && String(e.data.saveSessionId) === String(saveSessionId)) {
+                            recordGameDatabaseUse(e.data);
                         } else if (e.data.type === 'nexus-game-save' && isCurrentSession() && String(e.data.saveSessionId) === String(saveSessionId)) {
                             saveToIDB(e.data);
                             try {
@@ -3753,8 +4151,6 @@ async function loadGame(game, forceInternal = false, options = {}) {
         if (li) li.classList.remove('new-game');
     }
 
-    game = applyGameRunMode(game);
-
     const localStorage = window.nexusStorage || window.localStorage;
 
     // Launch non-stash game from sidebar straight to new tab in fullscreen
@@ -4016,6 +4412,7 @@ async function deleteGame(id, index) {
     saveGameOrder();
     renderGameList();
     notifyStashBookmarkAvailability();
+    queueStashSidebarPopularitySync();
     // Auto-navigate back to Game Stash after deletion
     const stash = games.find(g => g.id === "ugs-stash");
     if (stash) loadGame(stash);
@@ -4067,6 +4464,7 @@ async function removeSidebarGamesFromSaveManager(gameIds) {
     saveGameOrder();
     renderGameList();
     notifyStashBookmarkAvailability();
+    queueStashSidebarPopularitySync();
 
     if (removedCurrentGame) {
         const fallbackGame = games.find(game => game.id === 'ugs-stash') || games[0];
@@ -4283,6 +4681,34 @@ if (healthBtn) {
     };
 }
 
+function deleteGameIndexedDatabase(databaseName) {
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const timeout = window.setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            reject(new Error(`The game database “${databaseName}” is still open. Close its other game tab or window, then try clearing the save again.`));
+        }, 10000);
+        const finish = error => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeout);
+            if (error) reject(error);
+            else resolve();
+        };
+        try {
+            const request = window.indexedDB.deleteDatabase(databaseName);
+            request.onsuccess = () => finish();
+            request.onerror = () => finish(request.error || new Error(`Could not remove the game database “${databaseName}”.`));
+            // A tracked game connection closes on versionchange. Keep waiting
+            // briefly for that close instead of treating `blocked` as success.
+            request.onblocked = () => {};
+        } catch (error) {
+            finish(error);
+        }
+    });
+}
+
 async function clearGameSaves(gameIds) {
     if (!gameIds || gameIds.length === 0) return;
     await initDB();
@@ -4319,7 +4745,8 @@ async function clearGameSaves(gameIds) {
 
     const matchesSelectedGameId = gameId => {
         const id = String(gameId || '');
-        return allAliases.has(id) || selectedGames.some(game => doesSnapshotBelongToGame({ gameId: id }, game));
+        return Array.from(allAliases).some(alias => String(alias).toLowerCase() === id.toLowerCase()) ||
+            selectedGames.some(game => doesSnapshotBelongToGame({ gameId: id }, game));
     };
 
     // 1. Disarm and wipe only game contexts selected for clearing.
@@ -4350,6 +4777,7 @@ async function clearGameSaves(gameIds) {
     // 2. Discover all snapshots in gameSnapshots belonging to these games
     const keysToRemoveFromLS = new Set();
     const idbDatabasesToWipe = new Set();
+    const idbDatabasesUsedByOtherSaves = new Set();
 
     // Check specific known game candidates
     const isBalatro = Array.from(allAliases).some(id => String(id).toLowerCase().includes('balatro')) || selectedGames.some(g => {
@@ -4361,56 +4789,121 @@ async function clearGameSaves(gameIds) {
     }
 
     const snapshotsToDelete = [];
-    await new Promise(resolve => {
+    const metadataIds = new Set();
+    let hasUnreadableLegacySnapshot = false;
+    const collectDatabaseNames = snap => new Set([
+        ...(Array.isArray(snap && snap.indexedDBNames) ? snap.indexedDBNames : []),
+        ...(snap && snap.idbData && typeof snap.idbData === 'object' ? Object.keys(snap.idbData) : [])
+    ].map(String).filter(name => name && !NEXUS_SHARED_DATABASE_NAMES.has(name)));
+
+    // Ownership metadata is small and can be read without deserializing saves.
+    await new Promise((resolve, reject) => {
         try {
-            const tx = db.transaction('gameSnapshots', 'readonly');
-            const store = tx.objectStore('gameSnapshots');
-            const req = store.openCursor();
-            req.onsuccess = e => {
-                const cursor = e.target.result;
+            const tx = db.transaction(NEXUS_GAME_SNAPSHOT_META_STORE, 'readonly');
+            const req = tx.objectStore(NEXUS_GAME_SNAPSHOT_META_STORE).openCursor();
+            req.onsuccess = event => {
+                const cursor = event.target.result;
                 if (!cursor) return resolve();
-                const snap = cursor.value;
-                const snapKey = String(cursor.key);
-                const matches = selectedGames.some(g => doesSnapshotBelongToGame(snap, g)) ||
-                                allAliases.has(String(snap.gameId)) ||
-                                allAliases.has(snapKey);
-                if (matches) {
+                const gameId = String(cursor.primaryKey || cursor.key || '');
+                metadataIds.add(gameId.toLowerCase());
+                const names = collectDatabaseNames(cursor.value);
+                if (matchesSelectedGameId(gameId)) {
                     snapshotsToDelete.push(cursor.key);
-                    if (snap.localStorage && typeof snap.localStorage === 'object') {
-                        Object.keys(snap.localStorage).forEach(k => {
-                            if (k && !k.startsWith('tb_')) keysToRemoveFromLS.add(k);
-                        });
-                    }
-                    if (snap.idbData && typeof snap.idbData === 'object') {
-                        Object.keys(snap.idbData).forEach(dbN => {
-                            if (dbN && dbN !== 'GameStorageDB') idbDatabasesToWipe.add(dbN);
-                        });
-                    }
+                    names.forEach(name => idbDatabasesToWipe.add(name));
+                } else {
+                    names.forEach(name => idbDatabasesUsedByOtherSaves.add(name));
                 }
                 cursor.continue();
             };
-            req.onerror = () => resolve();
-        } catch (e) {
-            resolve();
+            req.onerror = () => reject(req.error || tx.error || new Error('Could not find the selected game storage.'));
+            tx.onabort = () => reject(tx.error || new Error('Could not find the selected game storage.'));
+        } catch (error) {
+            reject(error);
         }
     });
 
-    // 3. Delete all matching snapshots and alias keys from gameSnapshots
-    await new Promise(resolve => {
+    // Key cursors let us remove a legacy snapshot even if its large value cannot
+    // be cloned. Read only legacy records and selected records, one at a time.
+    await new Promise((resolve, reject) => {
         try {
-            const tx = db.transaction('gameSnapshots', 'readwrite');
+            const tx = db.transaction('gameSnapshots', 'readonly');
             const store = tx.objectStore('gameSnapshots');
+            const req = store.openKeyCursor();
+            req.onsuccess = event => {
+                const cursor = event.target.result;
+                if (!cursor) return resolve();
+                const gameId = String(cursor.primaryKey || cursor.key || '');
+                const matches = matchesSelectedGameId(gameId);
+                const hasMetadata = metadataIds.has(gameId.toLowerCase());
+                if (hasMetadata && !matches) {
+                    cursor.continue();
+                    return;
+                }
+                const valueReq = store.get(cursor.primaryKey);
+                valueReq.onsuccess = () => {
+                    const snap = valueReq.result || {};
+                    const snapshotMatches = matches || selectedGames.some(game => doesSnapshotBelongToGame(snap, game));
+                    const names = collectDatabaseNames(snap);
+                    if (snapshotMatches) {
+                        if (!snapshotsToDelete.some(key => String(key) === String(cursor.primaryKey))) snapshotsToDelete.push(cursor.primaryKey);
+                        if (snap.localStorage && typeof snap.localStorage === 'object') {
+                            Object.keys(snap.localStorage).forEach(key => {
+                                if (key && !key.startsWith('tb_')) keysToRemoveFromLS.add(key);
+                            });
+                        }
+                        names.forEach(name => idbDatabasesToWipe.add(name));
+                    } else {
+                        names.forEach(name => idbDatabasesUsedByOtherSaves.add(name));
+                    }
+                    cursor.continue();
+                };
+                valueReq.onerror = errorEvent => {
+                    errorEvent.preventDefault();
+                    if (matches && !snapshotsToDelete.some(key => String(key) === String(cursor.primaryKey))) {
+                        snapshotsToDelete.push(cursor.primaryKey);
+                    }
+                    if (!hasMetadata) hasUnreadableLegacySnapshot = true;
+                    cursor.continue();
+                };
+            };
+            req.onerror = () => reject(req.error || tx.error || new Error('Could not find the selected game storage.'));
+            tx.onabort = () => reject(tx.error || new Error('Could not find the selected game storage.'));
+        } catch (error) {
+            reject(error);
+        }
+    });
+
+    // A shared database stays intact while any other saved game still claims it.
+    idbDatabasesUsedByOtherSaves.forEach(name => idbDatabasesToWipe.delete(name));
+    // If a legacy save cannot be read, its database ownership is unknown. Keep
+    // game databases in that case so clearing one save cannot erase another.
+    if (hasUnreadableLegacySnapshot) idbDatabasesToWipe.clear();
+
+    // Delete known game databases before removing their ownership records. If
+    // an open game tab blocks deletion, keep the snapshot so the user can retry.
+    for (const dbName of idbDatabasesToWipe) {
+        await deleteGameIndexedDatabase(dbName);
+    }
+
+    // 3. Delete all matching snapshots only after their game databases are gone.
+    await new Promise((resolve, reject) => {
+        try {
+            const tx = db.transaction(['gameSnapshots', NEXUS_GAME_SNAPSHOT_META_STORE], 'readwrite');
+            const store = tx.objectStore('gameSnapshots');
+            const metaStore = tx.objectStore(NEXUS_GAME_SNAPSHOT_META_STORE);
             snapshotsToDelete.forEach(k => {
-                try { store.delete(k); } catch (e) {}
+                store.delete(k);
+                metaStore.delete(k);
             });
             allAliases.forEach(alias => {
-                try { store.delete(alias); } catch (e) {}
+                store.delete(alias);
+                metaStore.delete(alias);
             });
             tx.oncomplete = resolve;
-            tx.onerror = resolve;
-            tx.onabort = resolve;
+            tx.onerror = () => reject(tx.error || new Error('Could not remove the selected game snapshots.'));
+            tx.onabort = () => reject(tx.error || new Error('Could not remove the selected game snapshots.'));
         } catch (e) {
-            resolve();
+            reject(e);
         }
     });
 
@@ -4432,14 +4925,7 @@ async function clearGameSaves(gameIds) {
         });
     } catch (e) {}
 
-    // 6. Delete or clear game-specific IndexedDB databases
-    for (const dbName of idbDatabasesToWipe) {
-        try {
-            window.indexedDB.deleteDatabase(dbName);
-        } catch (e) {}
-    }
-
-    // 7. If currently loaded game in main frame was cleared, wipe iframe local storage and reload fresh
+    // 6. If currently loaded game in main frame was cleared, wipe iframe local storage and reload fresh
     const isCurrentGameCleared = currentGame && matchesSelectedGameId(currentGame.id);
 
     if (isCurrentGameCleared && frame) {
@@ -4457,7 +4943,7 @@ async function clearGameSaves(gameIds) {
         loadGame(currentGame, true);
     }
 
-    // 8. If any popup is open for a cleared game, reload it
+    // 7. If any popup is open for a cleared game, reload it
     activeGameSessions.forEach(session => {
         const win = session.win;
         const gameId = session.gameId;
@@ -4780,14 +5266,17 @@ function showRedConfirmDialog(message, options = {}) {
 let savesStorageEstimateRequest = 0;
 
 const SAVES_STORAGE_LOCAL_LIMIT_BYTES = 5 * 1024 * 1024;
+const SAVES_STORAGE_CHROMIUM_LOCAL_LIMIT_BYTES = 10 * 1024 * 1024;
 const SAVES_STORAGE_YELLOW_AT = 70;
 const SAVES_STORAGE_ORANGE_AT = 85;
 const SAVES_STORAGE_RED_AT = 95;
-const SAVES_STORAGE_FAILURE_KEY = 'tb_nexus_save_quota_failure';
+const SAVES_STORAGE_FAILURE_KEY = 'tb_nexus_save_quota_failure_v2';
+const SAVES_STORAGE_FAILURE_LEGACY_KEY = 'tb_nexus_save_quota_failure';
 const SAVES_STORAGE_FAILURE_MIN_RELEASE_BYTES = 32 * 1024;
 let savesStorageQuotaFailure = false;
 let savesStorageFailureBaseline = null;
 let savesStorageStatus = { tier: 'unknown', pressurePercent: null };
+let savesChromiumStorageEngine = null;
 let savesGamesPageReady = false;
 let savesOrangeWarningShown = false;
 let savesRedWarningShown = false;
@@ -4796,6 +5285,7 @@ let savesManagerOpening = false;
 let savesStorageDebugTier = null;
 
 try {
+    window.sessionStorage.removeItem(SAVES_STORAGE_FAILURE_LEGACY_KEY);
     const savedFailure = JSON.parse(window.sessionStorage.getItem(SAVES_STORAGE_FAILURE_KEY) || 'null');
     if (savedFailure && typeof savedFailure === 'object') {
         savesStorageQuotaFailure = true;
@@ -4816,23 +5306,68 @@ function formatSavesStorageSize(bytes) {
     return `${amount.toFixed(digits)} ${units[unitIndex]}`;
 }
 
+function formatSavesStorageDetailSize(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 0) return 'unavailable';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let amount = bytes;
+    let unitIndex = 0;
+    while (amount >= 1000 && unitIndex < units.length - 1) {
+        amount /= 1000;
+        unitIndex += 1;
+    }
+    return `${amount.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function isSavesChromiumStorageEngine() {
+    if (savesChromiumStorageEngine !== null) return savesChromiumStorageEngine;
+    const brands = window.navigator.userAgentData && Array.isArray(window.navigator.userAgentData.brands)
+        ? window.navigator.userAgentData.brands.map(brand => String(brand.brand || ''))
+        : [];
+    const userAgent = String(window.navigator.userAgent || '');
+    savesChromiumStorageEngine = brands.some(brand => /chromium|chrome|edge|opera/i.test(brand)) ||
+        /(?:Chrome|Chromium|CriOS|Edg|OPR)\//i.test(userAgent);
+    return savesChromiumStorageEngine;
+}
+
+function getSavesLocalStorageCapacityEstimate() {
+    // Chromium currently allows 10 MiB per DOM Storage area. Other browsers
+    // use the conservative 5 MiB Web Storage limit as a fallback estimate.
+    return isSavesChromiumStorageEngine()
+        ? SAVES_STORAGE_CHROMIUM_LOCAL_LIMIT_BYTES
+        : SAVES_STORAGE_LOCAL_LIMIT_BYTES;
+}
+
+function estimateSavesLocalStorageStringBytes(value) {
+    const text = String(value || '');
+    if (!isSavesChromiumStorageEngine()) return text.length * 2;
+    // Chromium stores strings that fit in Latin-1 as single-byte data and
+    // switches the whole string to UTF-16 when it contains a wider character.
+    return /[^\u0000-\u00ff]/.test(text) ? text.length * 2 : text.length;
+}
+
 function updateSavesStorageMeterDescription() {
     const control = document.getElementById('saves-btn');
     if (!control) return;
 
     const status = savesStorageStatus;
     const sourceDescription = status.limitingStore === 'localStorage'
-        ? 'localStorage estimate' : status.limitingStore === 'origin' ? 'whole-origin storage estimate' : 'storage pressure unavailable';
+        ? 'localStorage area estimate' : status.limitingStore === 'origin' ? 'whole-site origin estimate' : 'storage pressure unavailable';
     control.title = `The bar fill and warning tier indicate storage pressure based on the limiting estimate: ${sourceDescription}.`;
     control.setAttribute('aria-label', `Open Save Manager. The bar indicates ${status.tier} storage pressure based on ${sourceDescription}.`);
 }
 
-function isSavesDevModeActive() {
+function readSavesDevModeFlag() {
     try {
         return (window.nexusStorage || window.localStorage).getItem('tb_dev_mode') === 'true';
     } catch (error) {
         return false;
     }
+}
+
+let savesDevModeActive = readSavesDevModeFlag();
+
+function isSavesDevModeActive() {
+    return savesDevModeActive;
 }
 
 function renderSavesStorageMeterStatus(status = savesStorageStatus) {
@@ -4853,9 +5388,40 @@ function renderSavesStorageMeterStatus(status = savesStorageStatus) {
     control.removeAttribute('data-storage-debug-tier');
     updateSavesManagerStorageLock(status.tier);
     updateSavesStorageMeterDescription();
+    updateSavesStorageDevReadout(status);
+}
+
+let savesStorageDevReadout = null;
+
+function updateSavesStorageDevReadout(status = savesStorageStatus) {
+    const control = document.getElementById('saves-btn');
+    const devModeActive = isSavesDevModeActive();
+    if (!control || !devModeActive) {
+        if (savesStorageDevReadout) savesStorageDevReadout.remove();
+        savesStorageDevReadout = null;
+        return;
+    }
+
+    if (!savesStorageDevReadout) {
+        savesStorageDevReadout = document.createElement('span');
+        savesStorageDevReadout.id = 'saves-storage-dev-readout';
+        savesStorageDevReadout.className = 'saves-storage-dev-readout';
+        savesStorageDevReadout.setAttribute('aria-hidden', 'true');
+        control.appendChild(savesStorageDevReadout);
+    }
+
+    const used = Number(status && status.usage);
+    const capacity = Number(status && status.quota);
+    savesStorageDevReadout.textContent = Number.isFinite(used) && used >= 0 && Number.isFinite(capacity) && capacity > 0
+        ? `${formatSavesStorageDetailSize(used)}/${formatSavesStorageDetailSize(capacity)} used`
+        : 'unavailable/unavailable used';
+    savesStorageDevReadout.title = status && status.limitingStore === 'localStorage'
+        ? 'Estimated use and capacity for this site’s localStorage area.'
+        : 'Estimated use and capacity for this site’s browser storage quota.';
 }
 
 function applySavesStorageMeterDebugPreview() {
+    if (!isSavesDevModeActive()) return;
     const control = document.getElementById('saves-btn');
     const fill = document.getElementById('saves-storage-fill');
     const previews = {
@@ -4873,25 +5439,34 @@ function applySavesStorageMeterDebugPreview() {
     fill.style.minWidth = '0';
 }
 
+let savesMeterDebugClickHandler = null;
+
 function updateSavesMeterDebugControls() {
     const overlay = document.getElementById('saves-select-overlay');
     const controls = document.getElementById('saves-meter-debug-controls');
     if (!overlay || !controls) return;
 
-    const isVisible = overlay.style.display === 'flex' && isSavesDevModeActive();
+    const devModeActive = isSavesDevModeActive();
+    const isVisible = overlay.style.display === 'flex' && devModeActive;
     controls.hidden = !isVisible;
+    controls.querySelectorAll('[data-saves-debug-tier]').forEach(button => {
+        button.disabled = !devModeActive;
+    });
 
-    if (!controls.dataset.bound) {
-        controls.addEventListener('click', event => {
+    if (isVisible && !savesMeterDebugClickHandler) {
+        savesMeterDebugClickHandler = event => {
             const button = event.target.closest('[data-saves-debug-tier]');
-            if (!button || controls.hidden || !isSavesDevModeActive()) return;
+            if (!button || controls.hidden) return;
             savesStorageDebugTier = button.dataset.savesDebugTier;
             controls.querySelectorAll('[data-saves-debug-tier]').forEach(item => {
                 item.setAttribute('aria-pressed', String(item === button));
             });
             applySavesStorageMeterDebugPreview();
-        });
-        controls.dataset.bound = 'true';
+        };
+        controls.addEventListener('click', savesMeterDebugClickHandler);
+    } else if (!isVisible && savesMeterDebugClickHandler) {
+        controls.removeEventListener('click', savesMeterDebugClickHandler);
+        savesMeterDebugClickHandler = null;
     }
 
     if (!isVisible) {
@@ -4908,7 +5483,9 @@ function updateSavesMeterDebugControls() {
 
 window.addEventListener('storage', event => {
     if (event.key && event.key !== 'tb_dev_mode') return;
+    savesDevModeActive = event.key === null ? false : event.newValue === 'true';
     updateSavesMeterDebugControls();
+    updateSavesStorageDevReadout();
 });
 
 function getLocalStorageUsageEstimateBytes() {
@@ -4919,8 +5496,7 @@ function getLocalStorageUsageEstimateBytes() {
             const key = nativeStorage.key(index);
             if (key === null) continue;
             const value = nativeStorage.getItem(key) || '';
-            // DOM Storage implementations commonly budget strings as UTF-16.
-            measured += (String(key).length + String(value).length) * 2;
+            measured += estimateSavesLocalStorageStringBytes(key) + estimateSavesLocalStorageStringBytes(value);
         }
         return measured;
     } catch (error) {
@@ -5091,12 +5667,13 @@ async function refreshSavesStorageMeter({ allowQuotaFailureReset = false } = {})
     const localStorageUsage = getLocalStorageUsageEstimateBytes();
 
     const candidates = [];
+    const localStorageQuota = getSavesLocalStorageCapacityEstimate();
     if (localStorageUsage !== null) {
         candidates.push({
             type: 'localStorage',
             usage: localStorageUsage,
-            quota: SAVES_STORAGE_LOCAL_LIMIT_BYTES,
-            percent: localStorageUsage / SAVES_STORAGE_LOCAL_LIMIT_BYTES * 100
+            quota: localStorageQuota,
+            percent: localStorageUsage / localStorageQuota * 100
         });
     }
     if (originUsage !== null && originQuota !== null) {
@@ -5153,6 +5730,7 @@ async function refreshSavesStorageMeter({ allowQuotaFailureReset = false } = {})
         quota: limitingStore ? limitingStore.quota : null,
         limitingStore: limitingStore ? limitingStore.type : null,
         localStorageUsage,
+        localStorageQuota,
         originUsage,
         originQuota,
         quotaFailure: savesStorageQuotaFailure
@@ -5300,6 +5878,9 @@ async function openSavesManager() {
             : "Selected games' saves have been cleared.");
     } catch (error) {
         console.error('The Save Manager could not complete its storage operation.', error);
+        try {
+            await nexusAlert(error && error.message ? error.message : 'The selected game storage could not be cleared.');
+        } catch (alertError) {}
         if (savesStorageStatus.tier === 'red') reopenLockedManager = true;
     } finally {
         savesManagerOpening = false;
