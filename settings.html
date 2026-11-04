@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Settings - Nexus</title>
-    <link rel="stylesheet" href="style.css?v=63">
+    <link rel="stylesheet" href="style.css?v=96">
     <script src="bgm-manager.js?v=65"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
@@ -13,6 +13,7 @@
                 const storage = window.nexusStorage || window.localStorage;
                 const font = storage.getItem('tb_font_choice') || 'google-sans-flex';
                 if (font === 'space-grotesk') document.documentElement.setAttribute('data-font', 'space-grotesk');
+                else if (font === 'phikeqe') document.documentElement.setAttribute('data-font', 'phikeqe');
                 const theme = storage.getItem('tb_theme') || 'dark';
                 if (theme === 'light') document.documentElement.classList.add('light-mode');
                 if (storage.getItem('tb_performance_mode') === 'true') {
@@ -231,6 +232,7 @@
                         <select id="select-font-family" class="custom-select" style="min-width: 170px;">
                             <option value="google-sans-flex">Google Sans Flex</option>
                             <option value="space-grotesk">Space Grotesk</option>
+                            <option value="phikeqe">Phikeqe</option>
                         </select>
                     </div>
                     <div class="setting-row">
@@ -500,6 +502,8 @@
                 localStorage.setItem('tb_font_choice', val);
                 if (val === 'space-grotesk') {
                     document.documentElement.setAttribute('data-font', 'space-grotesk');
+                } else if (val === 'phikeqe') {
+                    document.documentElement.setAttribute('data-font', 'phikeqe');
                 } else {
                     document.documentElement.removeAttribute('data-font');
                 }

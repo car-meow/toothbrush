@@ -6,11 +6,14 @@
     <title>New Tab</title>
     <link rel="icon" id="dynamic-favicon" type="image/png" href="Assets/newtab.png">
     <link rel="shortcut icon" type="image/png" href="Assets/newtab.png">
-    <link rel="stylesheet" href="style.css?v=66">
+    <link rel="stylesheet" href="style.css?v=96">
     <script>
         (function () {
             try {
                 var storage = window.nexusStorage || window.localStorage;
+                var font = storage.getItem('tb_font_choice') || 'google-sans-flex';
+                if (font === 'space-grotesk') document.documentElement.setAttribute('data-font', 'space-grotesk');
+                else if (font === 'phikeqe') document.documentElement.setAttribute('data-font', 'phikeqe');
                 if (storage.getItem('tb_theme') === 'light') document.documentElement.classList.add('light-mode');
             } catch (error) {}
             try {

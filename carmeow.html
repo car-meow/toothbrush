@@ -4,12 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <title>New Tab</title>
-    <link rel="stylesheet" href="style.css?v=71">
+    <link rel="stylesheet" href="style.css?v=96">
     <script src="bgm-manager.js?v=65"></script>
     <script src="nexus-transition.js?v=1"></script>
     <script>
         (function() {
             const localStorage = window.nexusStorage || window.localStorage;
+            const font = localStorage.getItem('tb_font_choice') || 'google-sans-flex';
+            if (font === 'space-grotesk') document.documentElement.setAttribute('data-font', 'space-grotesk');
+            else if (font === 'phikeqe') document.documentElement.setAttribute('data-font', 'phikeqe');
             const theme = localStorage.getItem('tb_theme') || 'dark';
             if (theme === 'light') document.documentElement.classList.add('light-mode');
             if (localStorage.getItem('tb_performance_mode') === 'true') document.documentElement.classList.add('performance-mode');

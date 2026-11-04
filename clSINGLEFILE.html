@@ -4,12 +4,14 @@
 
 <head>
     <title>Nexus Files</title>
-    <link rel="stylesheet" href="style.css?v=95">
+    <link rel="stylesheet" href="style.css?v=96">
     <script>
         (function() {
             const theme = localStorage.getItem('tb_theme') || 'dark';
             if (theme === 'light') document.documentElement.classList.add('light-mode');
-            if (localStorage.getItem('tb_font_choice') === 'space-grotesk') document.documentElement.setAttribute('data-font', 'space-grotesk');
+            const font = localStorage.getItem('tb_font_choice');
+            if (font === 'space-grotesk') document.documentElement.setAttribute('data-font', 'space-grotesk');
+            else if (font === 'phikeqe') document.documentElement.setAttribute('data-font', 'phikeqe');
             if (localStorage.getItem('tb_performance_mode') === 'true') document.documentElement.classList.add('performance-mode');
             else if (localStorage.getItem('tb_performance_mode_lite') === 'true') document.documentElement.classList.add('performance-mode-lite');
             if (localStorage.getItem('tb_dev_mode') === 'true') document.documentElement.classList.add('dev-mode');
@@ -1769,6 +1771,7 @@
             }
             if (e.key === 'tb_font_choice') {
                 if (e.newValue === 'space-grotesk') document.documentElement.setAttribute('data-font', 'space-grotesk');
+                else if (e.newValue === 'phikeqe') document.documentElement.setAttribute('data-font', 'phikeqe');
                 else document.documentElement.removeAttribute('data-font');
             }
             if (e.key === 'tb_dev_mode') {

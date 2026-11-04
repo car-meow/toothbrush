@@ -1,5 +1,5 @@
 // nexus-version: 4.47.12
-const CACHE_NAME = 'nexus-cache-v63';
+const CACHE_NAME = 'nexus-cache-v64';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -26,6 +26,7 @@ const ASSETS_TO_CACHE = [
     './style.css?v=92',
     './style.css?v=93',
     './style.css?v=94',
+    './style.css?v=96',
     './style.css?v=68',
     './style.css?v=69',
     './style.css?v=70',
@@ -51,6 +52,7 @@ const ASSETS_TO_CACHE = [
     './Assets/SpaceGrotesk-Medium.ttf',
     './Assets/SpaceGrotesk-SemiBold.ttf',
     './Assets/SpaceGrotesk-Bold.ttf',
+    './Assets/Phikeqe-Regular.ttf',
     // Assets SVGs
     './Assets/AI.svg',
     './Assets/Active%20Timer.svg',

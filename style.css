@@ -7,6 +7,14 @@
     font-display: swap;
 }
 
+@font-face {
+    font-family: 'Phikeqe';
+    src: url('Assets/Phikeqe-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
 @font-face { font-family: 'Space Grotesk'; src: url('Assets/SpaceGrotesk-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Space Grotesk'; src: url('Assets/SpaceGrotesk-Medium.ttf') format('truetype'); font-weight: 500; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Space Grotesk'; src: url('Assets/SpaceGrotesk-SemiBold.ttf') format('truetype'); font-weight: 600; font-style: normal; font-display: swap; }
@@ -18,6 +26,10 @@
 
 html[data-font="space-grotesk"] {
     --app-font: 'Space Grotesk', sans-serif;
+}
+
+html[data-font="phikeqe"] {
+    --app-font: 'Phikeqe', sans-serif;
 }
 
 * {
