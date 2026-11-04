@@ -15,6 +15,7 @@
         return encodedChunks.join('');
     };
     const un64 = value => Uint8Array.from(atob(value), c => c.charCodeAt(0));
+    const BACKUP_BINARY_CHUNK_BYTES = 48 * 1024;
     async function encode(value) {
         if (value instanceof Blob) return { __nexusBinary: 'Blob', mime: value.type, data: b64(new Uint8Array(await value.arrayBuffer())) };
         if (value instanceof ArrayBuffer) return { __nexusBinary: 'ArrayBuffer', data: b64(new Uint8Array(value)) };
@@ -28,19 +29,152 @@
         if (value && typeof value === 'object') { const out = {}; for (const key of Object.keys(value)) out[key] = await encode(value[key]); return out; }
         return value;
     }
-    function decode(value) {
-        if (Array.isArray(value)) return value.map(decode);
+    function decode(value, references = new Map(), modernTypes = false) {
+        if (Array.isArray(value)) return value.map(item => decode(item, references, modernTypes));
+        if (modernTypes && value && value.__nexusGraph === 'Reference') {
+            const id = String(value.id);
+            if (!references.has(id)) throw new Error('The backup contains an invalid circular reference.');
+            return references.get(id);
+        }
+        if (modernTypes && value && value.__nexusGraph === 'Node') {
+            const id = String(value.id);
+            const nodeValue = value.value;
+            let output;
+            if (value.kind === 'Array') output = [];
+            else if (value.kind === 'Map') output = new Map();
+            else if (value.kind === 'Set') output = new Set();
+            else if (value.kind === 'Object') output = {};
+            else throw new Error('The backup contains an invalid stored value.');
+            references.set(id, output);
+            if (value.kind === 'Array') {
+                (Array.isArray(nodeValue) ? nodeValue : []).forEach(item => output.push(decode(item, references, modernTypes)));
+            } else if (value.kind === 'Map') {
+                (Array.isArray(nodeValue) ? nodeValue : []).forEach(entry => {
+                    if (Array.isArray(entry) && entry.length === 2) output.set(decode(entry[0], references, modernTypes), decode(entry[1], references, modernTypes));
+                });
+            } else if (value.kind === 'Set') {
+                (Array.isArray(nodeValue) ? nodeValue : []).forEach(item => output.add(decode(item, references, modernTypes)));
+            } else if (nodeValue && typeof nodeValue === 'object' && !Array.isArray(nodeValue)) {
+                Object.keys(nodeValue).forEach(key => Object.defineProperty(output, key, {
+                    value: decode(nodeValue[key], references, modernTypes), enumerable: true, writable: true, configurable: true
+                }));
+            }
+            return output;
+        }
         if (value && value.__nexusType === 'Date') return new Date(value.time);
+        if (modernTypes && value && value.__nexusType === 'Undefined') return undefined;
+        if (modernTypes && value && value.__nexusType === 'BigInt') return BigInt(value.value);
+        if (modernTypes && value && value.__nexusType === 'Map') return new Map((value.entries || []).map(([key, entryValue]) => [decode(key, references, modernTypes), decode(entryValue, references, modernTypes)]));
+        if (modernTypes && value && value.__nexusType === 'Set') return new Set((value.values || []).map(item => decode(item, references, modernTypes)));
         if (value && value.__nexusBinary) {
-            const bytes = un64(value.data || '');
+            const encodedChunks = Array.isArray(value.chunks) ? value.chunks : [value.data || ''];
+            const decodedChunks = encodedChunks.map(un64);
+            const length = decodedChunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+            const bytes = new Uint8Array(length);
+            let offset = 0;
+            decodedChunks.forEach(chunk => { bytes.set(chunk, offset); offset += chunk.byteLength; });
             if (value.__nexusBinary === 'Blob') return new Blob([bytes], { type: value.mime || 'application/octet-stream' });
             if (value.__nexusBinary === 'ArrayBuffer') return bytes.buffer;
-            const types = { Uint8Array, Uint8ClampedArray, Uint16Array, Uint32Array, Int8Array, Int16Array, Int32Array, Float32Array, Float64Array };
+            const types = {
+                Uint8Array, Uint8ClampedArray, Uint16Array, Uint32Array,
+                Int8Array, Int16Array, Int32Array, Float32Array, Float64Array,
+                BigInt64Array: global.BigInt64Array,
+                BigUint64Array: global.BigUint64Array
+            };
+            if (value.__nexusBinary === 'DataView') return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
             const Ctor = types[value.__nexusBinary] || Uint8Array;
-            return new Ctor(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / (Ctor.BYTES_PER_ELEMENT || 1)));
+            const elementSize = Ctor.BYTES_PER_ELEMENT || 1;
+            if (bytes.byteLength % elementSize !== 0) throw new Error('The backup contains a binary value with an invalid length.');
+            return new Ctor(bytes.buffer, bytes.byteOffset, bytes.byteLength / elementSize);
         }
-        if (value && typeof value === 'object') { const out = {}; for (const key of Object.keys(value)) out[key] = decode(value[key]); return out; }
+        if (value && typeof value === 'object') {
+            const out = {};
+            for (const key of Object.keys(value)) Object.defineProperty(out, key, {
+                value: decode(value[key], references, modernTypes), enumerable: true, writable: true, configurable: true
+            });
+            return out;
+        }
         return value;
+    }
+    async function writeEncodedJson(value, append, graph = { ids: new WeakMap(), nextId: 1 }) {
+        const write = async text => append(text);
+        const writeBinaryChunks = async (byteLength, getChunk) => {
+            await write('[');
+            let first = true;
+            for (let offset = 0; offset < byteLength; offset += BACKUP_BINARY_CHUNK_BYTES) {
+                const chunk = await getChunk(offset, Math.min(byteLength, offset + BACKUP_BINARY_CHUNK_BYTES));
+                if (!first) await write(',');
+                await write(JSON.stringify(b64(chunk)));
+                first = false;
+            }
+            await write(']');
+        };
+
+        if (value === undefined) return write('{"__nexusType":"Undefined"}');
+        if (typeof value === 'bigint') return write('{"__nexusType":"BigInt","value":' + JSON.stringify(String(value)) + '}');
+        if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+            return write(JSON.stringify(value));
+        }
+        if (value instanceof Date) return write('{"__nexusType":"Date","time":' + JSON.stringify(value.getTime()) + '}');
+        if (typeof Blob === 'function' && value instanceof Blob) {
+            await write('{"__nexusBinary":"Blob","mime":' + JSON.stringify(value.type || '') + ',"chunks":');
+            await writeBinaryChunks(value.size, async (start, end) => new Uint8Array(await value.slice(start, end).arrayBuffer()));
+            return write('}');
+        }
+        if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+            const bytes = value instanceof ArrayBuffer
+                ? new Uint8Array(value)
+                : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+            const binaryType = value instanceof ArrayBuffer ? 'ArrayBuffer' : value.constructor.name;
+            await write('{"__nexusBinary":' + JSON.stringify(binaryType) + ',"chunks":');
+            await writeBinaryChunks(bytes.byteLength, async (start, end) => bytes.subarray(start, end));
+            return write('}');
+        }
+        const existingId = graph.ids.get(value);
+        if (existingId !== undefined) return write('{"__nexusGraph":"Reference","id":' + JSON.stringify(existingId) + '}');
+        const id = graph.nextId++;
+        graph.ids.set(value, id);
+        if (value instanceof Map) {
+            await write('{"__nexusGraph":"Node","id":' + JSON.stringify(id) + ',"kind":"Map","value":[');
+            let first = true;
+            for (const [key, entryValue] of value.entries()) {
+                if (!first) await write(',');
+                await write('[');
+                await writeEncodedJson(key, append, graph);
+                await write(',');
+                await writeEncodedJson(entryValue, append, graph);
+                await write(']');
+                first = false;
+            }
+            return write(']}');
+        }
+        if (value instanceof Set) {
+            await write('{"__nexusGraph":"Node","id":' + JSON.stringify(id) + ',"kind":"Set","value":[');
+            let first = true;
+            for (const entryValue of value.values()) {
+                if (!first) await write(',');
+                await writeEncodedJson(entryValue, append, graph);
+                first = false;
+            }
+            return write(']}');
+        }
+        if (Array.isArray(value)) {
+            await write('{"__nexusGraph":"Node","id":' + JSON.stringify(id) + ',"kind":"Array","value":[');
+            for (let index = 0; index < value.length; index++) {
+                if (index) await write(',');
+                await writeEncodedJson(value[index], append, graph);
+            }
+            return write(']}');
+        }
+        await write('{"__nexusGraph":"Node","id":' + JSON.stringify(id) + ',"kind":"Object","value":{');
+        let first = true;
+        for (const key of Object.keys(value)) {
+            if (!first) await write(',');
+            await write(JSON.stringify(key) + ':');
+            await writeEncodedJson(value[key], append, graph);
+            first = false;
+        }
+        return write('}}');
     }
     function openDB(name) { return new Promise((resolve, reject) => { const req = indexedDB.open(name); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); req.onblocked = () => reject(new Error('A stored database is busy. Close other Nexus tabs and try again.')); }); }
     function deleteDB(name) {
@@ -56,6 +190,56 @@
         const names = new Set([...KNOWN_DBS, ...KNOWN_GAME_DBS]);
         if (indexedDB.databases) try { (await indexedDB.databases()).forEach(db => db.name && names.add(db.name)); } catch (_) {}
         return [...names];
+    }
+    async function readKeyBatch(db, storeName, lastKey, hasLastKey, batchSize = 64) {
+        return new Promise((resolve, reject) => {
+            let tx;
+            try {
+                tx = db.transaction(storeName, 'readonly');
+                const range = hasLastKey ? global.IDBKeyRange.lowerBound(lastKey, true) : undefined;
+                const request = tx.objectStore(storeName).openKeyCursor(range);
+                const keys = [];
+                request.onsuccess = () => {
+                    const cursor = request.result;
+                    if (!cursor || keys.length >= batchSize) return resolve(keys);
+                    keys.push(cursor.primaryKey);
+                    if (keys.length >= batchSize) return resolve(keys);
+                    cursor.continue();
+                };
+                request.onerror = () => reject(request.error || tx.error || new Error('Could not read IndexedDB keys.'));
+                tx.onabort = () => reject(tx.error || new Error('Reading IndexedDB keys was interrupted.'));
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+    async function forEachDatabaseKey(db, storeName, callback) {
+        let hasLastKey = false;
+        let lastKey;
+        while (true) {
+            const keys = await readKeyBatch(db, storeName, lastKey, hasLastKey);
+            if (!keys.length) break;
+            for (const key of keys) await callback(key);
+            lastKey = keys[keys.length - 1];
+            hasLastKey = true;
+        }
+    }
+    async function readDatabaseRecord(db, storeName, key) {
+        return new Promise((resolve, reject) => {
+            let tx;
+            try {
+                tx = db.transaction(storeName, 'readonly');
+                const request = tx.objectStore(storeName).openCursor(key);
+                request.onsuccess = () => {
+                    const cursor = request.result;
+                    resolve(cursor ? { found: true, value: cursor.value } : { found: false });
+                };
+                request.onerror = () => reject(request.error || tx.error || new Error('Could not read an IndexedDB record.'));
+                tx.onabort = () => reject(tx.error || new Error('Reading an IndexedDB record was interrupted.'));
+            } catch (error) {
+                reject(error);
+            }
+        });
     }
     async function readDatabase(name) {
         let db;
@@ -73,38 +257,21 @@
                         return { name: i.name, keyPath: i.keyPath, unique: i.unique, multiEntry: i.multiEntry };
                     })
                 };
-                const keys = await new Promise((res, rej) => {
-                    const request = store.getAllKeys();
-                    request.onsuccess = () => res(request.result);
-                    request.onerror = () => rej(request.error);
-                }).catch(error => {
-                    throw new Error(`Could not read keys from IndexedDB database “${name}”, store “${storeName}”: ${error && error.message || error}`);
-                });
                 const records = [];
-                for (const key of keys) {
+                await forEachDatabaseKey(db, storeName, async key => {
                     // getAll() asks Chromium to clone an entire store in one
                     // operation. A large store can exceed the browser's
                     // serialized-result limit even when each record is valid.
                     // Fetch one value per transaction and encode sequentially
                     // to keep peak memory bounded on low-memory devices.
-                    let value;
+                    let record;
                     try {
-                        value = await new Promise((res, rej) => {
-                        let recordTx;
-                        try {
-                            recordTx = db.transaction(storeName, 'readonly');
-                            const request = recordTx.objectStore(storeName).get(key);
-                            request.onsuccess = () => res(request.result);
-                            request.onerror = () => rej(request.error || recordTx.error);
-                        } catch (error) {
-                            rej(error);
-                        }
-                        });
+                        record = await readDatabaseRecord(db, storeName, key);
                     } catch (error) {
                         throw new Error(`Could not read a value from IndexedDB database “${name}”, store “${storeName}”: ${error && error.message || error}`);
                     }
-                    records.push({ key: await encode(key), value: await encode(value) });
-                }
+                    if (record.found) records.push({ key: await encode(key), value: await encode(record.value) });
+                });
                 result[storeName] = { ...storeInfo, records };
             }
             return result;
@@ -112,17 +279,18 @@
     }
     async function appendDatabaseToBackup(name, append, useComma) {
         let db;
-        try { db = await openDB(name); } catch (_) { return false; }
+        try { db = await openDB(name); } catch (error) {
+            throw new Error(`Could not open IndexedDB database “${name}” for backup: ${error && error.message || error}`);
+        }
         if (db.version === 1 && db.objectStoreNames.length === 0) {
             db.close();
             if (!KNOWN_DBS.includes(name)) await deleteDB(name);
             return false;
         }
         try {
-            append((useComma ? ',' : '') + JSON.stringify(name) + ':{"__version":' + JSON.stringify(db.version));
+            await append((useComma ? ',' : '') + JSON.stringify(name) + ':{"__version":' + JSON.stringify(db.version));
             for (const storeName of Array.from(db.objectStoreNames)) {
-                const tx = db.transaction(storeName, 'readonly');
-                const store = tx.objectStore(storeName);
+                const store = db.transaction(storeName, 'readonly').objectStore(storeName);
                 const storeInfo = {
                     keyPath: store.keyPath,
                     autoIncrement: store.autoIncrement,
@@ -131,42 +299,27 @@
                         return { name: index.name, keyPath: index.keyPath, unique: index.unique, multiEntry: index.multiEntry };
                     })
                 };
-                let keys;
-                try {
-                    keys = await new Promise((resolve, reject) => {
-                        const request = store.getAllKeys();
-                        request.onsuccess = () => resolve(request.result);
-                        request.onerror = () => reject(request.error);
-                    });
-                } catch (error) {
-                    throw new Error(`Could not read keys from IndexedDB database “${name}”, store “${storeName}”: ${error && error.message || error}`);
-                }
                 const storeHeader = JSON.stringify(storeInfo);
-                append(',' + JSON.stringify(storeName) + ':' + storeHeader.slice(0, -1) + ',"records":[');
-                for (let index = 0; index < keys.length; index++) {
-                    const key = keys[index];
-                    let value;
+                await append(',' + JSON.stringify(storeName) + ':' + storeHeader.slice(0, -1) + ',"records":[');
+                let recordIndex = 0;
+                await forEachDatabaseKey(db, storeName, async key => {
+                    let record;
                     try {
-                        value = await new Promise((resolve, reject) => {
-                            let recordTx;
-                            try {
-                                recordTx = db.transaction(storeName, 'readonly');
-                                const request = recordTx.objectStore(storeName).get(key);
-                                request.onsuccess = () => resolve(request.result);
-                                request.onerror = () => reject(request.error || recordTx.error);
-                            } catch (error) {
-                                reject(error);
-                            }
-                        });
+                        record = await readDatabaseRecord(db, storeName, key);
                     } catch (error) {
                         throw new Error(`Could not read a value from IndexedDB database “${name}”, store “${storeName}”: ${error && error.message || error}`);
                     }
-                    const record = JSON.stringify({ key: await encode(key), value: await encode(value) });
-                    append((index ? ',' : '') + record);
-                }
-                append(']}');
+                    if (!record.found) return;
+                    await append((recordIndex ? ',' : '') + '{"key":');
+                    await writeEncodedJson(key, append);
+                    await append(',"value":');
+                    await writeEncodedJson(record.value, append);
+                    await append('}');
+                    recordIndex++;
+                });
+                await append(']}');
             }
-            append('}');
+            await append('}');
             return true;
         } finally { db.close(); }
     }
@@ -176,29 +329,62 @@
         return result;
     }
     async function exportBackup() {
-        storage.setItem('tb_system_backup_flush', String(Date.now()));
-        await new Promise(resolve => setTimeout(resolve, 350));
-        const parts = [];
-        const maxPartLength = 1024 * 1024;
-        let pending = '';
-        const append = value => {
-            const text = String(value);
-            if (pending.length && pending.length + text.length > maxPartLength) {
-                parts.push(pending);
-                pending = '';
+        // Request the file handle during the button's user activation. Waiting
+        // first can make Chrome reject the picker and force a large in-memory
+        // download fallback on low-memory devices.
+        let pickerPromise = null;
+        if (typeof global.showSaveFilePicker === 'function') {
+            try {
+                pickerPromise = global.showSaveFilePicker({
+                    suggestedName: 'nexus_backup.json',
+                    types: [{ description: 'Nexus backup', accept: { 'application/json': ['.json'] } }]
+                }).then(handle => ({ handle }), error => ({ error }));
+            } catch (error) {
+                pickerPromise = Promise.resolve({ error });
             }
-            if (text.length > maxPartLength) parts.push(text);
-            else pending += text;
-        };
-        append('{"format":"nexus-system-backup","version":4,"createdAt":' + JSON.stringify(new Date().toISOString()) + ',"scope":{"type":"system-wide"},"localStorage":' + JSON.stringify(snapshotLocalStorage()) + ',"databases":{');
-        let databaseCount = 0;
-        for (const name of await dbNames()) {
-            if (await appendDatabaseToBackup(name, append, databaseCount > 0)) databaseCount++;
         }
-        append('}}');
-        if (pending) parts.push(pending);
-        const blob = new Blob(parts, { type: 'application/json' }), link = document.createElement('a');
-        link.href = URL.createObjectURL(blob); link.download = 'nexus_backup.json'; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        try { storage.setItem('tb_system_backup_flush', String(Date.now())); } catch (_) {}
+        await new Promise(resolve => setTimeout(resolve, 350));
+        let writable = null;
+        let parts = null;
+        if (pickerPromise) {
+            try {
+                const pickerResult = await pickerPromise;
+                if (pickerResult.error) throw pickerResult.error;
+                const handle = pickerResult.handle;
+                writable = await handle.createWritable();
+            } catch (error) {
+                if (error && error.name === 'AbortError') return;
+                // Browsers may expose the picker but deny it in a particular
+                // context; keep the download fallback available in that case.
+                writable = null;
+            }
+        }
+        if (!writable) parts = [];
+        const append = async value => {
+            const text = String(value);
+            if (writable) await writable.write(text);
+            else parts.push(text);
+        };
+        try {
+            await append('{"format":"nexus-system-backup","version":5,"createdAt":' + JSON.stringify(new Date().toISOString()) + ',"scope":{"type":"system-wide"},"localStorage":' + JSON.stringify(snapshotLocalStorage()) + ',"databases":{');
+            let databaseCount = 0;
+            for (const name of await dbNames()) {
+                if (await appendDatabaseToBackup(name, append, databaseCount > 0)) databaseCount++;
+            }
+            await append('}}');
+            if (writable) {
+                await writable.close();
+                return;
+            }
+            const blob = new Blob(parts, { type: 'application/json' }), link = document.createElement('a');
+            link.href = URL.createObjectURL(blob); link.download = 'nexus_backup.json'; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        } catch (error) {
+            if (writable && typeof writable.abort === 'function') {
+                try { await writable.abort(); } catch (abortError) {}
+            }
+            throw error;
+        }
     }
     function validate(data) {
         if (!data || typeof data !== 'object' || !Number.isInteger(Number(data.version))) throw new Error('This is not a supported Nexus backup.');
@@ -213,7 +399,7 @@
         }
         return system ? 'system' : 'legacy';
     }
-    async function restoreDatabase(name, content) {
+    async function restoreDatabase(name, content, backupVersion = 3) {
         await deleteDB(name);
         const version = Math.max(1, Number(content.__version) || 1);
         const db = await new Promise((resolve, reject) => {
@@ -238,7 +424,7 @@
                 if (storeName === '__version' || !db.objectStoreNames.contains(storeName)) continue;
                 const tx = db.transaction(storeName, 'readwrite'), store = tx.objectStore(storeName);
                 for (const item of (Array.isArray(info) ? info : info.records || [])) {
-                    const val = decode(item && Object.prototype.hasOwnProperty.call(item, 'value') ? item.value : item), key = item && decode(item.key);
+                    const val = decode(item && Object.prototype.hasOwnProperty.call(item, 'value') ? item.value : item, new Map(), backupVersion >= 5), key = item && decode(item.key, new Map(), backupVersion >= 5);
                     if (store.keyPath !== null) store.put(val); else if (key !== undefined) store.put(val, key); else store.put(val);
                 }
                 await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error); });
@@ -249,7 +435,7 @@
         if (kind === 'system') {
             const incoming = new Set(Object.keys(data.databases));
             for (const name of await dbNames()) if (!incoming.has(name)) await deleteDB(name);
-            for (const [name, contents] of Object.entries(data.databases)) await restoreDatabase(name, contents);
+            for (const [name, contents] of Object.entries(data.databases)) await restoreDatabase(name, contents, Number(data.version));
             for (let i = storage.length - 1; i >= 0; i--) { const key = storage.key(i); if ((key.startsWith('tb_') || key.startsWith('sidebar-game-order')) && !SENSITIVE.test(key) && !TRANSIENT.has(key)) storage.removeItem(key); }
             Object.entries(data.localStorage).forEach(([key, value]) => { if ((key.startsWith('tb_') || key.startsWith('sidebar-game-order')) && !SENSITIVE.test(key) && !TRANSIENT.has(key) && typeof value === 'string') storage.setItem(key, value); });
             return;

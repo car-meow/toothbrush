@@ -295,6 +295,22 @@
         }
         .stash-featured-viewport.is-dragging { cursor: grabbing; }
 
+        .stash-featured-empty {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            padding: 0 34px;
+            color: var(--text-color);
+            font-family: var(--app-font, 'Google Sans Flex', sans-serif);
+            font-size: 12px;
+            font-style: italic;
+            opacity: .55;
+            pointer-events: none;
+        }
+
+        .stash-featured-empty[hidden] { display: none; }
+
         .stash-featured-track {
             display: flex;
             align-items: stretch;
@@ -557,7 +573,12 @@
         let popularListRefreshInFlight = false;
         let popularListRefreshQueued = false;
         const FEATURED_LISTS = {
-            curated: { title: 'Curated By Nexus', icon: 'Assets/curated.svg', gameIds: [] },
+            curated: {
+                title: 'Curated By Nexus',
+                icon: 'Assets/curated.svg',
+                gameIds: [],
+                emptyText: 'Oops! Nexus is trying to find some good games... come back later to see the list!'
+            },
             popular: { title: 'What Users are Playing', icon: 'Assets/popular.svg', source: 'popularity' }
         };
         const searchResultsContainer = document.createElement('div');
@@ -776,12 +797,17 @@
 
             const track = document.createElement('div');
             track.className = 'stash-featured-track';
-            viewport.appendChild(track);
+            const emptyMessage = document.createElement('div');
+            emptyMessage.className = 'stash-featured-empty';
+            emptyMessage.textContent = config.emptyText || '';
+            emptyMessage.hidden = !config.emptyText;
+            viewport.append(track, emptyMessage);
             section.append(heading, viewport);
             return {
                 section,
                 viewport,
                 track,
+                emptyMessage,
                 listKey,
                 games: [],
                 originalCards: [],
@@ -836,6 +862,7 @@
             const track = list.track;
             track.replaceChildren();
             list.games = games.slice();
+            if (list.emptyMessage) list.emptyMessage.hidden = games.length > 0 || !list.emptyMessage.textContent;
             list.originalCards = games.map((game, index) => makeFeaturedCard(game, index + 1, list.listKey, list));
             list.originalCards.forEach(card => track.appendChild(card));
             list.offset = 0;

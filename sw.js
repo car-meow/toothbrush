@@ -1,5 +1,5 @@
-// nexus-version: 4.47.5
-const CACHE_NAME = 'nexus-cache-v56';
+// nexus-version: 4.47.6
+const CACHE_NAME = 'nexus-cache-v57';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -41,6 +41,8 @@ const ASSETS_TO_CACHE = [
     './app.js?v=78',
     './app.js?v=79',
     './app.js?v=80',
+    './app.js?v=86',
+    './nexus-backup.js?v=3',
     './bgm-manager.js',
     './game-title-utils.js',
     './tutorial-engine.js',
